@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">ClockDesk</string>
+    <string name="settings_button">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="use_manual_coordinates">Use Manual Coordinates</string>
+    <string name="latitude_label">Latitude</string>
+    <string name="latitude_hint">e.g., 36.72016</string>
+    <string name="longitude_label">Longitude</string>
+    <string name="longitude_hint">e.g., -4.42034</string>
+    <string name="save_button">Save</string>
+    <string name="invalid_coordinates">Invalid coordinates. Latitude must be -90 to 90, longitude -180 to 180.</string>
+    <string name="edit_mode_enabled">Edit mode enabled</string>
+    <string name="edit_mode_disabled">Edit mode disabled</string>
+    <string name="font_changed">Font changed</string>
+</resources>
