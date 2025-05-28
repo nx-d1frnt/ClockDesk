@@ -31,10 +31,13 @@
 
     <TextView
         android:id="@+id/time_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="435dp"
+        android:layout_height="135dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginBottom="16dp"
         android:autoText="false"
         android:fontFamily="@font/kanit_regular"
+        android:includeFontPadding="false"
         android:text="00:00"
         android:textColor="#DEFFFFFF"
         android:textSize="145sp"
@@ -53,4 +56,15 @@
         android:textSize="18sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+    <Button
+        android:id="@+id/debug_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/debug_button"
+        android:textSize="18sp"
+        android:fontFamily="@font/kanit_regular"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginBottom="16dp"
+        android:layout_marginStart="16dp" />
 </androidx.constraintlayout.widget.ConstraintLayout>
