@@ -32,6 +32,8 @@ ClockDesk is an Android app that turns any old device into a beautiful and funct
 
 📦 Download an APK build from releases or clone this repository and build it.
 
+```git clone https://github.com/nx-d1frnt/ClockDesk.git```
+
 ---
 
 ### 🤝 Contributing
