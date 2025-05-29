@@ -37,6 +37,8 @@ ClockDesk is an Android app that turns any old device into a beautiful and funct
 
 📦 APK builds will be provided in the future for easy installation.
 
+---
+
 ### 🤝 Contributing
 Pull requests and issues are welcome!
 I would love to see others contribute to ClockDesk in any of the following ways:
@@ -45,6 +47,8 @@ I would love to see others contribute to ClockDesk in any of the following ways:
 - Designing new themes or UI ideas
 - Translating the interface
 - Testing on different devices
+
+---
 
 ### 📃 License
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
