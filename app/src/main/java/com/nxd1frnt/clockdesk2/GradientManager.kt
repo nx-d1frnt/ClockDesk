@@ -9,7 +9,7 @@ import java.util.*
 
 class GradientManager( private val backgroundLayout: LinearLayout, private val sunTimeApi: SunTimeApi, private val handler: Handler ) {
     private var isDebugMode = false
-    private val debugCycleInterval = 500L // 500ms per 30 minutes
+    private val debugCycleInterval = 5L // 500ms per 30 minutes
     private var simulatedTime: Calendar = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
     private val gradientUpdateRunnable = object : Runnable {
         override fun run() {
@@ -43,7 +43,7 @@ class GradientManager( private val backgroundLayout: LinearLayout, private val s
 
     fun updateGradient() {
         val currentTime = if (isDebugMode) {
-            simulatedTime.add(Calendar.MINUTE, 30)
+            simulatedTime.add(Calendar.MINUTE, 1)
             if (simulatedTime.get(Calendar.HOUR_OF_DAY) >= 24) {
                 simulatedTime.set(Calendar.HOUR_OF_DAY, 0)
                 simulatedTime.set(Calendar.MINUTE, 0)

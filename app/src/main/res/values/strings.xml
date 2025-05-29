@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">ClockDesk</string>
     <string name="settings_button">Settings</string>
-    <string name="debug_button">Debug</string>
+    <string name="demo_button">Demo</string>
     <string name="settings_title">Settings</string>
     <string name="use_manual_coordinates">Use Manual Coordinates</string>
     <string name="latitude_label">Latitude</string>
@@ -13,6 +13,13 @@
     <string name="edit_mode_enabled">Edit mode enabled</string>
     <string name="edit_mode_disabled">Edit mode disabled</string>
     <string name="font_changed">Font changed</string>
-    <string name="debug_mode_enabled">Debug mode enabled</string>
-    <string name="debug_mode_disabled">Debug mode disabled</string>
+    <string name="demo_mode_enabled">Demo mode enabled</string>
+    <string name="demo_mode_disabled">Demo mode disabled</string>
+    <string name="font_size">Size</string>
+    <string name="transparency">Transparency</string>
+    <string name="cancel">Cancel</string>
+    <string name="apply">Apply</string>
+    <string name="customize_time">Customize Time</string>
+    <string name="customize_date">Customize Date</string>
+    <string name="frosted_glass_toggle">Frosted glass</string>
 </resources>

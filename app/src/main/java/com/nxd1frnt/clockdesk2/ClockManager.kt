@@ -8,7 +8,7 @@ import java.util.*
 
 class ClockManager (private val timeText: TextView, private val dateText: TextView, private val handler: Handler, private val debugCallback: (String, String, String) -> Unit ) {
     private var isDebugMode = false
-    private val debugCycleInterval = 500L // 500ms per 30 minutes
+    private val debugCycleInterval = 5L // 500ms per 30 minutes
     private var simulatedTime: Calendar = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
@@ -42,7 +42,7 @@ class ClockManager (private val timeText: TextView, private val dateText: TextVi
 
     private fun updateClock() {
         val currentTime = if (isDebugMode) {
-            simulatedTime.add(Calendar.MINUTE, 30)
+            simulatedTime.add(Calendar.MINUTE, 1)
             if (simulatedTime.get(Calendar.HOUR_OF_DAY) >= 24) {
                 simulatedTime.set(Calendar.HOUR_OF_DAY, 0)
                 simulatedTime.set(Calendar.MINUTE, 0)

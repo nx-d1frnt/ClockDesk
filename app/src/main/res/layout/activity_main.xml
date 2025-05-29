@@ -16,12 +16,11 @@
         app:layout_constraintTop_toTopOf="parent">
 
     </LinearLayout>
-
-    <TextView
+        <TextView
         android:id="@+id/date_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="8dp"
         android:fontFamily="@font/kanit_regular"
         android:text="Tue, May 27"
         android:textColor="#DEFFFFFF"
@@ -31,8 +30,8 @@
 
     <TextView
         android:id="@+id/time_text"
-        android:layout_width="435dp"
-        android:layout_height="135dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginBottom="16dp"
         android:autoText="false"
@@ -57,14 +56,34 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
     <Button
-        android:id="@+id/debug_button"
+        android:id="@+id/demo_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/debug_button"
+        android:text="@string/demo_button"
         android:textSize="18sp"
         android:fontFamily="@font/kanit_regular"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginBottom="16dp"
         android:layout_marginStart="16dp" />
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/bottom_sheet_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <LinearLayout
+            android:id="@+id/bottom_sheet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@android:color/white"
+            app:behavior_peekHeight="0dp"
+            app:behavior_hideable="true"
+            app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+            <include layout="@layout/bottom_sheet_customization" />
+        </LinearLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

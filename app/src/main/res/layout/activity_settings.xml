@@ -4,21 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:id="@+id/background_layout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="@drawable/gradient_background"
-        app:layout_constraintTop_toTopOf="parent" />
-
     <TextView
         android:id="@+id/settings_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/settings_title"
-        android:textSize="32sp"
-        android:textColor="#FFFFFFFF"
+        android:textSize="28sp"
         android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toTopOf="parent"
@@ -30,8 +21,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/use_manual_coordinates"
-        android:textSize="18sp"
-        android:textColor="#FFFFFFFF"
+        android:textSize="16sp"
         android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/settings_title"
@@ -44,7 +34,6 @@
         android:layout_height="wrap_content"
         android:text="@string/latitude_label"
         android:textSize="18sp"
-        android:textColor="#FFFFFFFF"
         android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/manual_coordinates_checkbox"
@@ -58,7 +47,6 @@
         android:hint="@string/latitude_hint"
         android:inputType="numberDecimal|numberSigned"
         android:textSize="18sp"
-        android:textColor="#FFFFFFFF"
         android:fontFamily="@font/kanit_regular"
         app:layout_constraintTop_toBottomOf="@id/latitude_label"
         app:layout_constraintStart_toStartOf="parent"
@@ -70,7 +58,6 @@
         android:layout_height="wrap_content"
         android:text="@string/longitude_label"
         android:textSize="18sp"
-        android:textColor="#FFFFFFFF"
         android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/latitude_edit_text"

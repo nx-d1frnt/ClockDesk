@@ -29,6 +29,7 @@
             android:label="@string/settings_title"
             android:screenOrientation="landscape"
             android:exported="false" />
+
     </application>
 
 </manifest>
