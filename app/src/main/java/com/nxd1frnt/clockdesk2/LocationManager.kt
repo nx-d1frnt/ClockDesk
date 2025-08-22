@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import android.location.LocationManager
+import android.util.Log
 
 class LocationManager(private val context: Context, private val permissionRequestCode: Int) {
     fun loadCoordinates(callback: (Double, Double) -> Unit) {
@@ -22,8 +23,9 @@ class LocationManager(private val context: Context, private val permissionReques
         }
     }
 
-    private fun fetchLocation(callback: (Double, Double) -> Unit) {
+    fun fetchLocation(callback: (Double, Double) -> Unit) {
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.w("LocationManager", "Location permission denied, using fallback: New York")
             callback(40.7128, -74.0060)
             return
         }
@@ -32,11 +34,14 @@ class LocationManager(private val context: Context, private val permissionReques
             val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             if (location != null) {
+                Log.d("LocationManager", "Fetched location: lat=${location.latitude}, lon=${location.longitude}")
                 callback(location.latitude, location.longitude)
             } else {
+                Log.w("LocationManager", "No location available, using fallback: New York")
                 callback(40.7128, -74.0060)
             }
         } catch (e: SecurityException) {
+            Log.e("LocationManager", "Security exception fetching location", e)
             callback(40.7128, -74.0060)
         }
     }

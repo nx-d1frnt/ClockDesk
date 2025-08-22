@@ -1,11 +1,15 @@
 package com.nxd1frnt.clockdesk2
 
 import android.content.Context import android.os.Bundle import android.view.View import android.view.WindowManager import android.widget.Button import android.widget.CheckBox import android.widget.EditText import android.widget.Toast import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 
 class SettingsActivity : AppCompatActivity() {
-    private lateinit var latitudeEditText: EditText
-    private lateinit var longitudeEditText: EditText
-    private lateinit var manualCoordinatesCheckBox: CheckBox
+    private lateinit var latitudeEditText: TextInputEditText
+    private lateinit var longitudeEditText: TextInputEditText
+    private lateinit var manualCoordinatesCheckBox: MaterialSwitch
     private lateinit var saveButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,8 +29,8 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
 
         // Initialize UI
-        latitudeEditText = findViewById(R.id.latitude_edit_text)
-        longitudeEditText = findViewById(R.id.longitude_edit_text)
+        latitudeEditText = findViewById(R.id.latitude_edit)
+        longitudeEditText = findViewById(R.id.longitude_edit)
         manualCoordinatesCheckBox = findViewById(R.id.manual_coordinates_checkbox)
         saveButton = findViewById(R.id.save_button)
 

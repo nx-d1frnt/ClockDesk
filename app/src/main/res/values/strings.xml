@@ -22,4 +22,5 @@
     <string name="customize_time">Customize Time</string>
     <string name="customize_date">Customize Date</string>
     <string name="frosted_glass_toggle">Frosted glass</string>
+    <string name="night_shift">Night shift</string>
 </resources>

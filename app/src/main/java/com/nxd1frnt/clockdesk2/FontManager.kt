@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.util.Log
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
+import java.util.Calendar
+import java.util.Date
 
 class FontManager(private val context: Context, private val timeText: TextView, private val dateText: TextView) {
     private var timeFontIndex = 0
@@ -13,6 +15,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
     private var dateSize = 24f // Default 24sp
     private var timeAlpha = 1.0f
     private var dateAlpha = 1.0f
+    private var isNightShiftEnabled = false
     private val fonts = listOf(
         R.font.anton_regular,
         //R.font.inflatevf,
@@ -48,6 +51,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         dateSize = prefs.getFloat("dateSize", 24f)
         timeAlpha = prefs.getFloat("timeAlpha", 1.0f)
         dateAlpha = prefs.getFloat("dateAlpha", 1.0f)
+        isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         applyTimeFont()
         applyDateFont()
         Log.d("FontManager", "Loaded: timeFont=$timeFontIndex, dateFont=$dateFontIndex, timeSize=$timeSize, dateSize=$dateSize, timeAlpha=$timeAlpha, dateAlpha=$dateAlpha")
@@ -62,9 +66,18 @@ class FontManager(private val context: Context, private val timeText: TextView, 
             putFloat("dateSize", dateSize)
             putFloat("timeAlpha", timeAlpha)
             putFloat("dateAlpha", dateAlpha)
+            putBoolean("nightShiftEnabled", isNightShiftEnabled)
             apply()
         }
     }
+
+    fun setNightShiftEnabled(enabled: Boolean) {
+        isNightShiftEnabled = enabled
+        saveSettings()
+        Log.d("FontManager", "Set nightShiftEnabled=$isNightShiftEnabled")
+    }
+
+    fun isNightShiftEnabled(): Boolean = isNightShiftEnabled
 
     fun setTimeFont(fontId: Int) {
         timeFontIndex = fonts.indexOf(fontId).takeIf { it >= 0 } ?: 0
@@ -120,5 +133,61 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         dateText.typeface = typeface
         dateText.textSize = dateSize
         dateText.alpha = dateAlpha
+    }
+
+    fun applyNightShiftTransition(currentTime: Date, sunTimeApi: SunTimeApi, enabled: Boolean) {
+        if (!enabled) {
+            timeText.setTextColor(Color.WHITE)
+            dateText.setTextColor(Color.WHITE)
+            Log.d("FontManager", "Night shift disabled, set color to white")
+            return
+        }
+
+        // Ensure sun times are valid
+        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunriseTime!! }
+        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunsetTime!! }
+
+        // Define transition periods
+        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
+        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
+        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
+
+        val reddish = Color.rgb(255, 104, 104)
+        val normal = Color.WHITE
+
+        val color = when {
+            currentTime.before(preSunrise) -> {
+                Log.d("FontManager", "Night before pre-sunrise at $currentTime, using reddish")
+                reddish // Full night before sunrise transition
+            }
+            currentTime.before(sunrise) -> {
+                val factor = (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time)
+                Log.d("FontManager", "Transitioning to day at $currentTime, factor=$factor")
+                interpolateColor(reddish, normal, factor) // Transition to day
+            }
+            currentTime.before(postSunset) -> {
+                Log.d("FontManager", "Daytime at $currentTime, using white")
+                normal // Daytime
+            }
+            currentTime.before(fullNight) -> {
+                val factor = (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+                Log.d("FontManager", "Transitioning to night at $currentTime, factor=$factor")
+                interpolateColor(normal, reddish, factor) // Transition to night
+            }
+            else -> {
+                Log.d("FontManager", "Full night at $currentTime, using reddish")
+                reddish // Full night
+            }
+        }
+        timeText.setTextColor(color)
+        dateText.setTextColor(color)
+    }
+
+    private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {
+        val clamped = factor.coerceIn(0f, 1f)
+        val r = Color.red(color1) + ((Color.red(color2) - Color.red(color1)) * clamped).toInt()
+        val g = Color.green(color1) + ((Color.green(color2) - Color.green(color1)) * clamped).toInt()
+        val b = Color.blue(color1) + ((Color.blue(color2) - Color.blue(color1)) * clamped).toInt()
+        return Color.rgb(r, g, b)
     }
 }

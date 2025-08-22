@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sunTimeApi: SunTimeApi
     private var isEditMode = false
     private var isDemoMode = false
+    private var isNightShiftEnabled = false
     private var focusedTextView: TextView? = null
     private val editModeTimeout = 10000L // 10 seconds
     private val animationDuration = 300L // 300ms
@@ -65,7 +66,6 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        // Initialize UI
         timeText = findViewById(R.id.time_text)
         dateText = findViewById(R.id.date_text)
         backgroundLayout = findViewById(R.id.background_layout)
@@ -77,28 +77,32 @@ class MainActivity : AppCompatActivity() {
             state = STATE_HIDDEN
         }
 
-        // Hide buttons initially
         settingsButton.alpha = 0f
         settingsButton.visibility = View.VISIBLE
         debugButton.alpha = 0f
         debugButton.visibility = View.VISIBLE
 
-        // Initialize managers
         fontManager = FontManager(this, timeText, dateText)
         locationManager = LocationManager(this, permissionRequestCode)
         sunTimeApi = SunTimeApi(this, locationManager)
-        gradientManager = GradientManager(backgroundLayout, sunTimeApi, handler)
-        clockManager = ClockManager(timeText, dateText, handler) { time, sunrise, sunset ->
-            if (isDemoMode) {
-//                Toast.makeText(
-//                    this,
-//                    "Time: $time, Sunrise: $sunrise, Sunset: $sunset",
-//                    Toast.LENGTH_SHORT
-//                ).show()
+        gradientManager = GradientManager(backgroundLayout, sunTimeApi, locationManager, handler)
+        clockManager = ClockManager(
+            timeText,
+            dateText,
+            handler,
+            fontManager,
+            sunTimeApi,
+            locationManager,
+            { time, sunrise, sunset ->
+                if (isDemoMode) {
+                    // existing debug callback
+                }
+            },
+            { simulatedTime -> // Add this callback
+                gradientManager.updateSimulatedTime(simulatedTime)
             }
-        }
+        )
 
-        // Load font
         fontManager.loadFont()
 
         // Long tap for edit mode
@@ -176,11 +180,10 @@ class MainActivity : AppCompatActivity() {
         val fontRecyclerView = bottomSheet.findViewById<RecyclerView>(R.id.font_recycler_view)
         val applyButton = bottomSheet.findViewById<TextView>(R.id.apply_button)
         val cancelButton = bottomSheet.findViewById<TextView>(R.id.cancel_button)
-
-        // Set title
+        val nightShiftSwitch = bottomSheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.night_shift_switch)        // Set title
         title.text = if (isTimeText) getString(R.string.customize_time) else getString(R.string.customize_date)
         Log.d("MainActivity", "Showing bottom sheet for ${if (isTimeText) "timeText" else "dateText"}")
-
+        nightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
         // Highlight focused text
         focusedTextView = if (isTimeText) timeText else dateText
         highlightFocusedText(true)
@@ -238,6 +241,12 @@ class MainActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+
+        nightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
+        nightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
+            isNightShiftEnabled = isChecked
+            fontManager.setNightShiftEnabled(isChecked)
+        }
 
         // Buttons
         applyButton.setOnClickListener {
@@ -356,6 +365,13 @@ class MainActivity : AppCompatActivity() {
         locationManager.loadCoordinates { lat, lon ->
             sunTimeApi.fetchSunTimes(lat, lon) {
                 gradientManager.updateGradient()
+                if (isNightShiftEnabled) {
+                    fontManager.applyNightShiftTransition(
+                        clockManager.getCurrentTime(),
+                        sunTimeApi,
+                        isNightShiftEnabled
+                    )
+                }
             }
         }
         if (isEditMode) exitEditMode()

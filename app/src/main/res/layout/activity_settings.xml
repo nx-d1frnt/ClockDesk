@@ -1,30 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-
-    <TextView
-        android:id="@+id/settings_title"
-        android:layout_width="wrap_content"
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/settings_title"
-        android:textSize="28sp"
-        android:fontFamily="@font/kanit_regular"
-        android:layout_marginTop="16dp"
-        app:layout_constraintTop_toTopOf="parent"
+        android:fitsSystemWindows="true"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
 
-    <CheckBox
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:title="@string/settings_title" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/manual_coordinates_checkbox"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/use_manual_coordinates"
         android:textSize="16sp"
-        android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
-        app:layout_constraintTop_toBottomOf="@id/settings_title"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintTop_toBottomOf="@id/appBarLayout"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -34,23 +40,39 @@
         android:layout_height="wrap_content"
         android:text="@string/latitude_label"
         android:textSize="18sp"
-        android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/manual_coordinates_checkbox"
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginStart="16dp" />
 
-    <EditText
+<!--    <EditText-->
+<!--        android:id="@+id/latitude_edit_text"-->
+<!--        android:layout_width="200dp"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:hint="@string/latitude_hint"-->
+<!--        android:inputType="numberDecimal|numberSigned"-->
+<!--        android:textSize="18sp"-->
+<!--        android:fontFamily="@font/kanit_regular"-->
+<!--        app:layout_constraintTop_toBottomOf="@id/latitude_label"-->
+<!--        app:layout_constraintStart_toStartOf="parent"-->
+<!--        app:layout_constraintEnd_toEndOf="parent" />-->
+
+    <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/latitude_edit_text"
-        android:layout_width="200dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
         android:hint="@string/latitude_hint"
-        android:inputType="numberDecimal|numberSigned"
-        android:textSize="18sp"
-        android:fontFamily="@font/kanit_regular"
-        app:layout_constraintTop_toBottomOf="@id/latitude_label"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/latitude_label">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/latitude_edit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned"/>
+    </com.google.android.material.textfield.TextInputLayout>
 
     <TextView
         android:id="@+id/longitude_label"
@@ -58,24 +80,40 @@
         android:layout_height="wrap_content"
         android:text="@string/longitude_label"
         android:textSize="18sp"
-        android:fontFamily="@font/kanit_regular"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/latitude_edit_text"
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginStart="16dp" />
 
-    <EditText
+<!--    <EditText-->
+<!--        android:id="@+id/longitude_edit_text"-->
+<!--        android:layout_width="200dp"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:hint="@string/longitude_hint"-->
+<!--        android:inputType="numberDecimal|numberSigned"-->
+<!--        android:textSize="18sp"-->
+<!--        android:textColor="#FFFFFFFF"-->
+<!--        android:fontFamily="@font/kanit_regular"-->
+<!--        app:layout_constraintTop_toBottomOf="@id/longitude_label"-->
+<!--        app:layout_constraintStart_toStartOf="parent"-->
+<!--        app:layout_constraintEnd_toEndOf="parent" />-->
+
+    <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/longitude_edit_text"
-        android:layout_width="200dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
         android:hint="@string/longitude_hint"
-        android:inputType="numberDecimal|numberSigned"
-        android:textSize="18sp"
-        android:textColor="#FFFFFFFF"
-        android:fontFamily="@font/kanit_regular"
-        app:layout_constraintTop_toBottomOf="@id/longitude_label"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/longitude_label">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/longitude_edit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned"/>
+    </com.google.android.material.textfield.TextInputLayout>
 
     <Button
         android:id="@+id/save_button"
@@ -88,4 +126,6 @@
         app:layout_constraintTop_toBottomOf="@id/longitude_edit_text"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>
