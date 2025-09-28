@@ -13,7 +13,7 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "1.0.2"
-
+        multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -46,6 +46,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.volley)
-    // Glide for image loading
+    implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
 }
