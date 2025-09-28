@@ -11,9 +11,9 @@ ClockDesk is an Android app that turns any old device into a beautiful and funct
 - ⏰ Customizable clock display (font and size)
 - 🌅 Dynamic background that mimics the sky using Sunrise/Sunset API
 - 🎨 Basic UI customization options
+- 🖼️ User-selectable background images
 
 ### 📌 Planned Features:
-- 🖼️ User-selectable background images
 - 🌦️ Weather-aware animated effects for the background (inspired by Android 16 QPR1)
 - ⏲️ Timers and additional widgets
 - ⚙️ Extended customization settings
