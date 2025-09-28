@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/material_dynamic_neutral10"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/backgrounds_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/backgrounds_title"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:paddingBottom="8dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/background_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:paddingBottom="8dp" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/background_blur_switch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/blur_background"
+        android:paddingTop="8dp" android:paddingBottom="8dp" />
+
+    <TextView
+        android:id="@+id/blur_intensity_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/blur_intensity"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp" />
+
+    <SeekBar
+        android:id="@+id/blur_intensity_seekbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="50"
+        android:progress="25" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:paddingTop="12dp">
+
+        <Button
+            android:id="@+id/clear_background_button_bs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/clear_background" />
+
+        <Button
+            android:id="@+id/apply_background_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/apply"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -4,14 +4,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/item_font_card"
-    android:backgroundTint="@color/md_theme_surface"
+    android:background="@color/md_theme_surface"
     android:clickable="true"
     android:focusable="true">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:focusableInTouchMode="true"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -89,7 +92,9 @@
                 android:id="@+id/font_recycler_view"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:nestedScrollingEnabled="false" />
+
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/night_shift_switch"
                 android:layout_width="match_parent"
@@ -98,29 +103,136 @@
                 android:paddingTop="8dp"
                 android:paddingBottom="16dp"
                 android:checked="false" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/alignment"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"/>
+
+            <RadioGroup
+                android:id="@+id/alignment_radio_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="16dp">
+
+                <RadioButton
+                    android:id="@+id/left_radio_button"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:checked="true"
+                    android:text="@string/align_left" />
+
+                <RadioButton
+                    android:id="@+id/center_radio_button"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:text="@string/align_center" />
+
+                <RadioButton
+                    android:id="@+id/right_radio_button"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/align_right" />
+            </RadioGroup>
+
+            <!-- New: Time format selection -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/time_format"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"/>
+
+            <RadioGroup
+                android:id="@+id/time_format_radio_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="16dp">
+
+                <RadioButton
+                    android:id="@+id/time_24_radio"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:text="@string/time_24" />
+
+                <RadioButton
+                    android:id="@+id/time_12_radio"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/time_12" />
+            </RadioGroup>
+
+            <!-- New: Date format selection -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/date_format"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"/>
+
+            <RadioGroup
+                android:id="@+id/date_format_radio_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
+
+                <RadioButton
+                    android:id="@+id/date_format_1"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:text="@string/date_format_short" />
+
+                <RadioButton
+                    android:id="@+id/date_format_2"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/date_format_medium" />
+
+                <RadioButton
+                    android:id="@+id/date_format_3"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/date_format_long" />
+            </RadioGroup>
+
+            <LinearLayout
+                android:layout_width="200dp"
+                android:layout_height="56dp"
+                android:layout_marginLeft="16dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/cancel_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/cancel" />
+
+                <Button
+                    android:id="@+id/apply_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:text="@string/apply" />
+            </LinearLayout>
         </LinearLayout>
-    </ScrollView>
-
-    <LinearLayout
-        android:layout_width="200dp"
-        android:layout_height="56dp"
-        android:layout_marginLeft="16dp"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/cancel_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/cancel" />
-
-        <Button
-            android:id="@+id/apply_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="@string/apply" />
-    </LinearLayout>
-
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

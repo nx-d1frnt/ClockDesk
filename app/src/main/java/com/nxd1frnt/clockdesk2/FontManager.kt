@@ -3,7 +3,9 @@ package com.nxd1frnt.clockdesk2
 import android.content.Context
 import android.graphics.Color
 import android.util.Log
+import android.view.View
 import android.widget.TextView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
 import java.util.Calendar
 import java.util.Date
@@ -16,6 +18,10 @@ class FontManager(private val context: Context, private val timeText: TextView, 
     private var timeAlpha = 1.0f
     private var dateAlpha = 1.0f
     private var isNightShiftEnabled = false
+    private var timeAlignment: Int = timeText.textAlignment
+    private var dateAlignment: Int = dateText.textAlignment
+    private var timeFormatPattern: String = "HH:mm"
+    private var dateFormatPattern: String = "EEE, MMM dd"
     private val fonts = listOf(
         R.font.anton_regular,
         //R.font.inflatevf,
@@ -52,9 +58,15 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         timeAlpha = prefs.getFloat("timeAlpha", 1.0f)
         dateAlpha = prefs.getFloat("dateAlpha", 1.0f)
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
+        // Load alignments, default to current text alignment on views
+        timeAlignment = prefs.getInt("timeAlignment", timeText.textAlignment)
+        dateAlignment = prefs.getInt("dateAlignment", dateText.textAlignment)
+        // Load formats
+        timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"
+        dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
         applyTimeFont()
         applyDateFont()
-        Log.d("FontManager", "Loaded: timeFont=$timeFontIndex, dateFont=$dateFontIndex, timeSize=$timeSize, dateSize=$dateSize, timeAlpha=$timeAlpha, dateAlpha=$dateAlpha")
+        Log.d("FontManager", "Loaded: timeFont=$timeFontIndex, dateFont=$dateFontIndex, timeSize=$timeSize, dateSize=$dateSize, timeAlpha=$timeAlpha, dateAlpha=$dateAlpha, timeAlign=$timeAlignment, dateAlign=$dateAlignment, timeFmt=$timeFormatPattern, dateFmt=$dateFormatPattern")
     }
 
     fun saveSettings() {
@@ -67,6 +79,10 @@ class FontManager(private val context: Context, private val timeText: TextView, 
             putFloat("timeAlpha", timeAlpha)
             putFloat("dateAlpha", dateAlpha)
             putBoolean("nightShiftEnabled", isNightShiftEnabled)
+            putInt("timeAlignment", timeAlignment)
+            putInt("dateAlignment", dateAlignment)
+            putString("timeFormatPattern", timeFormatPattern)
+            putString("dateFormatPattern", dateFormatPattern)
             apply()
         }
     }
@@ -115,17 +131,50 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         Log.d("FontManager", "Set dateAlpha=$dateAlpha")
     }
 
+    fun setTimeAlignment(alignment: Int) {
+        timeAlignment = alignment
+        applyAlignmentToView(timeText, timeAlignment)
+        saveSettings()
+        Log.d("FontManager", "Set timeAlignment=$timeAlignment")
+    }
+
+    fun setDateAlignment(alignment: Int) {
+        dateAlignment = alignment
+        applyAlignmentToView(dateText, dateAlignment)
+        saveSettings()
+        Log.d("FontManager", "Set dateAlignment=$dateAlignment")
+    }
+
+    // Formatting setters/getters
+    fun setTimeFormatPattern(pattern: String) {
+        timeFormatPattern = pattern
+        saveSettings()
+        Log.d("FontManager", "Set timeFormatPattern=$timeFormatPattern")
+    }
+
+    fun setDateFormatPattern(pattern: String) {
+        dateFormatPattern = pattern
+        saveSettings()
+        Log.d("FontManager", "Set dateFormatPattern=$dateFormatPattern")
+    }
+
+    fun getTimeFormatPattern(): String = timeFormatPattern
+    fun getDateFormatPattern(): String = dateFormatPattern
 
     fun getTimeSize(): Float = timeSize
     fun getDateSize(): Float = dateSize
     fun getTimeAlpha(): Float = timeAlpha
     fun getDateAlpha(): Float = dateAlpha
+    fun getTimeAlignment(): Int = timeAlignment
+    fun getDateAlignment(): Int = dateAlignment
 
     private fun applyTimeFont() {
         val typeface = ResourcesCompat.getFont(context, fonts[timeFontIndex])
         timeText.typeface = typeface
         timeText.textSize = timeSize
         timeText.alpha = timeAlpha
+        applyAlignmentToView(timeText, timeAlignment)
+
     }
 
     private fun applyDateFont() {
@@ -133,6 +182,39 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         dateText.typeface = typeface
         dateText.textSize = dateSize
         dateText.alpha = dateAlpha
+        applyAlignmentToView(dateText, dateAlignment)
+    }
+
+    private fun applyAlignmentToView(view: TextView, alignment: Int) {
+        view.textAlignment = alignment
+        // If parent is a ConstraintLayout, update horizontal constraints so left/center/right move the view
+        val lp = view.layoutParams
+        if (lp is ConstraintLayout.LayoutParams) {
+            when (alignment) {
+                View.TEXT_ALIGNMENT_VIEW_START, View.TEXT_ALIGNMENT_TEXT_START -> {
+                    lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    lp.endToEnd = ConstraintLayout.LayoutParams.UNSET
+                    lp.horizontalBias = 0f
+                }
+                View.TEXT_ALIGNMENT_CENTER -> {
+                    lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    lp.horizontalBias = 0.5f
+                }
+                View.TEXT_ALIGNMENT_VIEW_END, View.TEXT_ALIGNMENT_TEXT_END -> {
+                    lp.startToStart = ConstraintLayout.LayoutParams.UNSET
+                    lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+                    lp.horizontalBias = 1f
+                }
+                else -> {
+                    lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+                    lp.endToEnd = ConstraintLayout.LayoutParams.UNSET
+                    lp.horizontalBias = 0f
+                }
+            }
+            view.layoutParams = lp
+            view.requestLayout()
+        }
     }
 
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: SunTimeApi, enabled: Boolean) {

@@ -116,19 +116,23 @@ class ClockManager(
                 simulatedTime.add(Calendar.DAY_OF_MONTH, 1)
                 updateSunTimesForSimulatedDay()
             }
-            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(simulatedTime.time)
+
+            val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
+            val datePattern = fontManager.getDateFormatPattern().ifBlank { "yyyy-MM-dd" }
+
+            val timeStr = SimpleDateFormat(timePattern, Locale.getDefault()).format(simulatedTime.time)
             val sunriseStr = sunTimeApi.sunriseTime?.let {
-                SimpleDateFormat("HH:mm", Locale.getDefault()).format(it)
+                SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
             } ?: "06:00"
             val sunsetStr = sunTimeApi.sunsetTime?.let {
-                SimpleDateFormat("HH:mm", Locale.getDefault()).format(it)
+                SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
             } ?: "20:05"
             debugCallback(timeStr, sunriseStr, sunsetStr)
             Log.d(
                 "DemoMode",
                 "Simulated time: $timeStr, date: ${
                     SimpleDateFormat(
-                        "yyyy-MM-dd",
+                        datePattern,
                         Locale.getDefault()
                     ).format(simulatedTime.time)
                 }"
@@ -140,8 +144,11 @@ class ClockManager(
             checkAndUpdateSunTimesForRealTime(realTime)
             realTime
         }
-        timeText.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(currentTime)
-        dateText.text = SimpleDateFormat("EEE, MMM dd", Locale.getDefault()).format(currentTime)
+        val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
+        val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+
+        timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
+        dateText.text = SimpleDateFormat(datePattern, Locale.getDefault()).format(currentTime)
 
         if (fontManager.isNightShiftEnabled()) {
             fontManager.applyNightShiftTransition(

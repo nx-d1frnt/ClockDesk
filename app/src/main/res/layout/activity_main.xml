@@ -14,6 +14,51 @@
         android:orientation="vertical"
         app:layout_constraintTop_toTopOf="parent">
 
+        <FrameLayout
+            android:id="@+id/background_frame"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ImageView
+                android:id="@+id/background_image_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="@string/thumbnail_desc"
+                android:visibility="gone" />
+
+            <!-- Progress overlay shown while blur is being applied -->
+            <LinearLayout
+                android:id="@+id/background_progress_overlay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_gravity="center"
+                android:visibility="gone"
+                android:padding="12dp"
+                android:background="@android:color/transparent">
+
+                <ProgressBar
+                    android:id="@+id/background_progress_bar"
+                    style="?android:attr/progressBarStyleLarge"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:indeterminate="true" />
+
+                <TextView
+                    android:id="@+id/background_progress_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Applying blur — this may take a few seconds"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp" />
+
+            </LinearLayout>
+
+        </FrameLayout>
+
     </LinearLayout>
         <TextView
         android:id="@+id/date_text"
@@ -21,11 +66,11 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:fontFamily="@font/kanit_regular"
-        android:text="Tue, May 27"
+        android:text="@string/customize_date"
         android:textColor="#DEFFFFFF"
         android:textSize="24sp"
-        app:layout_constraintBottom_toTopOf="@+id/time_text"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/time_text"/>
 
     <TextView
         android:id="@+id/time_text"
@@ -33,7 +78,6 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginBottom="16dp"
-        android:autoText="false"
         android:fontFamily="@font/kanit_regular"
         android:includeFontPadding="false"
         android:text="00:00"
@@ -42,7 +86,6 @@
         app:autoSizeTextType="none"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
-
     <Button
         android:id="@+id/settings_button"
         android:layout_width="wrap_content"
@@ -64,23 +107,48 @@
         android:layout_marginBottom="16dp"
         android:layout_marginStart="16dp" />
 
+    <!-- New: open background customizations -->
+    <Button
+        android:id="@+id/background_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/backgrounds_title"
+        android:textSize="18sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/demo_button"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="16dp" />
+
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/bottom_sheet_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:background="@android:color/transparent"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <LinearLayout
             android:id="@+id/bottom_sheet"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
+             android:orientation="vertical"
+             android:background="@android:color/white"
+             app:behavior_peekHeight="0dp"
+             app:behavior_hideable="true"
+             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+             <include layout="@layout/bottom_sheet_customization" />
+         </LinearLayout>
+
+        <!-- Backgrounds bottom sheet (separate) -->
+        <LinearLayout
+            android:id="@+id/background_bottom_sheet"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:orientation="vertical"
             android:background="@android:color/white"
             app:behavior_peekHeight="0dp"
             app:behavior_hideable="true"
             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
-            <include layout="@layout/bottom_sheet_customization" />
+            <include layout="@layout/bottom_sheet_backgrounds" />
         </LinearLayout>
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+     </androidx.coordinatorlayout.widget.CoordinatorLayout>
+ </androidx.constraintlayout.widget.ConstraintLayout>

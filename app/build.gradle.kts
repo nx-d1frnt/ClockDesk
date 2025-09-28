@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.nxd1frnt.clockdesk2"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nxd1frnt.clockdesk2"
         minSdk = 19
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -46,4 +46,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.volley)
+    // Glide for image loading
+    implementation("com.github.bumptech.glide:glide:4.15.1")
 }

@@ -1,16 +1,27 @@
 package com.nxd1frnt.clockdesk2
 
-import android.content.Context import android.os.Bundle import android.view.View import android.view.WindowManager import android.widget.Button import android.widget.CheckBox import android.widget.EditText import android.widget.Toast import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.button.MaterialButton
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.view.View
+import android.view.WindowManager
+import android.widget.Button
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.textfield.TextInputLayout
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var latitudeEditText: TextInputEditText
     private lateinit var longitudeEditText: TextInputEditText
     private lateinit var manualCoordinatesCheckBox: MaterialSwitch
     private lateinit var saveButton: Button
+    private lateinit var chooseBackgroundButton: Button
+    private lateinit var clearBackgroundButton: Button
+
+    private val PICK_IMAGE_REQUEST = 200
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +44,8 @@ class SettingsActivity : AppCompatActivity() {
         longitudeEditText = findViewById(R.id.longitude_edit)
         manualCoordinatesCheckBox = findViewById(R.id.manual_coordinates_checkbox)
         saveButton = findViewById(R.id.save_button)
+        chooseBackgroundButton = findViewById(R.id.choose_background_button)
+        clearBackgroundButton = findViewById(R.id.clear_background_button)
 
         // Load saved preferences
         val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
@@ -48,6 +61,38 @@ class SettingsActivity : AppCompatActivity() {
         // Enable/disable EditText based on CheckBox
         manualCoordinatesCheckBox.setOnCheckedChangeListener { _, isChecked ->
             updateEditTextState()
+        }
+
+        // Choose background button -> open document picker for images
+        chooseBackgroundButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+            }
+            startActivityForResult(intent, PICK_IMAGE_REQUEST)
+        }
+
+        // Clear saved background
+        clearBackgroundButton.setOnClickListener {
+            val savedUriStr = prefs.getString("background_uri", null)
+            if (savedUriStr != null) {
+                try {
+                    val uri = Uri.parse(savedUriStr)
+                    // release persistable permission if we previously took it
+                    try {
+                        contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e: Exception) {
+                        // ignore if not permitted
+                    }
+                } catch (e: Exception) {
+                    // ignore
+                }
+                // Remove the current background selection but keep list of saved backgrounds
+                prefs.edit().remove("background_uri").apply()
+                Toast.makeText(this, getString(R.string.clear_background_toast), Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, getString(R.string.no_background_to_clear), Toast.LENGTH_SHORT).show()
+            }
         }
 
         // Save settings and finish
@@ -79,6 +124,28 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
             finish()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK) {
+            val uri = data?.data ?: return
+            // Persist permission
+            try {
+                // Persist read permission for the chosen URI.
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {
+                // ignore if cannot persist
+            }
+            // Save URI string to prefs as the current background and add to saved list
+            val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("background_uri", uri.toString()).apply()
+            // also add to the set of available backgrounds
+            val existing = prefs.getStringSet("background_uris", emptySet())?.toMutableSet() ?: mutableSetOf()
+            existing.add(uri.toString())
+            prefs.edit().putStringSet("background_uris", existing).apply()
+            Toast.makeText(this, getString(R.string.background_saved_toast), Toast.LENGTH_SHORT).show()
         }
     }
 

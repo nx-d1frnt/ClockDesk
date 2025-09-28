@@ -23,4 +23,33 @@
     <string name="customize_date">Customize Date</string>
     <string name="frosted_glass_toggle">Frosted glass</string>
     <string name="night_shift">Night shift</string>
+    <string name="alignment">Alignment</string>
+    <string name="align_left">Left</string>
+    <string name="align_center">Center</string>
+    <string name="align_right">Right</string>
+    <!-- New strings for format options -->
+    <string name="time_format">Time format</string>
+    <string name="time_24">24-hour</string>
+    <string name="time_12">12-hour</string>
+    <string name="date_format">Date format</string>
+    <string name="date_format_short">MMM dd</string>
+    <string name="date_format_medium">EEE, MMM dd</string>
+    <string name="date_format_long">EEEE, MMMM dd, yyyy</string>
+
+    <!-- New strings for background selection -->
+    <string name="choose_background">Choose background</string>
+    <string name="clear_background">Clear background</string>
+    <string name="background_saved_toast">Background saved</string>
+    <string name="clear_background_toast">Background cleared</string>
+    <string name="no_background_to_clear">No custom background to clear</string>
+    <string name="failed_to_load_background">Failed to load background image</string>
+    <string name="backgrounds_title">Backgrounds</string>
+    <string name="blur_background">Blur background</string>
+    <string name="default_size_value">48sp</string>
+    <string name="thumbnail_desc">Background thumbnail</string>
+    <string name="background_image">Background image</string>
+    <string name="blur_intensity">Blur intensity</string>
+    <string name="size_value_format">%ssp</string>
+    <string name="blur_applying_message">Applying blur - this may take a few seconds</string>
+    <string name="loading_background_message">Loading background - please wait</string>
 </resources>
