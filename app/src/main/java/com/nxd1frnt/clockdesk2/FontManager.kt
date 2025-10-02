@@ -13,7 +13,7 @@ import java.util.Date
 class FontManager(private val context: Context, private val timeText: TextView, private val dateText: TextView) {
     private var timeFontIndex = 0
     private var dateFontIndex = 0
-    private var timeSize = 48f // Default 48sp
+    private var timeSize = 78f // Default 48sp
     private var dateSize = 24f // Default 24sp
     private var timeAlpha = 1.0f
     private var dateAlpha = 1.0f

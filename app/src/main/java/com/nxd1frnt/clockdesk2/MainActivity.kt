@@ -23,8 +23,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
+import android.graphics.PorterDuff
+import android.graphics.Color
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
+import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -36,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
     private lateinit var backgroundButton: Button
+    private lateinit var backgroundcustomizationfab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var bottomSheet: LinearLayout
     private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
@@ -67,6 +74,7 @@ class MainActivity : AppCompatActivity() {
     private var backgroundsAdapter: BackgroundsAdapter? = null
     private lateinit var backgroundProgressOverlay: View
     private lateinit var backgroundProgressText: TextView
+    private lateinit var backgroundManager: BackgroundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,13 +101,15 @@ class MainActivity : AppCompatActivity() {
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
         backgroundButton = findViewById(R.id.background_button)
+        backgroundcustomizationfab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
         bottomSheet = findViewById(R.id.bottom_sheet)
+        // main bottom sheet behavior
         bottomSheetBehavior = from(bottomSheet).apply {
             state = STATE_HIDDEN
         }
 
-        // Background bottom sheet setup
+        // background-specific bottom sheet (used for picking backgrounds)
         val backgroundBottomSheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         backgroundBottomSheetBehavior = from(backgroundBottomSheet).apply {
             state = STATE_HIDDEN
@@ -110,8 +120,10 @@ class MainActivity : AppCompatActivity() {
         settingsButton.visibility = View.GONE
         debugButton.alpha = 0f
         debugButton.visibility = View.GONE
-        backgroundButton.alpha = 0f
-        backgroundButton.visibility = View.GONE
+//        backgroundButton.alpha = 0f
+//        backgroundButton.visibility = View.GONE
+        backgroundcustomizationfab.alpha = 0f
+        backgroundcustomizationfab.visibility = View.GONE
 
         fontManager = FontManager(this, timeText, dateText)
         locationManager = LocationManager(this, permissionRequestCode)
@@ -129,15 +141,40 @@ class MainActivity : AppCompatActivity() {
                     Log.d("MainActivity", "debug sun times callback (demo mode)")
                 }
             },
-            { simulatedTime -> // Add this callback
-                gradientManager.updateSimulatedTime(simulatedTime)
+            { currentTime -> // onTimeChanged callback (called in both real and demo)
+                // Update gradient manager's simulated time handling
+                try {
+                    gradientManager.updateSimulatedTime(currentTime)
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Failed to update gradient simulated time: ${e.message}")
+                }
+
+                // If a custom image background is visible and dim mode is dynamic, recompute/apply dimming
+                try {
+                    if (backgroundImageView.visibility == View.VISIBLE) {
+                        val mode = backgroundManager.getDimMode()
+                        if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
+                            setBackgroundDimming(mode, backgroundManager.getDimIntensity())
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Failed to update dynamic dimming: ${e.message}")
+                }
             }
         )
 
         fontManager.loadFont()
 
-        // Load any saved custom background image from prefs (if set)
-        loadSavedBackground()
+        // Background prefs manager
+        backgroundManager = BackgroundManager(this)
+
+         // Load any saved custom background image from prefs (if set)
+         loadSavedBackground()
+
+         // Ensure dim is applied if image already set
+         val dimModeInit = backgroundManager.getDimMode()
+         val dimIntensity = backgroundManager.getDimIntensity()
+         if (dimModeInit != BackgroundManager.DIM_MODE_OFF) setBackgroundDimming(dimModeInit, dimIntensity)
 
         // Long tap for edit mode
         mainLayout.setOnLongClickListener {
@@ -166,8 +203,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Background button behaves like settings: exit edit mode and open backgrounds sheet
-        backgroundButton.setOnClickListener {
+      //  backgroundButton.setOnClickListener {
+       //     showBackgroundBottomSheet()
+      //  }
+
+        backgroundcustomizationfab.setOnClickListener {
             showBackgroundBottomSheet()
+            highlightImageView(true)
+            if (!isDemoMode) {
+                handler.removeCallbacks(editModeTimeoutRunnable)
+                handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
+            }
         }
 
         // Debug mode toggle
@@ -181,12 +227,11 @@ class MainActivity : AppCompatActivity() {
                 // Stop any gradient updates that the demo toggle might have started
                 gradientManager.stopUpdates()
                 // Re-apply the saved image so it overwrites any gradient that may have been set
-                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-                val uriStr = prefs.getString("background_uri", null)
+                val uriStr = backgroundManager.getSavedBackgroundUri()
                 uriStr?.let {
                     try {
                         val uri = Uri.parse(it)
-                        applyImageBackground(uri, prefs.getInt("background_blur_intensity", 0))
+                        applyImageBackground(uri, backgroundManager.getBlurIntensity())
                     } catch (e: Exception) {
                         Log.w("MainActivity", "Failed to reapply custom background: ${e.message}")
                     }
@@ -207,7 +252,8 @@ class MainActivity : AppCompatActivity() {
         // Load coordinates and sun times
         locationManager.loadCoordinates { lat, lon ->
             sunTimeApi.fetchSunTimes(lat, lon) {
-                gradientManager.updateGradient()
+                // Only update the gradient if no custom image background is active
+                if (!hasCustomImageBackground) gradientManager.updateGradient()
             }
         }
 
@@ -227,27 +273,25 @@ class MainActivity : AppCompatActivity() {
                 // ignore if cannot persist
             }
             val uriStr = uri.toString()
-            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-            val existing = prefs.getStringSet("background_uris", emptySet())?.toMutableSet() ?: mutableSetOf()
-            existing.add(uriStr)
-            prefs.edit().putStringSet("background_uris", existing).apply()
-            // update adapter list (include default and add)
-            val items = mutableListOf<String>()
-            items.add("__DEFAULT_GRADIENT__")
-            items.addAll(existing)
-            items.add("__ADD__")
-            backgroundsAdapter?.updateItems(items)
-            // preview and set preview selection
-            previewBackgroundUri = uriStr
-            applyImageBackground(uri, prefs.getInt("background_blur_intensity", 0))
-        }
-    }
+            // Persist the uri using BackgroundManager
+            backgroundManager.addSavedUri(uriStr)
+             // update adapter list (include default and add)
+             val items = mutableListOf<String>().apply {
+                add("__DEFAULT_GRADIENT__")
+                addAll(backgroundManager.getSavedUriSet())
+                add("__ADD__")
+             }
+             backgroundsAdapter?.updateItems(items)
+             // preview and set preview selection
+             previewBackgroundUri = uriStr
+            applyImageBackground(uri, backgroundManager.getBlurIntensity())
+         }
+     }
 
-    // Load saved background URI from preferences and apply it if present
-    private fun loadSavedBackground() {
-        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-        val uriStr = prefs.getString("background_uri", null)
-        val blurIntensity = prefs.getInt("background_blur_intensity", 0)
+     // Load saved background URI from preferences and apply it if present
+     private fun loadSavedBackground() {
+        val uriStr = backgroundManager.getSavedBackgroundUri()
+        val blurIntensity = backgroundManager.getBlurIntensity()
         if (uriStr != null) {
             try {
                 val uri = Uri.parse(uriStr)
@@ -259,8 +303,10 @@ class MainActivity : AppCompatActivity() {
                 applyImageBackground(uri, blurIntensity)
                 hasCustomImageBackground = true
                 Log.d("MainActivity", "Loaded custom background: $uriStr (blurIntensity=$blurIntensity)")
+                // Apply saved dimming settings
+                setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
             } catch (e: Exception) {
-                prefs.edit().remove("background_uri").apply()
+                backgroundManager.setSavedBackgroundUri(null)
                 hasCustomImageBackground = false
                 Log.w("MainActivity", "Failed to load saved background: ${e.message}")
             }
@@ -270,7 +316,7 @@ class MainActivity : AppCompatActivity() {
             hasCustomImageBackground = false
             gradientManager.startUpdates()
         }
-    }
+     }
 
     // Apply image background using Glide into the ImageView; blurIntensity > 0 enables blur with that radius
     private fun applyImageBackground(uri: Uri, blurIntensity: Int = 0) {
@@ -285,19 +331,34 @@ class MainActivity : AppCompatActivity() {
             // On modern Android, prefer RenderEffect for high-quality blur on the ImageView layer
             val usePlatformBlur = blurIntensity > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
 
-            val req = if (usePlatformBlur) {
+            // Determine a reasonable target size to avoid loading very large bitmaps into memory.
+            val metrics = resources.displayMetrics
+            val screenW = metrics.widthPixels
+            val screenH = metrics.heightPixels
+            // Limit to a sensible cap (e.g. 1080p) to prevent massive bitmaps on very high-res photos
+            val maxDim = 1080
+            val targetW = minOf(screenW, maxDim)
+            val targetH = minOf(screenH, maxDim)
+
+            val req = RequestOptions()
+                .transform(CenterCrop())
+                .override(targetW, targetH)
+                .downsample(DownsampleStrategy.CENTER_INSIDE)
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+
+            val finalReq = if (usePlatformBlur) {
                 // don't pre-blur bitmaps; let the view's RenderEffect handle it
-                RequestOptions().transform(CenterCrop())
+                req
             } else if (blurIntensity > 0) {
-                // older devices: apply our BlurTransformation on the bitmap
-                RequestOptions().transform(CenterCrop(), BlurTransformation(blurIntensity))
+                // older devices: apply our BlurTransformation on the bitmap (Glide will run this off-main-thread)
+                req.transform(CenterCrop(), BlurTransformation(blurIntensity))
             } else {
-                RequestOptions().transform(CenterCrop())
+                req
             }
 
             Glide.with(this)
                 .load(uri)
-                .apply(req)
+                .apply(finalReq)
                 .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
                     override fun onResourceReady(resource: android.graphics.drawable.Drawable, transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?) {
                         // Hide progress overlay (work is done)
@@ -321,7 +382,11 @@ class MainActivity : AppCompatActivity() {
 
                         // Make sure ImageView is visible over the gradient
                         backgroundImageView.visibility = View.VISIBLE
-                    }
+
+                        // Apply saved dimming prefs after the image is set
+                        // Apply dim from BackgroundManager
+                        setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
+                     }
 
                     override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
                         // Hide any overlay when load cleared
@@ -340,6 +405,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setBackgroundDimming(mode: Int, intensity: Int) {
+         runOnUiThread {
+             try {
+                // mode: BackgroundManager.DIM_MODE_OFF/CONTINUOUS/DYNAMIC
+                if (mode == BackgroundManager.DIM_MODE_OFF || intensity <= 0) {
+                    backgroundImageView.clearColorFilter()
+                    backgroundImageView.alpha = 1.0f
+                    return@runOnUiThread
+                }
+
+                // Determine effective intensity. For dynamic mode, compute based on current time + sun times.
+                val effectiveIntensity = if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
+                    try {
+                        backgroundManager.computeEffectiveDimIntensity(clockManager.getCurrentTime(), sunTimeApi)
+                    } catch (e: Exception) {
+                        // fallback to user intensity if computation fails
+                        intensity.coerceIn(0, 50)
+                    }
+                } else {
+                    // continuous mode: always use user intensity
+                    intensity.coerceIn(0, 50)
+                }
+
+                val clamped = effectiveIntensity.coerceIn(0, 50)
+                val maxAlpha = 0.8f
+                val alpha = (clamped / 50f) * maxAlpha
+                 val zoom = 1.0f + (clamped / 50f) * 0.2f // up to 15% zoom
+                 backgroundImageView.scaleX = zoom
+                 backgroundImageView.scaleY= zoom
+                val alphaInt = (alpha * 255).toInt().coerceIn(0, 255)
+                val overlayColor = Color.argb(alphaInt, 0, 0, 0)
+                // Use SRC_OVER to darken the image
+                backgroundImageView.setColorFilter(overlayColor, PorterDuff.Mode.SRC_OVER)
+             } catch (e: Exception) {
+                 Log.w("MainActivity", "setBackgroundDimming failed: ${e.message}")
+             }
+         }
+     }
+
     private fun setBackgroundProgressVisible(visible: Boolean, message: String? = null) {
         runOnUiThread {
             backgroundProgressOverlay.visibility = if (visible) View.VISIBLE else View.GONE
@@ -353,15 +457,17 @@ class MainActivity : AppCompatActivity() {
         val recycler = sheet.findViewById<RecyclerView>(R.id.background_recycler_view)
         val blurSwitch = sheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.background_blur_switch)
         val blurSeek = sheet.findViewById<SeekBar>(R.id.blur_intensity_seekbar)
+        //val dimSwitch = sheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.background_dim_switch)
+        val dimtogglegroup = sheet.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group)
+        val dimSeek = sheet.findViewById<SeekBar>(R.id.dimming_intensity_seekbar)
         val clearBtn = sheet.findViewById<Button>(R.id.clear_background_button_bs)
         val applyBtn = sheet.findViewById<Button>(R.id.apply_background_button)
 
-        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val prefs = backgroundManager // alias for readability
         // Build items: default gradient, saved URIs, add-item
-        val saved = prefs.getStringSet("background_uris", emptySet())?.toMutableSet() ?: mutableSetOf()
         val items = mutableListOf<String>().apply {
             add("__DEFAULT_GRADIENT__")
-            addAll(saved)
+            addAll(prefs.getSavedUriSet())
             add("__ADD__")
         }
 
@@ -393,18 +499,19 @@ class MainActivity : AppCompatActivity() {
                         try {
                             val uri = Uri.parse(id)
                             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            val intensity = prefs.getInt("background_blur_intensity", 0)
-                            // Stop gradient updates immediately for preview
-                            gradientManager.stopUpdates()
-                            applyImageBackground(uri, intensity)
-                            previewBackgroundUri = id
+                            val intensity = prefs.getBlurIntensity()
+                             // Stop gradient updates immediately for preview
+                             gradientManager.stopUpdates()
+                             applyImageBackground(uri, intensity)
+                             previewBackgroundUri = id
                         } catch (e: Exception) {
-                            Log.w("MainActivity", "preview background failed: ${e.message}")
+
                         }
                     }
                  }
              }
             recycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+            recycler.isNestedScrollingEnabled = false
             recycler.adapter = backgroundsAdapter
         } else {
             // Update existing adapter items
@@ -414,8 +521,19 @@ class MainActivity : AppCompatActivity() {
         recycler.scrollToPosition(0)
 
         // initialize UI states (default no blur)
-        blurSeek.progress = prefs.getInt("background_blur_intensity", 0)
+        blurSeek.progress = prefs.getBlurIntensity()
         blurSwitch.isChecked = blurSeek.progress > 0
+
+        // initialize dimming UI from saved global prefs
+        val dimMode = prefs.getDimMode()
+        val dimIntensity = prefs.getDimIntensity()
+        when (dimMode) {
+            BackgroundManager.DIM_MODE_OFF -> dimtogglegroup.check(R.id.off_button)
+            BackgroundManager.DIM_MODE_CONTINUOUS -> dimtogglegroup.check(R.id.continuous_button)
+            BackgroundManager.DIM_MODE_DYNAMIC -> dimtogglegroup.check(R.id.dynamic_button)
+            else -> dimtogglegroup.check(R.id.off_button)
+        }
+        dimSeek.progress = dimIntensity
 
         blurSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (!isChecked) {
@@ -435,9 +553,64 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
+//        dimSwitch.setOnCheckedChangeListener { _, isChecked ->
+//            if (!isChecked) {
+//                dimSeek.progress = 0
+//            } else if (dimSeek.progress == 0) {
+//                dimSeek.progress = 25
+//            }
+//            // preview change immediately if an image is visible
+//            if (backgroundImageView.visibility == View.VISIBLE) {
+//                setBackgroundDimming(isChecked, dimSeek.progress)
+//            }
+//        }
+        dimtogglegroup.addOnButtonCheckedListener { group, checkedId, isChecked ->
+             if (!isChecked) {
+                 // Prevent unchecking all buttons: revert to previous state
+                 if (group.checkedButtonId == View.NO_ID) {
+                     group.check(checkedId)
+                 }
+                 return@addOnButtonCheckedListener
+             }
+            // Map the checked button to a dim mode
+            val previewMode = when (checkedId) {
+                R.id.off_button -> BackgroundManager.DIM_MODE_OFF
+                R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
+                R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
+                else -> BackgroundManager.DIM_MODE_OFF
+            }
+            // If user selected off, clear seek progress preview
+            if (previewMode == BackgroundManager.DIM_MODE_OFF) dimSeek.progress = 0
+
+            // preview change immediately if an image is visible
+            if (backgroundImageView.visibility == View.VISIBLE) {
+                setBackgroundDimming(previewMode, dimSeek.progress)
+            }
+         }
+
+         dimSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                 if (!fromUser) return
+                // preview change using currently selected toggle mode
+                val checkedId = dimtogglegroup.checkedButtonId
+                val previewMode = when (checkedId) {
+                    R.id.off_button -> BackgroundManager.DIM_MODE_OFF
+                    R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
+                    R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
+                    else -> BackgroundManager.DIM_MODE_OFF
+                }
+                if (backgroundImageView.visibility == View.VISIBLE) {
+                    setBackgroundDimming(previewMode, progress)
+                }
+             }
+
+             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+         })
+
         clearBtn.setOnClickListener {
             // Clear persisted background selection
-            prefs.edit().remove("background_uri").apply()
+            backgroundManager.setSavedBackgroundUri(null)
             previewBackgroundUri = null
             hasCustomImageBackground = false
             // hide image view and show gradient
@@ -446,6 +619,8 @@ class MainActivity : AppCompatActivity() {
                 try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
             }
             backgroundImageView.visibility = View.GONE
+            // clear dim prefs when switching to gradient
+            backgroundManager.clearDim()
             gradientManager.startUpdates()
             backgroundBottomSheetBehavior.state = STATE_HIDDEN
         }
@@ -453,45 +628,59 @@ class MainActivity : AppCompatActivity() {
         applyBtn.setOnClickListener {
             // Persist the currently previewed background (if any)
             val intensity = blurSeek.progress
-            prefs.edit().putInt("background_blur_intensity", intensity).apply()
-
-            when (previewBackgroundUri) {
-                "__DEFAULT_GRADIENT__" -> {
-                    // user chose the default gradient: remove any persisted custom uri
-                    prefs.edit().remove("background_uri").apply()
-                    hasCustomImageBackground = false
-                    backgroundImageView.visibility = View.GONE
-                    gradientManager.startUpdates()
-                }
-                null -> {
-                    // nothing new previewed; keep existing selection
-                    val existing = prefs.getString("background_uri", null)
-                    existing?.let {
-                        try {
-                            applyImageBackground(Uri.parse(it), intensity)
-                            hasCustomImageBackground = true
-                        } catch (e: Exception) {
-                            Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
-                        }
-                    }
-                }
-                else -> {
-                    // persist selected image uri and apply it
-                    prefs.edit().putString("background_uri", previewBackgroundUri).apply()
-                    try {
-                        applyImageBackground(Uri.parse(previewBackgroundUri), intensity)
-                        hasCustomImageBackground = true
-                    } catch (e: Exception) {
-                        Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
-                    }
-                }
+            backgroundManager.setBlurIntensity(intensity)
+            // Persist dim mode/intensity using toggle group
+            val checkedId = dimtogglegroup.checkedButtonId
+            val modeToSave = when (checkedId) {
+                R.id.off_button -> BackgroundManager.DIM_MODE_OFF
+                R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
+                R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
+                else -> BackgroundManager.DIM_MODE_OFF
             }
+            backgroundManager.setDimMode(modeToSave)
+            backgroundManager.setDimIntensity(dimSeek.progress)
 
-            previewBackgroundUri = null
-            backgroundBottomSheetBehavior.state = STATE_HIDDEN
-        }
+               when (previewBackgroundUri) {
+                  "__DEFAULT_GRADIENT__" -> {
+                      // user chose the default gradient: remove any persisted custom uri
+                    backgroundManager.setSavedBackgroundUri(null)
+                      hasCustomImageBackground = false
+                      backgroundImageView.visibility = View.GONE
+                      gradientManager.startUpdates()
+                  }
+                  null -> {
+                      // nothing new previewed; keep existing selection
+                    val existing = backgroundManager.getSavedBackgroundUri()
+                     existing?.let {
+                         try {
+                            applyImageBackground(Uri.parse(it), intensity)
+                             hasCustomImageBackground = true
+                             // Ensure dim applied
+                            setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
+                         } catch (e: Exception) {
+                             Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
+                         }
+                     }
+                 }
+                 else -> {
+                     // persist selected image uri and apply it
+                    backgroundManager.setSavedBackgroundUri(previewBackgroundUri)
+                      try {
+                          applyImageBackground(Uri.parse(previewBackgroundUri), intensity)
+                          hasCustomImageBackground = true
+                          // Ensure dim applied after persist
+                         setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
+                      } catch (e: Exception) {
+                          Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
+                      }
+                 }
+             }
 
-        backgroundBottomSheetBehavior.state = STATE_EXPANDED
+             previewBackgroundUri = null
+             backgroundBottomSheetBehavior.state = STATE_HIDDEN
+         }
+
+         backgroundBottomSheetBehavior.state = STATE_EXPANDED
     }
 
     private fun setupBottomSheet() {
@@ -504,6 +693,26 @@ class MainActivity : AppCompatActivity() {
         bottomSheetBehavior.isHideable = true
         // Allow dragging the bottom sheet (ensures NestedScrollView can pass drag gestures)
         bottomSheetBehavior.isDraggable = true
+        bottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == STATE_HIDDEN) {
+                    // Reuse existing cleanup path
+                    hideBottomSheet()
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+        })
+        backgroundBottomSheetBehavior.peekHeight = 0
+        backgroundBottomSheetBehavior.isHideable = true
+        backgroundBottomSheetBehavior.isDraggable = true
+        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (newState == STATE_HIDDEN) {
+                    highlightImageView(false)
+                }
+            }
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+        })
     }
 
     private fun showCustomizationBottomSheet(isTimeText: Boolean) {
@@ -521,7 +730,7 @@ class MainActivity : AppCompatActivity() {
         val fontRecyclerView = bottomSheet.findViewById<RecyclerView>(R.id.font_recycler_view)
         val applyButton = bottomSheet.findViewById<Button>(R.id.apply_button)
         val cancelButton = bottomSheet.findViewById<Button>(R.id.cancel_button)
-        val alignmentGroup = bottomSheet.findViewById<RadioGroup>(R.id.alignment_radio_group)
+        val alignmentGroup = bottomSheet.findViewById<MaterialButtonToggleGroup>(R.id.alignment_toggle_group)
         val nightShiftSwitch = bottomSheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.night_shift_switch)
         val timeFormatGroup = bottomSheet.findViewById<RadioGroup>(R.id.time_format_radio_group)
         val dateFormatGroup = bottomSheet.findViewById<RadioGroup>(R.id.date_format_radio_group)
@@ -551,7 +760,7 @@ class MainActivity : AppCompatActivity() {
         // --- Ensure old listeners won't react to our programmatic changes ---
         sizeSeekBar.setOnSeekBarChangeListener(null)
         transparencySeekBar.setOnSeekBarChangeListener(null)
-        alignmentGroup.setOnCheckedChangeListener(null)
+        alignmentGroup.clearOnButtonCheckedListeners()
         timeFormatGroup.setOnCheckedChangeListener(null)
         dateFormatGroup.setOnCheckedChangeListener(null)
 
@@ -616,10 +825,10 @@ class MainActivity : AppCompatActivity() {
         // Initialize alignment radio buttons to current alignment (avoid triggering listener by clearing it first)
         val currentAlignment = if (targetIsTime) fontManager.getTimeAlignment() else fontManager.getDateAlignment()
         when (currentAlignment) {
-            View.TEXT_ALIGNMENT_VIEW_START, View.TEXT_ALIGNMENT_TEXT_START -> alignmentGroup.check(R.id.left_radio_button)
-            View.TEXT_ALIGNMENT_CENTER -> alignmentGroup.check(R.id.center_radio_button)
-            View.TEXT_ALIGNMENT_VIEW_END, View.TEXT_ALIGNMENT_TEXT_END -> alignmentGroup.check(R.id.right_radio_button)
-            else -> alignmentGroup.check(R.id.left_radio_button)
+            View.TEXT_ALIGNMENT_VIEW_START, View.TEXT_ALIGNMENT_TEXT_START -> alignmentGroup.check(R.id.left_button)
+            View.TEXT_ALIGNMENT_CENTER -> alignmentGroup.check(R.id.center_button)
+            View.TEXT_ALIGNMENT_VIEW_END, View.TEXT_ALIGNMENT_TEXT_END -> alignmentGroup.check(R.id.right_button)
+            else -> alignmentGroup.check(R.id.left_button)
         }
 
         // Initialize time format radio buttons from FontManager
@@ -648,14 +857,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Now attach listener so only user interactions trigger alignment updates
-        alignmentGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (isBottomSheetInitializing) return@setOnCheckedChangeListener
+        alignmentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isBottomSheetInitializing) return@addOnButtonCheckedListener
+            if (!isChecked) return@addOnButtonCheckedListener
             val checkedView = alignmentGroup.findViewById<View>(checkedId)
-            if (checkedView == null || !checkedView.isPressed) return@setOnCheckedChangeListener
+            if (checkedView == null || !checkedView.isPressed) return@addOnButtonCheckedListener
             val alignment = when (checkedId) {
-                R.id.left_radio_button -> View.TEXT_ALIGNMENT_VIEW_START
-                R.id.center_radio_button -> View.TEXT_ALIGNMENT_CENTER
-                R.id.right_radio_button -> View.TEXT_ALIGNMENT_VIEW_END
+                R.id.left_button -> View.TEXT_ALIGNMENT_VIEW_START
+                R.id.center_button -> View.TEXT_ALIGNMENT_CENTER
+                R.id.right_button -> View.TEXT_ALIGNMENT_VIEW_END
                 else -> View.TEXT_ALIGNMENT_VIEW_START
             }
             val active = bottomSheet.getTag(R.id.customization_title) as? String
@@ -751,6 +961,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun highlightImageView(isHighlighted: Boolean) {
+        if (isHighlighted) {
+            backgroundImageView.animate()
+                .scaleX(1.1f)
+                .scaleY(1.1f)
+                .setDuration(animationDuration)
+                .start()
+            //backgroundImageView.setBackgroundResource(R.drawable.editable_border)
+        } else {
+            backgroundImageView.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(animationDuration)
+                .start()
+           // if (!isEditMode) backgroundImageView.background = null
+        }
+    }
+
 
 //    private fun showCustomizationDialog(isTimeText: Boolean) {
 //        val dialog = CustomizationDialog(fontManager, isTimeText) {
@@ -778,7 +1006,8 @@ class MainActivity : AppCompatActivity() {
         if (isEditMode) {
             settingsButton.visibility = View.VISIBLE
             debugButton.visibility = View.VISIBLE
-            backgroundButton.visibility = View.VISIBLE
+           // backgroundButton.visibility = View.VISIBLE
+            backgroundcustomizationfab.visibility = View.VISIBLE
             mainLayout.animate()
                 .scaleX(0.90f)
                 .scaleY(0.90f)
@@ -793,10 +1022,15 @@ class MainActivity : AppCompatActivity() {
                 .alpha(1f)
                 .setDuration(animationDuration)
                 .start()
-            backgroundButton.animate()
+            //backgroundButton.animate()
+            //    .alpha(1f)
+           //     .setDuration(animationDuration)
+            //    .start()
+            backgroundcustomizationfab.animate()
                 .alpha(1f)
                 .setDuration(animationDuration)
                 .start()
+
             timeText.setBackgroundResource(R.drawable.editable_border)
             dateText.setBackgroundResource(R.drawable.editable_border)
             //Toast.makeText(this, R.string.edit_mode_enabled, Toast.LENGTH_SHORT).show()
@@ -825,7 +1059,11 @@ class MainActivity : AppCompatActivity() {
             .alpha(0f)
             .setDuration(animationDuration)
             .start()
-        backgroundButton.animate()
+        //backgroundButton.animate()
+        //    .alpha(0f)
+         //   .setDuration(animationDuration)
+         //   .start()
+        backgroundcustomizationfab.animate()
             .alpha(0f)
             .setDuration(animationDuration)
             .start()
@@ -833,7 +1071,8 @@ class MainActivity : AppCompatActivity() {
         dateText.background = null
         settingsButton.visibility = View.GONE
         debugButton.visibility = View.GONE
-        backgroundButton.visibility = View.GONE
+       // backgroundButton.visibility = View.GONE
+        backgroundcustomizationfab.visibility = View.GONE
         handler.removeCallbacks(editModeTimeoutRunnable)
         //Toast.makeText(this, R.string.edit_mode_disabled, Toast.LENGTH_SHORT).show()
     }
@@ -842,7 +1081,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         locationManager.loadCoordinates { lat, lon ->
             sunTimeApi.fetchSunTimes(lat, lon) {
-                gradientManager.updateGradient()
+                if (!hasCustomImageBackground) gradientManager.updateGradient()
                 if (isNightShiftEnabled) {
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
@@ -850,17 +1089,21 @@ class MainActivity : AppCompatActivity() {
                         isNightShiftEnabled
                     )
                 }
-            }
-        }
-        if (isEditMode) exitEditMode()
-        if (isDemoMode) {
+                // Recompute dynamic dimming on resume in case sun times changed
+                if (backgroundImageView.visibility == View.VISIBLE) {
+                    setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
+                }
+             }
+         }
+         if (isEditMode) exitEditMode()
+         if (isDemoMode) {
             isDemoMode = false
             clockManager.toggleDebugMode(false)
             gradientManager.toggleDebugMode(false)
-        }
-        // reload background in case user changed it in Settings
-        loadSavedBackground()
-        startUpdates()
+         }
+         // reload background in case user changed it in Settings
+         loadSavedBackground()
+         startUpdates()
     }
 
     override fun onPause() {
@@ -876,7 +1119,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         locationManager.onRequestPermissionsResult(requestCode, grantResults) { lat, lon ->
             sunTimeApi.fetchSunTimes(lat, lon) {
-                gradientManager.updateGradient()
+                if (!hasCustomImageBackground) gradientManager.updateGradient()
             }
         }
     }

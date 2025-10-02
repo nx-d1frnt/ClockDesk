@@ -52,4 +52,12 @@
     <string name="size_value_format">%ssp</string>
     <string name="blur_applying_message">Applying blur - this may take a few seconds</string>
     <string name="loading_background_message">Loading background - please wait</string>
+    <string name="edit_customization">Customize background</string>
+    <string name="dimming_intensity">Dimming intensity</string>
+    <string name="dim_background">Dim background</string>
+    <string name="dim_toggle">Background dimming</string>
+    <string name="dimming_off">Off</string>
+    <string name="dimming_continuous">Continuous</string>
+    <string name="dimming_dynamic">Dynamic</string>
+    <string name="background_zoom">Background zoom</string>
 </resources>

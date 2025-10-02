@@ -137,12 +137,17 @@ class ClockManager(
                     ).format(simulatedTime.time)
                 }"
             )
-            onTimeChanged(simulatedTime.time)
             simulatedTime.time
         } else {
             val realTime = Calendar.getInstance().time
             checkAndUpdateSunTimesForRealTime(realTime)
             realTime
+        }
+        // Always notify listener about the current time (so UI like gradients/dimming can react), for both debug and real time.
+        try {
+            onTimeChanged(currentTime)
+        } catch (e: Exception) {
+            Log.w("ClockManager", "onTimeChanged callback failed: ${e.message}")
         }
         val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
         val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }

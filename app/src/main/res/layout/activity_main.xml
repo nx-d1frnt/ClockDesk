@@ -107,7 +107,6 @@
         android:layout_marginBottom="16dp"
         android:layout_marginStart="16dp" />
 
-    <!-- New: open background customizations -->
     <Button
         android:id="@+id/background_button"
         android:layout_width="wrap_content"
@@ -116,8 +115,24 @@
         android:textSize="18sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toEndOf="@id/demo_button"
+        android:visibility="gone"
         android:layout_marginStart="12dp"
         android:layout_marginBottom="16dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/background_customization_fab"
+        style="@style/ThemeOverlay.Material3.FloatingActionButton.Primary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="24dp"
+        android:contentDescription="@string/edit_customization"
+        android:visibility="gone"
+        app:fabSize="mini"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@drawable/image_edit_outline"
+        tools:visibility="visible" />
 
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/bottom_sheet_container"

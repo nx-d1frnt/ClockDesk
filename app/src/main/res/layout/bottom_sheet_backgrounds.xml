@@ -1,10 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/material_dynamic_neutral10"
-    android:padding="16dp">
+    style="@style/Widget.Material3.BottomSheet.Modal">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:id="@+id/drag_handle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:focusableInTouchMode="true"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp"
+            android:orientation="vertical">
 
     <TextView
         android:id="@+id/backgrounds_title"
@@ -42,6 +61,74 @@
         android:layout_height="wrap_content"
         android:max="50"
         android:progress="25" />
+<!--            <com.google.android.material.materialswitch.MaterialSwitch-->
+<!--                android:id="@+id/background_dim_switch"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:text="@string/dim_background"-->
+<!--                android:paddingTop="8dp" android:paddingBottom="8dp" />-->
+            <TextView
+                android:id="@+id/dim_toggle_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/dim_toggle"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/dimming_toggle_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="16dp"
+                android:paddingTop="8dp"
+                app:singleSelection="true">
+
+                <Button
+                    android:id="@+id/off_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:checked="true"
+                    android:text="@string/dimming_off"/>                    />
+
+                <Button
+                    android:id="@+id/continuous_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:text="@string/dimming_continuous"/>
+
+                <Button
+                    android:id="@+id/dynamic_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/dimming_dynamic" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+            <TextView
+                android:id="@+id/dimming_intensity_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/dimming_intensity"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp" />
+
+            <SeekBar
+                android:id="@+id/dimming_intensity_seekbar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="50"
+                android:progress="25" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/background_zoom_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/background_zoom"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -63,5 +150,6 @@
             android:text="@string/apply"
             android:layout_marginStart="8dp" />
     </LinearLayout>
-
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

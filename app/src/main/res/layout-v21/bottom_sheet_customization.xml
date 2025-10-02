@@ -3,10 +3,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:background="@color/md_theme_surface"
+    style="@style/Widget.Material3.BottomSheet.Modal"
     android:clickable="true"
     android:focusable="true">
+
+    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+        android:id="@+id/drag_handle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -74,11 +81,11 @@
 
                 <SeekBar
                     android:id="@+id/transparency_seekbar"
-                    style="@style/Widget.Material3.Slider"
+                    style="@style/Widget.AppCompat.SeekBar"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_gravity="center_vertical"/>
+                    android:layout_gravity="center_vertical"
+                    android:layout_weight="1" />
 
                 <View
                     android:id="@+id/transparency_preview"
@@ -111,37 +118,40 @@
                 android:textSize="16sp"
                 android:paddingBottom="8dp"/>
 
-            <RadioGroup
-                android:id="@+id/alignment_radio_group"
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/alignment_toggle_group"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingBottom="16dp">
+                android:paddingBottom="16dp"
+                app:singleSelection="true">
 
-                <RadioButton
-                    android:id="@+id/left_radio_button"
-                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                <Button
+                    android:id="@+id/left_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:checked="true"
-                    android:text="@string/align_left" />
+                    android:text="@string/align_left"
+                    android:icon="@drawable/align_horizontal_left"/>
 
-                <RadioButton
-                    android:id="@+id/center_radio_button"
-                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                <Button
+                    android:id="@+id/center_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
-                    android:text="@string/align_center" />
+                    android:text="@string/align_center"
+                    android:icon="@drawable/align_horizontal_center"/>
 
-                <RadioButton
-                    android:id="@+id/right_radio_button"
-                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                <Button
+                    android:id="@+id/right_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/align_right" />
-            </RadioGroup>
+                    android:text="@string/align_right"
+                    android:icon="@drawable/align_horizontal_right"/>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <!-- New: Time format selection -->
             <TextView
