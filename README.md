@@ -1,8 +1,12 @@
+![Alt text](app/src/main/res/mipmap-hdpi/ic_launcher_round.webp)
+
 # ClockDesk
 
 **ClockDesk — a second life for your old smartphone as a stylish desk clock.**
 
 ClockDesk is an Android app that turns any old device into a beautiful and functional desk clock. Perfect for bedside tables, work desks, or your kitchen counter.
+
+![Alt text](screenshots/Clockdesk_Screenshot-landscape.png)
 
 ---
 
