@@ -5,9 +5,10 @@
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:background="@color/md_theme_surface"
+    android:background="@drawable/main_activity_bg"
     style="@style/Widget.Material3.BottomSheet.Modal"
     android:clickable="true"
+    app:behavior_hideable="true"
     android:focusable="true">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
@@ -155,6 +156,7 @@
 
             <!-- New: Time format selection -->
             <TextView
+                android:id="@+id/time_format_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/time_format"
@@ -186,6 +188,7 @@
 
             <!-- New: Date format selection -->
             <TextView
+                android:id="@+id/date_format_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/date_format"

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/tutorial_overlay_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#C5000000"
+    android:visibility="gone"
+    android:clickable="true"
+    android:focusable="true">
+    <ImageView
+    android:id="@+id/tutorial_finger_icon"
+    android:layout_width="80dp"
+    android:layout_height="80dp"
+    android:src="@drawable/cursor_pointer"
+    android:rotation="-10"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toTopOf="parent"
+    android:alpha="0.0" />
+    <TextView
+    android:id="@+id/tutorial_text"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="32dp"
+    android:layout_marginEnd="32dp"
+    android:layout_marginBottom="64dp"
+    android:alpha="0.0"
+    android:gravity="center"
+    android:text="Welcome to ClockDesk!\nLet's take a quick tour."
+    android:textColor="@android:color/white"
+    android:textSize="22sp"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

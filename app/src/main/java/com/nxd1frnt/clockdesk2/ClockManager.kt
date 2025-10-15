@@ -38,6 +38,18 @@ class ClockManager(
         return if (isDebugMode) simulatedTime.time else Calendar.getInstance().time
     }
 
+    fun updateTimeText() {
+        val currentTime = getCurrentTime()
+        val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
+        timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
+    }
+
+    fun updateDateText() {
+        val currentTime = getCurrentTime()
+        val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+        dateText.text = SimpleDateFormat(datePattern, Locale.getDefault()).format(currentTime)
+    }
+
     fun startUpdates() {
         handler.removeCallbacks(clockUpdateRunnable)
         handler.post(clockUpdateRunnable)
@@ -149,12 +161,8 @@ class ClockManager(
         } catch (e: Exception) {
             Log.w("ClockManager", "onTimeChanged callback failed: ${e.message}")
         }
-        val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
-        val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
-
-        timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
-        dateText.text = SimpleDateFormat(datePattern, Locale.getDefault()).format(currentTime)
-
+        updateTimeText()
+        updateDateText()
         if (fontManager.isNightShiftEnabled()) {
             fontManager.applyNightShiftTransition(
                 currentTime,

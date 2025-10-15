@@ -1,6 +1,7 @@
 package com.nxd1frnt.clockdesk2
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -27,16 +28,24 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import android.graphics.PorterDuff
 import android.graphics.Color
+import android.os.Build
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var timeText: TextView
     private lateinit var dateText: TextView
+    private lateinit var weatherText: TextView
+    private lateinit var weatherIcon: ImageView
+    private lateinit var weatherLayout: LinearLayout
+    private lateinit var lastfmLayout: LinearLayout
+    private lateinit var lastfmIcon: ImageView
+    private lateinit var nowplayingTextView: TextView
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
     private lateinit var settingsButton: Button
@@ -46,20 +55,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var bottomSheet: LinearLayout
     private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
+    private lateinit var tutorialLayout: ConstraintLayout
+    private lateinit var tutorialFinger: ImageView
+    private lateinit var tutorialText: TextView
     private lateinit var clockManager: ClockManager
     private lateinit var gradientManager: GradientManager
     private lateinit var fontManager: FontManager
     private lateinit var locationManager: LocationManager
+    private lateinit var openMeteoApi: OpenMeteoApi
     private lateinit var sunTimeApi: SunTimeApi
+    private lateinit var lastfmManager: LastFmManager
     private var isEditMode = false
     private var isDemoMode = false
     private var isNightShiftEnabled = false
-    private var focusedTextView: TextView? = null
+    private var focusedView: View? = null
     private val editModeTimeout = 10000L // 10 seconds
     private val animationDuration = 300L // 300ms
     private val handler = Handler(Looper.getMainLooper())
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
+
     private val editModeTimeoutRunnable = object : Runnable {
         override fun run() {
             if (isEditMode && !isDemoMode) {
@@ -94,6 +109,12 @@ class MainActivity : AppCompatActivity() {
 
         timeText = findViewById(R.id.time_text)
         dateText = findViewById(R.id.date_text)
+        weatherText = findViewById(R.id.weather_text)
+        weatherIcon = findViewById(R.id.weather_icon)
+        weatherLayout = findViewById(R.id.weather_layout)
+        lastfmLayout = findViewById(R.id.lastfm_layout)
+        lastfmIcon = findViewById(R.id.lastfm_icon)
+        nowplayingTextView = findViewById(R.id.now_playing_text)
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
@@ -108,6 +129,9 @@ class MainActivity : AppCompatActivity() {
         bottomSheetBehavior = from(bottomSheet).apply {
             state = STATE_HIDDEN
         }
+        tutorialLayout = findViewById(R.id.tutorial_overlay_root)
+        tutorialFinger = findViewById(R.id.tutorial_finger_icon)
+        tutorialText = findViewById(R.id.tutorial_text)
 
         // background-specific bottom sheet (used for picking backgrounds)
         val backgroundBottomSheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
@@ -125,9 +149,20 @@ class MainActivity : AppCompatActivity() {
         backgroundcustomizationfab.alpha = 0f
         backgroundcustomizationfab.visibility = View.GONE
 
-        fontManager = FontManager(this, timeText, dateText)
+        fontManager = FontManager(
+            this,
+            timeText,
+            dateText,
+            weatherText,
+            weatherIcon,
+            nowplayingTextView,
+            lastfmIcon,
+            lastfmLayout
+        )
         locationManager = LocationManager(this, permissionRequestCode)
         sunTimeApi = SunTimeApi(this, locationManager)
+        openMeteoApi = OpenMeteoApi(this, locationManager)
+        lastfmManager = LastFmManager(this, nowplayingTextView, lastfmLayout)
         gradientManager = GradientManager(backgroundLayout, sunTimeApi, locationManager, handler)
         clockManager = ClockManager(
             timeText,
@@ -168,14 +203,19 @@ class MainActivity : AppCompatActivity() {
         // Background prefs manager
         backgroundManager = BackgroundManager(this)
 
-         // Load any saved custom background image from prefs (if set)
-         loadSavedBackground()
+        // Load any saved custom background image from prefs (if set)
+        loadSavedBackground()
 
-         // Ensure dim is applied if image already set
-         val dimModeInit = backgroundManager.getDimMode()
-         val dimIntensity = backgroundManager.getDimIntensity()
-         if (dimModeInit != BackgroundManager.DIM_MODE_OFF) setBackgroundDimming(dimModeInit, dimIntensity)
-
+        // Ensure dim is applied if image already set
+        val dimModeInit = backgroundManager.getDimMode()
+        val dimIntensity = backgroundManager.getDimIntensity()
+        if (dimModeInit != BackgroundManager.DIM_MODE_OFF) setBackgroundDimming(
+            dimModeInit,
+            dimIntensity
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            checkForFirstLaunchAnimation()
+        }
         // Long tap for edit mode
         mainLayout.setOnLongClickListener {
             toggleEditMode()
@@ -185,27 +225,26 @@ class MainActivity : AppCompatActivity() {
         setupBottomSheet()
         timeText.setOnClickListener {
             if (isEditMode) {
-                showCustomizationBottomSheet(true)
-                if (!isDemoMode) {
-                    handler.removeCallbacks(editModeTimeoutRunnable)
-                    handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
-                }
+                showCustomizationBottomSheet(it) // pass the clicked view for focus
+                resetEditModeTimeout()
             }
         }
         dateText.setOnClickListener {
             if (isEditMode) {
-                showCustomizationBottomSheet(false)
-                if (!isDemoMode) {
-                    handler.removeCallbacks(editModeTimeoutRunnable)
-                    handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
-                }
+                showCustomizationBottomSheet(it)
+                resetEditModeTimeout()
+            }
+        }
+        lastfmLayout.setOnClickListener {
+            if (isEditMode) {
+                showCustomizationBottomSheet(it)
+                resetEditModeTimeout()
             }
         }
 
-        // Background button behaves like settings: exit edit mode and open backgrounds sheet
-      //  backgroundButton.setOnClickListener {
-       //     showBackgroundBottomSheet()
-      //  }
+        //  backgroundButton.setOnClickListener {
+        //     showBackgroundBottomSheet()
+        //  }
 
         backgroundcustomizationfab.setOnClickListener {
             showBackgroundBottomSheet()
@@ -261,6 +300,127 @@ class MainActivity : AppCompatActivity() {
         startUpdates()
     }
 
+    private fun checkForFirstLaunchAnimation() {
+        val prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE)
+        val isFirstLaunch = prefs.getBoolean("isFirstLaunch", true)
+
+        if (isFirstLaunch) {
+            startTutorialAnimation()
+        }
+    }
+
+    private fun startTutorialAnimation() {
+        // --- 1. Initial Setup ---
+        tutorialLayout.visibility = View.VISIBLE
+        tutorialFinger.translationX = resources.displayMetrics.widthPixels.toFloat()
+        tutorialFinger.translationY = -200f
+        tutorialText.text = "Welcome to ClockDesk!\nLet's take a quick tour."
+        // --- Part 1: Demonstrate Entering Edit Mode ---
+        tutorialLayout.animate().alpha(1f).setDuration(500).withEndAction {
+            tutorialText.animate().alpha(1f).setDuration(800).withEndAction {
+                tutorialText.animate().alpha(0f).setDuration(800).setStartDelay(1000)
+                    .withEndAction {
+                        // Change text for the next step
+                        tutorialText.text = "Long-press anywhere to enter Edit Mode..."
+                        tutorialText.animate().alpha(1f).setDuration(500).withEndAction {
+                            tutorialFinger.animate()
+                                .alpha(1f)
+                                .translationX(mainLayout.width / 2f - tutorialFinger.width / 2f)
+                                .translationY(mainLayout.height / 2f - tutorialFinger.height / 2f)
+                                .setDuration(1200)
+                                .withEndAction {
+                                    tutorialFinger.animate()
+                                        .scaleX(0.8f).scaleY(0.8f)
+                                        .setDuration(200)
+                                        .setStartDelay(300)
+                                        .withEndAction {
+                                            tutorialFinger.animate()
+                                                .scaleX(0.8f).scaleY(0.8f)
+                                                .setDuration(800) // "Hold" duration
+                                                .withEndAction {
+                                                    // Trigger Edit Mode
+                                                    toggleEditMode()
+
+                                                    // --- Part 2: Demonstrate Customization ---
+                                                    // Change text for the next step
+                                                    tutorialText.text =
+                                                        "...then tap on the time or date to customize them."
+
+                                                    // Calculate target position over the time_text
+                                                    val targetX =
+                                                        timeText.x + (timeText.width / 2f) - (tutorialFinger.width / 2f)
+                                                    val targetY =
+                                                        timeText.y + (timeText.height / 2f) - (tutorialFinger.height / 2f)
+
+                                                    // Move finger from center to the time text
+                                                    tutorialFinger.animate()
+                                                        .scaleX(1f).scaleY(1f) // Un-press
+                                                        .x(targetX)
+                                                        .y(targetY)
+                                                        .setDuration(1000)
+                                                        .setStartDelay(800) // Pause to let user see edit mode
+                                                        .withEndAction {
+
+                                                            // Simulate the tap on the time text
+                                                            tutorialFinger.animate()
+                                                                .scaleX(0.8f).scaleY(0.8f)
+                                                                .setDuration(150)
+                                                                .withEndAction {
+                                                                    // As finger presses down, open the bottom sheet
+                                                                    showCustomizationBottomSheet(timeText)
+
+                                                                    // Animate finger release
+                                                                    tutorialFinger.animate()
+                                                                        .scaleX(1f).scaleY(1f)
+                                                                        .setDuration(150)
+                                                                        .setStartDelay(200)
+                                                                        .withEndAction {
+                                                                            // --- 3. Final Cleanup ---
+                                                                            tutorialText.text =
+                                                                                "Great! Now you know the basics.\nTap anywhere to begin."
+
+                                                                            // Animate the finger away
+                                                                            tutorialFinger.animate()
+                                                                                .alpha(0f)
+                                                                                .y(targetY - 200) // Move it up a bit as it fades
+                                                                                .setDuration(500)
+                                                                                .start()
+
+                                                                            // Make the overlay clickable to dismiss
+                                                                            tutorialLayout.setOnClickListener {
+                                                                                hideBottomSheet() // Close the sheet if it's open
+                                                                                tutorialLayout.animate()
+                                                                                    .alpha(0f)
+                                                                                    .setDuration(300)
+                                                                                    .withEndAction {
+                                                                                        tutorialLayout.visibility =
+                                                                                            View.GONE
+                                                                                        // IMPORTANT: Set the flag
+                                                                                        val prefs =
+                                                                                            getSharedPreferences(
+                                                                                                "AppPrefs",
+                                                                                                MODE_PRIVATE
+                                                                                            )
+                                                                                        prefs.edit()
+                                                                                            .putBoolean(
+                                                                                                "isFirstLaunch",
+                                                                                                false
+                                                                                            )
+                                                                                            .apply()
+                                                                                    }.start()
+                                                                            }
+                                                                        }.start()
+                                                                }.start()
+                                                        }.start()
+                                                }.start()
+                                        }.start()
+                                }.start()
+                        }.start()
+                    }.start()
+            }.start()
+        }.start()
+    }
+
     // Handle add-image result from background bottom sheet
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -268,43 +428,59 @@ class MainActivity : AppCompatActivity() {
             val uri = data?.data ?: return
             try {
                 // Persist read permission for the chosen URI so the app can access it later.
-                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
             } catch (e: Exception) {
                 // ignore if cannot persist
             }
             val uriStr = uri.toString()
             // Persist the uri using BackgroundManager
             backgroundManager.addSavedUri(uriStr)
-             // update adapter list (include default and add)
-             val items = mutableListOf<String>().apply {
+            // update adapter list (include default and add)
+            val items = mutableListOf<String>().apply {
                 add("__DEFAULT_GRADIENT__")
                 addAll(backgroundManager.getSavedUriSet())
                 add("__ADD__")
-             }
-             backgroundsAdapter?.updateItems(items)
-             // preview and set preview selection
-             previewBackgroundUri = uriStr
+            }
+            backgroundsAdapter?.updateItems(items)
+            // preview and set preview selection
+            previewBackgroundUri = uriStr
             applyImageBackground(uri, backgroundManager.getBlurIntensity())
-         }
-     }
+        }
+    }
 
-     // Load saved background URI from preferences and apply it if present
-     private fun loadSavedBackground() {
+    // Load saved background URI from preferences and apply it if present
+    private fun loadSavedBackground() {
         val uriStr = backgroundManager.getSavedBackgroundUri()
         val blurIntensity = backgroundManager.getBlurIntensity()
         if (uriStr != null) {
             try {
                 val uri = Uri.parse(uriStr)
                 try {
-                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    }
                 } catch (e: Exception) {
 
                 }
                 applyImageBackground(uri, blurIntensity)
                 hasCustomImageBackground = true
-                Log.d("MainActivity", "Loaded custom background: $uriStr (blurIntensity=$blurIntensity)")
+                Log.d(
+                    "MainActivity",
+                    "Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"
+                )
                 // Apply saved dimming settings
-                setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
+                setBackgroundDimming(
+                    backgroundManager.getDimMode(),
+                    backgroundManager.getDimIntensity()
+                )
             } catch (e: Exception) {
                 backgroundManager.setSavedBackgroundUri(null)
                 hasCustomImageBackground = false
@@ -316,7 +492,7 @@ class MainActivity : AppCompatActivity() {
             hasCustomImageBackground = false
             gradientManager.startUpdates()
         }
-     }
+    }
 
     // Apply image background using Glide into the ImageView; blurIntensity > 0 enables blur with that radius
     private fun applyImageBackground(uri: Uri, blurIntensity: Int = 0) {
@@ -325,11 +501,13 @@ class MainActivity : AppCompatActivity() {
             gradientManager.stopUpdates()
 
             // Show a progress overlay while loading/processing (especially when blurIntensity>0)
-            val loadingMessage = if (blurIntensity > 0) getString(R.string.blur_applying_message) else getString(R.string.loading_background_message)
+            val loadingMessage =
+                if (blurIntensity > 0) getString(R.string.blur_applying_message) else getString(R.string.loading_background_message)
             setBackgroundProgressVisible(true, loadingMessage)
 
             // On modern Android, prefer RenderEffect for high-quality blur on the ImageView layer
-            val usePlatformBlur = blurIntensity > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+            val usePlatformBlur =
+                blurIntensity > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
 
             // Determine a reasonable target size to avoid loading very large bitmaps into memory.
             val metrics = resources.displayMetrics
@@ -359,16 +537,26 @@ class MainActivity : AppCompatActivity() {
             Glide.with(this)
                 .load(uri)
                 .apply(finalReq)
-                .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
-                    override fun onResourceReady(resource: android.graphics.drawable.Drawable, transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?) {
+                .into(object :
+                    com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
+                    override fun onResourceReady(
+                        resource: android.graphics.drawable.Drawable,
+                        transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
+                    ) {
                         // Hide progress overlay (work is done)
                         setBackgroundProgressVisible(false)
                         backgroundImageView.setImageDrawable(resource)
+                        //editmodebgImageView.setImageDrawable(resource)
+                        //editmodebgImageView.setColorFilter(Color.argb(180, 0, 0, 0), PorterDuff.Mode.SRC_OVER)
                         // Apply platform blur if available
                         if (usePlatformBlur) {
                             try {
                                 val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
-                                val renderEffect = android.graphics.RenderEffect.createBlurEffect(radiusPx, radiusPx, android.graphics.Shader.TileMode.CLAMP)
+                                val renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                    radiusPx,
+                                    radiusPx,
+                                    android.graphics.Shader.TileMode.CLAMP
+                                )
                                 backgroundImageView.setRenderEffect(renderEffect)
                             } catch (e: Throwable) {
                                 // if RenderEffect fails for any reason, we already set a transformed drawable via Glide fallback
@@ -376,7 +564,10 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             // Ensure any previous RenderEffect is cleared on modern devices when blur==0
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
+                                try {
+                                    backgroundImageView.setRenderEffect(null)
+                                } catch (_: Throwable) {
+                                }
                             }
                         }
 
@@ -385,8 +576,11 @@ class MainActivity : AppCompatActivity() {
 
                         // Apply saved dimming prefs after the image is set
                         // Apply dim from BackgroundManager
-                        setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
-                     }
+                        setBackgroundDimming(
+                            backgroundManager.getDimMode(),
+                            backgroundManager.getDimIntensity()
+                        )
+                    }
 
                     override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
                         // Hide any overlay when load cleared
@@ -401,13 +595,14 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             setBackgroundProgressVisible(false)
             Log.w("MainActivity", "applyImageBackground(glide) failed: ${e.message}")
-            Toast.makeText(this, getString(R.string.failed_to_load_background), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.failed_to_load_background), Toast.LENGTH_SHORT)
+                .show()
         }
     }
 
     private fun setBackgroundDimming(mode: Int, intensity: Int) {
-         runOnUiThread {
-             try {
+        runOnUiThread {
+            try {
                 // mode: BackgroundManager.DIM_MODE_OFF/CONTINUOUS/DYNAMIC
                 if (mode == BackgroundManager.DIM_MODE_OFF || intensity <= 0) {
                     backgroundImageView.clearColorFilter()
@@ -418,7 +613,10 @@ class MainActivity : AppCompatActivity() {
                 // Determine effective intensity. For dynamic mode, compute based on current time + sun times.
                 val effectiveIntensity = if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
                     try {
-                        backgroundManager.computeEffectiveDimIntensity(clockManager.getCurrentTime(), sunTimeApi)
+                        backgroundManager.computeEffectiveDimIntensity(
+                            clockManager.getCurrentTime(),
+                            sunTimeApi
+                        )
                     } catch (e: Exception) {
                         // fallback to user intensity if computation fails
                         intensity.coerceIn(0, 50)
@@ -431,18 +629,18 @@ class MainActivity : AppCompatActivity() {
                 val clamped = effectiveIntensity.coerceIn(0, 50)
                 val maxAlpha = 0.8f
                 val alpha = (clamped / 50f) * maxAlpha
-                 val zoom = 1.0f + (clamped / 50f) * 0.2f // up to 15% zoom
-                 backgroundImageView.scaleX = zoom
-                 backgroundImageView.scaleY= zoom
+                val zoom = 1.0f + (clamped / 50f) * 0.2f // up to 15% zoom
+                backgroundImageView.scaleX = zoom
+                backgroundImageView.scaleY = zoom
                 val alphaInt = (alpha * 255).toInt().coerceIn(0, 255)
                 val overlayColor = Color.argb(alphaInt, 0, 0, 0)
                 // Use SRC_OVER to darken the image
                 backgroundImageView.setColorFilter(overlayColor, PorterDuff.Mode.SRC_OVER)
-             } catch (e: Exception) {
-                 Log.w("MainActivity", "setBackgroundDimming failed: ${e.message}")
-             }
-         }
-     }
+            } catch (e: Exception) {
+                Log.w("MainActivity", "setBackgroundDimming failed: ${e.message}")
+            }
+        }
+    }
 
     private fun setBackgroundProgressVisible(visible: Boolean, message: String? = null) {
         runOnUiThread {
@@ -455,10 +653,12 @@ class MainActivity : AppCompatActivity() {
     private fun showBackgroundBottomSheet() {
         val sheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         val recycler = sheet.findViewById<RecyclerView>(R.id.background_recycler_view)
-        val blurSwitch = sheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.background_blur_switch)
+        val blurSwitch =
+            sheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.background_blur_switch)
         val blurSeek = sheet.findViewById<SeekBar>(R.id.blur_intensity_seekbar)
         //val dimSwitch = sheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.background_dim_switch)
-        val dimtogglegroup = sheet.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group)
+        val dimtogglegroup =
+            sheet.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group)
         val dimSeek = sheet.findViewById<SeekBar>(R.id.dimming_intensity_seekbar)
         val clearBtn = sheet.findViewById<Button>(R.id.clear_background_button_bs)
         val applyBtn = sheet.findViewById<Button>(R.id.apply_background_button)
@@ -476,41 +676,65 @@ class MainActivity : AppCompatActivity() {
                 when (id) {
                     "__ADD__" -> {
                         // Launch picker
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "image/*"
+                        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "image/*"
+                            }
+                        } else {
+                            Intent(Intent.ACTION_GET_CONTENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "image/*"
+                            }
                         }
-                        startActivityForResult(intent, PICK_BG_REQUEST)
+
+                        try {
+                            startActivityForResult(intent, PICK_BG_REQUEST)
+                        } catch (e: ActivityNotFoundException) {
+                            Toast.makeText(this, "", Toast.LENGTH_SHORT).show()
+                        }
                     }
+
                     "__DEFAULT_GRADIENT__" -> {
                         // preview default gradient: hide imageView, resume gradient updates, clear any renderEffect
                         previewBackgroundUri = "__DEFAULT_GRADIENT__"
                         try {
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
+                                try {
+                                    backgroundImageView.setRenderEffect(null)
+                                } catch (_: Throwable) {
+                                }
                             }
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) {
+                        }
                         backgroundImageView.setImageDrawable(null)
                         backgroundImageView.visibility = View.GONE
                         gradientManager.startUpdates()
                     }
+
                     else -> {
                         // preview chosen saved image -> stop gradient updates right away and show progress while applying
                         try {
                             val uri = Uri.parse(id)
-                            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                contentResolver.takePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            }
                             val intensity = prefs.getBlurIntensity()
-                             // Stop gradient updates immediately for preview
-                             gradientManager.stopUpdates()
-                             applyImageBackground(uri, intensity)
-                             previewBackgroundUri = id
+                            // Stop gradient updates immediately for preview
+                            gradientManager.stopUpdates()
+                            applyImageBackground(uri, intensity)
+                            previewBackgroundUri = id
                         } catch (e: Exception) {
 
                         }
                     }
-                 }
-             }
-            recycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+                }
+            }
+            recycler.layoutManager =
+                LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
             recycler.isNestedScrollingEnabled = false
             recycler.adapter = backgroundsAdapter
         } else {
@@ -565,13 +789,13 @@ class MainActivity : AppCompatActivity() {
 //            }
 //        }
         dimtogglegroup.addOnButtonCheckedListener { group, checkedId, isChecked ->
-             if (!isChecked) {
-                 // Prevent unchecking all buttons: revert to previous state
-                 if (group.checkedButtonId == View.NO_ID) {
-                     group.check(checkedId)
-                 }
-                 return@addOnButtonCheckedListener
-             }
+            if (!isChecked) {
+                // Prevent unchecking all buttons: revert to previous state
+                if (group.checkedButtonId == View.NO_ID) {
+                    group.check(checkedId)
+                }
+                return@addOnButtonCheckedListener
+            }
             // Map the checked button to a dim mode
             val previewMode = when (checkedId) {
                 R.id.off_button -> BackgroundManager.DIM_MODE_OFF
@@ -586,11 +810,11 @@ class MainActivity : AppCompatActivity() {
             if (backgroundImageView.visibility == View.VISIBLE) {
                 setBackgroundDimming(previewMode, dimSeek.progress)
             }
-         }
+        }
 
-         dimSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                 if (!fromUser) return
+        dimSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
                 // preview change using currently selected toggle mode
                 val checkedId = dimtogglegroup.checkedButtonId
                 val previewMode = when (checkedId) {
@@ -602,11 +826,11 @@ class MainActivity : AppCompatActivity() {
                 if (backgroundImageView.visibility == View.VISIBLE) {
                     setBackgroundDimming(previewMode, progress)
                 }
-             }
+            }
 
-             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-         })
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
 
         clearBtn.setOnClickListener {
             // Clear persisted background selection
@@ -616,7 +840,10 @@ class MainActivity : AppCompatActivity() {
             // hide image view and show gradient
             backgroundImageView.setImageDrawable(null)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
+                try {
+                    backgroundImageView.setRenderEffect(null)
+                } catch (_: Throwable) {
+                }
             }
             backgroundImageView.visibility = View.GONE
             // clear dim prefs when switching to gradient
@@ -640,52 +867,61 @@ class MainActivity : AppCompatActivity() {
             backgroundManager.setDimMode(modeToSave)
             backgroundManager.setDimIntensity(dimSeek.progress)
 
-               when (previewBackgroundUri) {
-                  "__DEFAULT_GRADIENT__" -> {
-                      // user chose the default gradient: remove any persisted custom uri
+            when (previewBackgroundUri) {
+                "__DEFAULT_GRADIENT__" -> {
+                    // user chose the default gradient: remove any persisted custom uri
                     backgroundManager.setSavedBackgroundUri(null)
-                      hasCustomImageBackground = false
-                      backgroundImageView.visibility = View.GONE
-                      gradientManager.startUpdates()
-                  }
-                  null -> {
-                      // nothing new previewed; keep existing selection
+                    hasCustomImageBackground = false
+                    backgroundImageView.visibility = View.GONE
+                    gradientManager.startUpdates()
+                }
+
+                null -> {
+                    // nothing new previewed; keep existing selection
                     val existing = backgroundManager.getSavedBackgroundUri()
-                     existing?.let {
-                         try {
+                    existing?.let {
+                        try {
                             applyImageBackground(Uri.parse(it), intensity)
-                             hasCustomImageBackground = true
-                             // Ensure dim applied
-                            setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
-                         } catch (e: Exception) {
-                             Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
-                         }
-                     }
-                 }
-                 else -> {
-                     // persist selected image uri and apply it
+                            hasCustomImageBackground = true
+                            // Ensure dim applied
+                            setBackgroundDimming(
+                                backgroundManager.getDimMode(),
+                                backgroundManager.getDimIntensity()
+                            )
+                        } catch (e: Exception) {
+                            Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
+                        }
+                    }
+                }
+
+                else -> {
+                    // persist selected image uri and apply it
                     backgroundManager.setSavedBackgroundUri(previewBackgroundUri)
-                      try {
-                          applyImageBackground(Uri.parse(previewBackgroundUri), intensity)
-                          hasCustomImageBackground = true
-                          // Ensure dim applied after persist
-                         setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
-                      } catch (e: Exception) {
-                          Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
-                      }
-                 }
-             }
+                    try {
+                        applyImageBackground(Uri.parse(previewBackgroundUri), intensity)
+                        hasCustomImageBackground = true
+                        // Ensure dim applied after persist
+                        setBackgroundDimming(
+                            backgroundManager.getDimMode(),
+                            backgroundManager.getDimIntensity()
+                        )
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "apply on applyBtn failed: ${e.message}")
+                    }
+                }
+            }
 
-             previewBackgroundUri = null
-             backgroundBottomSheetBehavior.state = STATE_HIDDEN
-         }
+            previewBackgroundUri = null
+            backgroundBottomSheetBehavior.state = STATE_HIDDEN
+        }
 
-         backgroundBottomSheetBehavior.state = STATE_EXPANDED
+        backgroundBottomSheetBehavior.state = STATE_EXPANDED
     }
 
     private fun setupBottomSheet() {
         val fontRecyclerView = bottomSheet.findViewById<RecyclerView>(R.id.font_recycler_view)
-        fontRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        fontRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         // Let the parent NestedScrollView handle scrolling gestures
         fontRecyclerView.isNestedScrollingEnabled = false
         // Ensure bottom sheet behavior is configured for nested scrolling
@@ -696,10 +932,10 @@ class MainActivity : AppCompatActivity() {
         bottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
                 if (newState == STATE_HIDDEN) {
-                    // Reuse existing cleanup path
                     hideBottomSheet()
                 }
             }
+
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
         backgroundBottomSheetBehavior.peekHeight = 0
@@ -711,17 +947,18 @@ class MainActivity : AppCompatActivity() {
                     highlightImageView(false)
                 }
             }
+
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
     }
 
-    private fun showCustomizationBottomSheet(isTimeText: Boolean) {
+    private fun showCustomizationBottomSheet(viewToCustomize: View) {
         isBottomSheetInitializing = true
-        val targetIsTime = isTimeText
 
-        // Mark current target on the bottom sheet so listeners can always read the active target
-        bottomSheet.setTag(R.id.customization_title, if (targetIsTime) "time" else "date")
+        // Set the currently focused view for the listeners to use
+        focusedView = viewToCustomize
 
+        // Find all UI elements within the bottom sheet
         val title = bottomSheet.findViewById<TextView>(R.id.customization_title)
         val sizeSeekBar = bottomSheet.findViewById<SeekBar>(R.id.size_seekbar)
         val sizeValue = bottomSheet.findViewById<TextView>(R.id.size_value)
@@ -730,100 +967,94 @@ class MainActivity : AppCompatActivity() {
         val fontRecyclerView = bottomSheet.findViewById<RecyclerView>(R.id.font_recycler_view)
         val applyButton = bottomSheet.findViewById<Button>(R.id.apply_button)
         val cancelButton = bottomSheet.findViewById<Button>(R.id.cancel_button)
-        val alignmentGroup = bottomSheet.findViewById<MaterialButtonToggleGroup>(R.id.alignment_toggle_group)
-        val nightShiftSwitch = bottomSheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.night_shift_switch)
+        val alignmentGroup =
+            bottomSheet.findViewById<MaterialButtonToggleGroup>(R.id.alignment_toggle_group)
+        val nightShiftSwitch =
+            bottomSheet.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.night_shift_switch)
         val timeFormatGroup = bottomSheet.findViewById<RadioGroup>(R.id.time_format_radio_group)
         val dateFormatGroup = bottomSheet.findViewById<RadioGroup>(R.id.date_format_radio_group)
+        val timeformatlabel = bottomSheet.findViewById<TextView>(R.id.time_format_label)
+        val dateformatlabel = bottomSheet.findViewById<TextView>(R.id.date_format_label)
 
-        // Set title
-        title.text = if (targetIsTime) getString(R.string.customize_time) else getString(R.string.customize_date)
-        Log.d("MainActivity", "Showing bottom sheet for ${if (targetIsTime) "timeText" else "dateText"} (tag=${bottomSheet.getTag(R.id.customization_title)})")
-        nightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
-        // Highlight focused text
-        focusedTextView = if (targetIsTime) timeText else dateText
-        highlightFocusedText(true)
+        // --- Centralized Logic to get initial values based on the focused view ---
+        val currentSize: Float
+        val currentAlpha: Float
+        val currentAlignment: Int
 
-        // Font carousel
-        val fontAdapter = FontAdapter(fontManager.getFonts()) { fontId ->
-            val active = bottomSheet.getTag(R.id.customization_title) as? String
-            val isActiveTime = (active == "time")
-            if (isActiveTime) {
-                fontManager.setTimeFont(fontId)
-                Log.d("MainActivity", "Font selected for timeText: $fontId")
-            } else {
-                fontManager.setDateFont(fontId)
-                Log.d("MainActivity", "Font selected for dateText: $fontId")
+        when (viewToCustomize.id) {
+            R.id.time_text -> {
+                title.text = getString(R.string.customize_time)
+                timeFormatGroup.visibility = View.VISIBLE
+                timeformatlabel.visibility = View.VISIBLE
+                dateFormatGroup.visibility = View.GONE
+                dateformatlabel.visibility = View.GONE
+
+                currentSize = fontManager.getTimeSize()
+                currentAlpha = fontManager.getTimeAlpha()
+                currentAlignment = fontManager.getTimeAlignment()
+            }
+
+            R.id.date_text -> {
+                title.text = getString(R.string.customize_date)
+                timeFormatGroup.visibility = View.GONE
+                timeformatlabel.visibility = View.GONE
+                dateFormatGroup.visibility = View.VISIBLE
+                dateformatlabel.visibility = View.VISIBLE
+
+                currentSize = fontManager.getDateSize()
+                currentAlpha = fontManager.getDateAlpha()
+                currentAlignment = fontManager.getDateAlignment()
+            }
+
+            R.id.lastfm_layout -> {
+                title.text = getString(R.string.customize_now_playing)
+                timeFormatGroup.visibility = View.GONE
+                dateFormatGroup.visibility = View.GONE
+                timeformatlabel.visibility = View.GONE
+                dateformatlabel.visibility = View.GONE
+
+                currentSize = fontManager.getLastfmSize()
+                currentAlpha = fontManager.getLastfmAlpha()
+                currentAlignment = fontManager.getLastfmAlignment()
+            }
+
+            else -> {
+                // If an unknown view is passed, do nothing and hide the sheet
+                hideBottomSheet()
+                return
             }
         }
-        fontRecyclerView.adapter = fontAdapter
 
-        // --- Ensure old listeners won't react to our programmatic changes ---
+        // Highlight the newly focused view
+        highlightFocusedView(true)
+
+        // Animate background customization button out
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            backgroundcustomizationfab.animate().alpha(0f).setDuration(200).withEndAction {
+                backgroundcustomizationfab.visibility = View.GONE
+            }.start()
+        } else {
+            backgroundcustomizationfab.visibility = View.GONE
+        }
+
+        // --- Clear all listeners to prevent them from firing during initialization ---
         sizeSeekBar.setOnSeekBarChangeListener(null)
         transparencySeekBar.setOnSeekBarChangeListener(null)
         alignmentGroup.clearOnButtonCheckedListeners()
         timeFormatGroup.setOnCheckedChangeListener(null)
         dateFormatGroup.setOnCheckedChangeListener(null)
 
-        // Font size slider - initialize programmatically
-        val currentSize = if (targetIsTime) fontManager.getTimeSize() else fontManager.getDateSize()
+        // --- Initialize UI controls with the fetched values ---
         sizeSeekBar.max = 155
         sizeSeekBar.progress = (currentSize - 20).toInt()
-        sizeValue.text = "${currentSize}sp"
+        sizeValue.text = "${currentSize.toInt()}sp"
 
-        // Attach size listener (read active target from bottomSheet tag)
-        sizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser) return
-                if (isBottomSheetInitializing) return
-                val size = progress + 20
-                sizeValue.text = "${size}sp"
-                val active = bottomSheet.getTag(R.id.customization_title) as? String
-                val isActiveTime = (active == "time")
-                if (isActiveTime) {
-                    fontManager.setTimeSize(size.toFloat())
-                    Log.d("MainActivity", "Size set for timeText: $size (active=$active)")
-                } else {
-                    fontManager.setDateSize(size.toFloat())
-                    Log.d("MainActivity", "Size set for dateText: $size (active=$active)")
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        // Color slider
-        val currentAlpha = if (targetIsTime) fontManager.getTimeAlpha() else fontManager.getDateAlpha()
         transparencySeekBar.max = 100
         transparencySeekBar.progress = (currentAlpha * 100).toInt()
         transparencyPreview.alpha = currentAlpha
-        transparencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser) return
-                if (isBottomSheetInitializing) return
-                val alpha = progress / 100f
-                transparencyPreview.alpha = alpha
-                val active = bottomSheet.getTag(R.id.customization_title) as? String
-                val isActiveTime = (active == "time")
-                if (isActiveTime) {
-                    fontManager.setTimeAlpha(alpha)
-                    Log.d("MainActivity", "Alpha set for timeText: $alpha (active=$active)")
-                } else {
-                    fontManager.setDateAlpha(alpha)
-                    Log.d("MainActivity", "Alpha set for dateText: $alpha (active=$active)")
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
 
         nightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
-        nightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
-            isNightShiftEnabled = isChecked
-            fontManager.setNightShiftEnabled(isChecked)
-        }
 
-        // Initialize alignment radio buttons to current alignment (avoid triggering listener by clearing it first)
-        val currentAlignment = if (targetIsTime) fontManager.getTimeAlignment() else fontManager.getDateAlignment()
         when (currentAlignment) {
             View.TEXT_ALIGNMENT_VIEW_START, View.TEXT_ALIGNMENT_TEXT_START -> alignmentGroup.check(R.id.left_button)
             View.TEXT_ALIGNMENT_CENTER -> alignmentGroup.check(R.id.center_button)
@@ -831,75 +1062,89 @@ class MainActivity : AppCompatActivity() {
             else -> alignmentGroup.check(R.id.left_button)
         }
 
-        // Initialize time format radio buttons from FontManager
-        val currentTimePattern = fontManager.getTimeFormatPattern()
-        if (currentTimePattern.contains("H")) {
-            timeFormatGroup.check(R.id.time_24_radio)
-        } else {
-            timeFormatGroup.check(R.id.time_12_radio)
+        // Initialize format radio buttons
+        timeFormatGroup.check(
+            if (fontManager.getTimeFormatPattern()
+                    .contains("H")
+            ) R.id.time_24_radio else R.id.time_12_radio
+        )
+        when (fontManager.getDateFormatPattern()) {
+            "MMM dd" -> dateFormatGroup.check(R.id.date_format_1)
+            "EEE, MMM dd" -> dateFormatGroup.check(R.id.date_format_2)
+            "EEEE, MMMM dd, yyyy" -> dateFormatGroup.check(R.id.date_format_3)
+            else -> dateFormatGroup.check(R.id.date_format_2)
         }
 
-        // Initialize date format radio buttons from FontManager
-        val currentDatePattern = fontManager.getDateFormatPattern()
-        when (currentDatePattern) {
-            getString(R.string.date_format_short) -> dateFormatGroup.check(R.id.date_format_1)
-            getString(R.string.date_format_medium) -> dateFormatGroup.check(R.id.date_format_2)
-            getString(R.string.date_format_long) -> dateFormatGroup.check(R.id.date_format_3)
-            else -> {
-                // try matching known patterns
-                when (currentDatePattern) {
-                    "MMM dd" -> dateFormatGroup.check(R.id.date_format_1)
-                    "EEE, MMM dd" -> dateFormatGroup.check(R.id.date_format_2)
-                    "EEEE, MMMM dd, yyyy" -> dateFormatGroup.check(R.id.date_format_3)
-                    else -> dateFormatGroup.check(R.id.date_format_2)
-                }
+        // --- Setup Listeners (now they will only respond to user actions) ---
+
+        val fontAdapter = FontAdapter(fontManager.getFonts()) { fontId ->
+            when (focusedView?.id) {
+                R.id.time_text -> fontManager.setTimeFont(fontId)
+                R.id.date_text -> fontManager.setDateFont(fontId)
+                R.id.lastfm_layout -> fontManager.setLastfmFont(fontId)
             }
         }
+        fontRecyclerView.adapter = fontAdapter
 
-        // Now attach listener so only user interactions trigger alignment updates
+        sizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val size = (progress + 20).toFloat()
+                sizeValue.text = "${size.toInt()}sp"
+                when (focusedView?.id) {
+                    R.id.time_text -> fontManager.setTimeSize(size)
+                    R.id.date_text -> fontManager.setDateSize(size)
+                    R.id.lastfm_layout -> fontManager.setLastfmSize(size)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        transparencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val alpha = progress / 100f
+                transparencyPreview.alpha = alpha
+                when (focusedView?.id) {
+                    R.id.time_text -> fontManager.setTimeAlpha(alpha)
+                    R.id.date_text -> fontManager.setDateAlpha(alpha)
+                    R.id.lastfm_layout -> fontManager.setLastfmAlpha(alpha)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        nightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
+            isNightShiftEnabled = isChecked
+            fontManager.setNightShiftEnabled(isChecked)
+        }
+
         alignmentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isBottomSheetInitializing) return@addOnButtonCheckedListener
-            if (!isChecked) return@addOnButtonCheckedListener
-            val checkedView = alignmentGroup.findViewById<View>(checkedId)
-            if (checkedView == null || !checkedView.isPressed) return@addOnButtonCheckedListener
+            if (!isChecked || !findViewById<View>(checkedId).isPressed) return@addOnButtonCheckedListener
             val alignment = when (checkedId) {
                 R.id.left_button -> View.TEXT_ALIGNMENT_VIEW_START
                 R.id.center_button -> View.TEXT_ALIGNMENT_CENTER
                 R.id.right_button -> View.TEXT_ALIGNMENT_VIEW_END
                 else -> View.TEXT_ALIGNMENT_VIEW_START
             }
-            val active = bottomSheet.getTag(R.id.customization_title) as? String
-            val isActiveTime = (active == "time")
-            if (isActiveTime) {
-                fontManager.setTimeAlignment(alignment)
-                Log.d("MainActivity", "Alignment set for timeText: $alignment (active=$active)")
-            } else {
-                fontManager.setDateAlignment(alignment)
-                Log.d("MainActivity", "Alignment set for dateText: $alignment (active=$active)")
+            when (focusedView?.id) {
+                R.id.time_text -> fontManager.setTimeAlignment(alignment)
+                R.id.date_text -> fontManager.setDateAlignment(alignment)
+                R.id.lastfm_layout -> fontManager.setLastfmAlignment(alignment)
             }
         }
 
-        // Time format listener
         timeFormatGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (isBottomSheetInitializing) return@setOnCheckedChangeListener
-            val pattern = when (checkedId) {
-                R.id.time_24_radio -> "HH:mm"
-                R.id.time_12_radio -> "hh:mm a"
-                else -> "HH:mm"
-            }
+            val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else "hh:mm a"
             fontManager.setTimeFormatPattern(pattern)
-            // Update displayed time immediately
-            try {
-                val now = clockManager.getCurrentTime()
-                timeText.text = SimpleDateFormat(pattern, Locale.getDefault()).format(now)
-            } catch (e: Exception) {
-                Log.w("MainActivity", "Failed to format time immediately: ${e.message}")
-            }
+            clockManager.updateTimeText() // Update display immediately
         }
 
-        // Date format listener
         dateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (isBottomSheetInitializing) return@setOnCheckedChangeListener
             val pattern = when (checkedId) {
                 R.id.date_format_1 -> "MMM dd"
                 R.id.date_format_2 -> "EEE, MMM dd"
@@ -907,56 +1152,63 @@ class MainActivity : AppCompatActivity() {
                 else -> "EEE, MMM dd"
             }
             fontManager.setDateFormatPattern(pattern)
-            // Update displayed date immediately
-            try {
-                val now = clockManager.getCurrentTime()
-                dateText.text = SimpleDateFormat(pattern, Locale.getDefault()).format(now)
-            } catch (e: Exception) {
-                Log.w("MainActivity", "Failed to format date immediately: ${e.message}")
-            }
+            clockManager.updateDateText() // Update display immediately
         }
 
-        // Now attach other listeners (size/color) already set above
-
-        // Buttons
         applyButton.setOnClickListener {
             fontManager.saveSettings()
             hideBottomSheet()
-            Log.d("MainActivity", "Applied settings for ${if (targetIsTime) "timeText" else "dateText"}")
-        }
-        cancelButton.setOnClickListener {
-            fontManager.loadFont()
-            hideBottomSheet()
-            Log.d("MainActivity", "Cancelled settings for ${if (targetIsTime) "timeText" else "dateText"}")
         }
 
-        // Show bottom sheet
+        cancelButton.setOnClickListener {
+            fontManager.loadFont() // Revert any temporary changes
+            hideBottomSheet()
+        }
+
+        // --- Show the bottom sheet ---
         isBottomSheetInitializing = false
         bottomSheetBehavior.state = STATE_EXPANDED
     }
 
     private fun hideBottomSheet() {
         bottomSheetBehavior.state = STATE_HIDDEN
-        highlightFocusedText(false)
-        focusedTextView = null
+        highlightFocusedView(false) // Use the new unified function
+        focusedView = null
+        // Restore background customization button with animation
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            backgroundcustomizationfab.visibility = View.VISIBLE
+            backgroundcustomizationfab.animate()
+                .alpha(1f)
+                .setDuration(200)
+                .start()
+        } else {
+            backgroundcustomizationfab.visibility = View.GONE
+        }
     }
 
-    private fun highlightFocusedText(isHighlighted: Boolean) {
-        focusedTextView?.let { textView ->
+    private fun highlightFocusedView(isHighlighted: Boolean) {
+        focusedView?.let { view ->
+            val scale = if (isHighlighted) 1.05f else 1.0f
+
+            view.animate()
+                .scaleX(scale)
+                .scaleY(scale)
+                .setDuration(animationDuration)
+                .start()
+
             if (isHighlighted) {
-                textView.animate()
-                    .scaleX(1.1f)
-                    .scaleY(1.1f)
-                    .setDuration(animationDuration)
-                    .start()
-                textView.setBackgroundResource(R.drawable.editable_border)
+                view.setBackgroundResource(R.drawable.editable_border)
             } else {
-                textView.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(animationDuration)
-                    .start()
-                if (!isEditMode) textView.background = null
+                // Only remove the background if we are not in edit mode anymore.
+                // This prevents the border from disappearing when switching focus.
+                if (!isEditMode) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        view.background = null
+                    } else {
+                        @Suppress("DEPRECATION")
+                        view.setBackgroundDrawable(null)
+                    }
+                }
             }
         }
     }
@@ -975,7 +1227,7 @@ class MainActivity : AppCompatActivity() {
                 .scaleY(1f)
                 .setDuration(animationDuration)
                 .start()
-           // if (!isEditMode) backgroundImageView.background = null
+            // if (!isEditMode) backgroundImageView.background = null
         }
     }
 
@@ -989,6 +1241,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startUpdates() {
         clockManager.startUpdates()
+        lastfmManager.startUpdates()
         // Only start gradient updates if there is no custom image background
         if (!hasCustomImageBackground) {
             gradientManager.startUpdates()
@@ -997,6 +1250,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopUpdates() {
         clockManager.stopUpdates()
+        lastfmManager.stopUpdates()
         gradientManager.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
@@ -1006,7 +1260,7 @@ class MainActivity : AppCompatActivity() {
         if (isEditMode) {
             settingsButton.visibility = View.VISIBLE
             debugButton.visibility = View.VISIBLE
-           // backgroundButton.visibility = View.VISIBLE
+            // backgroundButton.visibility = View.VISIBLE
             backgroundcustomizationfab.visibility = View.VISIBLE
             mainLayout.animate()
                 .scaleX(0.90f)
@@ -1024,7 +1278,7 @@ class MainActivity : AppCompatActivity() {
                 .start()
             //backgroundButton.animate()
             //    .alpha(1f)
-           //     .setDuration(animationDuration)
+            //     .setDuration(animationDuration)
             //    .start()
             backgroundcustomizationfab.animate()
                 .alpha(1f)
@@ -1033,7 +1287,7 @@ class MainActivity : AppCompatActivity() {
 
             timeText.setBackgroundResource(R.drawable.editable_border)
             dateText.setBackgroundResource(R.drawable.editable_border)
-            //Toast.makeText(this, R.string.edit_mode_enabled, Toast.LENGTH_SHORT).show()
+            lastfmLayout.setBackgroundResource(R.drawable.editable_border)
             if (!isDemoMode) {
                 handler.removeCallbacks(editModeTimeoutRunnable)
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
@@ -1042,6 +1296,14 @@ class MainActivity : AppCompatActivity() {
             exitEditMode()
         }
     }
+
+    private fun resetEditModeTimeout() {
+        if (!isDemoMode) {
+            handler.removeCallbacks(editModeTimeoutRunnable)
+            handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
+        }
+    }
+
 
     private fun exitEditMode() {
         isEditMode = false
@@ -1067,8 +1329,18 @@ class MainActivity : AppCompatActivity() {
             .alpha(0f)
             .setDuration(animationDuration)
             .start()
-        timeText.background = null
-        dateText.background = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            timeText.background = null
+        } else
+            timeText.setBackgroundDrawable(null)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            dateText.background = null
+        } else
+            dateText.setBackgroundDrawable(null)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            lastfmLayout.background = null
+        } else
+            lastfmLayout.setBackgroundDrawable(null)
         settingsButton.visibility = View.GONE
         debugButton.visibility = View.GONE
        // backgroundButton.visibility = View.GONE
@@ -1104,12 +1376,14 @@ class MainActivity : AppCompatActivity() {
          // reload background in case user changed it in Settings
          loadSavedBackground()
          startUpdates()
+
     }
 
     override fun onPause() {
         super.onPause()
         stopUpdates()
     }
+
 
     override fun onRequestPermissionsResult(
         requestCode: Int,

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/material_dynamic_neutral10"
+    android:background="@drawable/main_activity_bg"
     style="@style/Widget.Material3.BottomSheet.Modal">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
@@ -90,7 +90,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:checked="true"
-                    android:text="@string/dimming_off"/>                    />
+                    android:text="@string/dimming_off"/>
 
                 <Button
                     android:id="@+id/continuous_button"

@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nxd1frnt.clockdesk2"
-        minSdk = 19
+        minSdk = 14
         targetSdk = 35
         versionCode = 3
         versionName = "1.0.2"
@@ -42,6 +42,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.preference.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

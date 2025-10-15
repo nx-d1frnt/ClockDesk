@@ -11,9 +11,10 @@ class LocationManager(private val context: Context, private val permissionReques
     fun loadCoordinates(callback: (Double, Double) -> Unit) {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         if (prefs.getBoolean("useManualCoordinates", false)) {
-            val latitude = prefs.getFloat("latitude", 40.7128f).toDouble()
-            val longitude = prefs.getFloat("longitude", -74.0060f).toDouble()
-            callback(latitude, longitude) } else { fetchLocation(callback) }
+            val latitude: Any = prefs.getString("latitude", "40.7128f")?.toDouble() ?: 40.7128f
+            val longitude: Any = prefs.getString("longitude", "-74.0060f")?.toDouble() ?: -74.0060f
+            Log.d("LocationManager", "Using manual coordinates: lat=$latitude, lon=$longitude")
+            callback(latitude as Double, longitude as Double) } else { fetchLocation(callback) }
     }
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray, callback: (Double, Double) -> Unit) {
         if (requestCode == permissionRequestCode && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {

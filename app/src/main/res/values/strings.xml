@@ -60,4 +60,5 @@
     <string name="dimming_continuous">Continuous</string>
     <string name="dimming_dynamic">Dynamic</string>
     <string name="background_zoom">Background zoom</string>
+    <string name="customize_now_playing">Customize \"Now Playing\" widget</string>
 </resources>

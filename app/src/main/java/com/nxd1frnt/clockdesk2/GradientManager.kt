@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Handler
 import android.util.Log
 import android.widget.LinearLayout
@@ -132,7 +133,14 @@ class GradientManager(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(topColor, bottomColor)
         )
-        backgroundLayout.background = gradientDrawable
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            // Use the modern method on API 16+
+            backgroundLayout.background = gradientDrawable
+        } else {
+            // Use the older, deprecated method on API < 16
+            @Suppress("DEPRECATION")
+            backgroundLayout.setBackgroundDrawable(gradientDrawable)
+        }
         Log.d("GradientUpdate", "Colors: top=$topColor, bottom=$bottomColor at time=$currentTime")
     }
 
