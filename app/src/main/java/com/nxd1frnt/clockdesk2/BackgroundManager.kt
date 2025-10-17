@@ -1,6 +1,7 @@
 package com.nxd1frnt.clockdesk2
 
 import android.content.Context
+import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.Calendar
 import java.util.Date
 
@@ -66,7 +67,7 @@ class BackgroundManager(private val context: Context) {
      * - If DYNAMIC -> compute factor based on sunrise/sunset and scale userIntensity by that factor
      * The transition windows mirror FontManager's night-shift logic.
      */
-    fun computeEffectiveDimIntensity(currentTime: Date, sunTimeApi: SunTimeApi): Int {
+    fun computeEffectiveDimIntensity(currentTime: Date, sunTimeApi: DayTimeGetter): Int {
         val mode = getDimMode()
         val userIntensity = getDimIntensity().coerceIn(0, 50)
         if (mode == DIM_MODE_OFF || userIntensity <= 0) return 0
@@ -74,8 +75,8 @@ class BackgroundManager(private val context: Context) {
 
         // DYNAMIC mode: mirror FontManager's night transitions but produce an intensity factor 0..1
         // Ensure sun times are available; SunTimeApi may have fallback setters like in FontManager usage
-        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunriseTime!! }
-        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunsetTime!! }
+        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
+        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
 
         val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
         val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time

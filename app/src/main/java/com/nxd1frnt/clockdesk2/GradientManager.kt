@@ -6,11 +6,12 @@ import android.os.Build
 import android.os.Handler
 import android.util.Log
 import android.widget.LinearLayout
+import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.*
 
 class GradientManager(
     private val backgroundLayout: LinearLayout,
-    private val sunTimeApi: SunTimeApi,
+    private val sunTimeApi: DayTimeGetter,
     private val locationManager: LocationManager,
     private val handler: Handler
 ) {
@@ -97,7 +98,7 @@ class GradientManager(
         if (lastRealTimeDay != null && lastRealTimeDay != currentDay) {
             Log.d("GradientManager", "Day changed to ${currentCal.time}, refreshing sun times")
             locationManager.loadCoordinates { lat, lon ->
-                sunTimeApi.fetchSunTimes(lat, lon) {
+                sunTimeApi.fetch(lat, lon) {
                     Log.d(
                         "GradientManager",
                         "Sun times updated for new day: sunrise=${sunTimeApi.sunriseTime}, sunset=${sunTimeApi.sunsetTime}"
@@ -154,15 +155,15 @@ class GradientManager(
 
     private fun getSkyGradientColors(currentTime: Date): Pair<Int, Int> {
         val sunrise = sunTimeApi.sunriseTime
-            ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunriseTime!! }
+            ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
         val sunset =
-            sunTimeApi.sunsetTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunsetTime!! }
+            sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
         val dawn =
-            sunTimeApi.dawnTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.dawnTime!! }
+            sunTimeApi.dawnTime ?: run { sunTimeApi.setDefault(); sunTimeApi.dawnTime!! }
         val solarNoon = sunTimeApi.solarNoonTime
-            ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.solarNoonTime!! }
+            ?: run { sunTimeApi.setDefault(); sunTimeApi.solarNoonTime!! }
         val dusk =
-            sunTimeApi.duskTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.duskTime!! }
+            sunTimeApi.duskTime ?: run { sunTimeApi.setDefault(); sunTimeApi.duskTime!! }
 
         // Use simulatedTime's date in debug mode, real-time date otherwise
         val today = if (isDemoMode) {

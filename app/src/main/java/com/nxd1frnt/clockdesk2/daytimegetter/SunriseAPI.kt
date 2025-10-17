@@ -1,21 +1,19 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.daytimegetter
 
 import android.content.Context
 import android.util.Log
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
+import com.nxd1frnt.clockdesk2.LocationManager
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
-class SunTimeApi(private val context: Context, private val locationManager: LocationManager) {
-    var sunriseTime: Date? = null
-    var sunsetTime: Date? = null
-    var dawnTime: Date? = null
-    var duskTime: Date? = null
-    var solarNoonTime: Date? = null
-    fun fetchSunTimes(latitude: Double, longitude: Double, callback: () -> Unit) {
+class SunriseAPI(private val context: Context, private val locationManager: LocationManager): DayTimeGetter(context, locationManager) {
+    override fun fetch(latitude: Double, longitude: Double, callback: () -> Unit) {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -55,7 +53,7 @@ class SunTimeApi(private val context: Context, private val locationManager: Loca
                 callback()
             },
             {
-                setFallbackTimes()
+                setDefault()
                 Log.d("SunTimes", "Used fallback times")
                 callback()
             }
@@ -88,56 +86,21 @@ class SunTimeApi(private val context: Context, private val locationManager: Loca
             }
         }
 
-        sunriseTime = normalizeTime(results.getString("sunrise")) ?: run { setFallbackTimes(); sunriseTime }
-        sunsetTime = normalizeTime(results.getString("sunset")) ?: run { setFallbackTimes(); sunsetTime }
-        solarNoonTime = normalizeTime(results.getString("solar_noon")) ?: run { setFallbackTimes(); solarNoonTime }
-        dawnTime = normalizeTime(results.getString("civil_twilight_begin")) ?: run { setFallbackTimes(); dawnTime }
-        duskTime = normalizeTime(results.getString("civil_twilight_end")) ?: run { setFallbackTimes(); duskTime }
+        sunriseTime = normalizeTime(results.getString("sunrise")) ?: run { setDefault(); sunriseTime }
+        sunsetTime = normalizeTime(results.getString("sunset")) ?: run { setDefault(); sunsetTime }
+        solarNoonTime = normalizeTime(results.getString("solar_noon")) ?: run { setDefault(); solarNoonTime }
+        dawnTime = normalizeTime(results.getString("civil_twilight_begin")) ?: run { setDefault(); dawnTime }
+        duskTime = normalizeTime(results.getString("civil_twilight_end")) ?: run { setDefault(); duskTime }
 
         // Validate times
         if (sunriseTime == null || sunsetTime == null || dawnTime == null || duskTime == null || solarNoonTime == null) {
             Log.w("SunTimes", "One or more sun times are null, using fallbacks")
-            setFallbackTimes()
+            setDefault()
         } else if (sunriseTime!!.after(sunsetTime) || dawnTime!!.after(sunriseTime) || duskTime!!.before(sunsetTime)) {
             Log.w("SunTimes", "Invalid sun times detected: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime")
-            setFallbackTimes()
+            setDefault()
         } else {
             Log.d("SunTimes", "Parsed: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime")
         }
-    }
-
-    fun setFallbackTimes() {
-        val today = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        sunriseTime = Calendar.getInstance().apply {
-            time = today.time
-            set(Calendar.HOUR_OF_DAY, 6)
-            set(Calendar.MINUTE, 0)
-        }.time
-        sunsetTime = Calendar.getInstance().apply {
-            time = today.time
-            set(Calendar.HOUR_OF_DAY, 18)
-            set(Calendar.MINUTE, 0)
-        }.time
-        dawnTime = Calendar.getInstance().apply {
-            time = today.time
-            set(Calendar.HOUR_OF_DAY, 5)
-            set(Calendar.MINUTE, 30)
-        }.time
-        duskTime = Calendar.getInstance().apply {
-            time = today.time
-            set(Calendar.HOUR_OF_DAY, 18)
-            set(Calendar.MINUTE, 30)
-        }.time
-        solarNoonTime = Calendar.getInstance().apply {
-            time = today.time
-            set(Calendar.HOUR_OF_DAY, 12)
-            set(Calendar.MINUTE, 0)
-        }.time
-        Log.d("SunTimes", "Set fallback times: sunrise=$sunriseTime, sunset=$sunsetTime")
     }
 }
