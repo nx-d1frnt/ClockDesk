@@ -3,6 +3,7 @@ package com.nxd1frnt.clockdesk2
 import android.os.Handler
 import android.util.Log
 import android.widget.TextView
+import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -11,7 +12,7 @@ class ClockManager(
     private val dateText: TextView,
     private val handler: Handler,
     private val fontManager: FontManager,
-    private val sunTimeApi: SunTimeApi,
+    private val dayTimeGetter: DayTimeGetter,
     private val locationManager: LocationManager,
     private val debugCallback: (String, String, String) -> Unit,
     private val onTimeChanged: (Date) -> Unit
@@ -91,14 +92,14 @@ class ClockManager(
             return cal.time
         }
 
-        sunTimeApi.sunriseTime = normalizeTime(sunTimeApi.sunriseTime)
-        sunTimeApi.sunsetTime = normalizeTime(sunTimeApi.sunsetTime)
-        sunTimeApi.dawnTime = normalizeTime(sunTimeApi.dawnTime)
-        sunTimeApi.duskTime = normalizeTime(sunTimeApi.duskTime)
-        sunTimeApi.solarNoonTime = normalizeTime(sunTimeApi.solarNoonTime)
+        dayTimeGetter.sunriseTime = normalizeTime(dayTimeGetter.sunriseTime)
+        dayTimeGetter.sunsetTime = normalizeTime(dayTimeGetter.sunsetTime)
+        dayTimeGetter.dawnTime = normalizeTime(dayTimeGetter.dawnTime)
+        dayTimeGetter.duskTime = normalizeTime(dayTimeGetter.duskTime)
+        dayTimeGetter.solarNoonTime = normalizeTime(dayTimeGetter.solarNoonTime)
         Log.d(
             "ClockManager",
-            "Re-normalized sun times for ${today.time}: sunrise=${sunTimeApi.sunriseTime}, sunset=${sunTimeApi.sunsetTime}"
+            "Re-normalized sun times for ${today.time}: sunrise=${dayTimeGetter.sunriseTime}, sunset=${dayTimeGetter.sunsetTime}"
         )
     }
 
@@ -108,10 +109,10 @@ class ClockManager(
         if (lastRealTimeDay != null && lastRealTimeDay != currentDay) {
             Log.d("ClockManager", "Day changed to ${currentCal.time}, refreshing sun times")
             locationManager.loadCoordinates { lat, lon ->
-                sunTimeApi.fetchSunTimes(lat, lon) {
+                dayTimeGetter.fetch(lat, lon) {
                     Log.d(
                         "ClockManager",
-                        "Sun times updated for new day: sunrise=${sunTimeApi.sunriseTime}, sunset=${sunTimeApi.sunsetTime}"
+                        "Sun times updated for new day: sunrise=${dayTimeGetter.sunriseTime}, sunset=${dayTimeGetter.sunsetTime}"
                     )
                 }
             }
@@ -133,10 +134,10 @@ class ClockManager(
             val datePattern = fontManager.getDateFormatPattern().ifBlank { "yyyy-MM-dd" }
 
             val timeStr = SimpleDateFormat(timePattern, Locale.getDefault()).format(simulatedTime.time)
-            val sunriseStr = sunTimeApi.sunriseTime?.let {
+            val sunriseStr = dayTimeGetter.sunriseTime?.let {
                 SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
             } ?: "06:00"
-            val sunsetStr = sunTimeApi.sunsetTime?.let {
+            val sunsetStr = dayTimeGetter.sunsetTime?.let {
                 SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
             } ?: "20:05"
             debugCallback(timeStr, sunriseStr, sunsetStr)
@@ -166,7 +167,7 @@ class ClockManager(
         if (fontManager.isNightShiftEnabled()) {
             fontManager.applyNightShiftTransition(
                 currentTime,
-                sunTimeApi,
+                dayTimeGetter,
                 true
             )
         }

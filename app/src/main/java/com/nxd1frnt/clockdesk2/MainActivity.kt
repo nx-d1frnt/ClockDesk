@@ -33,9 +33,12 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Locale
+import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
+import com.nxd1frnt.clockdesk2.musicgetter.LastFmAPI
+import com.nxd1frnt.clockdesk2.musicgetter.MusicGetter
+import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
+import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
 class MainActivity : AppCompatActivity() {
     private lateinit var timeText: TextView
@@ -45,13 +48,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var weatherLayout: LinearLayout
     private lateinit var lastfmLayout: LinearLayout
     private lateinit var lastfmIcon: ImageView
-    private lateinit var nowplayingTextView: TextView
+    private lateinit var nowPlayingTextView: TextView
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
     private lateinit var backgroundButton: Button
-    private lateinit var backgroundcustomizationfab: FloatingActionButton
+    private lateinit var backgroundCustomizationTab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var bottomSheet: LinearLayout
     private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
@@ -62,9 +65,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gradientManager: GradientManager
     private lateinit var fontManager: FontManager
     private lateinit var locationManager: LocationManager
-    private lateinit var openMeteoApi: OpenMeteoApi
-    private lateinit var sunTimeApi: SunTimeApi
-    private lateinit var lastfmManager: LastFmManager
+    private lateinit var weatherGetter: WeatherGetter
+    private lateinit var dayTimeGetter: DayTimeGetter
+    private lateinit var musicGetter: MusicGetter
     private var isEditMode = false
     private var isDemoMode = false
     private var isNightShiftEnabled = false
@@ -75,11 +78,9 @@ class MainActivity : AppCompatActivity() {
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
 
-    private val editModeTimeoutRunnable = object : Runnable {
-        override fun run() {
-            if (isEditMode && !isDemoMode) {
-                exitEditMode()
-            }
+    private val editModeTimeoutRunnable = Runnable {
+        if (isEditMode && !isDemoMode) {
+            exitEditMode()
         }
     }
     private var isBottomSheetInitializing = false
@@ -114,7 +115,7 @@ class MainActivity : AppCompatActivity() {
         weatherLayout = findViewById(R.id.weather_layout)
         lastfmLayout = findViewById(R.id.lastfm_layout)
         lastfmIcon = findViewById(R.id.lastfm_icon)
-        nowplayingTextView = findViewById(R.id.now_playing_text)
+        nowPlayingTextView = findViewById(R.id.now_playing_text)
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
@@ -122,7 +123,7 @@ class MainActivity : AppCompatActivity() {
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
         backgroundButton = findViewById(R.id.background_button)
-        backgroundcustomizationfab = findViewById(R.id.background_customization_fab)
+        backgroundCustomizationTab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
         bottomSheet = findViewById(R.id.bottom_sheet)
         // main bottom sheet behavior
@@ -146,8 +147,8 @@ class MainActivity : AppCompatActivity() {
         debugButton.visibility = View.GONE
 //        backgroundButton.alpha = 0f
 //        backgroundButton.visibility = View.GONE
-        backgroundcustomizationfab.alpha = 0f
-        backgroundcustomizationfab.visibility = View.GONE
+        backgroundCustomizationTab.alpha = 0f
+        backgroundCustomizationTab.visibility = View.GONE
 
         fontManager = FontManager(
             this,
@@ -155,21 +156,21 @@ class MainActivity : AppCompatActivity() {
             dateText,
             weatherText,
             weatherIcon,
-            nowplayingTextView,
+            nowPlayingTextView,
             lastfmIcon,
             lastfmLayout
         )
         locationManager = LocationManager(this, permissionRequestCode)
-        sunTimeApi = SunTimeApi(this, locationManager)
-        openMeteoApi = OpenMeteoApi(this, locationManager)
-        lastfmManager = LastFmManager(this, nowplayingTextView, lastfmLayout)
-        gradientManager = GradientManager(backgroundLayout, sunTimeApi, locationManager, handler)
+        dayTimeGetter = SunriseAPI(this, locationManager)
+        weatherGetter = OpenMeteoAPI(this, locationManager)
+        musicGetter = LastFmAPI(this, musicCallback)
+        gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
         clockManager = ClockManager(
             timeText,
             dateText,
             handler,
             fontManager,
-            sunTimeApi,
+            dayTimeGetter,
             locationManager,
             { _, _, _ ->
                 if (isDemoMode) {
@@ -246,7 +247,7 @@ class MainActivity : AppCompatActivity() {
         //     showBackgroundBottomSheet()
         //  }
 
-        backgroundcustomizationfab.setOnClickListener {
+        backgroundCustomizationTab.setOnClickListener {
             showBackgroundBottomSheet()
             highlightImageView(true)
             if (!isDemoMode) {
@@ -290,7 +291,7 @@ class MainActivity : AppCompatActivity() {
 
         // Load coordinates and sun times
         locationManager.loadCoordinates { lat, lon ->
-            sunTimeApi.fetchSunTimes(lat, lon) {
+            dayTimeGetter.fetch(lat, lon) {
                 // Only update the gradient if no custom image background is active
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
             }
@@ -298,6 +299,15 @@ class MainActivity : AppCompatActivity() {
 
         // Start updates
         startUpdates()
+    }
+
+    private val musicCallback: (()->Unit) = {
+        if (musicGetter.enabled) {
+            lastfmLayout.visibility = View.VISIBLE
+        } else {
+            lastfmLayout.visibility = View.GONE
+            nowPlayingTextView.text = musicGetter.currentTrack
+        }
     }
 
     private fun checkForFirstLaunchAnimation() {
@@ -615,7 +625,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         backgroundManager.computeEffectiveDimIntensity(
                             clockManager.getCurrentTime(),
-                            sunTimeApi
+                            dayTimeGetter
                         )
                     } catch (e: Exception) {
                         // fallback to user intensity if computation fails
@@ -1030,11 +1040,11 @@ class MainActivity : AppCompatActivity() {
 
         // Animate background customization button out
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            backgroundcustomizationfab.animate().alpha(0f).setDuration(200).withEndAction {
-                backgroundcustomizationfab.visibility = View.GONE
+            backgroundCustomizationTab.animate().alpha(0f).setDuration(200).withEndAction {
+                backgroundCustomizationTab.visibility = View.GONE
             }.start()
         } else {
-            backgroundcustomizationfab.visibility = View.GONE
+            backgroundCustomizationTab.visibility = View.GONE
         }
 
         // --- Clear all listeners to prevent them from firing during initialization ---
@@ -1176,13 +1186,13 @@ class MainActivity : AppCompatActivity() {
         focusedView = null
         // Restore background customization button with animation
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            backgroundcustomizationfab.visibility = View.VISIBLE
-            backgroundcustomizationfab.animate()
+            backgroundCustomizationTab.visibility = View.VISIBLE
+            backgroundCustomizationTab.animate()
                 .alpha(1f)
                 .setDuration(200)
                 .start()
         } else {
-            backgroundcustomizationfab.visibility = View.GONE
+            backgroundCustomizationTab.visibility = View.GONE
         }
     }
 
@@ -1241,7 +1251,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startUpdates() {
         clockManager.startUpdates()
-        lastfmManager.startUpdates()
+        musicGetter.startUpdates()
         // Only start gradient updates if there is no custom image background
         if (!hasCustomImageBackground) {
             gradientManager.startUpdates()
@@ -1250,7 +1260,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopUpdates() {
         clockManager.stopUpdates()
-        lastfmManager.stopUpdates()
+        musicGetter.stopUpdates()
         gradientManager.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
@@ -1261,7 +1271,7 @@ class MainActivity : AppCompatActivity() {
             settingsButton.visibility = View.VISIBLE
             debugButton.visibility = View.VISIBLE
             // backgroundButton.visibility = View.VISIBLE
-            backgroundcustomizationfab.visibility = View.VISIBLE
+            backgroundCustomizationTab.visibility = View.VISIBLE
             mainLayout.animate()
                 .scaleX(0.90f)
                 .scaleY(0.90f)
@@ -1280,7 +1290,7 @@ class MainActivity : AppCompatActivity() {
             //    .alpha(1f)
             //     .setDuration(animationDuration)
             //    .start()
-            backgroundcustomizationfab.animate()
+            backgroundCustomizationTab.animate()
                 .alpha(1f)
                 .setDuration(animationDuration)
                 .start()
@@ -1325,7 +1335,7 @@ class MainActivity : AppCompatActivity() {
         //    .alpha(0f)
          //   .setDuration(animationDuration)
          //   .start()
-        backgroundcustomizationfab.animate()
+        backgroundCustomizationTab.animate()
             .alpha(0f)
             .setDuration(animationDuration)
             .start()
@@ -1344,7 +1354,7 @@ class MainActivity : AppCompatActivity() {
         settingsButton.visibility = View.GONE
         debugButton.visibility = View.GONE
        // backgroundButton.visibility = View.GONE
-        backgroundcustomizationfab.visibility = View.GONE
+        backgroundCustomizationTab.visibility = View.GONE
         handler.removeCallbacks(editModeTimeoutRunnable)
         //Toast.makeText(this, R.string.edit_mode_disabled, Toast.LENGTH_SHORT).show()
     }
@@ -1352,12 +1362,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         locationManager.loadCoordinates { lat, lon ->
-            sunTimeApi.fetchSunTimes(lat, lon) {
+            dayTimeGetter.fetch(lat, lon) {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
                 if (isNightShiftEnabled) {
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
-                        sunTimeApi,
+                        dayTimeGetter,
                         isNightShiftEnabled
                     )
                 }
@@ -1392,7 +1402,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         locationManager.onRequestPermissionsResult(requestCode, grantResults) { lat, lon ->
-            sunTimeApi.fetchSunTimes(lat, lon) {
+            dayTimeGetter.fetch(lat, lon) {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
             }
         }

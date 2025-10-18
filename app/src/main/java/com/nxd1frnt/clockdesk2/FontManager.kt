@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
+import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.Calendar
 import java.util.Date
 
@@ -363,7 +364,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         }
     }
 
-    fun applyNightShiftTransition(currentTime: Date, sunTimeApi: SunTimeApi, enabled: Boolean) {
+    fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
             timeText.setTextColor(Color.WHITE)
             dateText.setTextColor(Color.WHITE)
@@ -375,8 +376,8 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         }
 
         // Ensure sun times are valid
-        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunriseTime!! }
-        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setFallbackTimes(); sunTimeApi.sunsetTime!! }
+        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
+        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
 
         // Define transition periods
         val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
