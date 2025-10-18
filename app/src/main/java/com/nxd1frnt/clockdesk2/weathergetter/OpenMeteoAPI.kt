@@ -34,6 +34,7 @@ class OpenMeteoAPI(private val context: Context, private val locationManager: Lo
             }
         )
 
-        Volley.newRequestQueue(context).add(request)
+        //Volley.newRequestQueue(context).add(request)
+        requestQueue.add(request) // Use shared request queue
     }
 }

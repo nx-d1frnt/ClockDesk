@@ -21,6 +21,7 @@ class LocationManager(private val context: Context, private val permissionReques
             fetchLocation(callback)
         } else {
             callback(40.7128, -74.0060) // Fallback: New York
+            Log.d("LocationManager", "Location permission denied, using fallback: New York")
         }
     }
 

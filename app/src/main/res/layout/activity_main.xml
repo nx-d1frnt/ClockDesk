@@ -5,7 +5,7 @@
     android:id="@+id/main_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-<!--    android:background="@color/md_theme_surface">-->
+    <!--    android:background="@color/md_theme_surface">-->
     <LinearLayout
         android:id="@+id/background_layout"
         android:layout_width="match_parent"
@@ -50,7 +50,7 @@
                     android:id="@+id/background_progress_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Applying blur — this may take a few seconds"
+                    android:text="@string/applying_blur"
                     android:textColor="@android:color/white"
                     android:textSize="14sp"
                     android:layout_marginTop="8dp" />
@@ -84,26 +84,29 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:layout_marginLeft="8dp"
-
             android:text="Now playing: Not connected"
             android:textColor="#FFFFFFFF"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:scrollHorizontally="true"
             android:textSize="16sp" />
 
 
     </LinearLayout>
 
-        <TextView
+    <TextView
         android:id="@+id/date_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-            android:layout_marginLeft="8dp"
-            android:layout_marginStart="8dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginStart="8dp"
         android:fontFamily="@font/kanit_regular"
         android:text="@string/customize_date"
         android:textColor="#DEFFFFFF"
         android:textSize="24sp"
         app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/time_text"/>
+        app:layout_constraintBottom_toTopOf="@id/time_text"/>
 
     <LinearLayout
         android:id="@+id/weather_layout"
@@ -210,13 +213,13 @@
             android:id="@+id/bottom_sheet"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-             android:orientation="vertical"
-             android:background="@android:color/white"
-             app:behavior_peekHeight="0dp"
-             app:behavior_hideable="true"
-             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
-             <include layout="@layout/bottom_sheet_customization" />
-         </LinearLayout>
+            android:orientation="vertical"
+            android:background="@android:color/white"
+            app:behavior_peekHeight="0dp"
+            app:behavior_hideable="true"
+            app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+            <include layout="@layout/bottom_sheet_customization" />
+        </LinearLayout>
 
         <!-- Backgrounds bottom sheet (separate) -->
         <LinearLayout
@@ -230,6 +233,6 @@
             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
             <include layout="@layout/bottom_sheet_backgrounds" />
         </LinearLayout>
-     </androidx.coordinatorlayout.widget.CoordinatorLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
     <include layout="@layout/tutorial_layout" />
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -58,7 +58,8 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
                 callback()
             }
         )
-        Volley.newRequestQueue(context).add(request)
+        //Volley.newRequestQueue(context).add(request)
+        requestQueue.add(request)
     }
 
     private fun parseSunTimes(response: JSONObject) {

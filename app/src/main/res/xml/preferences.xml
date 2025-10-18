@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        app:key="suntimeapi_category"
+        app:title="Sunset/Sunrise API Settings">
+
+    <SwitchPreferenceCompat
+        app:key="useManualCoordinates"
+        app:title="Use Manual Coordinates"
+        app:summary="Enable to manually enter latitude and longitude" />
+    <EditTextPreference
+        app:key="latitude"
+        app:title="Latitude"
+        app:dialogTitle="Enter Latitude"
+        app:useSimpleSummaryProvider="true"
+        app:dependency="useManualCoordinates"
+        android:inputType="numberDecimal|numberSigned"/>/>
+
+    <EditTextPreference
+        app:key="longitude"
+        app:title="Longitude"
+        app:dialogTitle="Enter Longitude"
+        app:useSimpleSummaryProvider="true"
+        app:dependency="useManualCoordinates"
+        android:inputType="numberDecimal|numberSigned" />/>
+    </PreferenceCategory>
+<PreferenceCategory
+    app:key="lastfm_category"
+    app:title="Last.fm API Settings">
+    <SwitchPreference
+        app:key="enable_lastfm"
+        app:title="Enable Last.fm Integration"
+        app:summary="Enable to fetch data from Last.fm" />
+    <EditTextPreference
+        app:key="lastfm_api_key"
+        app:title="Last.fm API Key"
+        app:dialogTitle="Enter Last.fm API Key"
+        app:dependency="enable_lastfm"
+        app:useSimpleSummaryProvider="true" />
+    <EditTextPreference
+        app:key="lastfm_username"
+        app:title="Last.fm Username"
+        app:dependency="enable_lastfm"
+        app:dialogTitle="Enter Last.fm Username"
+        app:useSimpleSummaryProvider="true" />
+    <SwitchPreference
+        app:key="lastfm_albumart_background"
+        app:title="Set album art as background"
+        app:summary="Automatically set album art as background when a new track starts playing"
+        app:dependency="enable_lastfm" />
+    </PreferenceCategory>
+</PreferenceScreen>

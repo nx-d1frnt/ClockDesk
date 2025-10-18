@@ -3,10 +3,12 @@ package com.nxd1frnt.clockdesk2.daytimegetter
 import android.content.Context
 import android.util.Log
 import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.network.NetworkManager
 import java.util.Calendar
 import java.util.Date
 
 open class DayTimeGetter(private val context: Context, private val locationManager: LocationManager) {
+    val requestQueue = NetworkManager.getRequestQueue(context)
     var sunriseTime: Date? = null
     var sunsetTime: Date? = null
     var dawnTime: Date? = null

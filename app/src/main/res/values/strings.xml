@@ -57,8 +57,19 @@
     <string name="dim_background">Dim background</string>
     <string name="dim_toggle">Background dimming</string>
     <string name="dimming_off">Off</string>
-    <string name="dimming_continuous">Continuous</string>
+    <string name="dimming_continuous">Static</string>
     <string name="dimming_dynamic">Dynamic</string>
     <string name="background_zoom">Background zoom</string>
     <string name="customize_now_playing">Customize \"Now Playing\" widget</string>
+    <string name="applying_blur">Applying blur…\nThis may take a few seconds…</string>
+    <string name="tutorial_text_1">Welcome to ClockDesk!\nLet\'s take a quick tour.</string>
+    <string name="tutorial_text_2">Long-press anywhere to enter Edit Mode…</string>
+    <string name="tutorial_text_3">…then tap on the time or date to customize them.</string>
+    <string name="tutorial_text_4">Great! Now you know the basics.\nTap anywhere to begin.</string>
+    <string name="tutorial_skip">Skip</string>
+    <string name="automatic_color">Automatic text color</string>
+    <string name="location_permission_title">Location permission needed</string>
+    <string name="location_permission_message">ClockDesk needs your location for fetching weather and sunset/sunrise times (for dynamic gradient background and night shift feature).\nYou can give the following permission or set the coordinates manually in settings.</string>
+    <string name="location_permission_grant">Grant permission</string>
+    <string name="location_permission_manual">Enter manually</string>
 </resources>

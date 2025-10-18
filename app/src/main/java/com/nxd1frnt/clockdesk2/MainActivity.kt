@@ -1,8 +1,13 @@
 package com.nxd1frnt.clockdesk2
 
+import android.Manifest
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -29,6 +34,8 @@ import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import android.graphics.PorterDuff
 import android.graphics.Color
 import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -68,8 +75,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
     private lateinit var musicGetter: MusicGetter
+    private var lastTrackInfo: String? = null
+    private var wasMusicBackgroundApplied = false
     private var isEditMode = false
     private var isDemoMode = false
+    private var isTutorialRunning = false
     private var isNightShiftEnabled = false
     private var focusedView: View? = null
     private val editModeTimeout = 10000L // 10 seconds
@@ -160,10 +170,11 @@ class MainActivity : AppCompatActivity() {
             lastfmIcon,
             lastfmLayout
         )
+        backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
         weatherGetter = OpenMeteoAPI(this, locationManager)
-        musicGetter = LastFmAPI(this, musicCallback)
+        musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
         gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
         clockManager = ClockManager(
             timeText,
@@ -201,22 +212,19 @@ class MainActivity : AppCompatActivity() {
 
         fontManager.loadFont()
 
-        // Background prefs manager
-        backgroundManager = BackgroundManager(this)
-
         // Load any saved custom background image from prefs (if set)
         loadSavedBackground()
 
         // Ensure dim is applied if image already set
         val dimModeInit = backgroundManager.getDimMode()
         val dimIntensity = backgroundManager.getDimIntensity()
-        if (dimModeInit != BackgroundManager.DIM_MODE_OFF) setBackgroundDimming(
-            dimModeInit,
-            dimIntensity
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            checkForFirstLaunchAnimation()
+        if (dimModeInit != BackgroundManager.DIM_MODE_OFF) {
+            setBackgroundDimming(
+                dimModeInit,
+                dimIntensity
+            )
         }
+        checkForFirstLaunchAnimation()
         // Long tap for edit mode
         mainLayout.setOnLongClickListener {
             toggleEditMode()
@@ -289,13 +297,7 @@ class MainActivity : AppCompatActivity() {
             exitEditMode() // Exit edit mode when opening settings
         }
 
-        // Load coordinates and sun times
-        locationManager.loadCoordinates { lat, lon ->
-            dayTimeGetter.fetch(lat, lon) {
-                // Only update the gradient if no custom image background is active
-                if (!hasCustomImageBackground) gradientManager.updateGradient()
-            }
-        }
+        checkLocationPermissionsAndLoadData()
 
         // Start updates
         startUpdates()
@@ -303,132 +305,229 @@ class MainActivity : AppCompatActivity() {
 
     private val musicCallback: (()->Unit) = {
         if (musicGetter.enabled) {
-            lastfmLayout.visibility = View.VISIBLE
+            if (musicGetter.currentTrack != lastTrackInfo) {
+                lastfmLayout.visibility = View.VISIBLE
+                lastfmLayout.animate().alpha(0f).setDuration(400).setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        nowPlayingTextView.text = musicGetter.currentTrack
+                        nowPlayingTextView.isSelected = true
+                        lastfmLayout.animate().alpha(1f).setDuration(400).setListener(null).start()
+                    }
+                })
+                lastTrackInfo = musicGetter.currentTrack
+
+                // flag to track if we applied music background for this track
+                var isMusicBgAppliedThisTrack = false
+
+                if (musicGetter.currentAlbumArtUrl != null) {
+                    Log.d("MainActivity", "Applying album art background: ${musicGetter.currentAlbumArtUrl}")
+                    applyImageBackground(Uri.parse(musicGetter.currentAlbumArtUrl), backgroundManager.getBlurIntensity())
+                    wasMusicBackgroundApplied = true // flag to indicate that music is controlling the background
+                    isMusicBgAppliedThisTrack = true // flag for this track
+
+                } else if (musicGetter.userPreselectedBackgroundUri != null) {
+                    Log.d(
+                        "MainActivity",
+                        "Applying user preselected background: ${musicGetter.userPreselectedBackgroundUri}"
+                    )
+                    applyImageBackground(
+                        Uri.parse(musicGetter.userPreselectedBackgroundUri),
+                        backgroundManager.getBlurIntensity()
+                    )
+                    wasMusicBackgroundApplied = true
+                    isMusicBgAppliedThisTrack = true
+                }
+                // If no new art for this track, and music had applied background before, restore user background
+                if (!isMusicBgAppliedThisTrack && wasMusicBackgroundApplied) {
+                    Log.d("MainActivity", "Restoring user background (track changed, no new art)")
+                    restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                    wasMusicBackgroundApplied = false // reset flag
+                }
+            }
         } else {
-            lastfmLayout.visibility = View.GONE
-            nowPlayingTextView.text = musicGetter.currentTrack
+            // nothing playing, hide layout
+            lastfmLayout.animate().alpha(0f).setDuration(400).setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    lastfmLayout.visibility = View.GONE
+                }
+            })
+
+            // If music background was applied, restore user background
+            if (wasMusicBackgroundApplied) {
+                restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                Log.d("MainActivity", "Restoring user background after music background disabled, bgUri=${backgroundManager.getSavedBackgroundUri()}")
+                wasMusicBackgroundApplied = false // Сбрасываем флаг
+            }
         }
     }
 
+
     private fun checkForFirstLaunchAnimation() {
-        val prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE)
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val isFirstLaunch = prefs.getBoolean("isFirstLaunch", true)
 
         if (isFirstLaunch) {
             startTutorialAnimation()
+        } else {
+          checkLocationPermissionsAndLoadData()
+        }
+    }
+
+    private fun checkLocationPermissionsAndLoadData() {
+        // Проверяем, есть ли уже разрешение
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+        if (hasCoarse || hasFine) {
+            // 1. Разрешение есть. Загружаем данные как обычно.
+            loadCoordinatesAndFetchData()
+        } else {
+            // 2. Разрешения нет. Показываем наш диалог с объяснением.
+            showLocationRationaleDialog()
+        }
+    }
+
+    private fun showLocationRationaleDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.location_permission_title)) // (Добавьте это в strings.xml)
+            .setMessage(getString(R.string.location_permission_message)) // (Добавьте это в strings.xml)
+            .setPositiveButton(getString(R.string.location_permission_grant)) { _, _ ->
+                // user chose to grant permission
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                    permissionRequestCode // Это 100, как вы указали в MainActivity
+                )
+            }
+            .setNegativeButton(getString(R.string.location_permission_manual)) { _, _ ->
+                // user chose to enter location manually
+                startActivity(Intent(this, SettingsActivity::class.java))
+            }
+            .setNeutralButton(getString(android.R.string.cancel)) { dialog, _ ->
+                // user cancelled
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun loadCoordinatesAndFetchData() {
+        locationManager.loadCoordinates { lat, lon ->
+            dayTimeGetter.fetch(lat, lon) {
+                if (!hasCustomImageBackground) gradientManager.updateGradient()
+                if (isNightShiftEnabled) {
+                    fontManager.applyNightShiftTransition(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter,
+                        isNightShiftEnabled
+                    )
+                }
+                // Пересчитываем динамическое затемнение на случай, если время восхода/заката изменилось
+                if (backgroundImageView.visibility == View.VISIBLE) {
+                    setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
+                }
+            }
         }
     }
 
     private fun startTutorialAnimation() {
         // --- 1. Initial Setup ---
+        isTutorialRunning = true // flag to prevent permissions check interference during tutorial
         tutorialLayout.visibility = View.VISIBLE
         tutorialFinger.translationX = resources.displayMetrics.widthPixels.toFloat()
         tutorialFinger.translationY = -200f
-        tutorialText.text = "Welcome to ClockDesk!\nLet's take a quick tour."
+        tutorialText.text = getString(R.string.tutorial_text_1)
+
         // --- Part 1: Demonstrate Entering Edit Mode ---
-        tutorialLayout.animate().alpha(1f).setDuration(500).withEndAction {
-            tutorialText.animate().alpha(1f).setDuration(800).withEndAction {
-                tutorialText.animate().alpha(0f).setDuration(800).setStartDelay(1000)
-                    .withEndAction {
-                        // Change text for the next step
-                        tutorialText.text = "Long-press anywhere to enter Edit Mode..."
-                        tutorialText.animate().alpha(1f).setDuration(500).withEndAction {
-                            tutorialFinger.animate()
-                                .alpha(1f)
-                                .translationX(mainLayout.width / 2f - tutorialFinger.width / 2f)
-                                .translationY(mainLayout.height / 2f - tutorialFinger.height / 2f)
-                                .setDuration(1200)
-                                .withEndAction {
-                                    tutorialFinger.animate()
-                                        .scaleX(0.8f).scaleY(0.8f)
-                                        .setDuration(200)
-                                        .setStartDelay(300)
-                                        .withEndAction {
+        tutorialLayout.animate().alpha(1f).setDuration(500).setListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                tutorialText.animate().alpha(1f).setDuration(800).setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        tutorialText.animate().alpha(0f).setDuration(800).setStartDelay(1000)
+                            .setListener(object : AnimatorListenerAdapter() {
+                                override fun onAnimationEnd(animation: Animator) {
+                                    tutorialText.text = getString(R.string.tutorial_text_2)
+                                    tutorialText.animate().alpha(1f).setDuration(500).setListener(object : AnimatorListenerAdapter() {
+                                        override fun onAnimationEnd(animation: Animator) {
                                             tutorialFinger.animate()
-                                                .scaleX(0.8f).scaleY(0.8f)
-                                                .setDuration(800) // "Hold" duration
-                                                .withEndAction {
-                                                    // Trigger Edit Mode
-                                                    toggleEditMode()
-
-                                                    // --- Part 2: Demonstrate Customization ---
-                                                    // Change text for the next step
-                                                    tutorialText.text =
-                                                        "...then tap on the time or date to customize them."
-
-                                                    // Calculate target position over the time_text
-                                                    val targetX =
-                                                        timeText.x + (timeText.width / 2f) - (tutorialFinger.width / 2f)
-                                                    val targetY =
-                                                        timeText.y + (timeText.height / 2f) - (tutorialFinger.height / 2f)
-
-                                                    // Move finger from center to the time text
-                                                    tutorialFinger.animate()
-                                                        .scaleX(1f).scaleY(1f) // Un-press
-                                                        .x(targetX)
-                                                        .y(targetY)
-                                                        .setDuration(1000)
-                                                        .setStartDelay(800) // Pause to let user see edit mode
-                                                        .withEndAction {
-
-                                                            // Simulate the tap on the time text
-                                                            tutorialFinger.animate()
-                                                                .scaleX(0.8f).scaleY(0.8f)
-                                                                .setDuration(150)
-                                                                .withEndAction {
-                                                                    // As finger presses down, open the bottom sheet
-                                                                    showCustomizationBottomSheet(timeText)
-
-                                                                    // Animate finger release
+                                                .alpha(1f)
+                                                .translationX(mainLayout.width / 2f - tutorialFinger.width / 2f)
+                                                .translationY(mainLayout.height / 2f - tutorialFinger.height / 2f)
+                                                .setDuration(1200)
+                                                .setListener(object : AnimatorListenerAdapter() {
+                                                    override fun onAnimationEnd(animation: Animator) {
+                                                        tutorialFinger.animate()
+                                                            .scaleX(0.8f).scaleY(0.8f)
+                                                            .setDuration(200)
+                                                            .setStartDelay(300)
+                                                            .setListener(object : AnimatorListenerAdapter() {
+                                                                override fun onAnimationEnd(animation: Animator) {
                                                                     tutorialFinger.animate()
-                                                                        .scaleX(1f).scaleY(1f)
-                                                                        .setDuration(150)
-                                                                        .setStartDelay(200)
-                                                                        .withEndAction {
-                                                                            // --- 3. Final Cleanup ---
-                                                                            tutorialText.text =
-                                                                                "Great! Now you know the basics.\nTap anywhere to begin."
+                                                                        .scaleX(0.8f).scaleY(0.8f)
+                                                                        .setDuration(800)
+                                                                        .setListener(object : AnimatorListenerAdapter() {
+                                                                            override fun onAnimationEnd(animation: Animator) {
+                                                                                toggleEditMode()
+                                                                                tutorialText.text = getString(R.string.tutorial_text_3) // ИСПРАВЛЕНО
+                                                                                val targetX = timeText.x + (timeText.width / 2f) - (tutorialFinger.width / 2f)
+                                                                                val targetY = timeText.y + (timeText.height / 2f) - (tutorialFinger.height / 2f)
 
-                                                                            // Animate the finger away
-                                                                            tutorialFinger.animate()
-                                                                                .alpha(0f)
-                                                                                .y(targetY - 200) // Move it up a bit as it fades
-                                                                                .setDuration(500)
-                                                                                .start()
-
-                                                                            // Make the overlay clickable to dismiss
-                                                                            tutorialLayout.setOnClickListener {
-                                                                                hideBottomSheet() // Close the sheet if it's open
-                                                                                tutorialLayout.animate()
-                                                                                    .alpha(0f)
-                                                                                    .setDuration(300)
-                                                                                    .withEndAction {
-                                                                                        tutorialLayout.visibility =
-                                                                                            View.GONE
-                                                                                        // IMPORTANT: Set the flag
-                                                                                        val prefs =
-                                                                                            getSharedPreferences(
-                                                                                                "AppPrefs",
-                                                                                                MODE_PRIVATE
-                                                                                            )
-                                                                                        prefs.edit()
-                                                                                            .putBoolean(
-                                                                                                "isFirstLaunch",
-                                                                                                false
-                                                                                            )
-                                                                                            .apply()
-                                                                                    }.start()
+                                                                                tutorialFinger.animate()
+                                                                                    .scaleX(1f).scaleY(1f)
+                                                                                    .x(targetX).y(targetY)
+                                                                                    .setDuration(1000)
+                                                                                    .setStartDelay(800)
+                                                                                    .setListener(object : AnimatorListenerAdapter() {
+                                                                                        override fun onAnimationEnd(animation: Animator) {
+                                                                                            tutorialFinger.animate()
+                                                                                                .scaleX(0.8f).scaleY(0.8f)
+                                                                                                .setDuration(150)
+                                                                                                .setListener(object : AnimatorListenerAdapter() {
+                                                                                                    override fun onAnimationEnd(animation: Animator) {
+                                                                                                        showCustomizationBottomSheet(timeText)
+                                                                                                        tutorialFinger.animate()
+                                                                                                            .scaleX(1f).scaleY(1f)
+                                                                                                            .setDuration(150)
+                                                                                                            .setStartDelay(200)
+                                                                                                            .setListener(object : AnimatorListenerAdapter() {
+                                                                                                                override fun onAnimationEnd(animation: Animator) {
+                                                                                                                    tutorialText.text = getString(R.string.tutorial_text_4) // ИСПРАВЛЕНО
+                                                                                                                    tutorialFinger.animate()
+                                                                                                                        .alpha(0f)
+                                                                                                                        .y(targetY - 200)
+                                                                                                                        .setDuration(500)
+                                                                                                                        .start()
+                                                                                                                    tutorialLayout.setOnClickListener {
+                                                                                                                        hideBottomSheet()
+                                                                                                                        tutorialLayout.animate().alpha(0f).setDuration(300)
+                                                                                                                            .setListener(object : AnimatorListenerAdapter() {
+                                                                                                                                override fun onAnimationEnd(animation: Animator) {
+                                                                                                                                    tutorialLayout.visibility = View.GONE
+                                                                                                                                    val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                                                                                                                                    prefs.edit().putBoolean("isFirstLaunch", false).apply()
+                                                                                                                                    isTutorialRunning = false
+                                                                                                                                }
+                                                                                                                            })
+                                                                                                                    }
+                                                                                                                }
+                                                                                                            })
+                                                                                                    }
+                                                                                                })
+                                                                                        }
+                                                                                    })
                                                                             }
-                                                                        }.start()
-                                                                }.start()
-                                                        }.start()
-                                                }.start()
-                                        }.start()
-                                }.start()
-                        }.start()
-                    }.start()
-            }.start()
-        }.start()
+                                                                        })
+                                                                }
+                                                            })
+                                                    }
+                                                })
+                                        }
+                                    })
+                                }
+                            })
+                    }
+                })
+            }
+        })
     }
 
     // Handle add-image result from background bottom sheet
@@ -505,10 +604,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Apply image background using Glide into the ImageView; blurIntensity > 0 enables blur with that radius
-    private fun applyImageBackground(uri: Uri, blurIntensity: Int = 0) {
+    fun applyImageBackground(uri: Uri, blurIntensity: Int = 0) {
         try {
+            val targetMode = backgroundManager.getDimMode()
+            val targetIntensity = backgroundManager.getDimIntensity()
+
+            val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
+
+            val targetZoom = calculateZoom(effectiveIntensity)
             // Stop gradient updates immediately to conserve CPU/battery when previewing/applying an image
             gradientManager.stopUpdates()
+            backgroundImageView.visibility = View.VISIBLE
+            //if (backgroundManager.getDimMode() == BackgroundManager.DIM_MODE_DYNAMIC) {
+                backgroundImageView.scaleX = targetZoom
+                backgroundImageView.scaleY = targetZoom
+
+                backgroundImageView.animate()
+                    .scaleX(targetZoom + 0.4f)
+                    .scaleY(targetZoom + 0.4f)
+                    .alpha(0f)
+                    .setDuration(700)
+                    .setListener(null)
+                    .start()
+            //}
+            //stop updating dimming while loading new image
 
             // Show a progress overlay while loading/processing (especially when blurIntensity>0)
             val loadingMessage =
@@ -572,7 +691,6 @@ class MainActivity : AppCompatActivity() {
                                 // if RenderEffect fails for any reason, we already set a transformed drawable via Glide fallback
                             }
                         } else {
-                            // Ensure any previous RenderEffect is cleared on modern devices when blur==0
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                                 try {
                                     backgroundImageView.setRenderEffect(null)
@@ -581,15 +699,29 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
 
-                        // Make sure ImageView is visible over the gradient
                         backgroundImageView.visibility = View.VISIBLE
 
-                        // Apply saved dimming prefs after the image is set
-                        // Apply dim from BackgroundManager
-                        setBackgroundDimming(
-                            backgroundManager.getDimMode(),
-                            backgroundManager.getDimIntensity()
-                        )
+                        val targetMode = backgroundManager.getDimMode()
+                        val targetIntensity = backgroundManager.getDimIntensity()
+
+                        val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
+
+                        val targetZoom = calculateZoom(effectiveIntensity)
+                            backgroundImageView.scaleX = targetZoom + 0.4f
+                            backgroundImageView.scaleY = targetZoom + 0.4f
+                            backgroundImageView.animate()
+                                .scaleX(targetZoom)
+                                .scaleY(targetZoom)
+                                .alpha(1.0f)
+                                .setDuration(700)
+                                .setListener(object : AnimatorListenerAdapter() {
+                                    override fun onAnimationEnd(animation: Animator) {
+                                        setBackgroundDimming(
+                                            targetMode,
+                                            targetIntensity
+                                        )
+                                    }
+                                }).start()
                     }
 
                     override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
@@ -600,6 +732,17 @@ class MainActivity : AppCompatActivity() {
                     override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
                         super.onLoadFailed(errorDrawable)
                         setBackgroundProgressVisible(false)
+                        Toast.makeText(
+                            this@MainActivity,
+                            getString(R.string.failed_to_load_background),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        try {
+                            restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                        } catch (e: Exception) {
+                            TODO("Not yet implemented")
+                            Log.w("MainActivity", "restoreUserBackground failed: ${e.message}")
+                        }
                     }
                 })
         } catch (e: Exception) {
@@ -608,6 +751,30 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.failed_to_load_background), Toast.LENGTH_SHORT)
                 .show()
         }
+    }
+
+    private fun getEffectiveDimIntensity(mode: Int, userIntensity: Int): Int {
+        val intensity = if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
+            try {
+                // Динамический режим: рассчитать по времени
+                backgroundManager.computeEffectiveDimIntensity(
+                    clockManager.getCurrentTime(),
+                    dayTimeGetter
+                )
+            } catch (e: Exception) {
+                // В случае сбоя используем статическое значение
+                userIntensity.coerceIn(0, 50)
+            }
+        } else {
+            // Статический режим: просто используем значение пользователя
+            userIntensity.coerceIn(0, 50)
+        }
+        // Финальная гарантия, что значение в нужных пределах
+        return intensity.coerceIn(0, 50)
+    }
+
+    private fun calculateZoom(effectiveIntensity: Int): Float {
+        return 1.0f + (effectiveIntensity.coerceIn(0, 50) / 50f) * 0.2f
     }
 
     private fun setBackgroundDimming(mode: Int, intensity: Int) {
@@ -621,25 +788,14 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // Determine effective intensity. For dynamic mode, compute based on current time + sun times.
-                val effectiveIntensity = if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
-                    try {
-                        backgroundManager.computeEffectiveDimIntensity(
-                            clockManager.getCurrentTime(),
-                            dayTimeGetter
-                        )
-                    } catch (e: Exception) {
-                        // fallback to user intensity if computation fails
-                        intensity.coerceIn(0, 50)
-                    }
-                } else {
-                    // continuous mode: always use user intensity
-                    intensity.coerceIn(0, 50)
-                }
+                val effectiveIntensity = getEffectiveDimIntensity(mode, intensity)
 
-                val clamped = effectiveIntensity.coerceIn(0, 50)
+                // 2. Рассчитываем зум и альфу
+                val zoom = calculateZoom(effectiveIntensity) // <-- Используем хелпер
                 val maxAlpha = 0.8f
-                val alpha = (clamped / 50f) * maxAlpha
-                val zoom = 1.0f + (clamped / 50f) * 0.2f // up to 15% zoom
+                val alpha = (effectiveIntensity / 50f) * maxAlpha
+
+                // 3. Применяем
                 backgroundImageView.scaleX = zoom
                 backgroundImageView.scaleY = zoom
                 val alphaInt = (alpha * 255).toInt().coerceIn(0, 255)
@@ -1225,29 +1381,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun highlightImageView(isHighlighted: Boolean) {
         if (isHighlighted) {
+            val targetMode = backgroundManager.getDimMode()
+            val targetIntensity = backgroundManager.getDimIntensity()
+            val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
+            val targetScale = calculateZoom(effectiveIntensity)
             backgroundImageView.animate()
-                .scaleX(1.1f)
-                .scaleY(1.1f)
+                .scaleX(targetScale + 0.4f)
+                .scaleY(targetScale + 0.4f)
                 .setDuration(animationDuration)
                 .start()
             //backgroundImageView.setBackgroundResource(R.drawable.editable_border)
         } else {
+            val targetMode = backgroundManager.getDimMode()
+            val targetIntensity = backgroundManager.getDimIntensity()
+            val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
+            val targetScale = calculateZoom(effectiveIntensity)
             backgroundImageView.animate()
-                .scaleX(1f)
-                .scaleY(1f)
+                .scaleX(targetScale)
+                .scaleY(targetScale)
                 .setDuration(animationDuration)
                 .start()
             // if (!isEditMode) backgroundImageView.background = null
         }
     }
-
-
-//    private fun showCustomizationDialog(isTimeText: Boolean) {
-//        val dialog = CustomizationDialog(fontManager, isTimeText) {
-//            // No additional action needed; fontManager applies changes
-//        }
-//        dialog.show(supportFragmentManager, "CustomizationDialog")
-//    }
 
     private fun startUpdates() {
         clockManager.startUpdates()
@@ -1387,6 +1543,33 @@ class MainActivity : AppCompatActivity() {
          loadSavedBackground()
          startUpdates()
 
+    }
+
+    private fun restoreGradientBackground() {
+        backgroundImageView.visibility = View.GONE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                backgroundImageView.setRenderEffect(null)
+            } catch (_: Throwable) {}
+        }
+        backgroundImageView.clearColorFilter() // Сбрасываем затемнение
+        hasCustomImageBackground = false
+        gradientManager.startUpdates() // Запускаем обновления градиента
+    }
+    fun restoreUserBackground(savedUriStr: String?) {
+        if (savedUriStr != null) {
+            try {
+                val uri = Uri.parse(savedUriStr)
+                val blur = backgroundManager.getBlurIntensity() // Берем текущие настройки блюра
+                applyImageBackground(uri, blur) // Просто применяем его заново
+                hasCustomImageBackground = true
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to restore user background", e)
+                restoreGradientBackground()
+            }
+        } else {
+            restoreGradientBackground()
+        }
     }
 
     override fun onPause() {
