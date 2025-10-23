@@ -75,6 +75,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
     private lateinit var musicGetter: MusicGetter
+    private lateinit var rssTickerText: TextView
+    private var rssTicker: RssTicker? = null
     private var lastTrackInfo: String? = null
     private var wasMusicBackgroundApplied = false
     private var isEditMode = false
@@ -125,6 +127,7 @@ class MainActivity : AppCompatActivity() {
         weatherLayout = findViewById(R.id.weather_layout)
         lastfmLayout = findViewById(R.id.lastfm_layout)
         lastfmIcon = findViewById(R.id.lastfm_icon)
+        rssTickerText = findViewById(R.id.rss_ticker_text)
         nowPlayingTextView = findViewById(R.id.now_playing_text)
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
@@ -360,7 +363,25 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun updateRssTickerFromPrefs() {
+        // Stop any existing ticker
+        rssTicker?.stop()
+        rssTicker = null
+        rssTickerText.visibility = View.GONE
 
+        // Get preferences
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val rssEnabled = prefs.getBoolean("enable_rss_ticker", true)
+
+        if (rssEnabled) {
+            val rssUrl = prefs.getString("rss_feed_url", "http://www.npr.org/rss/rss.php?id=1001")
+            if (!rssUrl.isNullOrBlank()) {
+                rssTickerText.visibility = View.VISIBLE
+                // Create a new ticker with the potentially updated URL
+                rssTicker = RssTicker(rssTickerText, rssUrl)
+            }
+        }
+    }
 
     private fun checkForFirstLaunchAnimation() {
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
@@ -1408,6 +1429,7 @@ class MainActivity : AppCompatActivity() {
     private fun startUpdates() {
         clockManager.startUpdates()
         musicGetter.startUpdates()
+        rssTicker?.start()
         // Only start gradient updates if there is no custom image background
         if (!hasCustomImageBackground) {
             gradientManager.startUpdates()
@@ -1416,6 +1438,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopUpdates() {
         clockManager.stopUpdates()
+        rssTicker?.stop()
         musicGetter.stopUpdates()
         gradientManager.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
@@ -1531,18 +1554,22 @@ class MainActivity : AppCompatActivity() {
                 if (backgroundImageView.visibility == View.VISIBLE) {
                     setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
                 }
-             }
-         }
-         if (isEditMode) exitEditMode()
-         if (isDemoMode) {
+            }
+        }
+        if (isEditMode) exitEditMode()
+        if (isDemoMode) {
             isDemoMode = false
             clockManager.toggleDebugMode(false)
             gradientManager.toggleDebugMode(false)
-         }
-         // reload background in case user changed it in Settings
-         loadSavedBackground()
-         startUpdates()
+        }
+        // reload background in case user changed it in Settings
+        loadSavedBackground()
 
+        // Create/re-create the RSS ticker from preferences
+        updateRssTickerFromPrefs()
+
+        // Start all updates (including the new RSS ticker)
+        startUpdates()
     }
 
     private fun restoreGradientBackground() {

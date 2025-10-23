@@ -15,7 +15,7 @@
         app:dialogTitle="Enter Latitude"
         app:useSimpleSummaryProvider="true"
         app:dependency="useManualCoordinates"
-        android:inputType="numberDecimal|numberSigned"/>/>
+        android:inputType="numberDecimal|numberSigned"/>
 
     <EditTextPreference
         app:key="longitude"
@@ -23,7 +23,7 @@
         app:dialogTitle="Enter Longitude"
         app:useSimpleSummaryProvider="true"
         app:dependency="useManualCoordinates"
-        android:inputType="numberDecimal|numberSigned" />/>
+        android:inputType="numberDecimal|numberSigned" />
     </PreferenceCategory>
 <PreferenceCategory
     app:key="lastfm_category"
@@ -43,11 +43,27 @@
         app:title="Last.fm Username"
         app:dependency="enable_lastfm"
         app:dialogTitle="Enter Last.fm Username"
-        app:useSimpleSummaryProvider="true" />
+        app.useSimpleSummaryProvider="true" />
     <SwitchPreference
         app:key="lastfm_albumart_background"
         app:title="Set album art as background"
         app:summary="Automatically set album art as background when a new track starts playing"
         app:dependency="enable_lastfm" />
+</PreferenceCategory>
+    <PreferenceCategory
+        app:key="rss_ticker_category"
+        app:title="RSS Ticker Settings">
+        <SwitchPreferenceCompat
+            app:key="enable_rss_ticker"
+            app:title="Enable RSS Ticker"
+            app:summary="Show the RSS ticker on the main screen"
+            app:defaultValue="true"/>
+        <EditTextPreference
+            app:key="rss_feed_url"
+            app:title="RSS Feed URL"
+            app:dialogTitle="Enter RSS Feed URL"
+            app:useSimpleSummaryProvider="true"
+            app:dependency="enable_rss_ticker"
+            app:defaultValue="http://www.npr.org/rss/rss.php?id=1001" />
     </PreferenceCategory>
 </PreferenceScreen>

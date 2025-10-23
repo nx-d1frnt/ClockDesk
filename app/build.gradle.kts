@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nxd1frnt.clockdesk2"
-        minSdk = 14
+        minSdk = 19
         targetSdk = 35
         versionCode = 5
         versionName = "1.0.4"
@@ -49,4 +49,5 @@ dependencies {
     implementation(libs.volley)
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
+    implementation("com.google.android.gms:play-services-base:18.3.0")
 }
