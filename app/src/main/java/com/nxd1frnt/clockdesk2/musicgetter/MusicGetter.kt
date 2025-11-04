@@ -16,16 +16,20 @@ import javax.security.auth.callback.Callback
 open class MusicGetter(private val context: Context, private val callback: () -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
     val requestQueue = NetworkManager.getRequestQueue(context)
-
     var enabled = false
     var currentTrack: String? = null
     var currentAlbumArtUrl: String? = null
     var userPreselectedBackgroundUri: String? = null
     var wasGradientBackgroundActive = false
+    var refreshInterval: Long = 30000L
     val updateRunnable = object : Runnable {
         override fun run() {
             fetch()
-            handler.postDelayed(this, 30000) // Update every 30 seconds
+            context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE).also { prefs ->
+                refreshInterval = prefs.getInt("last_fm_refresh_interval", 30) * 1000L // convert seconds to milliseconds
+                Log.d("MusicGetter", "Refresh interval set to $refreshInterval ms")
+            }
+            handler.postDelayed(this, refreshInterval)
         }
     }
 

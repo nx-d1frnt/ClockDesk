@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2
 
+import android.content.Context
 import android.os.Handler
 import android.util.Log
 import android.widget.TextView
@@ -15,8 +16,8 @@ class ClockManager(
     private val dayTimeGetter: DayTimeGetter,
     private val locationManager: LocationManager,
     private val debugCallback: (String, String, String) -> Unit,
-    private val onTimeChanged: (Date) -> Unit
-
+    private val onTimeChanged: (Date) -> Unit,
+    initialLoggingState: Boolean
 ) {
     private var isDebugMode = false
     private val debugCycleInterval = 5L // milliseconds
@@ -27,12 +28,18 @@ class ClockManager(
     }
     private var lastRealTimeDay: Int? = null
 
+    private var additionalLoggingEnabled = initialLoggingState
+
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
             updateClock()
             handler.postDelayed(this, if (isDebugMode) debugCycleInterval else 1000)
-            Log.d("ClockUpdate", "Clock updated at ${System.currentTimeMillis()}")
+            if (additionalLoggingEnabled) Log.d("ClockUpdate", "Clock updated at ${System.currentTimeMillis()}")
         }
+    }
+
+    fun setAdditionalLogging(enabled: Boolean) {
+        additionalLoggingEnabled = enabled
     }
 
     fun getCurrentTime(): Date {
@@ -107,7 +114,7 @@ class ClockManager(
         val currentCal = Calendar.getInstance().apply { time = currentTime }
         val currentDay = currentCal.get(Calendar.DAY_OF_YEAR)
         if (lastRealTimeDay != null && lastRealTimeDay != currentDay) {
-            Log.d("ClockManager", "Day changed to ${currentCal.time}, refreshing sun times")
+            if (additionalLoggingEnabled) Log.d("ClockManager", "Day changed to ${currentCal.time}, refreshing sun times")
             locationManager.loadCoordinates { lat, lon ->
                 dayTimeGetter.fetch(lat, lon) {
                     Log.d(

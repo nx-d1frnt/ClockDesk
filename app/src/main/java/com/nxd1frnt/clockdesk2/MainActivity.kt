@@ -36,6 +36,7 @@ import android.graphics.Color
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.preference.Preference
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -64,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var backgroundCustomizationTab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var bottomSheet: LinearLayout
+    private lateinit var backgroundBottomSheet: LinearLayout
     private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
     private lateinit var tutorialLayout: ConstraintLayout
     private lateinit var tutorialFinger: ImageView
@@ -87,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
+    private var enableAdditionalLogging = false
 
     private val editModeTimeoutRunnable = Runnable {
         if (isEditMode && !isDemoMode) {
@@ -136,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         backgroundCustomizationTab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
         bottomSheet = findViewById(R.id.bottom_sheet)
+        backgroundBottomSheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         // main bottom sheet behavior
         bottomSheetBehavior = from(bottomSheet).apply {
             state = STATE_HIDDEN
@@ -143,9 +147,9 @@ class MainActivity : AppCompatActivity() {
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
 
-        // background-specific bottom sheet (used for picking backgrounds)
-        val backgroundBottomSheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         backgroundBottomSheetBehavior = from(backgroundBottomSheet).apply {
             state = STATE_HIDDEN
         }
@@ -168,7 +172,8 @@ class MainActivity : AppCompatActivity() {
             weatherIcon,
             nowPlayingTextView,
             lastfmIcon,
-            lastfmLayout
+            lastfmLayout,
+            enableAdditionalLogging
         )
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
@@ -207,13 +212,15 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     Log.w("MainActivity", "Failed to update dynamic dimming: ${e.message}")
                 }
-            }
+            },
+            enableAdditionalLogging
         )
 
         fontManager.loadFont()
 
         // Load any saved custom background image from prefs (if set)
         loadSavedBackground()
+
 
         // Ensure dim is applied if image already set
         val dimModeInit = backgroundManager.getDimMode()
@@ -356,7 +363,7 @@ class MainActivity : AppCompatActivity() {
             if (wasMusicBackgroundApplied) {
                 restoreUserBackground(backgroundManager.getSavedBackgroundUri())
                 Log.d("MainActivity", "Restoring user background after music background disabled, bgUri=${backgroundManager.getSavedBackgroundUri()}")
-                wasMusicBackgroundApplied = false // Сбрасываем флаг
+                wasMusicBackgroundApplied = false // reset flag
             }
         }
     }
@@ -365,6 +372,7 @@ class MainActivity : AppCompatActivity() {
     private fun checkForFirstLaunchAnimation() {
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val isFirstLaunch = prefs.getBoolean("isFirstLaunch", true)
+        enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
 
         if (isFirstLaunch) {
             startTutorialAnimation()
@@ -374,29 +382,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkLocationPermissionsAndLoadData() {
-        // Проверяем, есть ли уже разрешение
+        // check location permissions
         val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
         if (hasCoarse || hasFine) {
-            // 1. Разрешение есть. Загружаем данные как обычно.
+            // permissions granted
             loadCoordinatesAndFetchData()
         } else {
-            // 2. Разрешения нет. Показываем наш диалог с объяснением.
+            // show rationale dialog
             showLocationRationaleDialog()
         }
     }
 
     private fun showLocationRationaleDialog() {
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.location_permission_title)) // (Добавьте это в strings.xml)
-            .setMessage(getString(R.string.location_permission_message)) // (Добавьте это в strings.xml)
+            .setTitle(getString(R.string.location_permission_title))
+            .setMessage(getString(R.string.location_permission_message))
             .setPositiveButton(getString(R.string.location_permission_grant)) { _, _ ->
                 // user chose to grant permission
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                    permissionRequestCode // Это 100, как вы указали в MainActivity
+                    permissionRequestCode
                 )
             }
             .setNegativeButton(getString(R.string.location_permission_manual)) { _, _ ->
@@ -421,7 +429,7 @@ class MainActivity : AppCompatActivity() {
                         isNightShiftEnabled
                     )
                 }
-                // Пересчитываем динамическое затемнение на случай, если время восхода/заката изменилось
+                // recalculate dimming if needed
                 if (backgroundImageView.visibility == View.VISIBLE) {
                     setBackgroundDimming(backgroundManager.getDimMode(), backgroundManager.getDimIntensity())
                 }
@@ -629,7 +637,7 @@ class MainActivity : AppCompatActivity() {
             //}
             //stop updating dimming while loading new image
 
-            // Show a progress overlay while loading/processing (especially when blurIntensity>0)
+            // Show a progress overlay while loading/processing the image from URI
             val loadingMessage =
                 if (blurIntensity > 0) getString(R.string.blur_applying_message) else getString(R.string.loading_background_message)
             setBackgroundProgressVisible(true, loadingMessage)
@@ -646,12 +654,12 @@ class MainActivity : AppCompatActivity() {
             val maxDim = 1080
             val targetW = minOf(screenW, maxDim)
             val targetH = minOf(screenH, maxDim)
-
+            // Build Glide request with transformations
             val req = RequestOptions()
-                .transform(CenterCrop())
-                .override(targetW, targetH)
-                .downsample(DownsampleStrategy.CENTER_INSIDE)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .transform(CenterCrop()) // always center-crop
+                .override(targetW, targetH) // target size
+                .downsample(DownsampleStrategy.CENTER_INSIDE) // downsample if image is larger than target
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC) // cache strategy
 
             val finalReq = if (usePlatformBlur) {
                 // don't pre-blur bitmaps; let the view's RenderEffect handle it
@@ -663,9 +671,9 @@ class MainActivity : AppCompatActivity() {
                 req
             }
 
-            Glide.with(this)
-                .load(uri)
-                .apply(finalReq)
+            GlideApp.with(this)
+                .load(uri) // load from URI
+                .apply(finalReq) // apply options
                 .into(object :
                     com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
                     override fun onResourceReady(
@@ -674,9 +682,8 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         // Hide progress overlay (work is done)
                         setBackgroundProgressVisible(false)
-                        backgroundImageView.setImageDrawable(resource)
-                        //editmodebgImageView.setImageDrawable(resource)
-                        //editmodebgImageView.setColorFilter(Color.argb(180, 0, 0, 0), PorterDuff.Mode.SRC_OVER)
+                        backgroundImageView.setImageDrawable(resource) // set the loaded image
+
                         // Apply platform blur if available
                         if (usePlatformBlur) {
                             try {
@@ -737,6 +744,7 @@ class MainActivity : AppCompatActivity() {
                             getString(R.string.failed_to_load_background),
                             Toast.LENGTH_SHORT
                         ).show()
+                        Log.w("MainActivity", "Glide failed to load background image from URI: $uri")
                         try {
                             restoreUserBackground(backgroundManager.getSavedBackgroundUri())
                         } catch (e: Exception) {
@@ -744,6 +752,13 @@ class MainActivity : AppCompatActivity() {
                             Log.w("MainActivity", "restoreUserBackground failed: ${e.message}")
                         }
                     }
+
+                    override fun onLoadStarted(placeholder: android.graphics.drawable.Drawable?) {
+                        super.onLoadStarted(placeholder)
+                        // Show progress overlay when load starts
+                        setBackgroundProgressVisible(true, getString(R.string.loading_background_message))
+                    }
+
                 })
         } catch (e: Exception) {
             setBackgroundProgressVisible(false)
@@ -790,7 +805,7 @@ class MainActivity : AppCompatActivity() {
                 // Determine effective intensity. For dynamic mode, compute based on current time + sun times.
                 val effectiveIntensity = getEffectiveDimIntensity(mode, intensity)
 
-                // 2. Рассчитываем зум и альфу
+                // 2. Calculate parameters
                 val zoom = calculateZoom(effectiveIntensity) // <-- Используем хелпер
                 val maxAlpha = 0.8f
                 val alpha = (effectiveIntensity / 50f) * maxAlpha
@@ -810,7 +825,40 @@ class MainActivity : AppCompatActivity() {
 
     private fun setBackgroundProgressVisible(visible: Boolean, message: String? = null) {
         runOnUiThread {
-            backgroundProgressOverlay.visibility = if (visible) View.VISIBLE else View.GONE
+            if (visible) {
+                backgroundProgressOverlay.visibility = View.VISIBLE
+                backgroundProgressOverlay.alpha = 0f
+                backgroundProgressOverlay.scaleX = 1.1f
+                backgroundProgressOverlay.scaleY = 1.1f
+                backgroundProgressOverlay.animate()
+                    .alpha(0.55f)
+                    .setDuration(300)
+                    .setListener(null)
+                    .start()
+                backgroundProgressOverlay.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(300)
+                    .setListener(null)
+                    .start()
+            } else {
+                backgroundProgressOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            backgroundProgressOverlay.visibility = View.GONE
+                        }
+                    })
+                    .start()
+                backgroundProgressOverlay.animate()
+                    .scaleX(1.1f)
+                    .scaleY(1.1f)
+                    .setDuration(300)
+                    .setListener(null)
+                    .start()
+            }
+            backgroundProgressText.isSelected = true // enable marquee
             if (message != null) backgroundProgressText.text = message
         }
     }
@@ -836,6 +884,8 @@ class MainActivity : AppCompatActivity() {
             addAll(prefs.getSavedUriSet())
             add("__ADD__")
         }
+        val savedUri = backgroundManager.getSavedBackgroundUri()
+        val currentSelectionId = savedUri ?: "__DEFAULT_GRADIENT__"
 
         if (backgroundsAdapter == null) {
             backgroundsAdapter = BackgroundsAdapter(this, items) { id ->
@@ -857,7 +907,7 @@ class MainActivity : AppCompatActivity() {
                         try {
                             startActivityForResult(intent, PICK_BG_REQUEST)
                         } catch (e: ActivityNotFoundException) {
-                            Toast.makeText(this, "", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
                         }
                     }
 
@@ -903,9 +953,11 @@ class MainActivity : AppCompatActivity() {
                 LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
             recycler.isNestedScrollingEnabled = false
             recycler.adapter = backgroundsAdapter
+            backgroundsAdapter?.selectedId = currentSelectionId
         } else {
             // Update existing adapter items
             backgroundsAdapter?.updateItems(items)
+            backgroundsAdapter?.selectedId = currentSelectionId
         }
         // ensure the first two items (default/add) are visible
         recycler.scrollToPosition(0)
@@ -1211,9 +1263,12 @@ class MainActivity : AppCompatActivity() {
         dateFormatGroup.setOnCheckedChangeListener(null)
 
         // --- Initialize UI controls with the fetched values ---
-        sizeSeekBar.max = 155
+        // Arbitrary max text size (in sp) based on screen width and density
+        val maxvalue = (resources.displayMetrics.widthPixels / resources.displayMetrics.density * 0.3).toInt()
+        Log.d("MainActivity", "Setting max font size to $maxvalue dp based on screen width and density")
+        sizeSeekBar.max = maxvalue - 20
         sizeSeekBar.progress = (currentSize - 20).toInt()
-        sizeValue.text = "${currentSize.toInt()}sp"
+        sizeValue.text = getString(R.string.size_value_format, currentSize.toInt())
 
         transparencySeekBar.max = 100
         transparencySeekBar.progress = (currentAlpha * 100).toInt()
@@ -1256,7 +1311,7 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser) return
                 val size = (progress + 20).toFloat()
-                sizeValue.text = "${size.toInt()}sp"
+                sizeValue.text = getString(R.string.size_value_format, size.toInt())
                 when (focusedView?.id) {
                     R.id.time_text -> fontManager.setTimeSize(size)
                     R.id.date_text -> fontManager.setDateSize(size)
@@ -1539,8 +1594,11 @@ class MainActivity : AppCompatActivity() {
             clockManager.toggleDebugMode(false)
             gradientManager.toggleDebugMode(false)
          }
-         // reload background in case user changed it in Settings
-         loadSavedBackground()
+
+         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
+         clockManager.setAdditionalLogging(enableAdditionalLogging)
+         fontManager.setAdditionalLogging(enableAdditionalLogging)
          startUpdates()
 
     }

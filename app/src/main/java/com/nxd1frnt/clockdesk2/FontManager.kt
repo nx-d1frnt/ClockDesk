@@ -15,7 +15,7 @@ import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.Calendar
 import java.util.Date
 
-class FontManager(private val context: Context, private val timeText: TextView, private val dateText: TextView, private val weatherText: TextView, private val weatherIcon: ImageView, private val lastfmText: TextView, private val lastfmIcon: ImageView, private val lastfmLayout: LinearLayout) {
+class FontManager(private val context: Context, private val timeText: TextView, private val dateText: TextView, private val weatherText: TextView, private val weatherIcon: ImageView, private val lastfmText: TextView, private val lastfmIcon: ImageView, private val lastfmLayout: LinearLayout, initialLoggingState: Boolean) {
     private var timeFontIndex = 0
     private var dateFontIndex = 0
     private var lastfmFontIndex = 0
@@ -32,6 +32,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
     private var lastfmAlignment: Int = View.TEXT_ALIGNMENT_VIEW_START
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
+    private var additionalLoggingEnabled = initialLoggingState
 
     init {
         // Only try to read textAlignment on API 17+
@@ -94,6 +95,10 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         applyDateFont()
         applyLastfmFont()
         Log.d("FontManager", "Loaded: timeFont=$timeFontIndex, dateFont=$dateFontIndex, timeSize=$timeSize, dateSize=$dateSize, timeAlpha=$timeAlpha, dateAlpha=$dateAlpha, timeAlign=$timeAlignment, dateAlign=$dateAlignment, timeFmt=$timeFormatPattern, dateFmt=$dateFormatPattern")
+    }
+
+    fun setAdditionalLogging(enabled: Boolean) {
+        additionalLoggingEnabled = enabled
     }
 
     fun saveSettings() {
@@ -371,7 +376,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
             //weatherText.setTextColor(Color.WHITE)
             lastfmText.setTextColor(Color.WHITE)
             lastfmIcon.setColorFilter(Color.WHITE)
-            Log.d("FontManager", "Night shift disabled, set color to white")
+            if (additionalLoggingEnabled) Log.d("FontManager", "Night shift disabled, set color to white")
             return
         }
 
@@ -389,25 +394,25 @@ class FontManager(private val context: Context, private val timeText: TextView, 
 
         val color = when {
             currentTime.before(preSunrise) -> {
-                Log.d("FontManager", "Night before pre-sunrise at $currentTime, using reddish")
+                if (additionalLoggingEnabled) Log.d("FontManager", "Night before pre-sunrise at $currentTime, using reddish")
                 reddish // Full night before sunrise transition
             }
             currentTime.before(sunrise) -> {
                 val factor = (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time)
-                Log.d("FontManager", "Transitioning to day at $currentTime, factor=$factor")
+                if (additionalLoggingEnabled) Log.d("FontManager", "Transitioning to day at $currentTime, factor=$factor")
                 interpolateColor(reddish, normal, factor) // Transition to day
             }
             currentTime.before(postSunset) -> {
-                Log.d("FontManager", "Daytime at $currentTime, using white")
+                if (additionalLoggingEnabled) Log.d("FontManager", "Daytime at $currentTime, using white")
                 normal // Daytime
             }
             currentTime.before(fullNight) -> {
                 val factor = (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
-                Log.d("FontManager", "Transitioning to night at $currentTime, factor=$factor")
+                if (additionalLoggingEnabled) Log.d("FontManager", "Transitioning to night at $currentTime, factor=$factor")
                 interpolateColor(normal, reddish, factor) // Transition to night
             }
             else -> {
-                Log.d("FontManager", "Full night at $currentTime, using reddish")
+                if (additionalLoggingEnabled) Log.d("FontManager", "Full night at $currentTime, using reddish")
                 reddish // Full night
             }
         }

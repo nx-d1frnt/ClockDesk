@@ -3,51 +3,69 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
     <PreferenceCategory
         app:key="suntimeapi_category"
-        app:title="Sunset/Sunrise API Settings">
+        app:title="@string/sun_sunrise_api_settings">
 
     <SwitchPreferenceCompat
         app:key="useManualCoordinates"
-        app:title="Use Manual Coordinates"
-        app:summary="Enable to manually enter latitude and longitude" />
+        app:title="@string/use_manual_coordinates"
+        app:summary="@string/use_manual_coordinates_summary" />
     <EditTextPreference
         app:key="latitude"
-        app:title="Latitude"
-        app:dialogTitle="Enter Latitude"
+        app:title="@string/latitude_label"
+        app:dialogTitle="@string/enter_latitude"
         app:useSimpleSummaryProvider="true"
         app:dependency="useManualCoordinates"
         android:inputType="numberDecimal|numberSigned"/>/>
 
     <EditTextPreference
         app:key="longitude"
-        app:title="Longitude"
-        app:dialogTitle="Enter Longitude"
+        app:title="@string/longitude"
+        app:dialogTitle="@string/enter_longitude"
         app:useSimpleSummaryProvider="true"
         app:dependency="useManualCoordinates"
         android:inputType="numberDecimal|numberSigned" />/>
     </PreferenceCategory>
 <PreferenceCategory
     app:key="lastfm_category"
-    app:title="Last.fm API Settings">
+    app:title="@string/last_fm_api_settings">
     <SwitchPreference
         app:key="enable_lastfm"
-        app:title="Enable Last.fm Integration"
-        app:summary="Enable to fetch data from Last.fm" />
+        app:title="@string/enable_last_fm_integration"
+        app:summary="@string/enable_last_fm_integration_summary" />
     <EditTextPreference
         app:key="lastfm_api_key"
-        app:title="Last.fm API Key"
-        app:dialogTitle="Enter Last.fm API Key"
+        app:title="@string/last_fm_api_key"
+        app:dialogTitle="@string/enter_last_fm_api_key"
         app:dependency="enable_lastfm"
         app:useSimpleSummaryProvider="true" />
     <EditTextPreference
         app:key="lastfm_username"
-        app:title="Last.fm Username"
+        app:title="@string/last_fm_username"
         app:dependency="enable_lastfm"
-        app:dialogTitle="Enter Last.fm Username"
+        app:dialogTitle="@string/enter_last_fm_username"
         app:useSimpleSummaryProvider="true" />
     <SwitchPreference
         app:key="lastfm_albumart_background"
-        app:title="Set album art as background"
-        app:summary="Automatically set album art as background when a new track starts playing"
+        app:title="@string/set_album_art_as_background"
+        app:summary="@string/set_album_art_as_background_summary"
         app:dependency="enable_lastfm" />
+    <SeekBarPreference
+        app:key="last_fm_refresh_interval"
+        app:title="@string/last_fm_refresh_interval"
+        app:summary="@string/last_fm_refresh_interval_summary"
+        app:dependency="enable_lastfm"
+        android:min="5"
+        android:max="60"
+        android:defaultValue="30"
+        app:showSeekBarValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="miscellaneous_category"
+        app:title="@string/miscellaneous_settings">
+    <SwitchPreference
+        app:key="additional_logging"
+        app:title="@string/enable_additional_logging"
+        app:summary="@string/enable_additional_logging_summary" />
     </PreferenceCategory>
 </PreferenceScreen>

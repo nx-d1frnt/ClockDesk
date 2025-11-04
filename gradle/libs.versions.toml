@@ -13,6 +13,7 @@ volley = "1.2.1"
 glide = "4.15.1"
 glideTransformations = "4.3.0"
 preferenceKtx = "1.2.1"
+cardview = "1.0.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -27,6 +28,7 @@ volley = { module = "com.android.volley:volley", version.ref = "volley" }
 glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
 glideTransformations = { group = "jp.wasabeef", name = "glide-transformations", version.ref = "glideTransformations" }
 androidx-preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "preferenceKtx" }
+androidx-cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

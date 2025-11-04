@@ -49,7 +49,6 @@
     <string name="thumbnail_desc">Background thumbnail</string>
     <string name="background_image">Background image</string>
     <string name="blur_intensity">Blur intensity</string>
-    <string name="size_value_format">%ssp</string>
     <string name="blur_applying_message">Applying blur - this may take a few seconds</string>
     <string name="loading_background_message">Loading background - please wait</string>
     <string name="edit_customization">Customize background</string>
@@ -72,4 +71,27 @@
     <string name="location_permission_message">ClockDesk needs your location for fetching weather and sunset/sunrise times (for dynamic gradient background and night shift feature).\nYou can give the following permission or set the coordinates manually in settings.</string>
     <string name="location_permission_grant">Grant permission</string>
     <string name="location_permission_manual">Enter manually</string>
+    <string name="size_value_format">%dsp</string>
+    <string name="image_picker_error">Couldn\'t open image picker</string>
+
+    <!-- Preference Strings -->
+    <string name="sun_sunrise_api_settings">Sunset/Sunrise API Settings</string>
+    <string name="use_manual_coordinates_summary">Enable to manually enter latitude and longitude</string>
+    <string name="enter_latitude">Enter Latitude</string>
+    <string name="longitude">Longitude</string>
+    <string name="enter_longitude">Enter Longitude</string>
+    <string name="last_fm_api_settings">Last.fm API Settings</string>
+    <string name="enable_last_fm_integration">Enable Last.fm Integration</string>
+    <string name="enable_last_fm_integration_summary">Enable to fetch data from Last.fm</string>
+    <string name="last_fm_api_key">Last.fm API Key</string>
+    <string name="enter_last_fm_api_key">Enter Last.fm API Key</string>
+    <string name="last_fm_username">Last.fm Username</string>
+    <string name="enter_last_fm_username">Enter Last.fm Username</string>
+    <string name="set_album_art_as_background">Set album art as background</string>
+    <string name="set_album_art_as_background_summary">Automatically set album art as background when a new track starts playing</string>
+    <string name="last_fm_refresh_interval">Last.fm Refresh Interval (seconds)</string>
+    <string name="last_fm_refresh_interval_summary">Set how often to refresh Last.fm data in seconds</string>
+    <string name="miscellaneous_settings">Miscellaneous Settings</string>
+    <string name="enable_additional_logging">Enable Additional Logging</string>
+    <string name="enable_additional_logging_summary">Enable to log more detailed information for debugging purposes (may affect performance)</string>
 </resources>

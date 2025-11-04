@@ -15,8 +15,10 @@ class BackgroundsAdapter(
     private val onClick: (String) -> Unit
 ) : RecyclerView.Adapter<BackgroundsAdapter.VH>() {
 
+    var selectedId: String? = null
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val thumb: ImageView = view.findViewById(R.id.background_thumbnail)
+        val overlay: View = view.findViewById(R.id.selection_overlay)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -50,6 +52,11 @@ class BackgroundsAdapter(
         } catch (e: Exception) {
             // ignore and leave empty thumbnail
         }
+        holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
+        holder.itemView.setOnClickListener {
+            onClick(id) // Call the original click handler (for previewing)
+            updateSelection(id) // Update the visual selection
+        }
         holder.itemView.setOnClickListener { onClick(id) }
     }
 
@@ -58,5 +65,10 @@ class BackgroundsAdapter(
     fun updateItems(newItems: List<String>) {
         items = newItems
         notifyDataSetChanged()
+    }
+
+    fun updateSelection(newId: String?) {
+        selectedId = newId
+        notifyDataSetChanged() // This will re-run onBindViewHolder
     }
 }

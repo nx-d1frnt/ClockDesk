@@ -6,6 +6,52 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
     <!--    android:background="@color/md_theme_surface">-->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/background_progress_overlay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginRight="16dp"
+        app:cardBackgroundColor="@color/md_theme_background"
+        app:cardCornerRadius="32dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@android:color/transparent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="18dp">
+
+            <ProgressBar
+                android:id="@+id/background_progress_bar"
+                style="?android:attr/progressBarStyleLarge"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminate="true" />
+
+            <TextView
+                android:id="@+id/background_progress_text"
+                android:layout_width="205dp"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:layout_marginStart="16dp"
+                android:layout_marginLeft="16dp"
+                android:text="@string/applying_blur"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textColor="@color/md_theme_onBackground"
+                android:textSize="14sp" />
+            />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
     <LinearLayout
         android:id="@+id/background_layout"
         android:layout_width="match_parent"
@@ -13,6 +59,11 @@
         android:background="@drawable/gradient_background"
         android:orientation="vertical"
         app:layout_constraintTop_toTopOf="parent">
+
+<!--        <nl.dionsegijn.konfetti.xml.KonfettiView-->
+<!--            android:id="@+id/konfettiView"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="match_parent" />-->
 
         <FrameLayout
             android:id="@+id/background_frame"
@@ -28,34 +79,6 @@
                 android:visibility="gone" />
 
             <!-- Progress overlay shown while blur is being applied -->
-            <LinearLayout
-                android:id="@+id/background_progress_overlay"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:layout_gravity="center"
-                android:visibility="gone"
-                android:padding="12dp"
-                android:background="@android:color/transparent">
-
-                <ProgressBar
-                    android:id="@+id/background_progress_bar"
-                    style="?android:attr/progressBarStyleLarge"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:indeterminate="true" />
-
-                <TextView
-                    android:id="@+id/background_progress_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/applying_blur"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp"
-                    android:layout_marginTop="8dp" />
-
-            </LinearLayout>
 
         </FrameLayout>
 

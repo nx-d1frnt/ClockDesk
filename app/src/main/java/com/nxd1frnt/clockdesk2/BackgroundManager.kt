@@ -21,6 +21,8 @@ class BackgroundManager(private val context: Context) {
         private const val KEY_DIM_ENABLED = "background_dim_enabled" // legacy (0/1) kept for compatibility
         private const val KEY_DIM_INTENSITY = "background_dim_intensity"
 
+        private const val KEY_ZOOM_ENABLED = "background_zoom_enabled"
+
         const val DIM_MODE_OFF = 0
         const val DIM_MODE_CONTINUOUS = 1
         const val DIM_MODE_DYNAMIC = 2
@@ -48,9 +50,11 @@ class BackgroundManager(private val context: Context) {
     fun getBlurIntensity(): Int = prefs.getInt(KEY_BACKGROUND_BLUR_INTENSITY, 0)
     fun setBlurIntensity(v: Int) { prefs.edit().putInt(KEY_BACKGROUND_BLUR_INTENSITY, v).apply() }
 
-    // New dim mode getters/setters
     fun getDimMode(): Int = prefs.getInt(KEY_DIM_MODE, DIM_MODE_OFF)
     fun setDimMode(mode: Int) { prefs.edit().putInt(KEY_DIM_MODE, mode).apply() }
+
+    fun getZoomEnabled(): Boolean = prefs.getBoolean(KEY_ZOOM_ENABLED, false)
+    fun setZoomEnabled(enabled: Boolean) { prefs.edit().putBoolean(KEY_ZOOM_ENABLED, enabled).apply() }
 
     // Legacy compatibility: previously callers used an "enabled" int. Keep this for now.
     fun isDimEnabled(): Int = prefs.getInt(KEY_DIM_ENABLED, if (getDimMode() == DIM_MODE_OFF) 0 else 1)
