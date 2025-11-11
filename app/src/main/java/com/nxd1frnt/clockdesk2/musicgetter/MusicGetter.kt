@@ -22,11 +22,17 @@ open class MusicGetter(private val context: Context, private val callback: () ->
     var userPreselectedBackgroundUri: String? = null
     var wasGradientBackgroundActive = false
     var refreshInterval: Long = 30000L
+    private var isPowerSavingMode = false
+    private var isPlayingNow = true
     val updateRunnable = object : Runnable {
         override fun run() {
             fetch()
             context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE).also { prefs ->
-                refreshInterval = prefs.getInt("last_fm_refresh_interval", 30) * 1000L // convert seconds to milliseconds
+                val refreshInterval = when {
+                    isPowerSavingMode -> 30000L // 30 seconds
+                    //isPlayingNow -> 10000L
+                    else -> prefs.getInt("last_fm_refresh_interval", 30) * 1000L
+                }
                 Log.d("MusicGetter", "Refresh interval set to $refreshInterval ms")
             }
             handler.postDelayed(this, refreshInterval)
@@ -47,5 +53,11 @@ open class MusicGetter(private val context: Context, private val callback: () ->
         currentTrack = null
         currentAlbumArtUrl = null
         enabled = false
+    }
+
+    fun setPowerSavingMode(enabled: Boolean){
+        if (isPowerSavingMode == enabled) return
+        isPowerSavingMode = enabled
+        Log.d("MusicGetter", "Power saving mode set to $enabled")
     }
 }

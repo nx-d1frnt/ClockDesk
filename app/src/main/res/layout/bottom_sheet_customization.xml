@@ -111,12 +111,20 @@
                 android:paddingBottom="16dp"
                 android:checked="false" />
 
+<!--            <com.google.android.material.materialswitch.MaterialSwitch-->
+<!--                android:id="@+id/dynamic_color_switch"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_marginTop="8dp"-->
+<!--                android:text="@string/dynamic_text_color" />-->
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/alignment"
                 android:textSize="16sp"
-                android:paddingBottom="8dp"/>
+                android:paddingBottom="8dp"
+                android:paddingTop="8dp"/>
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/alignment_toggle_group"

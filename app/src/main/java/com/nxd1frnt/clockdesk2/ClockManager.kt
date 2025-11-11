@@ -21,6 +21,7 @@ class ClockManager(
 ) {
     private var isDebugMode = false
     private val debugCycleInterval = 5L // milliseconds
+    private var isPowerSavingMode = false
     private var simulatedTime: Calendar = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
@@ -33,9 +34,24 @@ class ClockManager(
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
             updateClock()
-            handler.postDelayed(this, if (isDebugMode) debugCycleInterval else 1000)
+            val interval = when {
+                isDebugMode -> debugCycleInterval
+                isPowerSavingMode -> 60000L // 1 minute
+                else -> 1000L // 1 second
+            }
+            handler.postDelayed(this, interval)
             if (additionalLoggingEnabled) Log.d("ClockUpdate", "Clock updated at ${System.currentTimeMillis()}")
         }
+    }
+
+    fun setPowerSavingMode(enabled: Boolean) {
+        if (isPowerSavingMode == enabled) return
+
+        isPowerSavingMode = enabled
+        Log.d("ClockManager", "Power saving mode set to $enabled")
+
+        // Re-post the runnable to apply the new interval immediately
+        startUpdates()
     }
 
     fun setAdditionalLogging(enabled: Boolean) {
@@ -62,6 +78,7 @@ class ClockManager(
         handler.removeCallbacks(clockUpdateRunnable)
         handler.post(clockUpdateRunnable)
     }
+
 
     fun stopUpdates() {
         handler.removeCallbacks(clockUpdateRunnable)

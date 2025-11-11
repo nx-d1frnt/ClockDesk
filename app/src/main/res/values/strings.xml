@@ -91,7 +91,19 @@
     <string name="set_album_art_as_background_summary">Automatically set album art as background when a new track starts playing</string>
     <string name="last_fm_refresh_interval">Last.fm Refresh Interval (seconds)</string>
     <string name="last_fm_refresh_interval_summary">Set how often to refresh Last.fm data in seconds</string>
-    <string name="miscellaneous_settings">Miscellaneous Settings</string>
+    <string name="last_fm_dynamic_refresh_rate_summary">Adjust refresh rate based on playback status (more frequent when playing)</string>
+    <string name="performance_settings">Performance and battery settings</string>
     <string name="enable_additional_logging">Enable Additional Logging</string>
     <string name="enable_additional_logging_summary">Enable to log more detailed information for debugging purposes (may affect performance)</string>
+    <string name="dynamic_text_color">Automatically adjust text color and transparency</string>
+    <string name="automatic_battery_saver_mode_title">Automatic Battery Saver Mode</string>
+    <string name="automatic_battery_saver_mode_summary">Reduce resource usage when battery saver is enabled</string>
+    <string name="battery_saver_trigger_title">Battery Saver Trigger Level</string>
+    <string name="battery_saver_trigger_summary">Set the battery level (%) at which battery saver mode activates</string>
+    <string name="battery_saver_settings_title">Battery saving settings</string>
+    <string name="smart_chips_settings_title">Smart Chips Settings</string>
+    <string name="show_battery_alert_chip">Show Battery Alert Chip</string>
+    <string name="show_battery_alert_chip_summary">Shows a chip when battery is low or app battery saver is on</string>
+    <string name="battery_low">Battery Low</string>
+    <string name="battery_saver_on">Saver On</string>
 </resources>

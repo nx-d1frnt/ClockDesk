@@ -60,10 +60,6 @@
         android:orientation="vertical"
         app:layout_constraintTop_toTopOf="parent">
 
-<!--        <nl.dionsegijn.konfetti.xml.KonfettiView-->
-<!--            android:id="@+id/konfettiView"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="match_parent" />-->
 
         <FrameLayout
             android:id="@+id/background_frame"
@@ -83,6 +79,23 @@
         </FrameLayout>
 
     </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/smart_chip_scrollview"
+        android:layout_width="165dp"
+        android:layout_height="165dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        android:scrollbars="none"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/smart_chip_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="4dp" />
+    </ScrollView>
 
     <LinearLayout
         android:id="@+id/lastfm_layout"

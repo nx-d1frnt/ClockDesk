@@ -58,14 +58,44 @@
         android:max="60"
         android:defaultValue="30"
         app:showSeekBarValue="true" />
+    <SwitchPreference
+        app:key="last_fm_dynamic_refresh_rate"
+        app:summary="@string/last_fm_dynamic_refresh_rate_summary"/>
+
     </PreferenceCategory>
 
     <PreferenceCategory
-        app:key="miscellaneous_category"
-        app:title="@string/miscellaneous_settings">
+        app:key="performance_category"
+        app:title="@string/performance_settings">
     <SwitchPreference
         app:key="additional_logging"
         app:title="@string/enable_additional_logging"
         app:summary="@string/enable_additional_logging_summary" />
+        <PreferenceCategory
+            app:key="battery_saver_category"
+            app:title="@string/battery_saver_settings_title">
+        <SwitchPreference
+            app:key="automatic_battery_saver_mode"
+            app:title="@string/automatic_battery_saver_mode_title"
+            app:summary="@string/automatic_battery_saver_mode_summary" />
+        <SeekBarPreference
+            app:key="battery_saver_trigger"
+            app:title="@string/battery_saver_trigger_title"
+            app:summary="@string/battery_saver_trigger_summary"
+            android:min="5"
+            android:max="90"
+            android:defaultValue="15"
+            app:showSeekBarValue="true"
+            app:dependency="automatic_battery_saver_mode" />
+    </PreferenceCategory>
+        <PreferenceCategory
+            app:key="smart_chips_category"
+            app:title="@string/smart_chips_settings_title">
+            <SwitchPreferenceCompat
+                app:key="show_battery_alert"
+                app:title="@string/show_battery_alert_chip"
+                app:summary="@string/show_battery_alert_chip_summary"
+                app:defaultValue="true" />
+        </PreferenceCategory>
     </PreferenceCategory>
 </PreferenceScreen>

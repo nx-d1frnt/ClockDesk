@@ -6,7 +6,11 @@ import android.animation.AnimatorListenerAdapter
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -33,7 +37,15 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import android.graphics.PorterDuff
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.GradientDrawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.BatteryManager
 import android.os.Build
+import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.preference.Preference
@@ -45,6 +57,7 @@ import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
 import com.nxd1frnt.clockdesk2.musicgetter.LastFmAPI
 import com.nxd1frnt.clockdesk2.musicgetter.MusicGetter
+import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
@@ -90,6 +103,50 @@ class MainActivity : AppCompatActivity() {
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
     private var enableAdditionalLogging = false
+    private var isPowerSavingMode = false
+    private var isAutoPowerSavingActive = false // Tracks if auto-mode did it
+    private var batteryLevelReceiver: BatteryLevelReceiver? = null
+    private lateinit var sensorManager: SensorManager
+    private var lightSensor: Sensor? = null
+    private val minPowerSaveBrightness = 0.01f
+    private lateinit var smartChipManager: SmartChipManager
+    private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
+
+    private val sensorEventListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
+                // If we are NOT in power-saving mode, do nothing.
+                // Let the system handle auto-brightness.
+                if (!isPowerSavingMode) {
+                    return
+                }
+
+                val lux = event.values[0]
+                val layoutParams = window.attributes
+
+                // We are in power-saving mode, so we apply custom logic:
+                // We map the lux value to a brightness level, but cap it
+                // to a low value (e.g., 40%) to still save power.
+
+                val newBrightness = when {
+                    lux <= 20 -> minPowerSaveBrightness      // Very dark, use minimum
+                    lux <= 500 -> 0.1f       // Dim room
+                    lux <= 5000 -> 0.25f      // Bright room
+                    else -> 0.4f             // Very bright (e.g., outdoors)
+                }
+
+                // Only update if the brightness actually needs to change
+                if (layoutParams.screenBrightness != newBrightness) {
+                    layoutParams.screenBrightness = newBrightness
+                    window.attributes = layoutParams
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            // Not needed for this
+        }
+    }
 
     private val editModeTimeoutRunnable = Runnable {
         if (isEditMode && !isDemoMode) {
@@ -216,6 +273,38 @@ class MainActivity : AppCompatActivity() {
             enableAdditionalLogging
         )
 
+        val chipContainer = findViewById<ConstraintLayout>(R.id.smart_chip_container)
+        smartChipManager = SmartChipManager(
+            this,
+            chipContainer,
+            prefs
+        )
+
+        preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            // Check if the key that changed is one of our smart chip toggles
+            val chipKeys = setOf("show_battery_alert") +
+                    smartChipManager.externalPlugins.map { it.preferenceKey }
+
+            if (chipKeys.contains(key)) {
+                smartChipManager.onPreferencesChanged()
+            }
+
+            // You can add other preference checks here too
+            when (key) {
+                "automatic_battery_saver_mode", "battery_saver_trigger" -> {
+                    // If auto-saver settings change, re-check chip status
+                    smartChipManager.onPreferencesChanged()
+                }
+                "battery_saver_mode" -> {
+                    // This is handled by SettingsFragment, but we also update the chip
+                    smartChipManager.onPreferencesChanged()
+                }
+            }
+        }
+
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
+
         fontManager.loadFont()
 
         // Load any saved custom background image from prefs (if set)
@@ -310,6 +399,11 @@ class MainActivity : AppCompatActivity() {
         startUpdates()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        smartChipManager.destroy()
+    }
+
     private val musicCallback: (()->Unit) = {
         if (musicGetter.enabled) {
             if (musicGetter.currentTrack != lastTrackInfo) {
@@ -378,6 +472,38 @@ class MainActivity : AppCompatActivity() {
             startTutorialAnimation()
         } else {
           checkLocationPermissionsAndLoadData()
+        }
+    }
+
+    private fun togglePowerSavingMode(enable: Boolean) {
+        if (enable == isPowerSavingMode) return // Already in the correct state
+
+        isPowerSavingMode = enable
+
+        if (enable) {
+            // --- ENABLE POWER SAVING ---
+
+            // Stop frequent updates
+            musicGetter.setPowerSavingMode(true)
+            gradientManager.stopUpdates()
+            clockManager.setPowerSavingMode(true)
+
+
+            // Set screen brightness to low
+            val layoutParams = window.attributes
+            layoutParams.screenBrightness = minPowerSaveBrightness
+            window.attributes = layoutParams
+
+        } else {
+            // --- DISABLE POWER SAVING ---
+            musicGetter.setPowerSavingMode(false)
+            gradientManager.startUpdates()
+            clockManager.setPowerSavingMode(false)
+
+            // Restore brightness
+            val layoutParams = window.attributes
+            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE // System default
+            window.attributes = layoutParams
         }
     }
 
@@ -622,6 +748,19 @@ class MainActivity : AppCompatActivity() {
             val targetZoom = calculateZoom(effectiveIntensity)
             // Stop gradient updates immediately to conserve CPU/battery when previewing/applying an image
             gradientManager.stopUpdates()
+            //Paint the background black while loading new image
+            val gradientDrawable = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.BLACK, Color.BLACK)
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                // Use the modern method on API 16+
+                backgroundLayout.background = gradientDrawable
+            } else {
+                // Use the older, deprecated method on API < 16
+                @Suppress("DEPRECATION")
+                backgroundLayout.setBackgroundDrawable(gradientDrawable)
+            }
             backgroundImageView.visibility = View.VISIBLE
             //if (backgroundManager.getDimMode() == BackgroundManager.DIM_MODE_DYNAMIC) {
                 backgroundImageView.scaleX = targetZoom
@@ -683,7 +822,19 @@ class MainActivity : AppCompatActivity() {
                         // Hide progress overlay (work is done)
                         setBackgroundProgressVisible(false)
                         backgroundImageView.setImageDrawable(resource) // set the loaded image
-
+                        if (fontManager.isDynamicColorEnabled()) {
+                            val bitmap = (resource as? BitmapDrawable)?.bitmap
+                            if (bitmap != null) {
+                                fontManager.updateDynamicColors(bitmap) {
+                                    // Colors are ready, force a color recalculation
+                                    fontManager.applyNightShiftTransition(
+                                        clockManager.getCurrentTime(),
+                                        dayTimeGetter,
+                                        fontManager.isNightShiftEnabled()
+                                    )
+                                }
+                            }
+                        }
                         // Apply platform blur if available
                         if (usePlatformBlur) {
                             try {
@@ -914,6 +1065,13 @@ class MainActivity : AppCompatActivity() {
                     "__DEFAULT_GRADIENT__" -> {
                         // preview default gradient: hide imageView, resume gradient updates, clear any renderEffect
                         previewBackgroundUri = "__DEFAULT_GRADIENT__"
+
+                        fontManager.clearDynamicColors()
+                        fontManager.applyNightShiftTransition(
+                            clockManager.getCurrentTime(),
+                            dayTimeGetter,
+                            fontManager.isNightShiftEnabled()
+                        )
                         try {
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                                 try {
@@ -1057,6 +1215,12 @@ class MainActivity : AppCompatActivity() {
             hasCustomImageBackground = false
             // hide image view and show gradient
             backgroundImageView.setImageDrawable(null)
+            fontManager.clearDynamicColors()
+            fontManager.applyNightShiftTransition(
+                clockManager.getCurrentTime(),
+                dayTimeGetter,
+                fontManager.isNightShiftEnabled()
+            )
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                 try {
                     backgroundImageView.setRenderEffect(null)
@@ -1090,6 +1254,12 @@ class MainActivity : AppCompatActivity() {
                     // user chose the default gradient: remove any persisted custom uri
                     backgroundManager.setSavedBackgroundUri(null)
                     hasCustomImageBackground = false
+                    fontManager.clearDynamicColors()
+                    fontManager.applyNightShiftTransition(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter,
+                        fontManager.isNightShiftEnabled()
+                    )
                     backgroundImageView.visibility = View.GONE
                     gradientManager.startUpdates()
                 }
@@ -1344,6 +1514,7 @@ class MainActivity : AppCompatActivity() {
             fontManager.setNightShiftEnabled(isChecked)
         }
 
+
         alignmentGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || !findViewById<View>(checkedId).isPressed) return@addOnButtonCheckedListener
             val alignment = when (checkedId) {
@@ -1467,12 +1638,14 @@ class MainActivity : AppCompatActivity() {
         if (!hasCustomImageBackground) {
             gradientManager.startUpdates()
         }
+        smartChipManager.startUpdates()
     }
 
     private fun stopUpdates() {
         clockManager.stopUpdates()
         musicGetter.stopUpdates()
         gradientManager.stopUpdates()
+        smartChipManager.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
 
@@ -1599,8 +1772,18 @@ class MainActivity : AppCompatActivity() {
          enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
          clockManager.setAdditionalLogging(enableAdditionalLogging)
          fontManager.setAdditionalLogging(enableAdditionalLogging)
+        if (batteryLevelReceiver == null) {
+            batteryLevelReceiver = BatteryLevelReceiver()
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            registerReceiver(batteryLevelReceiver, filter)
+        }
+        lightSensor?.let {
+            sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
+        smartChipManager.updateAllChips()
          startUpdates()
-
     }
 
     private fun restoreGradientBackground() {
@@ -1632,6 +1815,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        batteryLevelReceiver?.let {
+            unregisterReceiver(it)
+            batteryLevelReceiver = null
+        }
+        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
+        sensorManager.unregisterListener(sensorEventListener)
         stopUpdates()
     }
 
@@ -1645,6 +1835,53 @@ class MainActivity : AppCompatActivity() {
         locationManager.onRequestPermissionsResult(requestCode, grantResults) { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
+            }
+        }
+    }
+    private inner class BatteryLevelReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                val isAutoPowerSaveEnabled = prefs.getBoolean("automatic_battery_saver_mode", true)
+
+                if (!isAutoPowerSaveEnabled) {
+                    // If the user disabled the feature, do nothing.
+                    // If the mode was on, you might want to disable it.
+                    if (isAutoPowerSavingActive) {
+                        togglePowerSavingMode(false)
+                    }
+                    return
+                }
+
+                // Get battery status
+                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL
+
+                // Get battery level
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                val batteryPct = (level.toFloat() / scale.toFloat() * 100).toInt()
+
+                // Get user's threshold
+                val threshold = prefs.getInt("battery_saver_trigger", 15)
+
+                // --- Logic ---
+                if (batteryPct <= threshold && !isCharging) {
+                    // Battery is low and not charging: Turn ON power saving
+                    if (!isPowerSavingMode) {
+                        Log.d("BatteryReceiver", "Battery low ($batteryPct%), enabling power-saving mode.")
+                        togglePowerSavingMode(true)
+                        isAutoPowerSavingActive = true // Flag that this was an automatic change
+                    }
+                } else {
+                    // Battery is OK or charging: Turn OFF power saving (if we turned it on)
+                    if (isPowerSavingMode && isAutoPowerSavingActive) {
+                        Log.d("BatteryReceiver", "Battery OK ($batteryPct%) or charging, disabling auto power-saving mode.")
+                        togglePowerSavingMode(false)
+                        isAutoPowerSavingActive = false // Clear the flag
+                    }
+                }
             }
         }
     }

@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
 import android.view.Gravity
@@ -11,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
+import androidx.palette.graphics.Palette
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.Calendar
 import java.util.Date
@@ -33,6 +35,12 @@ class FontManager(private val context: Context, private val timeText: TextView, 
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
     private var additionalLoggingEnabled = initialLoggingState
+
+    private var isDynamicColorEnabled = false
+    private var dynamicColor: Int? = null
+
+    private val normalColor = Color.parseColor("#DEFFFFFF")
+    private val reddishColor = Color.parseColor("#FFDCA8") // Warm night shift color
 
     init {
         // Only try to read textAlignment on API 17+
@@ -84,6 +92,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
         lastfmAlpha = prefs.getFloat("lastfmAlpha", 0.8f)
         lastfmSize = prefs.getFloat("lastfmSize", 32f)
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
+        isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
         // Load alignments, default to current text alignment on views
         timeAlignment = prefs.getInt("timeAlignment", View.TEXT_ALIGNMENT_VIEW_START)
         dateAlignment = prefs.getInt("dateAlignment", View.TEXT_ALIGNMENT_VIEW_START)
@@ -114,6 +123,7 @@ class FontManager(private val context: Context, private val timeText: TextView, 
             putFloat("lastfmAlpha", lastfmAlpha)
             putFloat("lastfmSize", lastfmSize)
             putBoolean("nightShiftEnabled", isNightShiftEnabled)
+            putBoolean("use_dynamic_color", isDynamicColorEnabled)
             putInt("timeAlignment", timeAlignment)
             putInt("dateAlignment", dateAlignment)
             putInt("lastfmAlignment", lastfmAlignment)
@@ -131,6 +141,40 @@ class FontManager(private val context: Context, private val timeText: TextView, 
 
     fun isNightShiftEnabled(): Boolean = isNightShiftEnabled
 
+    fun updateDynamicColors(bitmap: Bitmap, onComplete: () -> Unit) {
+        Palette.from(bitmap).generate { palette ->
+//            val swatch = palette?.darkVibrantSwatch
+//                ?: palette?.vibrantSwatch
+//                ?: palette?.dominantSwatch
+//
+//            dynamicColor = swatch?.bodyTextColor
+//                ?: swatch?.titleTextColor
+//                        ?: normalColor
+
+            val accentColor = palette?.vibrantSwatch?.rgb
+                ?: palette?.lightVibrantSwatch?.rgb
+                ?: palette?.dominantSwatch?.rgb // Fallback to dominant
+                ?: normalColor // Final fallback
+
+            dynamicColor = accentColor
+
+            if (additionalLoggingEnabled) Log.d("FontManager", "Dynamic color extracted: $dynamicColor")
+            onComplete() // Notify MainActivity
+        }
+    }
+
+    fun clearDynamicColors() {
+        dynamicColor = null
+        if (additionalLoggingEnabled) Log.d("FontManager", "Dynamic colors cleared")
+    }
+
+    fun setDynamicColorEnabled(enabled: Boolean) {
+        isDynamicColorEnabled = enabled
+    }
+
+    fun isDynamicColorEnabled(): Boolean {
+        return isDynamicColorEnabled
+    }
     fun setLastfmFont(fontId: Int) {
         lastfmFontIndex = fonts.indexOf(fontId).takeIf { it >= 0 } ?: 0
         applyLastfmFont()
