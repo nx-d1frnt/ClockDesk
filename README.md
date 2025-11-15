@@ -17,6 +17,7 @@ ClockDesk is an Android app that turns any old device into a beautiful and funct
 - 🎨 Basic UI customization options
 - 🖼️ User-selectable background images
 - 🎶 Now Playing widget with Last.fm integration (requires Last.fm API key)
+- 🏷️ Smart Chips - Small, glanceable bits of info with external plugins support
 
 ### 📌 Planned Features:
 - 🌦️ Weather-aware animated effects for the background (inspired by Android 16 QPR1)
