@@ -54,4 +54,14 @@ open class DayTimeGetter(private val context: Context, private val locationManag
         }.time
         Log.d("SunTimes", "Set fallback times: sunrise=$sunriseTime, sunset=$sunsetTime")
     }
+    fun isDay(): Boolean {
+        val now = Date()
+        return if (sunriseTime != null && sunsetTime != null) {
+            now.after(sunriseTime) && now.before(sunsetTime)
+        } else {
+            val cal = Calendar.getInstance()
+            val hour = cal.get(Calendar.HOUR_OF_DAY)
+            hour in 6..18
+        }
+    }
 }

@@ -15,6 +15,7 @@ glide = "4.15.1"
 glideTransformations = "4.3.0"
 preferenceKtx = "1.2.1"
 cardview = "1.0.0"
+uiGraphics = "1.10.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,6 +32,7 @@ glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "gl
 glideTransformations = { group = "jp.wasabeef", name = "glide-transformations", version.ref = "glideTransformations" }
 androidx-preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "preferenceKtx" }
 androidx-cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version = "1.9.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

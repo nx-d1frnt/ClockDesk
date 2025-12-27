@@ -125,7 +125,7 @@ class LastFmAPI(
         val jsonObjectRequest = JsonObjectRequest(
             Request.Method.GET, url, null,
             { response ->
-                Log.d("LastFmManager", "Response JSON: ${response.toString()}")
+                //Log.d("LastFmManager", "Response JSON: $response")
 
                 try {
                     if (response.has("error")) {

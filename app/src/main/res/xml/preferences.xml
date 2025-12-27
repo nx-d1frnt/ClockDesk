@@ -71,6 +71,10 @@
         app:key="additional_logging"
         app:title="@string/enable_additional_logging"
         app:summary="@string/enable_additional_logging_summary" />
+        <SwitchPreference
+            app:key="advanced_graphics"
+            app:title="@string/enable_advanced_graphics"
+            app:summary="@string/enable_advanced_graphics_summary" />
         <PreferenceCategory
             app:key="battery_saver_category"
             app:title="@string/battery_saver_settings_title">
@@ -88,6 +92,14 @@
             app:showSeekBarValue="true"
             app:dependency="automatic_battery_saver_mode" />
     </PreferenceCategory>
+        <PreferenceCategory
+            app:key="display_category"
+            app:title="@string/display_settings_title">
+        <SwitchPreference
+            app:key="burn_in_protection"
+            app:title="@string/burn_in_protection_title"
+            app:summary="@string/burn_in_protection_summary" />
+        </PreferenceCategory>
         <PreferenceCategory
             app:key="smart_chips_category"
             app:title="@string/smart_chips_settings_title">

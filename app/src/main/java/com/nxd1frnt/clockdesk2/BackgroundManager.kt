@@ -27,6 +27,10 @@ class BackgroundManager(private val context: Context) {
         const val DIM_MODE_CONTINUOUS = 1
         const val DIM_MODE_DYNAMIC = 2
         private const val KEY_USE_ACCENT_FONT = "use_accent_font_color"
+        private const val KEY_WEATHER_ENABLED = "weather_effects_enabled"
+        private const val KEY_MANUAL_WEATHER_ENABLED = "manual_weather_enabled"
+        private const val KEY_MANUAL_WEATHER_TYPE = "manual_weather_type"
+        private const val KEY_MANUAL_WEATHER_INTENSITY = "manual_weather_intensity"
     }
 
     fun getSavedBackgroundUri(): String? = prefs.getString(KEY_BACKGROUND_URI, null)
@@ -62,6 +66,27 @@ class BackgroundManager(private val context: Context) {
 
     fun getDimIntensity(): Int = prefs.getInt(KEY_DIM_INTENSITY, 0)
     fun setDimIntensity(i: Int) { prefs.edit().putInt(KEY_DIM_INTENSITY, i).apply() }
+    fun isWeatherEffectsEnabled(): Boolean = prefs.getBoolean(KEY_WEATHER_ENABLED, true)
+    fun setWeatherEffectsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_WEATHER_ENABLED, enabled).apply()
+    }
+
+    // Manual Mode Toggle
+    fun isManualWeatherEnabled(): Boolean = prefs.getBoolean(KEY_MANUAL_WEATHER_ENABLED, false)
+    fun setManualWeatherEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MANUAL_WEATHER_ENABLED, enabled).apply()
+    }
+
+    // Saved Weather Type and Intensity
+    fun getManualWeatherType(): Int = prefs.getInt(KEY_MANUAL_WEATHER_TYPE, 1) // Default RAIN (1)
+    fun setManualWeatherType(typeOrdinal: Int) {
+        prefs.edit().putInt(KEY_MANUAL_WEATHER_TYPE, typeOrdinal).apply()
+    }
+
+    fun getManualWeatherIntensity(): Int = prefs.getInt(KEY_MANUAL_WEATHER_INTENSITY, 100)
+    fun setManualWeatherIntensity(value: Int) {
+        prefs.edit().putInt(KEY_MANUAL_WEATHER_INTENSITY, value).apply()
+    }
 
     /**
      * Compute the effective dim intensity for the provided time using sun times.

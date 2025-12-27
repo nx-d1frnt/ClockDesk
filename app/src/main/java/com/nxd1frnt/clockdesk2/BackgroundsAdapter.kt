@@ -16,7 +16,7 @@ class BackgroundsAdapter(
 ) : RecyclerView.Adapter<BackgroundsAdapter.VH>() {
 
     var selectedId: String? = null
-    inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+    class VH(view: View) : RecyclerView.ViewHolder(view) {
         val thumb: ImageView = view.findViewById(R.id.background_thumbnail)
         val overlay: View = view.findViewById(R.id.selection_overlay)
     }

@@ -20,6 +20,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
+        android:layout_weight="1"
         android:focusableInTouchMode="true"
         android:clipToPadding="false"
         android:paddingBottom="16dp">
@@ -112,17 +113,63 @@
                 android:paddingBottom="8dp"
                 android:checked="false" />
 
-<!--            <com.google.android.material.materialswitch.MaterialSwitch-->
-<!--                android:id="@+id/dynamic_color_switch"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_marginTop="8dp"-->
-<!--                android:text="@string/dynamic_text_color" />-->
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/free_mode_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/free_mode_switch"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:checked="false" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/alignment"
+                android:text="@string/text_gravity"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"
+                android:paddingTop="8dp"
+                android:visibility="gone"/>
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/text_gravity_toggle_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                app:singleSelection="true"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/gravity_left_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:text="@string/align_start"
+                    android:icon="@drawable/align_horizontal_left"/>
+
+                <Button
+                    android:id="@+id/gravity_center_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:text="@string/align_center"
+                    android:icon="@drawable/align_horizontal_center"/>
+
+                <Button
+                    android:id="@+id/gravity_right_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/align_end"
+                    android:icon="@drawable/align_horizontal_right"/>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/horizontal_alignment"
                 android:textSize="16sp"
                 android:paddingBottom="8dp"
                 android:paddingTop="8dp"/>
@@ -161,7 +208,119 @@
                     android:text="@string/align_right"
                     android:icon="@drawable/align_horizontal_right"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/vertical_alignment"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"/>
 
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/vertical_alignment_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingBottom="16dp"
+                app:singleSelection="true">
+
+                <Button
+                    android:id="@+id/align_top_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/align_top"/>
+
+                <Button
+                    android:id="@+id/align_center_vertical_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="@string/align_center"
+                    />
+
+                <Button
+                    android:id="@+id/align_bottom_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/align_bottom"/>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/grid_snap_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/snap_to_grid"
+                android:checked="true"
+                android:paddingBottom="16dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_order"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="16dp">
+
+                <Button
+                    android:id="@+id/move_up_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="@string/widget_order_up" />
+
+                <Button
+                    android:id="@+id/move_down_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/widget_order_down" />
+            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/layer_order"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"
+                android:visibility="gone"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingBottom="16dp"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/send_backward_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="@string/send_backward" />
+
+                <Button
+                    android:id="@+id/bring_forward_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/bring_forward" />
+            </LinearLayout>
             <!-- New: Time format selection -->
             <TextView
                 android:id="@+id/time_format_label"
@@ -232,28 +391,34 @@
                     android:layout_height="wrap_content"
                     android:text="@string/date_format_long" />
             </RadioGroup>
-
-            <LinearLayout
-                android:layout_width="200dp"
-                android:layout_height="56dp"
-                android:layout_marginLeft="16dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/cancel_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/cancel" />
-
-                <Button
-                    android:id="@+id/apply_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/apply" />
-            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+    <LinearLayout
+        android:id="@+id/buttons_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/main_activity_bg"
+        android:elevation="8dp"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/cancel_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:text="@string/cancel" />
+
+        <Space
+            android:layout_width="16dp"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/apply_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/apply" />
+    </LinearLayout>
 </LinearLayout>

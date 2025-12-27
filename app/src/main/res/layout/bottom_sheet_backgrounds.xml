@@ -40,6 +40,12 @@
         android:layout_height="96dp"
         android:paddingBottom="8dp" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/weather_bg_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/weather_background"
+                android:paddingTop="8dp" android:paddingBottom="8dp" />
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/background_blur_switch"
         android:layout_width="match_parent"
@@ -130,6 +136,113 @@
                 android:paddingTop="8dp"
                 android:paddingBottom="8dp" />
 
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/weather_effects_title"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="8dp"/>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/weather_effect_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/enable_weather_effects" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/manual_weather_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/manual_weather_control"
+                android:enabled="false" />
+
+            <HorizontalScrollView
+                android:id="@+id/manual_weather_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/weather_type_toggle_group"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+
+                    <Button
+                        android:id="@+id/btn_weather_clear"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/weather_rain" />
+
+                    <Button
+                        android:id="@+id/btn_weather_cloudy"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/weather_cloudy" />
+                    <Button
+                        android:id="@+id/btn_weather_rain"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/weather_rain" />
+
+                    <Button
+                        android:id="@+id/btn_weather_snow"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/weather_snow" />
+
+                    <Button
+                        android:id="@+id/btn_weather_fog"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/weather_fog" />
+
+                    <Button
+                        android:id="@+id/btn_weather_thunder"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/weather_storm" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+            </HorizontalScrollView>
+            <LinearLayout
+                android:id="@+id/weather_intensity_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:paddingTop="8dp">
+
+                <TextView
+                    android:id="@+id/weather_intensity_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/weather_intensity"
+                    android:textSize="14sp" />
+
+                <SeekBar
+                    android:id="@+id/weather_intensity_seekbar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="200"
+                    android:progress="100" />
+            </LinearLayout>
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

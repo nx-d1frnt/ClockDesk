@@ -2,9 +2,26 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/edit_mode_blur_layer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no"
+        android:contentDescription="@null"
+        app:tint="#C5000000"
+        app:tintMode="src_over"/>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/main_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <!--    android:background="@color/md_theme_surface">-->
     <androidx.cardview.widget.CardView
         android:id="@+id/background_progress_overlay"
@@ -47,8 +64,6 @@
                 android:textAppearance="@style/TextAppearance.AppCompat.Body1"
                 android:textColor="@color/md_theme_onBackground"
                 android:textSize="14sp" />
-            />
-
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
@@ -73,6 +88,11 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="@string/thumbnail_desc"
                 android:visibility="gone" />
+            
+            <com.nxd1frnt.clockdesk2.WeatherView
+                android:id="@+id/weatherView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
 
             <!-- Progress overlay shown while blur is being applied -->
 
@@ -101,9 +121,9 @@
         android:id="@+id/lastfm_layout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:layout_marginLeft="8dp"
         android:layout_marginBottom="16dp"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toTopOf="@+id/date_text"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -120,12 +140,12 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:layout_marginLeft="8dp"
-            android:text="Now playing: Not connected"
-            android:textColor="#FFFFFFFF"
-            android:singleLine="true"
             android:ellipsize="marquee"
             android:marqueeRepeatLimit="marquee_forever"
             android:scrollHorizontally="true"
+            android:singleLine="true"
+            android:text="@string/now_playing_placeholder"
+            android:textColor="#FFFFFFFF"
             android:textSize="16sp" />
 
 
@@ -175,10 +195,11 @@
         android:id="@+id/time_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="8dp"
         android:layout_marginStart="8dp"
+        android:layout_marginLeft="8dp"
         android:layout_marginBottom="16dp"
         android:fontFamily="@font/kanit_regular"
+        android:gravity="center_horizontal"
         android:includeFontPadding="false"
         android:text="00:00"
         android:textColor="#DEFFFFFF"
@@ -237,7 +258,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@drawable/image_edit_outline"
         tools:visibility="visible" />
-
+    </androidx.constraintlayout.widget.ConstraintLayout>
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/bottom_sheet_container"
         android:layout_width="match_parent"
@@ -247,12 +268,13 @@
 
         <LinearLayout
             android:id="@+id/bottom_sheet"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:background="@android:color/white"
+            android:layout_width="380dp"  android:layout_height="match_parent"
+            android:layout_gravity="end"  android:orientation="vertical"
+            android:background="@color/md_theme_background"
+            android:elevation="16dp"
             app:behavior_peekHeight="0dp"
             app:behavior_hideable="true"
+            app:behavior_skipCollapsed="true"
             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
             <include layout="@layout/bottom_sheet_customization" />
         </LinearLayout>
@@ -260,12 +282,13 @@
         <!-- Backgrounds bottom sheet (separate) -->
         <LinearLayout
             android:id="@+id/background_bottom_sheet"
-            android:layout_width="match_parent"
+            android:layout_width="380dp"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:background="@android:color/white"
+            android:background="@color/md_theme_background"
             app:behavior_peekHeight="0dp"
             app:behavior_hideable="true"
+            android:layout_gravity="end"
             app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
             <include layout="@layout/bottom_sheet_backgrounds" />
         </LinearLayout>

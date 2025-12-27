@@ -4,13 +4,19 @@ import android.content.Context
 import android.util.Log
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
 import com.nxd1frnt.clockdesk2.LocationManager
 
-class OpenMeteoAPI(private val context: Context, private val locationManager: LocationManager): WeatherGetter(context, locationManager) {
-    override fun fetch(latitude: Double, longitude: Double, callback: () -> Unit) {
+class OpenMeteoAPI(
+    context: Context,
+    locationManager: LocationManager,
+    private val onWeatherUpdated: () -> Unit
+): WeatherGetter(context, locationManager, onWeatherUpdated) {
+
+    override fun fetch(latitude: Double, longitude: Double) {
         val url =
-            "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,weather_code,is_day&forecast_days=1"
+            "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
+                    "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility" +
+                    "&forecast_days=1"
 
         val request = JsonObjectRequest(
             Request.Method.GET, url, null,
@@ -21,20 +27,43 @@ class OpenMeteoAPI(private val context: Context, private val locationManager: Lo
                     weatherCode = current.getInt("weather_code")
                     isDay = current.getInt("is_day") == 1
 
-                    Log.d("OpenMeteoApi", "Temp: $temperature°C, Code: $weatherCode, Day: $isDay")
-                    callback()
+                    windSpeed = if (current.has("wind_speed_10m")) {
+                        current.getDouble("wind_speed_10m")
+                    } else {
+                        0.0
+                    }
+
+                    precipitation = if (current.has("precipitation")) {
+                        current.getDouble("precipitation")
+                    } else {
+                        null
+                    }
+
+                    cloudCover = if (current.has("cloud_cover")) {
+                        current.getInt("cloud_cover")
+                    } else {
+                        null
+                    }
+
+                    visibility = if (current.has("visibility")) {
+                        current.getDouble("visibility")
+                    } else {
+                        null
+                    }
+
+                    Log.d("OpenMeteoApi", "Weather: Code=$weatherCode, Wind=$windSpeed km/h, " +
+                            "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m")
+
+                    onWeatherUpdated()
+
                 } catch (e: Exception) {
                     Log.e("OpenMeteoApi", "Error parsing weather JSON", e)
-                    callback()
                 }
             },
             {
-                Log.e("OpenMeteoApi", "Error fetching weather")
-                callback()
+                Log.e("OpenMeteoApi", "Error fetching weather: ${it.message}")
             }
         )
-
-        //Volley.newRequestQueue(context).add(request)
-        requestQueue.add(request) // Use shared request queue
+        requestQueue.add(request)
     }
 }
