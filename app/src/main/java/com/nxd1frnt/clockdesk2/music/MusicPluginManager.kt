@@ -112,8 +112,9 @@ class MusicPluginManager(
     private fun discoverAndRegisterExternalPlugins() {
         val pm = context.packageManager
         val queryIntent = Intent(ExternalPluginContract.ACTION_MUSIC_PLUGIN_SERVICE)
+        Log.d("MusicManager", "Querying plugins with action: ${queryIntent.action}")
         val resolveInfos = pm.queryIntentServices(queryIntent, android.content.pm.PackageManager.GET_META_DATA)
-
+        Log.d("MusicManager", "Found ${resolveInfos.size} services")
         for (resolveInfo in resolveInfos) {
             val serviceInfo = resolveInfo.serviceInfo ?: continue
             val packageName = serviceInfo.packageName
@@ -121,7 +122,7 @@ class MusicPluginManager(
 
             var displayName = serviceInfo.loadLabel(pm).toString()
             var description = "External Music Provider"
-
+            Log.d("MusicManager", "Found plugin: ${resolveInfo.serviceInfo.packageName}")
             val metaData = serviceInfo.metaData
             if (metaData != null && metaData.containsKey(ExternalPluginContract.META_DATA_PLUGIN_INFO)) {
                 val resId = metaData.getInt(ExternalPluginContract.META_DATA_PLUGIN_INFO)

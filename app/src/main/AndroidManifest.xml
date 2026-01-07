@@ -8,7 +8,11 @@
         <intent>
             <action android:name="com.nxd1frnt.clockdesk2.ACTION_QUERY_SMART_CHIPS" />
         </intent>
+        <intent>
+            <action android:name="com.nxd1frnt.clockdesk2.music.PLUGIN" />
+        </intent>
     </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

@@ -3,8 +3,10 @@ package com.nxd1frnt.clockdesk2.music.ui
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,12 +18,19 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ClockDeskMediaService
+import com.nxd1frnt.clockdesk2.music.ExternalPluginContract
 import java.util.Collections
 
 class MusicSourcesFragment : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: SourcesAdapter
+    private data class PluginInfo(
+        val id: String,
+        val name: String,
+        val desc: String,
+        val settingsActivityClassName: String? = null
+    )
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         recyclerView = RecyclerView(requireContext()).apply {
@@ -36,16 +45,49 @@ class MusicSourcesFragment : Fragment() {
 
         val prefs = requireContext().getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
-        val savedOrder = prefs.getString("music_provider_order", "system_media,lastfm") ?: "system_media,lastfm"
-        val orderList = savedOrder.split(",").map { it.trim() }.toMutableList()
+        val availablePluginsMap = loadAvailablePluginsMap()
 
-        val items = orderList.mapNotNull { id ->
-            createPluginModel(id, prefs)
+        val savedOrderString = prefs.getString("music_provider_order", "system_media,lastfm") ?: "system_media,lastfm"
+        val savedOrderList = savedOrderString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
+        val finalIdList = ArrayList<String>()
+
+        for (id in savedOrderList) {
+            if (availablePluginsMap.containsKey(id)) {
+                finalIdList.add(id)
+            }
+        }
+
+        for (id in availablePluginsMap.keys) {
+            if (!finalIdList.contains(id)) {
+                finalIdList.add(id)
+            }
+        }
+
+        val items = finalIdList.mapNotNull { id ->
+            val info = availablePluginsMap[id] ?: return@mapNotNull null
+            val key = getPrefKeyForPlugin(id)
+            val isEnabled = prefs.getBoolean(key, true)
+
+            PluginUiModel(
+                id = info.id,
+                name = info.name,
+                desc = info.desc,
+                settingsActivityClassName = info.settingsActivityClassName,
+                isEnabled = isEnabled
+            )
         }.toMutableList()
+
+        val newOrderString = items.joinToString(",") { it.id }
+        if (newOrderString != savedOrderString) {
+            prefs.edit().putString("music_provider_order", newOrderString).apply()
+        }
 
         adapter = SourcesAdapter(
             items = items,
             onClick = { pluginId ->
+                val info = availablePluginsMap[pluginId]
+
                 when (pluginId) {
                     "lastfm" -> {
                         parentFragmentManager.beginTransaction()
@@ -55,6 +97,19 @@ class MusicSourcesFragment : Fragment() {
                     }
                     "system_media" -> {
                         checkAndRequestNotificationPermission()
+                    }
+                    else -> {
+                        if (info?.settingsActivityClassName != null) {
+                            try {
+                                val intent = Intent()
+                                intent.component = ComponentName(pluginId, info.settingsActivityClassName)
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Cannot open settings", Toast.LENGTH_SHORT).show()
+                                Log.e("MusicSources", "Error launching settings", e)
+                            }
+                        }
                     }
                 }
             },
@@ -83,8 +138,8 @@ class MusicSourcesFragment : Fragment() {
                 Collections.swap(items, fromPos, toPos)
                 adapter.notifyItemMoved(fromPos, toPos)
 
-                val newOrderString = items.joinToString(",") { it.id }
-                prefs.edit().putString("music_provider_order", newOrderString).apply()
+                val newOrder = items.joinToString(",") { it.id }
+                prefs.edit().putString("music_provider_order", newOrder).apply()
                 return true
             }
 
@@ -93,6 +148,69 @@ class MusicSourcesFragment : Fragment() {
         itemTouchHelper.attachToRecyclerView(recyclerView)
     }
 
+    private fun loadAvailablePluginsMap(): Map<String, PluginInfo> {
+        val map = mutableMapOf<String, PluginInfo>()
+
+        map["system_media"] = PluginInfo(
+            "system_media",
+            getString(R.string.system_media_plugin_name),
+            getString(R.string.system_media_plugin_description),
+            settingsActivityClassName = null
+        )
+        map["lastfm"] = PluginInfo(
+            "lastfm",
+            getString(R.string.lastfm_plugin_name),
+            getString(R.string.lastfm_plugin_description),
+            settingsActivityClassName = null
+        )
+
+        val pm = requireContext().packageManager
+        val queryIntent = Intent(ExternalPluginContract.ACTION_MUSIC_PLUGIN_SERVICE)
+        val resolveInfos = pm.queryIntentServices(queryIntent, PackageManager.GET_META_DATA)
+
+        for (resolveInfo in resolveInfos) {
+            val serviceInfo = resolveInfo.serviceInfo ?: continue
+            val packageName = serviceInfo.packageName
+
+            if (map.containsKey(packageName)) continue
+
+            var displayName = serviceInfo.loadLabel(pm).toString()
+            var description = "External Music Provider"
+            var settingsActivity: String? = null
+
+            val metaData = serviceInfo.metaData
+            if (metaData != null && metaData.containsKey(ExternalPluginContract.META_DATA_PLUGIN_INFO)) {
+                val resId = metaData.getInt(ExternalPluginContract.META_DATA_PLUGIN_INFO)
+                try {
+                    val pluginRes = pm.getResourcesForApplication(packageName)
+                    val parser = pluginRes.getXml(resId)
+                    var eventType = parser.eventType
+                    while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                        if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "music-plugin") {
+                            val nameAttr = parser.getAttributeValue(null, "displayName")
+                            val descAttr = parser.getAttributeValue(null, "description")
+                            val settingsAttr = parser.getAttributeValue(null, "settingsActivity")
+
+                            if (!nameAttr.isNullOrEmpty()) displayName = nameAttr
+                            if (!descAttr.isNullOrEmpty()) description = descAttr
+                            if (!settingsAttr.isNullOrEmpty()) settingsActivity = settingsAttr
+                        }
+                        eventType = parser.next()
+                    }
+                } catch (e: Exception) {
+                    Log.e("MusicSourcesFragment", "Failed to parse plugin info for $packageName", e)
+                }
+            }
+
+            map[packageName] = PluginInfo(
+                packageName,
+                displayName,
+                description,
+                settingsActivityClassName = settingsActivity
+            )
+        }
+        return map
+    }
 
     private fun isNotificationServiceEnabled(): Boolean {
         val context = requireContext()
@@ -125,39 +243,18 @@ class MusicSourcesFragment : Fragment() {
         }
     }
 
-    private fun createPluginModel(id: String, prefs: android.content.SharedPreferences): PluginUiModel? {
-        val key = getPrefKeyForPlugin(id)
-        val isEnabled = prefs.getBoolean(key, true)
-
-        return when (id) {
-            "lastfm" -> PluginUiModel(
-                id,
-                getString(R.string.lastfm_plugin_name),
-                getString(R.string.lastfm_plugin_description),
-                true,
-                isEnabled
-            )
-            "system_media" -> PluginUiModel(
-                id,
-                getString(R.string.system_media_plugin_name),
-                getString(R.string.system_media_plugin_description),
-                true,
-                isEnabled
-            )
-            else -> {
-                PluginUiModel(id, id, "External Provider", false, isEnabled)
-            }
-        }
-    }
-
     private fun getPrefKeyForPlugin(pluginId: String): String {
         return if (pluginId == "lastfm") "enable_lastfm" else "enable_$pluginId"
     }
 }
+
 data class PluginUiModel(
     val id: String,
     val name: String,
     val desc: String,
-    val hasSettings: Boolean,
-    var isEnabled: Boolean
-)
+    val settingsActivityClassName: String? = null,
+    var isEnabled: Boolean,
+) {
+    val hasSettings: Boolean
+        get() = settingsActivityClassName != null || id == "lastfm" || id == "system_media"
+}
