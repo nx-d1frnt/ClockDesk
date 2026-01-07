@@ -139,5 +139,14 @@
     <string name="bring_forward">Bring to Front</string>
     <string name="display_settings_title">Display Settings</string>
     <string name="burn_in_protection_title">Burn-in Protection</string>
-    <string name="burn_in_protection_summary">Prevent burn-in on OLED screens by moving UI elements periodically</string>>
+    <string name="burn_in_protection_summary">Prevent burn-in on OLED screens by moving UI elements periodically</string>
+    <string name="system_media_plugin_name">System Media</string>
+    <string name="lastfm_plugin_name">Last.fm</string>
+    <string name="system_media_plugin_description">Android MediaSession</string>
+    <string name="lastfm_plugin_description">Scrobble API</string>
+    <string name="music_settings_title">Music settings</string>
+    <string name="permission_required_title">Permission Required</string>
+    <string name="permission_notification_explanation">ClockDesk needs access to notifications to read currently playing music from apps like Spotify or YouTube.\n\nPlease find ClockDesk in the list and enable it.</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="permission_already_granted">Access is already granted</string>
 </resources>

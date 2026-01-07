@@ -25,45 +25,20 @@
         app:dependency="useManualCoordinates"
         android:inputType="numberDecimal|numberSigned" />/>
     </PreferenceCategory>
-<PreferenceCategory
-    app:key="lastfm_category"
-    app:title="@string/last_fm_api_settings">
-    <SwitchPreference
-        app:key="enable_lastfm"
-        app:title="@string/enable_last_fm_integration"
-        app:summary="@string/enable_last_fm_integration_summary" />
-    <EditTextPreference
-        app:key="lastfm_api_key"
-        app:title="@string/last_fm_api_key"
-        app:dialogTitle="@string/enter_last_fm_api_key"
-        app:dependency="enable_lastfm"
-        app:useSimpleSummaryProvider="true" />
-    <EditTextPreference
-        app:key="lastfm_username"
-        app:title="@string/last_fm_username"
-        app:dependency="enable_lastfm"
-        app:dialogTitle="@string/enter_last_fm_username"
-        app:useSimpleSummaryProvider="true" />
-    <SwitchPreference
-        app:key="lastfm_albumart_background"
-        app:title="@string/set_album_art_as_background"
-        app:summary="@string/set_album_art_as_background_summary"
-        app:dependency="enable_lastfm" />
-    <SeekBarPreference
-        app:key="last_fm_refresh_interval"
-        app:title="@string/last_fm_refresh_interval"
-        app:summary="@string/last_fm_refresh_interval_summary"
-        app:dependency="enable_lastfm"
-        android:min="5"
-        android:max="60"
-        android:defaultValue="30"
-        app:showSeekBarValue="true" />
-    <SwitchPreference
-        app:key="last_fm_dynamic_refresh_rate"
-        app:summary="@string/last_fm_dynamic_refresh_rate_summary"/>
 
+    <PreferenceCategory
+        app:key="music_category"
+        app:title="@string/music_settings_title">
+    <Preference
+        app:key="music_sources_screen"
+        app:title="Music Sources"
+        app:summary="Manage priority and configure providers"
+        app:fragment="com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment" />
+        <SwitchPreference
+            app:key="lastfm_albumart_background"
+            app:title="@string/set_album_art_as_background"
+            app:summary="@string/set_album_art_as_background_summary" />
     </PreferenceCategory>
-
     <PreferenceCategory
         app:key="performance_category"
         app:title="@string/performance_settings">

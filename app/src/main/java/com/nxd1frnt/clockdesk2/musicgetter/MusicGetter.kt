@@ -13,6 +13,10 @@ import com.nxd1frnt.clockdesk2.network.NetworkManager
 import org.json.JSONException
 import javax.security.auth.callback.Callback
 
+/** DEPRECATED: Use MusicPluginManager with appropriate plugins instead.
+ * Base MusicGetter class for fetching music data.
+ */
+
 open class MusicGetter(private val context: Context, private val callback: () -> Unit) {
     private val handler = Handler(Looper.getMainLooper())
     val requestQueue = NetworkManager.getRequestQueue(context)

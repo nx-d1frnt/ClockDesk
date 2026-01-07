@@ -140,4 +140,13 @@
     <string name="display_settings_title">Налаштування відображення</string>
     <string name="burn_in_protection_title">Захист від вигорання</string>
     <string name="burn_in_protection_summary">Запобігти вигоранню на екранах OLED, періодично переміщуючи елементи інтерфейсу</string>
+    <string name="system_media_plugin_name">Системні медіа</string>
+    <string name="lastfm_plugin_name">Last.fm</string>
+    <string name="system_media_plugin_description">Android MediaSession</string>
+    <string name="lastfm_plugin_description">API для скроблінга</string>
+    <string name="music_settings_title">Налаштування музики</string>
+    <string name="permission_required_title">Необхідні дозволи</string>
+    <string name="permission_notification_explanation">ClockDesk потребує доступу до сповіщень, щоб зчитувати в даний момент відтворювану музику з таких додатків, як Spotify або YouTube.\n\nБудь ласка, знайдіть ClockDesk у списку та увімкніть його.</string>
+    <string name="open_settings">Відкрити налаштування</string>
+    <string name="permission_already_granted">Доступ вже надано</string>
 </resources>

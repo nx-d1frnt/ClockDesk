@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -40,6 +41,7 @@ import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -52,6 +54,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.preference.Preference
 import com.bumptech.glide.load.resource.bitmap.FitCenter
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -63,6 +67,9 @@ import com.nxd1frnt.clockdesk2.musicgetter.MusicGetter
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
+import com.nxd1frnt.clockdesk2.music.MusicPluginManager
+import com.nxd1frnt.clockdesk2.music.MusicTrack
+import com.nxd1frnt.clockdesk2.music.PluginState
 
 class MainActivity : AppCompatActivity() {
     private lateinit var timeText: TextView
@@ -134,7 +141,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var locationManager: LocationManager
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
-    private lateinit var musicGetter: MusicGetter
+    // private lateinit var musicGetter: MusicGetter
+    // musicgetter was replaced with music plugin manager
+   private var musicManager: MusicPluginManager? = null
     private lateinit var widgetMover: WidgetMover
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private var isAdvancedGraphicsEnabled = false
@@ -326,7 +335,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
+        //musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
+        // musicgetter was replaced with music plugin manager
+        setupMusicSystem()
         gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
         clockManager = ClockManager(
             timeText,
@@ -498,91 +509,211 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         smartChipManager.destroy()
         weatherGetter.stopUpdates()
+        musicManager?.destroy()
+    }
+    private fun setupMusicSystem() {
+        val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
+        //music manager will find all plugins by itself
+        musicManager = MusicPluginManager(this, prefs) { state ->
+            runOnUiThread {
+                handleMusicStateUpdate(state)
+            }
+        }
     }
 
-    private val musicCallback: (()->Unit) = callback@{
-       if (isEditMode) {
-       // if edit mode is active, do nothing
-           return@callback
-       } else {
-           if (musicGetter.enabled) {
-               if (musicGetter.currentTrack != lastTrackInfo) {
-                   lastfmLayout.visibility = View.VISIBLE
-                   lastfmLayout.animate().alpha(0f).setDuration(400)
-                       .setListener(object : AnimatorListenerAdapter() {
-                           override fun onAnimationEnd(animation: Animator) {
-                               if (!isEditMode) {
-                                   nowPlayingTextView.text = musicGetter.currentTrack
-                                   nowPlayingTextView.isSelected = true
-                                   lastfmLayout.animate().alpha(1f).setDuration(400).setListener(null)
-                                       .start()
-                               }
-                           }
-                       })
-                   lastTrackInfo = musicGetter.currentTrack
+    private fun handleMusicStateUpdate(state: PluginState) {
+        if (isEditMode) {
+            return
+        }
 
-                   // flag to track if we applied music background for this track
-                   var isMusicBgAppliedThisTrack = false
+        when (state) {
+            is PluginState.Playing -> {
+                val track = state.track
+                val trackInfoText = "${track.artist} - ${track.title}"
 
-                   if (musicGetter.currentAlbumArtUrl != null) {
-                       Log.d(
-                           "MainActivity",
-                           "Applying album art background: ${musicGetter.currentAlbumArtUrl}"
-                       )
-                       applyImageBackground(
-                           Uri.parse(musicGetter.currentAlbumArtUrl),
-                           backgroundManager.getBlurIntensity()
-                       )
-                       wasMusicBackgroundApplied =
-                           true // flag to indicate that music is controlling the background
-                       isMusicBgAppliedThisTrack = true // flag for this track
+                val isTextDifferent = trackInfoText != lastTrackInfo
 
-                   } else if (musicGetter.userPreselectedBackgroundUri != null) {
-                       Log.d(
-                           "MainActivity",
-                           "Applying user preselected background: ${musicGetter.userPreselectedBackgroundUri}"
-                       )
-                       applyImageBackground(
-                           Uri.parse(musicGetter.userPreselectedBackgroundUri),
-                           backgroundManager.getBlurIntensity()
-                       )
-                       wasMusicBackgroundApplied = true
-                       isMusicBgAppliedThisTrack = true
-                   }
-                   // If no new art for this track, and music had applied background before, restore user background
-                   if (!isMusicBgAppliedThisTrack && wasMusicBackgroundApplied) {
-                       Log.d(
-                           "MainActivity",
-                           "Restoring user background (track changed, no new art)"
-                       )
-                       restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-                       wasMusicBackgroundApplied = false // reset flag
-                   }
-               }
-           } else {
-               Log.d("MusicCallback", "Hiding lastfmLayout with animation")
-               lastfmLayout.animate().alpha(0f).setDuration(400)
-                   .setListener(object : AnimatorListenerAdapter() {
-                       override fun onAnimationEnd(animation: Animator) {
-                           Log.d("MusicCallback", "Animation end: isEditMode=$isEditMode")
-                           if (!isEditMode) {
-                               lastfmLayout.visibility = View.GONE
-                           }
-                       }
-                   })
+                val hasNewArt = !wasMusicBackgroundApplied &&
+                        (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
 
-               // If music background was applied, restore user background
-               if (wasMusicBackgroundApplied) {
-                   restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-                   Log.d(
-                       "MainActivity",
-                       "Restoring user background after music background disabled, bgUri=${backgroundManager.getSavedBackgroundUri()}"
-                   )
-                   wasMusicBackgroundApplied = false // reset flag
-               }
-           }
-       }
+                if (isTextDifferent) {
+                    lastTrackInfo = trackInfoText
+
+                    if (lastfmLayout.visibility != View.VISIBLE) {
+                        lastfmLayout.visibility = View.VISIBLE
+                        lastfmLayout.alpha = 0f
+                    }
+
+                    lastfmLayout.animate()
+                        .alpha(0f)
+                        .setDuration(400)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                if (!isEditMode) {
+                                    nowPlayingTextView.text = trackInfoText
+                                    nowPlayingTextView.isSelected = true
+
+                                    lastfmLayout.animate()
+                                        .alpha(1f)
+                                        .setDuration(400)
+                                        .setListener(null)
+                                        .start()
+                                }
+                            }
+                        })
+                        .start()
+                }
+
+                if (isTextDifferent || hasNewArt) {
+                    handleBackgroundUpdate(track)
+                }
+            }
+
+            is PluginState.Idle, is PluginState.Disabled -> {
+                if (lastfmLayout.visibility == View.VISIBLE) {
+                    Log.d("MainActivity", "Hiding music layout")
+                    lastfmLayout.animate()
+                        .alpha(0f)
+                        .setDuration(400)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                if (!isEditMode) {
+                                    lastfmLayout.visibility = View.GONE
+                                }
+                            }
+                        })
+                        .start()
+                }
+
+                if (wasMusicBackgroundApplied) {
+                    Log.d("MainActivity", "Restoring user background")
+                    restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                    wasMusicBackgroundApplied = false
+                    lastTrackInfo = null
+                }
+            }
+        }
     }
+
+    private fun handleBackgroundUpdate(track: MusicTrack) {
+        val blurIntensity = backgroundManager.getBlurIntensity()
+        var isMusicBgAppliedThisTrack = false
+        val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val musicBgEnabled = prefs.getBoolean("lastfm_albumart_background", true)
+        if (!musicBgEnabled) {
+            restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+            wasMusicBackgroundApplied = false
+            return
+        }
+        if (track.artworkBitmap != null) {
+            Log.d("MainActivity", "Applying bitmap album art background")
+            applyBitmapBackground(track.artworkBitmap, blurIntensity)
+
+            wasMusicBackgroundApplied = true
+            isMusicBgAppliedThisTrack = true
+        }
+        else if (!track.artworkUrl.isNullOrEmpty()) {
+            Log.d("MainActivity", "Applying URL album art background: ${track.artworkUrl}")
+            applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
+
+            wasMusicBackgroundApplied = true
+            isMusicBgAppliedThisTrack = true
+        }
+        else {
+            val savedUri = backgroundManager.getSavedBackgroundUri()
+            if (savedUri != null) {
+                if (wasMusicBackgroundApplied) {
+                    restoreUserBackground(savedUri)
+                    wasMusicBackgroundApplied = false
+                }
+            }
+        }
+    }
+
+//    private val musicCallback: (()->Unit) = callback@{
+//       if (isEditMode) {
+//       // if edit mode is active, do nothing
+//           return@callback
+//       } else {
+//           if (musicGetter.enabled) {
+//               if (musicGetter.currentTrack != lastTrackInfo) {
+//                   lastfmLayout.visibility = View.VISIBLE
+//                   lastfmLayout.animate().alpha(0f).setDuration(400)
+//                       .setListener(object : AnimatorListenerAdapter() {
+//                           override fun onAnimationEnd(animation: Animator) {
+//                               if (!isEditMode) {
+//                                   nowPlayingTextView.text = musicGetter.currentTrack
+//                                   nowPlayingTextView.isSelected = true
+//                                   lastfmLayout.animate().alpha(1f).setDuration(400).setListener(null)
+//                                       .start()
+//                               }
+//                           }
+//                       })
+//                   lastTrackInfo = musicGetter.currentTrack
+//
+//                   // flag to track if we applied music background for this track
+//                   var isMusicBgAppliedThisTrack = false
+//
+//                   if (musicGetter.currentAlbumArtUrl != null) {
+//                       Log.d(
+//                           "MainActivity",
+//                           "Applying album art background: ${musicGetter.currentAlbumArtUrl}"
+//                       )
+//                       applyImageBackground(
+//                           Uri.parse(musicGetter.currentAlbumArtUrl),
+//                           backgroundManager.getBlurIntensity()
+//                       )
+//                       wasMusicBackgroundApplied =
+//                           true // flag to indicate that music is controlling the background
+//                       isMusicBgAppliedThisTrack = true // flag for this track
+//
+//                   } else if (musicGetter.userPreselectedBackgroundUri != null) {
+//                       Log.d(
+//                           "MainActivity",
+//                           "Applying user preselected background: ${musicGetter.userPreselectedBackgroundUri}"
+//                       )
+//                       applyImageBackground(
+//                           Uri.parse(musicGetter.userPreselectedBackgroundUri),
+//                           backgroundManager.getBlurIntensity()
+//                       )
+//                       wasMusicBackgroundApplied = true
+//                       isMusicBgAppliedThisTrack = true
+//                   }
+//                   // If no new art for this track, and music had applied background before, restore user background
+//                   if (!isMusicBgAppliedThisTrack && wasMusicBackgroundApplied) {
+//                       Log.d(
+//                           "MainActivity",
+//                           "Restoring user background (track changed, no new art)"
+//                       )
+//                       restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+//                       wasMusicBackgroundApplied = false // reset flag
+//                   }
+//               }
+//           } else {
+//               Log.d("MusicCallback", "Hiding lastfmLayout with animation")
+//               lastfmLayout.animate().alpha(0f).setDuration(400)
+//                   .setListener(object : AnimatorListenerAdapter() {
+//                       override fun onAnimationEnd(animation: Animator) {
+//                           Log.d("MusicCallback", "Animation end: isEditMode=$isEditMode")
+//                           if (!isEditMode) {
+//                               lastfmLayout.visibility = View.GONE
+//                           }
+//                       }
+//                   })
+//
+//               // If music background was applied, restore user background
+//               if (wasMusicBackgroundApplied) {
+//                   restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+//                   Log.d(
+//                       "MainActivity",
+//                       "Restoring user background after music background disabled, bgUri=${backgroundManager.getSavedBackgroundUri()}"
+//                   )
+//                   wasMusicBackgroundApplied = false // reset flag
+//               }
+//           }
+//       }
+//    }
 
 
     private fun applyHeavyBlurToLayer(view: ImageView) {
@@ -617,7 +748,7 @@ class MainActivity : AppCompatActivity() {
             // --- ENABLE POWER SAVING ---
 
             // Stop frequent updates
-            musicGetter.setPowerSavingMode(true)
+            //musicGetter.setPowerSavingMode(true)
             gradientManager.stopUpdates()
             clockManager.setPowerSavingMode(true)
             weatherGetter.setPowerSavingMode(true)
@@ -629,7 +760,7 @@ class MainActivity : AppCompatActivity() {
 
         } else {
             // --- DISABLE POWER SAVING ---
-            musicGetter.setPowerSavingMode(false)
+            //musicGetter.setPowerSavingMode(false)
             gradientManager.startUpdates()
             clockManager.setPowerSavingMode(false)
             weatherGetter.setPowerSavingMode(false)
@@ -901,222 +1032,210 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Apply image background using Glide into the ImageView; blurIntensity > 0 enables blur with that radius
+
     fun applyImageBackground(uri: Uri, blurIntensity: Int = 0) {
+        loadBackgroundInternal(uri, blurIntensity)
+    }
+
+    fun applyBitmapBackground(bitmap: Bitmap, blurIntensity: Int = 0) {
+        loadBackgroundInternal(bitmap, blurIntensity)
+    }
+
+    private fun loadBackgroundInternal(model: Any, blurIntensity: Int) {
+        if (isDestroyed || isFinishing) return
         try {
             val targetMode = backgroundManager.getDimMode()
             val targetIntensity = backgroundManager.getDimIntensity()
-
             val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
-
             val targetZoom = calculateZoom(effectiveIntensity)
-            // Stop gradient updates immediately to conserve CPU/battery when previewing/applying an image
+
             gradientManager.stopUpdates()
-            //Paint the background black while loading new image
+
             val gradientDrawable = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(Color.BLACK, Color.BLACK)
             )
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                // Use the modern method on API 16+
                 backgroundLayout.background = gradientDrawable
             } else {
-                // Use the older, deprecated method on API < 16
                 @Suppress("DEPRECATION")
                 backgroundLayout.setBackgroundDrawable(gradientDrawable)
             }
+
             backgroundImageView.visibility = View.VISIBLE
-            //if (backgroundManager.getDimMode() == BackgroundManager.DIM_MODE_DYNAMIC) {
-                backgroundImageView.scaleX = targetZoom
-                backgroundImageView.scaleY = targetZoom
+            backgroundImageView.scaleX = targetZoom
+            backgroundImageView.scaleY = targetZoom
+            backgroundImageView.animate()
+                .scaleX(targetZoom + 0.4f)
+                .scaleY(targetZoom + 0.4f)
+                .alpha(0f)
+                .setDuration(700)
+                .setListener(null)
+                .start()
 
-                backgroundImageView.animate()
-                    .scaleX(targetZoom + 0.4f)
-                    .scaleY(targetZoom + 0.4f)
-                    .alpha(0f)
-                    .setDuration(700)
-                    .setListener(null)
-                    .start()
-            //}
-            //stop updating dimming while loading new image
+            val loadingMessage = if (blurIntensity > 0)
+                getString(R.string.blur_applying_message)
+            else
+                getString(R.string.loading_background_message)
 
-            // Show a progress overlay while loading/processing the image from URI
-            val loadingMessage =
-                if (blurIntensity > 0) getString(R.string.blur_applying_message) else getString(R.string.loading_background_message)
             setBackgroundProgressVisible(true, loadingMessage)
 
-            // On modern Android, prefer RenderEffect for high-quality blur on the ImageView layer
-            val usePlatformBlur =
-                blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-            // Determine a reasonable target size to avoid loading very large bitmaps into memory.
+            val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val metrics = resources.displayMetrics
-            val screenW = metrics.widthPixels
-            val screenH = metrics.heightPixels
-            // Limit to a sensible cap (e.g. 1080p) to prevent massive bitmaps on very high-res photos
             val maxDim = 1080
-            val targetW = minOf(screenW, maxDim)
-            val targetH = minOf(screenH, maxDim)
-            // Build Glide request with transformations
+            val targetW = minOf(metrics.widthPixels, maxDim)
+            val targetH = minOf(metrics.heightPixels, maxDim)
+
             val req = RequestOptions()
-                .transform(CenterCrop()) // always center-crop
-                .override(targetW, targetH) // target size
-                .downsample(DownsampleStrategy.CENTER_INSIDE) // downsample if image is larger than target
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC) // cache strategy
+                .transform(CenterCrop())
+                .override(targetW, targetH)
+                .downsample(DownsampleStrategy.CENTER_INSIDE)
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
 
             val finalReq = if (usePlatformBlur) {
-                // don't pre-blur bitmaps; let the view's RenderEffect handle it
                 req
             } else if (blurIntensity > 0) {
-                // older devices: apply our BlurTransformation on the bitmap (Glide will run this off-main-thread)
                 req.transform(CenterCrop(), BlurTransformation(blurIntensity))
             } else {
                 req
             }
 
-            GlideApp.with(this)
-                .load(uri) // load from URI
-                .apply(finalReq) // apply options
-                .into(object :
-                    com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
-                    override fun onResourceReady(
-                        resource: android.graphics.drawable.Drawable,
-                        transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
-                    ) {
-                        // Hide progress overlay (work is done)
-                        setBackgroundProgressVisible(false)
-                        backgroundImageView.setImageDrawable(resource) // set the loaded image
-                        if (fontManager.isDynamicColorEnabled()) {
-                            val bitmap = (resource as? BitmapDrawable)?.bitmap
-                            if (bitmap != null) {
-                                fontManager.updateDynamicColors(bitmap) {
-                                    // Colors are ready, force a color recalculation
-                                    fontManager.applyNightShiftTransition(
-                                        clockManager.getCurrentTime(),
-                                        dayTimeGetter,
-                                        fontManager.isNightShiftEnabled()
-                                    )
-                                }
-                            }
-                        }
-                        // Apply platform blur if available
-                        if (usePlatformBlur) {
-                            try {
-                                val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
-                                val renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                    radiusPx,
-                                    radiusPx,
-                                    android.graphics.Shader.TileMode.CLAMP
+            val mainTarget = object : CustomTarget<Drawable>() {
+                override fun onResourceReady(
+                    resource: Drawable,
+                    transition: Transition<in Drawable>?
+                ) {
+                    setBackgroundProgressVisible(false)
+                    backgroundImageView.setImageDrawable(resource)
+
+                    if (fontManager.isDynamicColorEnabled()) {
+                        val bitmap = (resource as? BitmapDrawable)?.bitmap
+                        if (bitmap != null) {
+                            fontManager.updateDynamicColors(bitmap) {
+                                fontManager.applyNightShiftTransition(
+                                    clockManager.getCurrentTime(),
+                                    dayTimeGetter,
+                                    fontManager.isNightShiftEnabled()
                                 )
-                                backgroundImageView.setRenderEffect(renderEffect)
-                            } catch (e: Throwable) {
-                                // if RenderEffect fails for any reason, we already set a transformed drawable via Glide fallback
-                            }
-                        } else {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                try {
-                                    backgroundImageView.setRenderEffect(null)
-                                } catch (_: Throwable) {
-                                }
                             }
                         }
-
-                        backgroundImageView.visibility = View.VISIBLE
-
-                        val targetMode = backgroundManager.getDimMode()
-                        val targetIntensity = backgroundManager.getDimIntensity()
-
-                        val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
-
-                        val targetZoom = calculateZoom(effectiveIntensity)
-                            backgroundImageView.scaleX = targetZoom + 0.4f
-                            backgroundImageView.scaleY = targetZoom + 0.4f
-                            backgroundImageView.animate()
-                                .scaleX(targetZoom)
-                                .scaleY(targetZoom)
-                                .alpha(1.0f)
-                                .setDuration(700)
-                                .setListener(object : AnimatorListenerAdapter() {
-                                    override fun onAnimationEnd(animation: Animator) {
-//                                        setBackgroundDimming(
-//                                            targetMode,
-//                                            targetIntensity
-//                                        )
-                                        updateBackgroundFilters()
-                                    }
-                                }).start()
                     }
 
-                    override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
-                        // Hide any overlay when load cleared
-                        setBackgroundProgressVisible(false)
-
-                    }
-
-                    override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
-                        super.onLoadFailed(errorDrawable)
-                        setBackgroundProgressVisible(false)
-                        Toast.makeText(
-                            this@MainActivity,
-                            getString(R.string.failed_to_load_background),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        Log.w("MainActivity", "Glide failed to load background image from URI: $uri")
+                    if (usePlatformBlur) {
                         try {
-                            restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-                        } catch (e: Exception) {
-                            TODO("Not yet implemented")
-                            Log.w("MainActivity", "restoreUserBackground failed: ${e.message}")
+                            val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
+                            val renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                radiusPx,
+                                radiusPx,
+                                android.graphics.Shader.TileMode.CLAMP
+                            )
+                            backgroundImageView.setRenderEffect(renderEffect)
+                        } catch (e: Throwable) { /* ignore */ }
+                    } else {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            backgroundImageView.setRenderEffect(null)
                         }
                     }
 
-                    override fun onLoadStarted(placeholder: android.graphics.drawable.Drawable?) {
-                        super.onLoadStarted(placeholder)
-                        // Show progress overlay when load starts
-                        setBackgroundProgressVisible(true, getString(R.string.loading_background_message))
-                    }
+                    backgroundImageView.visibility = View.VISIBLE
+                    val currentTargetMode = backgroundManager.getDimMode()
+                    val currentTargetIntensity = backgroundManager.getDimIntensity()
+                    val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
+                    val finalZoom = calculateZoom(currentEffectiveIntensity)
 
-                })
-            if (isAdvancedGraphicsEnabled) {
-                editModeBlurLayer.visibility = View.VISIBLE
-                val ambientReq = RequestOptions()
-                    .transform(FitCenter())
-                    .override(200, 400)
-                    .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
-                val finalAmbientReq = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                    ambientReq.transform(FitCenter(), BlurTransformation(35)) // Heavy blur
-                } else {
-                    ambientReq
+                    backgroundImageView.scaleX = finalZoom + 0.4f
+                    backgroundImageView.scaleY = finalZoom + 0.4f
+
+                    backgroundImageView.animate()
+                        .scaleX(finalZoom)
+                        .scaleY(finalZoom)
+                        .alpha(1.0f)
+                        .setDuration(700)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                updateBackgroundFilters()
+                            }
+                        }).start()
                 }
 
-                GlideApp.with(this)
-                    .load(uri)
-                    .apply(finalAmbientReq)
-                    .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
-                        override fun onResourceReady(
-                            resource: android.graphics.drawable.Drawable,
-                            transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
-                        ) {
-                            editModeBlurLayer.setImageDrawable(resource)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                applyHeavyBlurToLayer(editModeBlurLayer)
-                            } else {
-                                editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
-                            }
+                override fun onLoadCleared(placeholder: Drawable?) {
+                    setBackgroundProgressVisible(false)
+                }
+
+                override fun onLoadFailed(errorDrawable: Drawable?) {
+                    super.onLoadFailed(errorDrawable)
+                    setBackgroundProgressVisible(false)
+                    Log.w("MainActivity", "Glide failed to load background: $model")
+
+                    try {
+                        val savedUri = backgroundManager.getSavedBackgroundUri()
+                        if (model.toString() != savedUri) {
+                            restoreUserBackground(savedUri)
                         }
-                        override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
-                            editModeBlurLayer.setImageDrawable(null)
-                        }
-                    })
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to restore user background", e)
+                    }
+                }
+
+                override fun onLoadStarted(placeholder: Drawable?) {
+                    super.onLoadStarted(placeholder)
+                    setBackgroundProgressVisible(true, loadingMessage)
+                }
+            }
+
+            GlideApp.with(this)
+                .load(model)
+                .apply(finalReq)
+                .into(mainTarget)
+
+            if (isAdvancedGraphicsEnabled) {
+                applyEditModeBlurLayer(model)
             } else {
                 editModeBlurLayer.setImageDrawable(null)
                 editModeBlurLayer.visibility = View.GONE
             }
+
         } catch (e: Exception) {
             setBackgroundProgressVisible(false)
-            Log.w("MainActivity", "applyImageBackground(glide) failed: ${e.message}")
-            Toast.makeText(this, getString(R.string.failed_to_load_background), Toast.LENGTH_SHORT)
-                .show()
+            Log.e("MainActivity", "loadBackgroundInternal failed", e)
         }
+    }
+
+    private fun applyEditModeBlurLayer(model: Any) {
+        editModeBlurLayer.visibility = View.VISIBLE
+        val ambientReq = RequestOptions()
+            .transform(FitCenter())
+            .override(200, 400)
+            .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
+
+        val finalAmbientReq = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            ambientReq.transform(FitCenter(), BlurTransformation(35))
+        } else {
+            ambientReq
+        }
+
+        val editTarget = object : CustomTarget<Drawable>() {
+            override fun onResourceReady(
+                resource: Drawable,
+                transition: Transition<in Drawable>?
+            ) {
+                editModeBlurLayer.setImageDrawable(resource)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    applyHeavyBlurToLayer(editModeBlurLayer)
+                } else {
+                    editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
+                }
+            }
+            override fun onLoadCleared(placeholder: Drawable?) {
+                editModeBlurLayer.setImageDrawable(null)
+            }
+        }
+
+        GlideApp.with(this)
+            .load(model)
+            .apply(finalAmbientReq)
+            .into(editTarget)
     }
 
     private fun getEffectiveDimIntensity(mode: Int, userIntensity: Int): Int {
@@ -1730,7 +1849,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startUpdates() {
         clockManager.startUpdates()
-        musicGetter.startUpdates()
+        //musicGetter.startUpdates()
         // Only start gradient updates if there is no custom image background
         if (!hasCustomImageBackground) {
             gradientManager.startUpdates()
@@ -1747,7 +1866,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopUpdates() {
         clockManager.stopUpdates()
-        musicGetter.stopUpdates()
+        //musicGetter.stopUpdates()
         gradientManager.stopUpdates()
         smartChipManager.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
@@ -1901,9 +2020,9 @@ class MainActivity : AppCompatActivity() {
         } else
             lastfmLayout.setBackgroundDrawable(null)
 
-        if (!musicGetter.enabled || musicGetter.currentTrack.isNullOrEmpty()) {
-            lastfmLayout.visibility = View.GONE
-        }
+      //  if (!musicGetter.enabled || musicGetter.currentTrack.isNullOrEmpty()) {
+       //     lastfmLayout.visibility = View.GONE
+       // }
        // musicGetter.startUpdates()
         settingsButton.visibility = View.GONE
         debugButton.visibility = View.GONE

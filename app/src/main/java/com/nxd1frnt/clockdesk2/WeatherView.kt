@@ -27,16 +27,22 @@ class WeatherView @JvmOverloads constructor(
     private var windFactor: Float = 0f
     private var intensity: Float = 1.0f
 
-
     private var lightningAlpha: Int = 0
     private var nextLightningFrame: Int = 0
 
     private val maxParticles = 800
     private val particles = ArrayList<Particle>(maxParticles)
 
+
     private lateinit var softTextureBitmap: Bitmap
+    private lateinit var smallTextureBitmap: Bitmap
 
     private val destRect = android.graphics.RectF()
+
+    private var screenWidth = 0
+    private var screenHeight = 0
+    private var lastUpdateTime = 0L
+    private val targetFrameTime = 16L // ~60 FPS
 
     private val rainPaint = Paint().apply {
         color = Color.parseColor("#90FFFFFF")
@@ -52,8 +58,9 @@ class WeatherView @JvmOverloads constructor(
     }
 
     private val texturePaint = Paint().apply {
-        isAntiAlias = true
+        isAntiAlias = false
         isFilterBitmap = true
+        isDither = false
     }
 
     private val starPaint = Paint().apply {
@@ -73,6 +80,7 @@ class WeatherView @JvmOverloads constructor(
         var angle: Float = 0f
         var alphaSpeed: Float = 0f
         var active: Boolean = false
+        var layer: Int = 0
 
         fun reset(w: Int, h: Int, type: WeatherType, intensityMult: Float, wind: Float, isNight: Boolean) {
             val windOffset = abs(wind * h)
@@ -82,9 +90,7 @@ class WeatherView @JvmOverloads constructor(
                 WeatherType.RAIN, WeatherType.THUNDERSTORM -> {
                     x = Random.nextFloat() * (w + windOffset * 2) - windOffset
                     y = -Random.nextFloat() * h * 0.5f
-
                     speedY = (30f + Random.nextFloat() * 15f) * (0.8f + intensityMult * 0.2f)
-
                     size = 20f + Random.nextFloat() * 30f
                     alpha = (100 + Random.nextInt(155)).coerceAtMost(255)
                 }
@@ -101,18 +107,20 @@ class WeatherView @JvmOverloads constructor(
                     y = Random.nextFloat() * h
                     speedX = (Random.nextFloat() - 0.5f) * 0.5f + (wind * 0.05f)
                     speedY = (Random.nextFloat() - 0.5f) * 0.2f
-                    size = 300f + Random.nextFloat() * 300f
-                    scaleX = 1.5f + Random.nextFloat() * 1.0f
+                    size = 200f + Random.nextFloat() * 200f
+                    scaleX = 1.2f + Random.nextFloat() * 0.8f
                     alpha = 15 + Random.nextInt(35)
+                    layer = if (Random.nextBoolean()) 0 else 1
                 }
                 WeatherType.CLOUDY -> {
                     x = Random.nextFloat() * w
                     y = Random.nextFloat() * h
                     speedX = (wind * 0.2f) + (Random.nextFloat() - 0.5f) * 0.5f
                     speedY = 0f
-                    size = 400f + Random.nextFloat() * 400f
-                    scaleX = 1.2f
+                    size = 250f + Random.nextFloat() * 250f
+                    scaleX = 1.0f + Random.nextFloat() * 0.5f
                     alpha = 10 + Random.nextInt(20)
+                    layer = if (Random.nextBoolean()) 0 else 1
                 }
                 WeatherType.CLEAR -> {
                     if (isNight) {
@@ -136,15 +144,20 @@ class WeatherView @JvmOverloads constructor(
             }
             active = true
         }
+
+        fun isVisible(w: Int, h: Int): Boolean {
+            val margin = size * scaleX
+            return x > -margin && x < w + margin && y > -margin && y < h + margin
+        }
     }
 
     init {
         for (i in 0 until maxParticles) particles.add(Particle())
-        createSoftTexture()
+        createTextures()
         resetLightningTimer()
     }
 
-    private fun createSoftTexture() {
+    private fun createTextures() {
         val size = 128
         softTextureBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(softTextureBitmap)
@@ -157,10 +170,32 @@ class WeatherView @JvmOverloads constructor(
             )
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+
+        val smallSize = 64
+        smallTextureBitmap = Bitmap.createBitmap(smallSize, smallSize, Bitmap.Config.ARGB_8888)
+        val smallCanvas = Canvas(smallTextureBitmap)
+        val smallPaint = Paint().apply {
+            isAntiAlias = true
+            shader = RadialGradient(
+                smallSize / 2f, smallSize / 2f, smallSize / 2f,
+                Color.WHITE, Color.TRANSPARENT,
+                Shader.TileMode.CLAMP
+            )
+        }
+        smallCanvas.drawCircle(smallSize / 2f, smallSize / 2f, smallSize / 2f, smallPaint)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        screenWidth = w
+        screenHeight = h
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+
+        val currentTime = System.currentTimeMillis()
+        val deltaTime = currentTime - lastUpdateTime
 
         if (lightningAlpha > 0) {
             canvas.drawColor(Color.argb(lightningAlpha, 255, 255, 255))
@@ -177,11 +212,10 @@ class WeatherView @JvmOverloads constructor(
 
         val activeLimit = when (currentWeather) {
             WeatherType.FOG -> {
-
-                (20 + (40 * intensity)).toInt().coerceIn(10, 80)
+                (15 + (25 * intensity)).toInt().coerceIn(10, 40)
             }
             WeatherType.CLOUDY -> {
-                (20 + (40 * intensity)).toInt().coerceIn(15, 80)
+                (15 + (25 * intensity)).toInt().coerceIn(10, 40) // Уменьшено с 80
             }
             WeatherType.CLEAR -> {
                 if (isNight) {
@@ -195,6 +229,11 @@ class WeatherView @JvmOverloads constructor(
             }
         }
 
+        val shouldUpdate = when (currentWeather) {
+            WeatherType.FOG, WeatherType.CLOUDY -> deltaTime >= targetFrameTime * 2
+            else -> true
+        }
+
         for (i in 0 until maxParticles) {
             val p = particles[i]
             if (i >= activeLimit) {
@@ -203,9 +242,19 @@ class WeatherView @JvmOverloads constructor(
             }
             if (!p.active) p.reset(w, h, currentWeather, intensity, windFactor, isNight)
 
-            updateParticle(p, w, h)
-            drawParticle(canvas, p)
+            if (shouldUpdate) {
+                updateParticle(p, w, h)
+            }
+
+            if (p.isVisible(w, h)) {
+                drawParticle(canvas, p)
+            }
         }
+
+        if (shouldUpdate) {
+            lastUpdateTime = currentTime
+        }
+
         postInvalidateOnAnimation()
     }
 
@@ -258,7 +307,6 @@ class WeatherView @JvmOverloads constructor(
         when (currentWeather) {
             WeatherType.RAIN, WeatherType.THUNDERSTORM -> {
                 rainPaint.alpha = p.alpha
-
                 val tailY = p.y + p.size
                 val horizontalOffset = if (p.speedY != 0f) {
                     (windFactor / p.speedY) * p.size * 0.8f
@@ -275,7 +323,7 @@ class WeatherView @JvmOverloads constructor(
             WeatherType.FOG, WeatherType.CLOUDY -> {
                 val adjustedAlpha = (p.alpha * (0.5f + intensity * 0.5f)).toInt().coerceIn(0, 255)
                 texturePaint.alpha = adjustedAlpha
-                drawTexture(canvas, p)
+                drawTextureOptimized(canvas, p, true)
             }
             WeatherType.CLEAR -> {
                 if (isNight) {
@@ -285,14 +333,14 @@ class WeatherView @JvmOverloads constructor(
                 } else {
                     val adjustedAlpha = (p.alpha * (0.3f + intensity * 0.7f)).toInt().coerceIn(0, 255)
                     texturePaint.alpha = adjustedAlpha
-                    drawTexture(canvas, p)
+                    drawTextureOptimized(canvas, p, false)
                 }
             }
             else -> {}
         }
     }
 
-    private fun drawTexture(canvas: Canvas, p: Particle) {
+    private fun drawTextureOptimized(canvas: Canvas, p: Particle, useSmall: Boolean) {
         val halfSize = p.size / 2f
         val left = p.x - halfSize * p.scaleX
         val top = p.y - halfSize
@@ -300,7 +348,8 @@ class WeatherView @JvmOverloads constructor(
         val bottom = p.y + halfSize
         destRect.set(left, top, right, bottom)
 
-        canvas.drawBitmap(softTextureBitmap, null, destRect, texturePaint)
+        val bitmap = if (useSmall) smallTextureBitmap else softTextureBitmap
+        canvas.drawBitmap(bitmap, null, destRect, texturePaint)
     }
 
     private fun updateLightning() {
@@ -386,5 +435,15 @@ class WeatherView @JvmOverloads constructor(
         }
         intensity = intens
         invalidate()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        if (::softTextureBitmap.isInitialized && !softTextureBitmap.isRecycled) {
+            softTextureBitmap.recycle()
+        }
+        if (::smallTextureBitmap.isInitialized && !smallTextureBitmap.isRecycled) {
+            smallTextureBitmap.recycle()
+        }
     }
 }

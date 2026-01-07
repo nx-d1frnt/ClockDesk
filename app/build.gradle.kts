@@ -12,8 +12,8 @@ android {
         applicationId = "com.nxd1frnt.clockdesk2"
         minSdk = 14
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.3.0-beta2"
+        versionCode = 130003
+        versionName = "1.3.0-beta3"
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory app:title="Authorization">
+        <EditTextPreference
+            app:key="lastfm_username"
+            app:title="@string/last_fm_username"
+            app:dialogTitle="@string/enter_last_fm_username"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="lastfm_api_key"
+            app:title="@string/last_fm_api_key"
+            app:dialogTitle="@string/enter_last_fm_api_key"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:title="Behavior">
+        <SeekBarPreference
+            app:key="last_fm_refresh_interval"
+            app:title="@string/last_fm_refresh_interval"
+            app:summary="@string/last_fm_refresh_interval_summary"
+            android:min="5"
+            android:max="60"
+            android:defaultValue="30"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreference
+            app:key="last_fm_dynamic_refresh_rate"
+            app:summary="@string/last_fm_dynamic_refresh_rate_summary"
+            app:title="Dynamic Refresh" />
+    </PreferenceCategory>
+</PreferenceScreen>

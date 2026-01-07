@@ -8,6 +8,10 @@ import com.android.volley.toolbox.JsonObjectRequest
 import com.nxd1frnt.clockdesk2.BackgroundManager
 import org.json.JSONException
 
+
+/** * DEPRECATED: Use MusicPluginManager with LastFmPlugin instead.
+    * MusicGetter implementation for fetching music data from Last.fm API.
+ */
 class LastFmAPI(
     private val context: Context,
     private val callback: () -> Unit,

@@ -140,4 +140,13 @@
     <string name="display_settings_title">Настройки отображения</string>
     <string name="burn_in_protection_title">Защита от выгорания</string>
     <string name="burn_in_protection_summary">Предотвращение выгорания на OLED-экранах путем периодического перемещения элементов интерфейса</string>
+    <string name="system_media_plugin_name">Системные медиа</string>
+    <string name="lastfm_plugin_name">Last.fm</string>
+    <string name="system_media_plugin_description">Android MediaSession</string>
+    <string name="lastfm_plugin_description">API для скробблинга</string>
+    <string name="music_settings_title">Настройки музыки</string>
+    <string name="permission_required_title">Необходимы разрешения</string>
+    <string name="permission_notification_explanation">ClockDesk необходимо разрешение на доступ к уведомлениям, чтобы считывать текущую воспроизводимую музыку из таких приложений, как Spotify или YouTube.\n\nПожалуйста, найдите ClockDesk в списке и включите его.</string>
+    <string name="open_settings">Открыть настройки</string>
+    <string name="permission_already_granted">Доступ уже предоставлен</string>
 </resources>
