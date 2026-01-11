@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2.smartchips
+package com.nxd1frnt.clockdesk2.smartchips.plugins
 
 import android.content.Context
 import android.content.Intent
@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
 
 class BatteryAlertPlugin(private val context: Context) : ISmartChip {
 
@@ -35,7 +36,9 @@ class BatteryAlertPlugin(private val context: Context) : ISmartChip {
 
         // Check 2: Is the AUTOMATIC saver condition met?
         // Get battery status
-        val batteryStatus: Intent? = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val batteryStatus: Intent? = context.registerReceiver(null,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        )
         val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                 status == BatteryManager.BATTERY_STATUS_FULL

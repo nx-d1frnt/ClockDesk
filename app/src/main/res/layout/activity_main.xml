@@ -89,7 +89,7 @@
                 android:contentDescription="@string/thumbnail_desc"
                 android:visibility="gone" />
             
-            <com.nxd1frnt.clockdesk2.WeatherView
+            <com.nxd1frnt.clockdesk2.ui.view.WeatherView
                 android:id="@+id/weatherView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>

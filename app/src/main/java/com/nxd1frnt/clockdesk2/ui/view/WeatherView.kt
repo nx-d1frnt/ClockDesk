@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.ui.view
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -6,9 +6,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.View
+import com.nxd1frnt.clockdesk2.calculateWeatherIntensity
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
@@ -37,7 +39,7 @@ class WeatherView @JvmOverloads constructor(
     private lateinit var softTextureBitmap: Bitmap
     private lateinit var smallTextureBitmap: Bitmap
 
-    private val destRect = android.graphics.RectF()
+    private val destRect = RectF()
 
     private var screenWidth = 0
     private var screenHeight = 0
@@ -88,56 +90,56 @@ class WeatherView @JvmOverloads constructor(
 
             when (type) {
                 WeatherType.RAIN, WeatherType.THUNDERSTORM -> {
-                    x = Random.nextFloat() * (w + windOffset * 2) - windOffset
-                    y = -Random.nextFloat() * h * 0.5f
-                    speedY = (30f + Random.nextFloat() * 15f) * (0.8f + intensityMult * 0.2f)
-                    size = 20f + Random.nextFloat() * 30f
-                    alpha = (100 + Random.nextInt(155)).coerceAtMost(255)
+                    x = Random.Default.nextFloat() * (w + windOffset * 2) - windOffset
+                    y = -Random.Default.nextFloat() * h * 0.5f
+                    speedY = (30f + Random.Default.nextFloat() * 15f) * (0.8f + intensityMult * 0.2f)
+                    size = 20f + Random.Default.nextFloat() * 30f
+                    alpha = (100 + Random.Default.nextInt(155)).coerceAtMost(255)
                 }
                 WeatherType.SNOW -> {
-                    x = Random.nextFloat() * (w + windOffset * 2) - windOffset
-                    y = -Random.nextFloat() * h * 0.5f
-                    speedY = 2f + Random.nextFloat() * 4f
-                    size = 4f + Random.nextFloat() * 6f
-                    alpha = 150 + Random.nextInt(105)
-                    angle = Random.nextFloat() * 360f
+                    x = Random.Default.nextFloat() * (w + windOffset * 2) - windOffset
+                    y = -Random.Default.nextFloat() * h * 0.5f
+                    speedY = 2f + Random.Default.nextFloat() * 4f
+                    size = 4f + Random.Default.nextFloat() * 6f
+                    alpha = 150 + Random.Default.nextInt(105)
+                    angle = Random.Default.nextFloat() * 360f
                 }
                 WeatherType.FOG -> {
-                    x = Random.nextFloat() * w
-                    y = Random.nextFloat() * h
-                    speedX = (Random.nextFloat() - 0.5f) * 0.5f + (wind * 0.05f)
-                    speedY = (Random.nextFloat() - 0.5f) * 0.2f
-                    size = 200f + Random.nextFloat() * 200f
-                    scaleX = 1.2f + Random.nextFloat() * 0.8f
-                    alpha = 15 + Random.nextInt(35)
-                    layer = if (Random.nextBoolean()) 0 else 1
+                    x = Random.Default.nextFloat() * w
+                    y = Random.Default.nextFloat() * h
+                    speedX = (Random.Default.nextFloat() - 0.5f) * 0.5f + (wind * 0.05f)
+                    speedY = (Random.Default.nextFloat() - 0.5f) * 0.2f
+                    size = 200f + Random.Default.nextFloat() * 200f
+                    scaleX = 1.2f + Random.Default.nextFloat() * 0.8f
+                    alpha = 15 + Random.Default.nextInt(35)
+                    layer = if (Random.Default.nextBoolean()) 0 else 1
                 }
                 WeatherType.CLOUDY -> {
-                    x = Random.nextFloat() * w
-                    y = Random.nextFloat() * h
-                    speedX = (wind * 0.2f) + (Random.nextFloat() - 0.5f) * 0.5f
+                    x = Random.Default.nextFloat() * w
+                    y = Random.Default.nextFloat() * h
+                    speedX = (wind * 0.2f) + (Random.Default.nextFloat() - 0.5f) * 0.5f
                     speedY = 0f
-                    size = 250f + Random.nextFloat() * 250f
-                    scaleX = 1.0f + Random.nextFloat() * 0.5f
-                    alpha = 10 + Random.nextInt(20)
-                    layer = if (Random.nextBoolean()) 0 else 1
+                    size = 250f + Random.Default.nextFloat() * 250f
+                    scaleX = 1.0f + Random.Default.nextFloat() * 0.5f
+                    alpha = 10 + Random.Default.nextInt(20)
+                    layer = if (Random.Default.nextBoolean()) 0 else 1
                 }
                 WeatherType.CLEAR -> {
                     if (isNight) {
-                        x = Random.nextFloat() * w
-                        y = Random.nextFloat() * h
+                        x = Random.Default.nextFloat() * w
+                        y = Random.Default.nextFloat() * h
                         speedX = 0f; speedY = 0f
-                        size = 2f + Random.nextFloat() * 4f
-                        alpha = Random.nextInt(255)
-                        angle = Random.nextFloat() * 360f
-                        alphaSpeed = 0.02f + Random.nextFloat() * 0.03f
+                        size = 2f + Random.Default.nextFloat() * 4f
+                        alpha = Random.Default.nextInt(255)
+                        angle = Random.Default.nextFloat() * 360f
+                        alphaSpeed = 0.02f + Random.Default.nextFloat() * 0.03f
                     } else {
-                        x = Random.nextFloat() * w
-                        y = Random.nextFloat() * h
-                        speedX = (Random.nextFloat() - 0.5f) * 0.3f
-                        speedY = (Random.nextFloat() - 0.5f) * 0.3f
-                        size = 50f + Random.nextFloat() * 150f
-                        alpha = 10 + Random.nextInt(30)
+                        x = Random.Default.nextFloat() * w
+                        y = Random.Default.nextFloat() * h
+                        speedX = (Random.Default.nextFloat() - 0.5f) * 0.3f
+                        speedY = (Random.Default.nextFloat() - 0.5f) * 0.3f
+                        size = 50f + Random.Default.nextFloat() * 150f
+                        alpha = 10 + Random.Default.nextInt(30)
                     }
                 }
                 else -> {}
@@ -356,13 +358,13 @@ class WeatherView @JvmOverloads constructor(
         if (nextLightningFrame > 0) {
             nextLightningFrame--
         } else {
-            lightningAlpha = 150 + Random.nextInt(80)
+            lightningAlpha = 150 + Random.Default.nextInt(80)
             resetLightningTimer()
         }
     }
 
     private fun resetLightningTimer() {
-        nextLightningFrame = 100 + Random.nextInt(500)
+        nextLightningFrame = 100 + Random.Default.nextInt(500)
     }
 
     fun forceWeather(type: WeatherType, intens: Float, wind: Float, night: Boolean) {

@@ -18,6 +18,7 @@
         android:focusableInTouchMode="true"
         android:clipToPadding="false"
         android:paddingBottom="16dp">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -25,68 +26,71 @@
             android:layout_marginRight="8dp"
             android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/backgrounds_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/backgrounds_title"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:paddingBottom="8dp" />
+            <TextView
+                android:id="@+id/backgrounds_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:text="@string/backgrounds_title"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/background_recycler_view"
-        android:layout_width="match_parent"
-        android:layout_height="96dp"
-        android:paddingBottom="8dp" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/background_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="96dp"
+                android:paddingBottom="8dp" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/weather_bg_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/weather_background"
-                android:paddingTop="8dp" android:paddingBottom="8dp" />
-    <com.google.android.material.materialswitch.MaterialSwitch
-        android:id="@+id/background_blur_switch"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/blur_background"
-        android:paddingTop="8dp" android:paddingBottom="8dp" />
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="@string/weather_background" />
 
-    <TextView
-        android:id="@+id/blur_intensity_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/blur_intensity"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp" />
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/background_blur_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="@string/blur_background" />
 
-    <SeekBar
-        android:id="@+id/blur_intensity_seekbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:max="50"
-        android:progress="25" />
-<!--            <com.google.android.material.materialswitch.MaterialSwitch-->
-<!--                android:id="@+id/background_dim_switch"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:text="@string/dim_background"-->
-<!--                android:paddingTop="8dp" android:paddingBottom="8dp" />-->
+            <TextView
+                android:id="@+id/blur_intensity_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp"
+                android:text="@string/blur_intensity" />
+
+            <SeekBar
+                android:id="@+id/blur_intensity_seekbar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="50"
+                android:progress="25" />
+            <!--            <com.google.android.material.materialswitch.MaterialSwitch-->
+            <!--                android:id="@+id/background_dim_switch"-->
+            <!--                android:layout_width="match_parent"-->
+            <!--                android:layout_height="wrap_content"-->
+            <!--                android:text="@string/dim_background"-->
+            <!--                android:paddingTop="8dp" android:paddingBottom="8dp" />-->
             <TextView
                 android:id="@+id/dim_toggle_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/dim_toggle"
                 android:paddingTop="16dp"
-                android:paddingBottom="4dp" />
+                android:paddingBottom="4dp"
+                android:text="@string/dim_toggle" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/dimming_toggle_group"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="16dp"
                 android:paddingTop="8dp"
+                android:paddingBottom="16dp"
                 app:singleSelection="true">
 
                 <Button
@@ -96,7 +100,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:checked="true"
-                    android:text="@string/dimming_off"/>
+                    android:text="@string/dimming_off" />
 
                 <Button
                     android:id="@+id/continuous_button"
@@ -104,7 +108,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
-                    android:text="@string/dimming_continuous"/>
+                    android:text="@string/dimming_continuous" />
 
                 <Button
                     android:id="@+id/dynamic_button"
@@ -113,13 +117,14 @@
                     android:layout_height="wrap_content"
                     android:text="@string/dimming_dynamic" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
+
             <TextView
                 android:id="@+id/dimming_intensity_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/dimming_intensity"
                 android:paddingTop="8dp"
-                android:paddingBottom="4dp" />
+                android:paddingBottom="4dp"
+                android:text="@string/dimming_intensity" />
 
             <SeekBar
                 android:id="@+id/dimming_intensity_seekbar"
@@ -132,24 +137,24 @@
                 android:id="@+id/background_zoom_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/background_zoom"
                 android:paddingTop="8dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:text="@string/background_zoom" />
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="?android:attr/listDivider"
                 android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp"
+                android:background="?android:attr/listDivider" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
                 android:text="@string/weather_effects_title"
                 android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingBottom="8dp"/>
+                android:textStyle="bold" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/weather_effect_switch"
@@ -161,23 +166,23 @@
                 android:id="@+id/manual_weather_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/manual_weather_control"
-                android:enabled="false" />
+                android:enabled="false"
+                android:text="@string/manual_weather_control" />
 
             <HorizontalScrollView
                 android:id="@+id/manual_weather_scroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
                 android:scrollbars="none"
-                android:visibility="gone"
-                android:layout_marginBottom="8dp">
+                android:visibility="gone">
 
                 <com.google.android.material.button.MaterialButtonToggleGroup
                     android:id="@+id/weather_type_toggle_group"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    app:singleSelection="true"
-                    app:selectionRequired="true">
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
 
                     <Button
                         android:id="@+id/btn_weather_clear"
@@ -192,6 +197,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/weather_cloudy" />
+
                     <Button
                         android:id="@+id/btn_weather_rain"
                         style="@style/Widget.Material3.Button.OutlinedButton"
@@ -221,13 +227,14 @@
                         android:text="@string/weather_storm" />
                 </com.google.android.material.button.MaterialButtonToggleGroup>
             </HorizontalScrollView>
+
             <LinearLayout
                 android:id="@+id/weather_intensity_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:visibility="gone"
-                android:paddingTop="8dp">
+                android:paddingTop="8dp"
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/weather_intensity_label"
@@ -243,26 +250,27 @@
                     android:max="200"
                     android:progress="100" />
             </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="end"
-        android:paddingTop="12dp">
 
-        <Button
-            android:id="@+id/clear_background_button_bs"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/clear_background" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="horizontal"
+                android:paddingTop="12dp">
 
-        <Button
-            android:id="@+id/apply_background_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/apply"
-            android:layout_marginStart="8dp" />
-    </LinearLayout>
+                <Button
+                    android:id="@+id/clear_background_button_bs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/clear_background" />
+
+                <Button
+                    android:id="@+id/apply_background_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/apply" />
+            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>

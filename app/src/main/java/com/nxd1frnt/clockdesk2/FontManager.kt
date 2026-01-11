@@ -182,6 +182,14 @@ class FontManager(
     fun setDynamicColorEnabled(enabled: Boolean) { isDynamicColorEnabled = enabled }
     fun isDynamicColorEnabled(): Boolean = isDynamicColorEnabled
 
+    fun getFontIndexForView(view: View): Int {
+        return when (view) {
+            timeText -> timeFontIndex
+            dateText -> dateFontIndex
+            lastfmText, lastfmIcon, lastfmLayout -> lastfmFontIndex
+            else -> -1
+        }
+    }
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
             timeText.setTextColor(Color.WHITE)

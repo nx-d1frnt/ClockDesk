@@ -3,7 +3,6 @@ package com.nxd1frnt.clockdesk2
 import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
@@ -31,7 +30,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -52,7 +50,6 @@ import android.os.Build
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.preference.Preference
 import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
@@ -60,16 +57,20 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.*
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.nxd1frnt.clockdesk2.background.BackgroundManager
+import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
+import com.nxd1frnt.clockdesk2.background.BlurTransformation
+import com.nxd1frnt.clockdesk2.background.GradientManager
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
-import com.nxd1frnt.clockdesk2.musicgetter.LastFmAPI
-import com.nxd1frnt.clockdesk2.musicgetter.MusicGetter
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 import com.nxd1frnt.clockdesk2.music.MusicPluginManager
 import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
+import com.nxd1frnt.clockdesk2.ui.WidgetMover
+import com.nxd1frnt.clockdesk2.ui.view.WeatherView
 
 class MainActivity : AppCompatActivity() {
     private lateinit var timeText: TextView
@@ -206,6 +207,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val editModeTimeoutRunnable = Runnable {
+        if (bottomSheetBehavior.state != STATE_HIDDEN ||
+            backgroundBottomSheetBehavior.state != STATE_HIDDEN) {
+            return@Runnable
+        }
+
         if (isEditMode && !isDemoMode) {
             exitEditMode()
         }
@@ -524,6 +530,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleMusicStateUpdate(state: PluginState) {
         if (isEditMode) {
+            if (state is PluginState.Playing) {
+                val track = state.track
+                val trackInfoText = "${track.artist} - ${track.title}"
+                nowPlayingTextView.text = trackInfoText
+                lastTrackInfo = trackInfoText
+            } else {
+                nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
+                lastTrackInfo = null
+            }
             return
         }
 
@@ -531,48 +546,56 @@ class MainActivity : AppCompatActivity() {
             is PluginState.Playing -> {
                 val track = state.track
                 val trackInfoText = "${track.artist} - ${track.title}"
-
                 val isTextDifferent = trackInfoText != lastTrackInfo
 
+                // 1. Сначала применяем фон (ваша логика)
                 val hasNewArt = !wasMusicBackgroundApplied &&
                         (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
-
+                if (isTextDifferent || hasNewArt) {
+                    handleBackgroundUpdate(track)
+                }
                 if (isTextDifferent) {
                     lastTrackInfo = trackInfoText
 
-                    if (lastfmLayout.visibility != View.VISIBLE) {
+                    lastfmLayout.animate().cancel()
+
+                    if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
                         lastfmLayout.visibility = View.VISIBLE
                         lastfmLayout.alpha = 0f
-                    }
+                        nowPlayingTextView.text = trackInfoText
+                        nowPlayingTextView.isSelected = true
 
-                    lastfmLayout.animate()
-                        .alpha(0f)
-                        .setDuration(400)
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator) {
-                                if (!isEditMode) {
-                                    nowPlayingTextView.text = trackInfoText
-                                    nowPlayingTextView.isSelected = true
-
-                                    lastfmLayout.animate()
-                                        .alpha(1f)
-                                        .setDuration(400)
-                                        .setListener(null)
-                                        .start()
+                        lastfmLayout.animate()
+                            .alpha(1f)
+                            .setDuration(400)
+                            .setListener(null)
+                            .start()
+                    } else {
+                        lastfmLayout.animate()
+                            .alpha(0f)
+                            .setDuration(200)
+                            .setListener(object : AnimatorListenerAdapter() {
+                                override fun onAnimationEnd(animation: Animator) {
+                                    if (!isEditMode) {
+                                        nowPlayingTextView.text = trackInfoText
+                                        nowPlayingTextView.isSelected = true
+                                        lastfmLayout.animate()
+                                            .alpha(1f)
+                                            .setDuration(200)
+                                            .setListener(null)
+                                            .start()
+                                    }
                                 }
-                            }
-                        })
-                        .start()
-                }
-
-                if (isTextDifferent || hasNewArt) {
-                    handleBackgroundUpdate(track)
+                            })
+                            .start()
+                    }
                 }
             }
 
             is PluginState.Idle, is PluginState.Disabled -> {
+                lastfmLayout.animate().cancel()
+
                 if (lastfmLayout.visibility == View.VISIBLE) {
-                    Log.d("MainActivity", "Hiding music layout")
                     lastfmLayout.animate()
                         .alpha(0f)
                         .setDuration(400)
@@ -585,13 +608,11 @@ class MainActivity : AppCompatActivity() {
                         })
                         .start()
                 }
-
                 if (wasMusicBackgroundApplied) {
-                    Log.d("MainActivity", "Restoring user background")
                     restoreUserBackground(backgroundManager.getSavedBackgroundUri())
                     wasMusicBackgroundApplied = false
-                    lastTrackInfo = null
                 }
+                lastTrackInfo = null
             }
         }
     }
@@ -851,6 +872,28 @@ class MainActivity : AppCompatActivity() {
 
             }
             weatherGetter.startUpdates(lat, lon)
+        }
+    }
+
+    private fun restoreMainLayoutState() {
+        if (isEditMode) {
+            mainLayout.animate()
+                .scaleX(0.90f)
+                .scaleY(0.90f)
+                .translationX(0f)
+                .setDuration(animationDuration)
+                .setInterpolator(OvershootInterpolator())
+                .start()
+
+            resetEditModeTimeout()
+        } else {
+            mainLayout.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .translationX(0f)
+                .setDuration(animationDuration)
+                .setInterpolator(OvershootInterpolator())
+                .start()
         }
     }
 
@@ -1614,7 +1657,7 @@ class MainActivity : AppCompatActivity() {
     private fun showCustomizationBottomSheet(viewToCustomize: View) {
         isBottomSheetInitializing = true
         focusedView = viewToCustomize
-
+        val currentFontIndex = fontManager.getFontIndexForView(viewToCustomize)
         val metrics = resources.displayMetrics
         val screenW = metrics.widthPixels.toFloat()
         val bottomSheetDp = 380f
@@ -1744,6 +1787,14 @@ class MainActivity : AppCompatActivity() {
             bsHorizontalAlignGroup.check(hAlignBtnId)
         }
 
+        (bsFontRecyclerView.adapter as? FontAdapter)?.apply {
+            selectedPosition = currentFontIndex
+            notifyDataSetChanged()
+            if (currentFontIndex != -1) {
+                bsFontRecyclerView.scrollToPosition(currentFontIndex)
+            }
+        }
+
         isBottomSheetInitializing = false
         bottomSheetBehavior.state = STATE_EXPANDED
     }
@@ -1751,14 +1802,7 @@ class MainActivity : AppCompatActivity() {
     private fun hideBottomSheet() {
         bottomSheetBehavior.state = STATE_HIDDEN
         highlightFocusedView(false) // Use the new unified function
-        resetEditModeTimeout()
-        mainLayout.animate()
-            .scaleX(0.90f)
-            .scaleY(0.90f)
-            .translationX(0f)
-            .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
-            .start()
+        restoreMainLayoutState()
         focusedView = null
         // Restore background customization button with animation
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -1774,15 +1818,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideBackgroundBottomSheet() {
         backgroundBottomSheetBehavior.state = STATE_HIDDEN
-        resetEditModeTimeout()
-        mainLayout.animate()
-            .scaleX(0.90f)
-            .scaleY(0.90f)
-            .translationX(0f)
-            .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
-            .start()
-        // Restore background customization button with animation
+        restoreMainLayoutState()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             backgroundCustomizationTab.visibility = View.VISIBLE
             backgroundCustomizationTab.animate()
@@ -1945,8 +1981,9 @@ class MainActivity : AppCompatActivity() {
                 lastfmLayout.setBackgroundResource(R.drawable.editable_border)
                // Log.d("EditMode", "lastfmLayout set via post(): visibility=${lastfmLayout.visibility}, alpha=${lastfmLayout.alpha}")
             }
-            lastfmLayout.alpha = 1f
-            lastfmLayout.visibility = View.VISIBLE
+            if (nowPlayingTextView.text.isNullOrEmpty()) {
+                nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
+            }
             if (!isDemoMode) {
                 handler.removeCallbacks(editModeTimeoutRunnable)
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
@@ -2019,6 +2056,30 @@ class MainActivity : AppCompatActivity() {
             lastfmLayout.background = null
         } else
             lastfmLayout.setBackgroundDrawable(null)
+
+        val isMusicPlaying = !nowPlayingTextView.text.isNullOrEmpty() &&
+                lastTrackInfo != null &&
+                lastfmLayout.alpha > 0
+
+        if (!isMusicPlaying) {
+            lastfmLayout.animate()
+                .alpha(0f)
+                .setDuration(400)
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        if (!isEditMode) {
+                            lastfmLayout.visibility = View.GONE
+                        }
+                    }
+                })
+                .start()
+        } else {
+            lastfmLayout.animate()
+                .alpha(1f)
+                .setDuration(200)
+                .setListener(null)
+                .start()
+        }
 
       //  if (!musicGetter.enabled || musicGetter.currentTrack.isNullOrEmpty()) {
        //     lastfmLayout.visibility = View.GONE
@@ -2299,25 +2360,38 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
                     }
                 }
+
                 "__DEFAULT_GRADIENT__" -> {
                     previewBackgroundUri = "__DEFAULT_GRADIENT__"
                     fontManager.clearDynamicColors()
-                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
+                    fontManager.applyNightShiftTransition(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter,
+                        fontManager.isNightShiftEnabled()
+                    )
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
+                        try {
+                            backgroundImageView.setRenderEffect(null)
+                        } catch (_: Throwable) {
+                        }
                     }
                     backgroundImageView.setImageDrawable(null)
                     backgroundImageView.visibility = View.GONE
                     gradientManager.startUpdates()
                 }
+
                 else -> {
                     try {
                         val uri = Uri.parse(id)
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                             try {
-                                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            } catch (e: Exception) { /* ignore */ }
+                                contentResolver.takePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            } catch (e: Exception) { /* ignore */
+                            }
                         }
                         val intensity = bgBlurSeek.progress
                         gradientManager.stopUpdates()
@@ -2419,6 +2493,33 @@ class MainActivity : AppCompatActivity() {
             applyWeatherState(previewManual = isChecked)
         }
 
+        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                when (newState) {
+                    STATE_DRAGGING, STATE_SETTLING, STATE_EXPANDED, STATE_HALF_EXPANDED -> {
+                        stopHideUiTimer()
+                    }
+
+                    STATE_HIDDEN -> {
+                        if (previewBackgroundUri != null) {
+                            val savedUri = backgroundManager.getSavedBackgroundUri()
+                            restoreUserBackground(savedUri)
+                            previewBackgroundUri = null
+                        }
+
+                        restoreMainLayoutState()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                            backgroundCustomizationTab.visibility = View.VISIBLE
+                            backgroundCustomizationTab.animate().alpha(1f).setDuration(200).start()
+                        } else {
+                            backgroundCustomizationTab.visibility = View.VISIBLE
+                        }
+                    }
+                }
+            }
+
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+        })
 
         // --- BUTTONS ---
         bgClearBtn.setOnClickListener {

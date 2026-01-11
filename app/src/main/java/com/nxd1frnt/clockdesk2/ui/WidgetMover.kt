@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.ui
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -17,9 +17,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import com.nxd1frnt.clockdesk2.R
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import com.nxd1frnt.clockdesk2.R
 
 /**
  * Refactored WidgetMover with improved state management and bug fixes

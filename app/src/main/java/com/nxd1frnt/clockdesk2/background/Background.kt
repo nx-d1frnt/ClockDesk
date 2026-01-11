@@ -1,7 +1,6 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.background
 
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 
 data class Background(
     val id: String,

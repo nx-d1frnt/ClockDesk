@@ -5,7 +5,7 @@ import android.net.Uri
 import android.util.Log
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
-import com.nxd1frnt.clockdesk2.BackgroundManager
+import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import org.json.JSONException
 
 

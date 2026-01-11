@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.background
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Handler
 import android.util.Log
 import android.widget.LinearLayout
+import com.nxd1frnt.clockdesk2.LocationManager
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.*
 

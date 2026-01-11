@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.background
 
 import android.content.Context
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter

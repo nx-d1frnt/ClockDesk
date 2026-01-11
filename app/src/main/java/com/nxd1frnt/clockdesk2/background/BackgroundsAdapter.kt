@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.background
 
 import android.content.Context
 import android.net.Uri
@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.nxd1frnt.clockdesk2.R
 
 class BackgroundsAdapter(
     private val context: Context,

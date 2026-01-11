@@ -21,6 +21,7 @@ import androidx.core.view.ViewCompat
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import org.xmlpull.v1.XmlPullParser
 import kotlin.text.compareTo
 
