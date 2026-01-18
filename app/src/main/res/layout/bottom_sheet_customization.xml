@@ -100,8 +100,110 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/font_recycler_view"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
+                android:layout_height="wrap_content"
                 android:paddingBottom="8dp" />
+
+            <TextView
+                android:id="@+id/variable_properties_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:text="Variable Properties"
+                android:textSize="16sp"
+                android:layout_marginTop="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:id="@+id/var_weight_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="60dp"
+                        android:layout_height="wrap_content"
+                        android:text="Weight"
+                        android:textSize="12sp"/>
+                    <SeekBar
+                        android:id="@+id/var_weight_seekbar"
+                        style="@style/Widget.Material3.Slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="1000"
+                        android:min="1" />
+                    <TextView
+                        android:id="@+id/var_weight_value"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:text="400"
+                        android:textSize="12sp"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/var_width_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:layout_width="60dp"
+                        android:layout_height="wrap_content"
+                        android:text="Width"
+                        android:textSize="12sp"/>
+                    <SeekBar
+                        android:id="@+id/var_width_seekbar"
+                        style="@style/Widget.Material3.Slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="200"
+                        android:progress="100"/>
+                    <TextView
+                        android:id="@+id/var_width_value"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:text="100"
+                        android:textSize="12sp"/>
+
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/var_roundness_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:layout_width="60dp"
+                        android:layout_height="wrap_content"
+                        android:text="Round"
+                        android:textSize="12sp"/>
+                    <SeekBar
+                        android:id="@+id/var_roundness_seekbar"
+                        style="@style/Widget.Material3.Slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progress="0"/>
+                    <TextView
+                        android:id="@+id/var_roundness_value"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:text="0"
+                        android:textSize="12sp"/>
+                </LinearLayout>
+            </LinearLayout>
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/night_shift_switch"
@@ -111,63 +213,6 @@
                 android:paddingTop="8dp"
                 android:paddingBottom="16dp"
                 android:checked="false" />
-
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/free_mode_switch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/free_mode_switch"
-                android:textColor="@color/md_theme_error"
-                android:textStyle="bold"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:checked="false" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/text_gravity"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"
-                android:paddingTop="8dp"
-                android:visibility="gone"/>
-
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/text_gravity_toggle_group"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingBottom="8dp"
-                app:singleSelection="true"
-                android:visibility="gone">
-
-                <Button
-                    android:id="@+id/gravity_left_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
-                    android:layout_marginRight="16dp"
-                    android:text="@string/align_start"
-                    app:icon="@drawable/align_horizontal_left"/>
-
-                <Button
-                    android:id="@+id/gravity_center_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
-                    android:layout_marginRight="16dp"
-                    android:text="Center"
-                    app:icon="@drawable/align_horizontal_center"/>
-
-                <Button
-                    android:id="@+id/gravity_right_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/align_end"
-                    app:icon="@drawable/align_horizontal_right"/>
-            </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <View
                 android:layout_width="match_parent"
@@ -259,14 +304,6 @@
                     android:text="@string/align_bottom"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/grid_snap_switch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/snap_to_grid"
-                android:checked="true"
-                android:paddingBottom="16dp"/>
-
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -298,6 +335,88 @@
                     android:layout_marginStart="8dp"
                     android:text="@string/widget_order_down" />
             </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:background="?android:attr/listDivider" />
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/free_mode_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/free_mode_switch"
+                android:textColor="@color/md_theme_error"
+                android:textStyle="bold"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/text_alignment"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"
+                android:paddingTop="8dp"
+                android:visibility="visible"/>
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/text_gravity_toggle_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="16dp"
+                app:singleSelection="true"
+                android:visibility="visible">
+
+                <Button
+                    android:id="@+id/gravity_left_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginRight="16dp"
+                    android:text="@string/align_start"
+                    android:textColor="@color/md_theme_onSurfaceVariant"
+                    app:iconTint="@color/md_theme_onSurfaceVariant"
+                    app:icon="@drawable/align_horizontal_left" />
+
+                <Button
+                    android:id="@+id/gravity_center_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginRight="16dp"
+                    android:text="Center"
+                    android:textColor="@color/md_theme_onSurfaceVariant"
+                    app:iconTint="@color/md_theme_onSurfaceVariant"
+                    app:icon="@drawable/align_horizontal_center"/>
+
+                <Button
+                    android:id="@+id/gravity_right_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/align_end"
+                    android:textColor="@color/md_theme_onSurfaceVariant"
+                    app:iconTint="@color/md_theme_onSurfaceVariant"
+                    app:icon="@drawable/align_horizontal_right"/>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/grid_snap_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/snap_to_grid"
+                android:checked="true"
+                android:paddingBottom="8dp"/>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="8dp"
+                android:background="?android:attr/listDivider" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -362,6 +481,13 @@
                     android:layout_height="wrap_content"
                     android:text="@string/time_12" />
             </RadioGroup>
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/show_am_pm_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/show_am_pm"
+                android:paddingBottom="16dp"
+                android:checked="false" />
 
             <TextView
                 android:id="@+id/date_format_label"

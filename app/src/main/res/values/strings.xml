@@ -149,4 +149,10 @@
     <string name="permission_notification_explanation">ClockDesk needs access to notifications to read currently playing music from apps like Spotify or YouTube.\n\nPlease find ClockDesk in the list and enable it.</string>
     <string name="open_settings">Open Settings</string>
     <string name="permission_already_granted">Access is already granted</string>
+    <string name="text_alignment">Text Alignment</string>
+    <string name="variable_properties_title">Variable Properties</string>
+    <string name="variable_properties_width">Width</string>
+    <string name="variable_properties_weight">Weight</string>
+    <string name="variable_properties_roundness">Round</string>
+    <string name="show_am_pm">Show AM/PM indicator</string>
 </resources>

@@ -149,4 +149,10 @@
     <string name="permission_notification_explanation">ClockDesk потребує доступу до сповіщень, щоб зчитувати в даний момент відтворювану музику з таких додатків, як Spotify або YouTube.\n\nБудь ласка, знайдіть ClockDesk у списку та увімкніть його.</string>
     <string name="open_settings">Відкрити налаштування</string>
     <string name="permission_already_granted">Доступ вже надано</string>
+    <string name="text_alignment">Вирівнювання тексту</string>
+    <string name="variable_properties_title">Варіативні параметри</string>
+    <string name="variable_properties_width">Ширина</string>
+    <string name="variable_properties_weight">Товщина</string>
+    <string name="variable_properties_roundness">Скруглення</string>
+    <string name="show_am_pm">Показувати індикатор AM/PM</string>
 </resources>

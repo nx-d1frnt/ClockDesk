@@ -1,51 +1,62 @@
 package com.nxd1frnt.clockdesk2
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
-import android.util.Log
-import android.view.Gravity
+import android.provider.OpenableColumns
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
 import androidx.palette.graphics.Palette
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.utils.FontNameUtils
+import com.nxd1frnt.clockdesk2.utils.FontVariationUtils
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Calendar
 import java.util.Date
+
+/**
+ Font settings data class to hold font properties for each widget.
+ Default values are set here as well.
+ */
+data class FontSettings(
+    var fontIndex: Int = 1,
+    var size: Float = 24f,
+    var alpha: Float = 1.0f,
+    var weight: Int = 400,
+    var width: Int = 100,
+    var roundness: Int = 0
+)
 
 class FontManager(
     private val context: Context,
     private val timeText: TextView,
     private val dateText: TextView,
-    private val weatherText: TextView,
-    private val weatherIcon: ImageView,
+    private val lastfmLayout: LinearLayout,
     private val lastfmText: TextView,
     private val lastfmIcon: ImageView,
-    private val lastfmLayout: LinearLayout,
+    private val weatherText: TextView,
+    private val weatherIcon: ImageView,
     initialLoggingState: Boolean
 ) {
-    private var timeFontIndex = 0
-    private var dateFontIndex = 0
-    private var lastfmFontIndex = 0
-    private var timeSize = 128f
-    private var dateSize = 48f
-    private var timeAlpha = 1.0f
-    private var dateAlpha = 1.0f
-    private var lastfmAlpha = 1.0f
-    private var lastfmSize = 32f
-    private var isNightShiftEnabled = false
-    private var timeFormatPattern: String = "HH:mm"
-    private var dateFormatPattern: String = "EEE, MMM dd"
-    private var additionalLoggingEnabled = initialLoggingState
 
-    private var isDynamicColorEnabled = false
-    private var dynamicColor: Int? = null
-    private val normalColor = Color.parseColor("#DEFFFFFF")
-    private val fonts = listOf(
+    private val keyPrefixMap = mapOf(
+        R.id.time_text to "time",
+        R.id.date_text to "date",
+        R.id.lastfm_layout to "lastfm"
+    )
+
+    private val settingsMap = mutableMapOf<Int, FontSettings>()
+    private val fonts: MutableList<FontItem> = mutableListOf()
+
+    private val resourceFontIds = listOf(
+        R.font.googlesansflex,
         R.font.anton_regular,
         R.font.kanit_regular,
         R.font.sigmar_regular,
@@ -70,126 +81,296 @@ class FontManager(
         R.font.googlesans_bold
     )
 
-    fun getFonts(): List<Int> = fonts
+    private var isNightShiftEnabled = false
+    private var isDynamicColorEnabled = false
+    private var dynamicColor: Int? = null
+    private var timeFormatPattern: String = "HH:mm"
+    private var dateFormatPattern: String = "EEE, MMM dd"
 
+    init {
+        rebuildFontList()
+        //initialize settings map with defaults
+        keyPrefixMap.keys.forEach { id ->
+            settingsMap[id] = getDefaultSettingsFor(id)
+        }
+    }
+
+    private fun getDefaultSettingsFor(id: Int): FontSettings {
+        val size = when (id) {
+            R.id.time_text -> 128f
+            R.id.date_text -> 48f
+            R.id.lastfm_layout -> 32f
+            else -> 24f
+        }
+        val weight = when (id) {
+            R.id.time_text -> 700 //Time is bold
+            R.id.date_text -> 500 // Date is medium
+            R.id.lastfm_layout -> 400 // LastFM is regular
+            else -> 400
+        }
+        val fontIndex = if (fonts.size > 1) 1 else 0
+
+        return FontSettings(
+            fontIndex = fontIndex,
+            size = size,
+            alpha = 1.0f,
+            weight = weight,
+            width = 100,
+            roundness = 100 //Google Sans Flex default
+        )
+    }
+
+    fun getFonts(): List<FontItem> = fonts
+
+    private fun rebuildFontList() {
+        fonts.clear()
+        fonts.add(FontItem.AddNew)
+
+        val fontDir = File(context.filesDir, "custom_fonts")
+        if (fontDir.exists()) {
+            fontDir.listFiles()
+                ?.filter { it.extension.equals("ttf", ignoreCase = true) || it.extension.equals("otf", ignoreCase = true) }
+                ?.sortedBy { it.name }
+                ?.forEach { file ->
+                    // Parsing font name from file
+                    val parsedName = FontNameUtils.getFontName(file)
+                    // If parsing failed, use file name without extension
+                    val displayName = parsedName ?: file.nameWithoutExtension
+
+                    fonts.add(FontItem.CustomFont(file.absolutePath, displayName))
+                }
+        }
+
+        // Parsing resource fonts
+        fonts.addAll(resourceFontIds.map { resId ->
+            val parsedName = FontNameUtils.getFontName {
+                context.resources.openRawResource(resId)
+            }
+
+            // Fallback: use resource entry name, replace underscores with spaces and capitalize words
+            val fallbackName = context.resources.getResourceEntryName(resId)
+                .replace("_", " ")
+                .capitalizeWords() // e.g., "googlesansflex" -> "Googlesansflex"
+
+            FontItem.ResourceFont(resId, parsedName ?: fallbackName)
+        })
+    }
+
+    private fun String.capitalizeWords(): String = split(" ").joinToString(" ") {
+        it.replaceFirstChar { char -> char.uppercase() }
+    }
+
+    fun addCustomFont(uri: Uri): Int {
+        return try {
+            val fontDir = File(context.filesDir, "custom_fonts")
+            if (!fontDir.exists()) fontDir.mkdirs()
+
+            val fileName = getFileName(uri) ?: "custom_${System.currentTimeMillis()}.ttf"
+            val destFile = File(fontDir, fileName)
+
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(destFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            rebuildFontList()
+            1
+        } catch (e: Exception) {
+            e.printStackTrace()
+            -1
+        }
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) result = cursor.getString(index)
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.path
+            val cut = result?.lastIndexOf('/')
+            if (cut != null && cut != -1) result = result?.substring(cut + 1)
+        }
+        return result
+    }
+
+    private fun getTypeface(index: Int): Typeface {
+        if (index !in fonts.indices) return Typeface.DEFAULT
+        return try {
+            when (val item = fonts[index]) {
+                is FontItem.ResourceFont -> ResourcesCompat.getFont(context, item.resId) ?: Typeface.DEFAULT
+                is FontItem.CustomFont -> Typeface.createFromFile(item.path)
+                is FontItem.AddNew -> Typeface.DEFAULT
+            }
+        } catch (e: Exception) {
+            Typeface.DEFAULT
+        }
+    }
+
+    // Used during loading to populate settings from prefs
     fun loadFont() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
-        timeFontIndex = prefs.getInt("timeFontIndex", 1)
-        dateFontIndex = prefs.getInt("dateFontIndex", 1)
-        lastfmFontIndex = prefs.getInt("lastfmFontIndex", 1)
-        timeSize = prefs.getFloat("timeSize", 128f)
-        dateSize = prefs.getFloat("dateSize", 48f)
-        timeAlpha = prefs.getFloat("timeAlpha", 0.8f)
-        dateAlpha = prefs.getFloat("dateAlpha", 0.8f)
-        lastfmAlpha = prefs.getFloat("lastfmAlpha", 0.8f)
-        lastfmSize = prefs.getFloat("lastfmSize", 32f)
+
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
         timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
 
-        applyTimeFont()
-        applyDateFont()
-        applyLastfmFont()
+        keyPrefixMap.forEach { (viewId, prefix) ->
+            // Get default settings for this view
+            val defaults = getDefaultSettingsFor(viewId)
+
+            // Get or create settings object
+            val settings = settingsMap.getOrPut(viewId) { defaults.copy() }
+
+            // Load data. If the key is not in the file, take the value from defaults (not hard 400!)
+            val rawIndex = prefs.getInt("${prefix}FontIndex", defaults.fontIndex)
+            settings.fontIndex = rawIndex.coerceIn(1, fonts.lastIndex)
+
+            settings.size = prefs.getFloat("${prefix}Size", defaults.size)
+            settings.alpha = prefs.getFloat("${prefix}Alpha", defaults.alpha)
+
+            settings.weight = prefs.getInt("${prefix}Weight", defaults.weight)
+            settings.width = prefs.getInt("${prefix}Width", defaults.width)
+            settings.roundness = prefs.getInt("${prefix}Roundness", defaults.roundness)
+        }
+
+        applyAll()
     }
 
+    // Save current settings to SharedPreferences
     fun saveSettings() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
-        with(prefs.edit()) {
-            putInt("timeFontIndex", timeFontIndex)
-            putInt("dateFontIndex", dateFontIndex)
-            putInt("lastfmFontIndex", lastfmFontIndex)
-            putFloat("timeSize", timeSize)
-            putFloat("dateSize", dateSize)
-            putFloat("timeAlpha", timeAlpha)
-            putFloat("dateAlpha", dateAlpha)
-            putFloat("lastfmAlpha", lastfmAlpha)
-            putFloat("lastfmSize", lastfmSize)
-            putBoolean("nightShiftEnabled", isNightShiftEnabled)
-            putBoolean("use_dynamic_color", isDynamicColorEnabled)
-            putString("timeFormatPattern", timeFormatPattern)
-            putString("dateFormatPattern", dateFormatPattern)
-            apply()
+        val editor = prefs.edit()
+
+        editor.putBoolean("nightShiftEnabled", isNightShiftEnabled)
+        editor.putBoolean("use_dynamic_color", isDynamicColorEnabled)
+        editor.putString("timeFormatPattern", timeFormatPattern)
+        editor.putString("dateFormatPattern", dateFormatPattern)
+
+        keyPrefixMap.forEach { (viewId, prefix) ->
+            val settings = settingsMap[viewId] ?: return@forEach
+            editor.putInt("${prefix}FontIndex", settings.fontIndex)
+            editor.putFloat("${prefix}Size", settings.size)
+            editor.putFloat("${prefix}Alpha", settings.alpha)
+            editor.putInt("${prefix}Weight", settings.weight)
+            editor.putInt("${prefix}Width", settings.width)
+            editor.putInt("${prefix}Roundness", settings.roundness)
+        }
+        editor.apply()
+    }
+
+    // Getters and Setters for font properties
+    fun getSettings(view: View): FontSettings? = settingsMap[view.id]
+
+    fun setFontIndex(view: View, index: Int) {
+        if (index !in fonts.indices || fonts[index] is FontItem.AddNew) return
+        updateSettings(view.id) {
+            it.fontIndex = index
         }
     }
 
-    // ... [Setters for Fonts/Sizes/Colors/NightShift/DynamicColor remain same] ...
+    fun setFontSize(view: View, size: Float) {
+        updateSettings(view.id) { it.size = size }
+    }
 
-    fun setTimeFont(fontId: Int) {
-        timeFontIndex = fonts.indexOf(fontId).takeIf { it >= 0 } ?: 0
-        applyTimeFont()
+    fun setFontAlpha(view: View, alpha: Float) {
+        updateSettings(view.id) { it.alpha = alpha.coerceIn(0f, 1f) }
     }
-    fun setDateFont(fontId: Int) {
-        dateFontIndex = fonts.indexOf(fontId).takeIf { it >= 0 } ?: 0
-        applyDateFont()
-    }
-    fun setLastfmFont(fontId: Int) {
-        lastfmFontIndex = fonts.indexOf(fontId).takeIf { it >= 0 } ?: 0
-        applyLastfmFont()
-    }
-    fun setTimeSize(size: Float) { timeSize = size; applyTimeFont() }
-    fun setDateSize(size: Float) { dateSize = size; applyDateFont() }
-    fun setLastfmSize(size: Float) { lastfmSize = size; applyLastfmFont() }
-    fun setTimeAlpha(alpha: Float) { timeAlpha = alpha.coerceIn(0f, 1f); applyTimeFont() }
-    fun setDateAlpha(alpha: Float) { dateAlpha = alpha.coerceIn(0f, 1f); applyDateFont() }
-    fun setLastfmAlpha(alpha: Float) { lastfmAlpha = alpha.coerceIn(0f, 1f); applyLastfmFont() }
 
+    fun setFontVariations(view: View, weight: Int, width: Int, roundness: Int) {
+        updateSettings(view.id) {
+            it.weight = weight
+            it.width = width
+            it.roundness = roundness
+        }
+    }
+
+    private inline fun updateSettings(viewId: Int, block: (FontSettings) -> Unit) {
+        val settings = settingsMap[viewId] ?: return
+        block(settings)
+        applyToView(viewId)
+    }
+
+
+    private fun applyAll() {
+        keyPrefixMap.keys.forEach { applyToView(it) }
+    }
+
+    private fun applyToView(viewId: Int) {
+        val settings = settingsMap[viewId] ?: return
+        val typeface = getTypeface(settings.fontIndex)
+
+        when (viewId) {
+            R.id.time_text -> applyStyleToTextView(timeText, settings, typeface)
+            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface)
+            R.id.lastfm_layout -> {
+                applyStyleToTextView(lastfmText, settings, typeface)
+                lastfmIcon.alpha = settings.alpha
+            }
+        }
+    }
+
+    private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface) {
+       // Apply typeface and size
+        textView.typeface = typeface
+        textView.textSize = settings.size
+        textView.alpha = settings.alpha
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            textView.fontVariationSettings = null
+
+            // Form the variation settings string
+            val variationSettings = "'wght' ${settings.weight}, 'wdth' ${settings.width}, 'ROND' ${settings.roundness}"
+            textView.fontVariationSettings = variationSettings
+        }
+    }
+
+    // Get supported axes for the currently selected font in the given view
+    fun getSupportedAxesForCurrentIndex(view: View): List<String> {
+        val settings = getSettings(view) ?: return emptyList()
+        val index = settings.fontIndex
+        if (index !in fonts.indices) return emptyList()
+
+        val item = fonts[index]
+        return FontVariationUtils.scanAxes {
+            try {
+                when (item) {
+                    is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
+                    is FontItem.CustomFont -> context.contentResolver.openInputStream(Uri.fromFile(File(item.path)))
+                    is FontItem.AddNew -> null
+                }
+            } catch (e: Exception) { null }
+        }
+    }
+
+    fun getTimeFormatPattern() = timeFormatPattern
     fun setTimeFormatPattern(pattern: String) { timeFormatPattern = pattern; saveSettings() }
-    fun setDateFormatPattern(pattern: String) { dateFormatPattern = pattern; saveSettings() }
-    fun getTimeFormatPattern(): String = timeFormatPattern
-    fun getDateFormatPattern(): String = dateFormatPattern
 
-    fun getTimeSize() = timeSize
-    fun getDateSize() = dateSize
-    fun getLastfmSize() = lastfmSize
-    fun getTimeAlpha() = timeAlpha
-    fun getDateAlpha() = dateAlpha
-    fun getLastfmAlpha() = lastfmAlpha
+    fun getDateFormatPattern() = dateFormatPattern
+    fun setDateFormatPattern(pattern: String) { dateFormatPattern = pattern; saveSettings() }
+
     fun isNightShiftEnabled() = isNightShiftEnabled
     fun setNightShiftEnabled(enabled: Boolean) { isNightShiftEnabled = enabled; saveSettings() }
-    fun setAdditionalLogging(enabled: Boolean) { additionalLoggingEnabled = enabled }
 
-    private fun applyTimeFont() {
-        val typeface = ResourcesCompat.getFont(context, fonts[timeFontIndex])
-        timeText.typeface = typeface
-        timeText.textSize = timeSize
-        timeText.alpha = timeAlpha
-    }
-
-    private fun applyDateFont() {
-        val typeface = ResourcesCompat.getFont(context, fonts[dateFontIndex])
-        dateText.typeface = typeface
-        dateText.textSize = dateSize
-        dateText.alpha = dateAlpha
-    }
-
-    private fun applyLastfmFont() {
-        val typeface = ResourcesCompat.getFont(context, fonts[lastfmFontIndex])
-        lastfmText.typeface = typeface
-        lastfmText.textSize = lastfmSize
-        lastfmText.alpha = lastfmAlpha
-        lastfmIcon.alpha = lastfmAlpha
-    }
+    fun setAdditionalLogging(enabled: Boolean) { }
 
     fun updateDynamicColors(bitmap: Bitmap, onComplete: () -> Unit) {
         Palette.from(bitmap).generate { palette ->
-            val accentColor = palette?.vibrantSwatch?.rgb ?: palette?.lightVibrantSwatch?.rgb ?: palette?.dominantSwatch?.rgb ?: normalColor
+            val accentColor = palette?.vibrantSwatch?.rgb ?: palette?.lightVibrantSwatch?.rgb ?: palette?.dominantSwatch?.rgb ?: Color.WHITE
             dynamicColor = accentColor
             onComplete()
         }
     }
     fun clearDynamicColors() { dynamicColor = null }
-    fun setDynamicColorEnabled(enabled: Boolean) { isDynamicColorEnabled = enabled }
-    fun isDynamicColorEnabled(): Boolean = isDynamicColorEnabled
+    fun setDynamicColorEnabled(enabled: Boolean) { isDynamicColorEnabled = enabled; saveSettings() }
+    fun isDynamicColorEnabled() = isDynamicColorEnabled
 
-    fun getFontIndexForView(view: View): Int {
-        return when (view) {
-            timeText -> timeFontIndex
-            dateText -> dateFontIndex
-            lastfmText, lastfmIcon, lastfmLayout -> lastfmFontIndex
-            else -> -1
-        }
-    }
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
             timeText.setTextColor(Color.WHITE)

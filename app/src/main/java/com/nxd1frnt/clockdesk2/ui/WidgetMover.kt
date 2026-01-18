@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -93,6 +94,19 @@ class WidgetMover(
 
     private fun log(message: String) {
         if (isLoggingEnabled) Log.d(TAG, message)
+    }
+
+
+    private fun beginLayoutTransition() {
+        // TransitionManager available since API 19 (KitKat).
+        // On older devices, changes will happen instantly without animation, which is safe.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && parentView is ViewGroup) {
+            val transition = android.transition.AutoTransition()
+            transition.duration = 300 // 300ms for smoothness
+            // Soft bounce
+            transition.interpolator = OvershootInterpolator(0.8f)
+            android.transition.TransitionManager.beginDelayedTransition(parentView, transition)
+        }
     }
 
     // ============================================================================
@@ -187,8 +201,8 @@ class WidgetMover(
             views.forEachIndexed { index, view ->
                 val idName = getResourceName(view.id)
                 editor.putInt("${idName}_order_index", index)
-                editor.putInt("${idName}_align_h", ALIGN_H_CENTER)
-                editor.putInt("${idName}_align_v", ALIGN_V_CENTER)
+                editor.putInt("${idName}_align_h", ALIGN_H_LEFT)
+                editor.putInt("${idName}_align_v", ALIGN_V_BOTTOM)
                 editor.putInt("${idName}_internal_gravity", GRAVITY_CENTER)
                 editor.putFloat("${idName}_x", 0f)
                 editor.putFloat("${idName}_y", 0f)
@@ -232,6 +246,7 @@ class WidgetMover(
                 }
             }
 
+            beginLayoutTransition() // Animate initialization if possible
             set.applyTo(parentView)
         }
     }
@@ -307,6 +322,7 @@ class WidgetMover(
             }
         }
 
+        beginLayoutTransition()
         set.applyTo(parentView)
     }
 
@@ -338,12 +354,10 @@ class WidgetMover(
             val alignH = prefs.getInt("${idName}_align_h", ALIGN_H_CENTER)
             applyHorizontalConstraintToSet(set, view, alignH)
 
+            // Reset translation animations safely
             view.animate().cancel()
-            view.animate()
-                .translationX(0f)
-                .translationY(0f)
-                .setDuration(200)
-                .start()
+            view.translationX = 0f
+            view.translationY = 0f
 
             if (saveOrder) {
                 savePositionRaw(view, 0f, 0f)
@@ -375,6 +389,7 @@ class WidgetMover(
             }
         }
 
+        beginLayoutTransition()
         set.applyTo(parentView)
         log("✓ Smart Stack applied")
     }
@@ -610,6 +625,7 @@ class WidgetMover(
             }
         }
 
+        beginLayoutTransition()
         set.applyTo(parentView)
     }
 
@@ -717,13 +733,13 @@ class WidgetMover(
     fun alignViewHorizontal(view: View, mode: Int) {
         log("Align horizontal: ${getResourceName(view.id)} -> $mode")
 
+        //start the layout transition
+        beginLayoutTransition()
+
         applyConstraintAlignment(view, mode)
 
-        view.animate()
-            .translationX(0f)
-            .setDuration(300)
-            .setInterpolator(OvershootInterpolator())
-            .start()
+        view.animate().cancel()
+        view.translationX = 0f
 
         savePositionRaw(view, 0f, view.translationY)
         saveAlignmentOnlyH(view, mode)

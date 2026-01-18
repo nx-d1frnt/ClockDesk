@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bsCancelButton: Button
     private lateinit var bsNightShiftSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var bsTimeFormatGroup: RadioGroup
+    private lateinit var bsShowAMPMSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var bsDateFormatGroup: RadioGroup
     private lateinit var bsTimeFormatLabel: TextView
     private lateinit var bsDateFormatLabel: TextView
@@ -118,6 +119,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bsVerticalAlignGroup: MaterialButtonToggleGroup
     private lateinit var bsMoveUpBtn: Button
     private lateinit var bsMoveDownBtn: Button
+    private lateinit var bsVarContainer: View
+    private lateinit var bsVarTitle: TextView
+
+    private lateinit var bsVarWeightContainer: View
+    private lateinit var bsVarWeightSeekBar: SeekBar
+    private lateinit var bsVarWeightValue: TextView
+
+    private lateinit var bsVarWidthContainer: View
+    private lateinit var bsVarWidthSeekBar: SeekBar
+    private lateinit var bsVarWidthValue: TextView
+
+    private lateinit var bsVarRoundnessContainer: View
+    private lateinit var bsVarRoundnessSeekBar: SeekBar
+    private lateinit var bsVarRoundnessValue: TextView
 
     // Background Bottom Sheet UI elements
     private lateinit var bgRecycler: RecyclerView
@@ -160,6 +175,7 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
+    private val PICK_FONT_REQUEST = 400
     private var enableAdditionalLogging = false
     private var isPowerSavingMode = false
     private var isAutoPowerSavingActive = false // Tracks if auto-mode did it
@@ -269,7 +285,7 @@ class MainActivity : AppCompatActivity() {
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
-        widgetMover = WidgetMover(this, listOf(timeText, dateText, lastfmLayout), mainLayout)
+        widgetMover = WidgetMover(this, listOf(lastfmLayout, dateText, timeText), mainLayout)
         widgetMover.restoreOrderAndPositions()
         widgetMover.setOnInteractionListener { isInteracting ->
             if (isInteracting) {
@@ -306,11 +322,11 @@ class MainActivity : AppCompatActivity() {
             this,
             timeText,
             dateText,
-            weatherText,
-            weatherIcon,
+            lastfmLayout,
             nowPlayingTextView,
             lastfmIcon,
-            lastfmLayout,
+            weatherText,
+            weatherIcon,
             enableAdditionalLogging
         )
         backgroundManager = BackgroundManager(this)
@@ -802,8 +818,10 @@ class MainActivity : AppCompatActivity() {
             // permissions granted
             loadCoordinatesAndFetchData()
         } else {
-            // show rationale dialog
-            showLocationRationaleDialog()
+            // show rationale dialog only once
+            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            val rationaleShown = prefs.getBoolean("location_permission_rationale_shown", false)
+            if (!rationaleShown) showLocationRationaleDialog()
         }
     }
 
@@ -848,6 +866,9 @@ class MainActivity : AppCompatActivity() {
             .setNeutralButton(getString(android.R.string.cancel)) { dialog, _ ->
                 // user cancelled
                 dialog.dismiss()
+                //don't show again
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                prefs.edit().putBoolean("location_permission_rationale_shown", true).apply()
             }
             .show()
     }
@@ -1001,6 +1022,31 @@ class MainActivity : AppCompatActivity() {
     // Handle add-image result from background bottom sheet
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PICK_FONT_REQUEST && resultCode == RESULT_OK) {
+            data?.data?.let { uri ->
+                // 1. addCustomFont теперь возвращает индекс нового шрифта (или -1 при ошибке)
+                val newIndex = fontManager.addCustomFont(uri)
+
+                // Проверяем, что индекс валидный (больше 0, т.к. 0 это кнопка "+")
+                if (newIndex > 0) {
+                    // Обновляем список в адаптере
+                    bsFontRecyclerView.adapter?.notifyDataSetChanged()
+
+                    // Визуально выбираем новый шрифт в списке
+                    (bsFontRecyclerView.adapter as? FontAdapter)?.apply {
+                        selectedPosition = newIndex
+                        notifyDataSetChanged()
+                    }
+
+                    // 2. Используем новый универсальный метод setFontIndex вместо applyFontToCurrentView
+                    focusedView?.let { view ->
+                        fontManager.setFontIndex(view, newIndex)
+                        // Обновляем видимость слайдеров (вдруг загрузили вариативный шрифт)
+                        updateVariationVisibility()
+                    }
+                }
+            }
+        }
         if (requestCode == PICK_BG_REQUEST && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             try {
@@ -1026,7 +1072,9 @@ class MainActivity : AppCompatActivity() {
             backgroundsAdapter?.updateItems(items)
             // preview and set preview selection
             previewBackgroundUri = uriStr
-            applyImageBackground(uri, backgroundManager.getBlurIntensity())
+            if (!wasMusicBackgroundApplied) {
+                applyImageBackground(uri, backgroundManager.getBlurIntensity())
+            }
         }
     }
 
@@ -1085,7 +1133,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadBackgroundInternal(model: Any, blurIntensity: Int) {
-        if (isDestroyed || isFinishing) return
+        if (isFinishing) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
         try {
             val targetMode = backgroundManager.getDimMode()
             val targetIntensity = backgroundManager.getDimIntensity()
@@ -1657,7 +1706,7 @@ class MainActivity : AppCompatActivity() {
     private fun showCustomizationBottomSheet(viewToCustomize: View) {
         isBottomSheetInitializing = true
         focusedView = viewToCustomize
-        val currentFontIndex = fontManager.getFontIndexForView(viewToCustomize)
+
         val metrics = resources.displayMetrics
         val screenW = metrics.widthPixels.toFloat()
         val bottomSheetDp = 380f
@@ -1674,31 +1723,31 @@ class MainActivity : AppCompatActivity() {
             .start()
 
         handler.removeCallbacks(editModeTimeoutRunnable)
+        highlightFocusedView(true)
 
-
-        val currentSize: Float
-        val currentAlpha: Float
+        backgroundCustomizationTab.animate().alpha(0f).setDuration(200).withEndAction {
+            backgroundCustomizationTab.visibility = View.GONE
+        }.start()
 
         when (viewToCustomize.id) {
             R.id.time_text -> {
                 bsTitle.text = getString(R.string.customize_time)
                 bsTimeFormatGroup.visibility = View.VISIBLE
                 bsTimeFormatLabel.visibility = View.VISIBLE
+                bsShowAMPMSwitch.visibility = View.VISIBLE
                 bsDateFormatGroup.visibility = View.GONE
                 bsDateFormatLabel.visibility = View.GONE
-
+                bsShowAMPMSwitch.isEnabled = !bsTimeFormatGroup.checkedRadioButtonId.equals(R.id.time_24_radio)
 
                 bsTimeFormatGroup.check(
                     if (fontManager.getTimeFormatPattern().contains("H")) R.id.time_24_radio else R.id.time_12_radio
                 )
-
-                currentSize = fontManager.getTimeSize()
-                currentAlpha = fontManager.getTimeAlpha()
             }
             R.id.date_text -> {
                 bsTitle.text = getString(R.string.customize_date)
                 bsTimeFormatGroup.visibility = View.GONE
                 bsTimeFormatLabel.visibility = View.GONE
+                bsShowAMPMSwitch.visibility = View.GONE
                 bsDateFormatGroup.visibility = View.VISIBLE
                 bsDateFormatLabel.visibility = View.VISIBLE
 
@@ -1710,9 +1759,6 @@ class MainActivity : AppCompatActivity() {
                     else -> R.id.date_format_2
                 }
                 bsDateFormatGroup.check(id)
-
-                currentSize = fontManager.getDateSize()
-                currentAlpha = fontManager.getDateAlpha()
             }
             R.id.lastfm_layout -> {
                 bsTitle.text = getString(R.string.customize_now_playing)
@@ -1720,9 +1766,7 @@ class MainActivity : AppCompatActivity() {
                 bsDateFormatGroup.visibility = View.GONE
                 bsTimeFormatLabel.visibility = View.GONE
                 bsDateFormatLabel.visibility = View.GONE
-
-                currentSize = fontManager.getLastfmSize()
-                currentAlpha = fontManager.getLastfmAlpha()
+                bsShowAMPMSwitch.visibility = View.GONE
             }
             else -> {
                 hideBottomSheet()
@@ -1730,24 +1774,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        highlightFocusedView(true)
+        val settings = fontManager.getSettings(focusedView!!)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            backgroundCustomizationTab.animate().alpha(0f).setDuration(200).withEndAction {
-                backgroundCustomizationTab.visibility = View.GONE
-            }.start()
-        } else {
-            backgroundCustomizationTab.visibility = View.GONE
+        if (settings != null) {
+            // Size
+            val maxvalue = (metrics.widthPixels / metrics.density * 0.3).toInt()
+            bsSizeSeekBar.max = maxvalue - 20
+            bsSizeSeekBar.progress = (settings.size - 20).toInt()
+            bsSizeValue.text = getString(R.string.size_value_format, settings.size.toInt())
+
+            // Alpha
+            bsTransparencySeekBar.max = 100
+            bsTransparencySeekBar.progress = (settings.alpha * 100).toInt()
+            bsTransparencyPreview.alpha = settings.alpha
+
+            // Variable Fonts
+            bsVarWeightSeekBar.progress = settings.weight
+            bsVarWeightValue.text = settings.weight.toString()
+
+            bsVarWidthSeekBar.progress = settings.width
+            bsVarWidthValue.text = settings.width.toString()
+
+            bsVarRoundnessSeekBar.progress = settings.roundness
+            bsVarRoundnessValue.text = settings.roundness.toString()
+
+            (bsFontRecyclerView.adapter as? FontAdapter)?.apply {
+                selectedPosition = settings.fontIndex
+                notifyDataSetChanged()
+                if (settings.fontIndex != -1 && settings.fontIndex < itemCount) {
+                    bsFontRecyclerView.scrollToPosition(settings.fontIndex)
+                }
+            }
+
+            updateVariationVisibility()
         }
-
-        val maxvalue = (metrics.widthPixels / metrics.density * 0.3).toInt()
-        bsSizeSeekBar.max = maxvalue - 20
-        bsSizeSeekBar.progress = (currentSize - 20).toInt()
-        bsSizeValue.text = getString(R.string.size_value_format, currentSize.toInt())
-
-        bsTransparencySeekBar.max = 100
-        bsTransparencySeekBar.progress = (currentAlpha * 100).toInt()
-        bsTransparencyPreview.alpha = currentAlpha
 
         bsNightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
         bsFreeModeSwitch.isChecked = widgetMover.isFreeMovementEnabled()
@@ -1787,18 +1847,51 @@ class MainActivity : AppCompatActivity() {
             bsHorizontalAlignGroup.check(hAlignBtnId)
         }
 
-        (bsFontRecyclerView.adapter as? FontAdapter)?.apply {
-            selectedPosition = currentFontIndex
-            notifyDataSetChanged()
-            if (currentFontIndex != -1) {
-                bsFontRecyclerView.scrollToPosition(currentFontIndex)
-            }
-        }
 
         isBottomSheetInitializing = false
         bottomSheetBehavior.state = STATE_EXPANDED
     }
 
+    private fun updateVariationVisibility() {
+        if (focusedView == null) return
+
+        val axes = fontManager.getSupportedAxesForCurrentIndex(focusedView!!)
+        Log.d("ClockDesk", "Updating visibility for view ${focusedView?.id}. Found Axes: $axes")
+
+        val hasWeight = axes.contains("wght")
+        val hasWidth = axes.contains("wdth")
+        val hasRound = axes.contains("ROND")
+
+        fun setVisible(view: View?, visible: Boolean) {
+            if (view == null) {
+                Log.w("ClockDesk", "View is null! Check XML IDs.")
+                return
+            }
+            if (visible) {
+                if (view.visibility != View.VISIBLE) {
+                    view.alpha = 0f
+                    view.visibility = View.VISIBLE
+                    view.animate().alpha(1f).setDuration(200).start()
+                }
+            } else {
+                if (view.visibility == View.VISIBLE) {
+                    view.visibility = View.GONE
+                }
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            setVisible(bsVarWeightContainer, hasWeight)
+            setVisible(bsVarWidthContainer, hasWidth)
+            setVisible(bsVarRoundnessContainer, hasRound)
+        } else {
+            // Hide all on unsupported versions
+            setVisible(bsVarWeightContainer, false)
+            setVisible(bsVarWidthContainer, false)
+            setVisible(bsVarRoundnessContainer, false)
+        }
+
+        setVisible(bsVarTitle, hasWeight || hasWidth || hasRound)
+    }
     private fun hideBottomSheet() {
         bottomSheetBehavior.state = STATE_HIDDEN
         highlightFocusedView(false) // Use the new unified function
@@ -2171,59 +2264,130 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initCustomizationControls() {
+        // --- 1. Инициализация View ---
         bsTitle = bottomSheet.findViewById(R.id.customization_title)
         bsSizeSeekBar = bottomSheet.findViewById(R.id.size_seekbar)
         bsSizeValue = bottomSheet.findViewById(R.id.size_value)
         bsTransparencySeekBar = bottomSheet.findViewById(R.id.transparency_seekbar)
         bsTransparencyPreview = bottomSheet.findViewById(R.id.transparency_preview)
         bsFontRecyclerView = bottomSheet.findViewById(R.id.font_recycler_view)
+
+        // Кнопки действий
         bsApplyButton = bottomSheet.findViewById(R.id.apply_button)
         bsCancelButton = bottomSheet.findViewById(R.id.cancel_button)
+
+        // Переключатели
         bsNightShiftSwitch = bottomSheet.findViewById(R.id.night_shift_switch)
+        bsFreeModeSwitch = bottomSheet.findViewById(R.id.free_mode_switch)
+        bsGridSnapSwitch = bottomSheet.findViewById(R.id.grid_snap_switch)
+
+        // Группы выравнивания и форматы (оставляем как есть, они специфичны)
         bsTimeFormatGroup = bottomSheet.findViewById(R.id.time_format_radio_group)
+        bsShowAMPMSwitch = bottomSheet.findViewById(R.id.show_am_pm_switch)
         bsDateFormatGroup = bottomSheet.findViewById(R.id.date_format_radio_group)
         bsTimeFormatLabel = bottomSheet.findViewById(R.id.time_format_label)
         bsDateFormatLabel = bottomSheet.findViewById(R.id.date_format_label)
-        bsFreeModeSwitch = bottomSheet.findViewById(R.id.free_mode_switch)
-        bsGridSnapSwitch = bottomSheet.findViewById(R.id.grid_snap_switch)
         bsTextGravityGroup = bottomSheet.findViewById(R.id.text_gravity_toggle_group)
         bsHorizontalAlignGroup = bottomSheet.findViewById(R.id.alignment_toggle_group)
         bsVerticalAlignGroup = bottomSheet.findViewById(R.id.vertical_alignment_group)
         bsMoveUpBtn = bottomSheet.findViewById(R.id.move_up_button)
         bsMoveDownBtn = bottomSheet.findViewById(R.id.move_down_button)
 
+        // --- Новые Variable Controls ---
+        bsVarTitle = bottomSheet.findViewById(R.id.variable_properties_title)
 
+        bsVarWeightContainer = bottomSheet.findViewById(R.id.var_weight_container)
+        bsVarWeightSeekBar = bottomSheet.findViewById(R.id.var_weight_seekbar)
+        bsVarWeightValue = bottomSheet.findViewById(R.id.var_weight_value)
+
+        bsVarWidthContainer = bottomSheet.findViewById(R.id.var_width_container)
+        bsVarWidthSeekBar = bottomSheet.findViewById(R.id.var_width_seekbar)
+        bsVarWidthValue = bottomSheet.findViewById(R.id.var_width_value)
+
+        bsVarRoundnessContainer = bottomSheet.findViewById(R.id.var_roundness_container)
+        bsVarRoundnessSeekBar = bottomSheet.findViewById(R.id.var_roundness_seekbar)
+        bsVarRoundnessValue = bottomSheet.findViewById(R.id.var_roundness_value)
+
+        // --- 2. Слушатели (Listeners) ---
+
+        // Размер (Size) - Универсальный
         bsSizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser || focusedView == null) return
                 val size = (progress + 20).toFloat()
                 bsSizeValue.text = getString(R.string.size_value_format, size.toInt())
 
-                when (focusedView?.id) {
-                    R.id.time_text -> fontManager.setTimeSize(size)
-                    R.id.date_text -> fontManager.setDateSize(size)
-                    R.id.lastfm_layout -> fontManager.setLastfmSize(size)
-                }
+                // Clean Code: одна строка вместо switch
+                fontManager.setFontSize(focusedView!!, size)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
+        // Прозрачность (Alpha) - Универсальный
         bsTransparencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser || focusedView == null) return
                 val alpha = progress / 100f
                 bsTransparencyPreview.alpha = alpha
 
-                when (focusedView?.id) {
-                    R.id.time_text -> fontManager.setTimeAlpha(alpha)
-                    R.id.date_text -> fontManager.setDateAlpha(alpha)
-                    R.id.lastfm_layout -> fontManager.setLastfmAlpha(alpha)
-                }
+                fontManager.setFontAlpha(focusedView!!, alpha)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+
+        val variationsListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || focusedView == null) return
+
+                bsVarWeightValue.text = bsVarWeightSeekBar.progress.toString()
+                bsVarWidthValue.text = bsVarWidthSeekBar.progress.toString()
+                bsVarRoundnessValue.text = bsVarRoundnessSeekBar.progress.toString()
+
+                fontManager.setFontVariations(
+                    focusedView!!,
+                    weight = bsVarWeightSeekBar.progress,
+                    width = bsVarWidthSeekBar.progress,
+                    roundness = bsVarRoundnessSeekBar.progress
+                )
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+
+        bsVarWeightSeekBar.setOnSeekBarChangeListener(variationsListener)
+        bsVarWidthSeekBar.setOnSeekBarChangeListener(variationsListener)
+        bsVarRoundnessSeekBar.setOnSeekBarChangeListener(variationsListener)
+
+
+        val fontAdapter = FontAdapter(
+            fontManager.getFonts(),
+            onFontSelected = { fontIndex ->
+                focusedView?.let { view ->
+                    fontManager.setFontIndex(view, fontIndex)
+                    updateVariationVisibility()
+                }
+            },
+            onAddFontClicked = {
+                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
+                    }
+                } else {
+                    Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
+                }
+                try {
+                    startActivityForResult(intent, 400) // PICK_FONT_REQUEST
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(this, "File manager not found", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+        bsFontRecyclerView.adapter = fontAdapter
+
 
         bsNightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
             isNightShiftEnabled = isChecked
@@ -2281,7 +2445,20 @@ class MainActivity : AppCompatActivity() {
 
         bsTimeFormatGroup.setOnCheckedChangeListener { _, checkedId ->
             if (focusedView?.id == R.id.time_text) {
-                val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else "hh:mm a"
+                val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else if (bsShowAMPMSwitch.isChecked) "hh:mm a" else "hh:mm"
+                if (checkedId == R.id.time_24_radio) {
+                    bsShowAMPMSwitch.isEnabled = false
+                } else {
+                    bsShowAMPMSwitch.isEnabled = true
+                }
+                fontManager.setTimeFormatPattern(pattern)
+                clockManager.updateTimeText()
+            }
+        }
+
+        bsShowAMPMSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (focusedView?.id == R.id.time_text) {
+                val pattern = if (isChecked) "hh:mm a" else "hh:mm"
                 fontManager.setTimeFormatPattern(pattern)
                 clockManager.updateTimeText()
             }
@@ -2310,17 +2487,7 @@ class MainActivity : AppCompatActivity() {
             widgetMover.restoreOrderAndPositions()
             hideBottomSheet()
         }
-
-        val fontAdapter = FontAdapter(fontManager.getFonts()) { fontId ->
-            when (focusedView?.id) {
-                R.id.time_text -> fontManager.setTimeFont(fontId)
-                R.id.date_text -> fontManager.setDateFont(fontId)
-                R.id.lastfm_layout -> fontManager.setLastfmFont(fontId)
-            }
-        }
-        bsFontRecyclerView.adapter = fontAdapter
     }
-
     private fun initBackgroundControls() {
         val sheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         bgRecycler = sheet.findViewById(R.id.background_recycler_view)
@@ -2341,8 +2508,7 @@ class MainActivity : AppCompatActivity() {
         bgRecycler.isNestedScrollingEnabled = false
 
         backgroundsAdapter = BackgroundsAdapter(this, mutableListOf()) { id ->
-            when (id) {
-                "__ADD__" -> {
+                if (id == "__ADD__") {
                     val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                         Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
@@ -2361,6 +2527,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
+            previewBackgroundUri = id
+
+            if (wasMusicBackgroundApplied) {
+                return@BackgroundsAdapter
+            }
+
+            when (id) {
                 "__DEFAULT_GRADIENT__" -> {
                     previewBackgroundUri = "__DEFAULT_GRADIENT__"
                     fontManager.clearDynamicColors()
@@ -2502,8 +2675,10 @@ class MainActivity : AppCompatActivity() {
 
                     STATE_HIDDEN -> {
                         if (previewBackgroundUri != null) {
-                            val savedUri = backgroundManager.getSavedBackgroundUri()
-                            restoreUserBackground(savedUri)
+                            if (!wasMusicBackgroundApplied) {
+                                val savedUri = backgroundManager.getSavedBackgroundUri()
+                                restoreUserBackground(savedUri)
+                            }
                             previewBackgroundUri = null
                         }
 
