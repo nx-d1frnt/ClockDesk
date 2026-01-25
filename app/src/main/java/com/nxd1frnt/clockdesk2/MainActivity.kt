@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
@@ -71,8 +72,11 @@ import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.ui.WidgetMover
 import com.nxd1frnt.clockdesk2.ui.view.WeatherView
+import com.nxd1frnt.clockdesk2.utils.Logger
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
+import com.nxd1frnt.clockdesk2.utils.PowerStateManager
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var timeText: TextView
     private lateinit var dateText: TextView
     private lateinit var weatherText: TextView
@@ -83,6 +87,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nowPlayingTextView: TextView
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
+    private lateinit var turbulenceOverlay: com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
     private lateinit var weatherView: WeatherView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
@@ -134,6 +139,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bsVarRoundnessSeekBar: SeekBar
     private lateinit var bsVarRoundnessValue: TextView
 
+    private lateinit var bsColorRecyclerView: RecyclerView
+
     // Background Bottom Sheet UI elements
     private lateinit var bgRecycler: RecyclerView
     private lateinit var bgBlurSwitch: com.google.android.material.materialswitch.MaterialSwitch
@@ -177,14 +184,15 @@ class MainActivity : AppCompatActivity() {
     private val PICK_BG_REQUEST = 300
     private val PICK_FONT_REQUEST = 400
     private var enableAdditionalLogging = false
+    private lateinit var powerStateManager: PowerStateManager
     private var isPowerSavingMode = false
     private var isAutoPowerSavingActive = false // Tracks if auto-mode did it
-    private var batteryLevelReceiver: BatteryLevelReceiver? = null
     private lateinit var sensorManager: SensorManager
     private var lightSensor: Sensor? = null
     private val minPowerSaveBrightness = 0.01f
     private lateinit var smartChipManager: SmartChipManager
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
+    private var pendingRestoreRunnable: Runnable? = null
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
@@ -254,6 +262,7 @@ class MainActivity : AppCompatActivity() {
                         or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                         or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 )
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
         setContentView(R.layout.activity_main)
 
@@ -267,6 +276,7 @@ class MainActivity : AppCompatActivity() {
         nowPlayingTextView = findViewById(R.id.now_playing_text)
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
+        turbulenceOverlay = findViewById(R.id.turbulence_overlay)
         weatherView = findViewById(R.id.weatherView)
         backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
         backgroundProgressText = findViewById(R.id.background_progress_text)
@@ -300,6 +310,7 @@ class MainActivity : AppCompatActivity() {
         }
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
+        Logger.isLoggingEnabled = enableAdditionalLogging
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
@@ -357,10 +368,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
         //musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
         // musicgetter was replaced with music plugin manager
         setupMusicSystem()
-        gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
         clockManager = ClockManager(
             timeText,
             dateText,
@@ -370,7 +381,7 @@ class MainActivity : AppCompatActivity() {
             locationManager,
             { _, _, _ ->
                 if (isDemoMode) {
-                    Log.d("MainActivity", "debug sun times callback (demo mode)")
+                    Logger.d("MainActivity"){"debug sun times callback (demo mode)"}
                 }
             },
             { currentTime -> // onTimeChanged callback (called in both real and demo)
@@ -378,7 +389,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     gradientManager.updateSimulatedTime(currentTime)
                 } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to update gradient simulated time: ${e.message}")
+                    Logger.w("MainActivity"){"Failed to update gradient simulated time: ${e.message}"}
                 }
 
                 // If a custom image background is visible and dim mode is dynamic, recompute/apply dimming
@@ -391,7 +402,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to update dynamic dimming: ${e.message}")
+                    Logger.w("MainActivity"){"Failed to update dynamic dimming: ${e.message}"}
                 }
             },
             enableAdditionalLogging
@@ -423,6 +434,10 @@ class MainActivity : AppCompatActivity() {
                     // This is handled by SettingsFragment, but we also update the chip
                     smartChipManager.onPreferencesChanged()
                 }
+                "additional_logging" -> {
+                    enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
+                    Logger.isLoggingEnabled = enableAdditionalLogging
+                }
             }
         }
 
@@ -431,6 +446,10 @@ class MainActivity : AppCompatActivity() {
 
         fontManager.loadFont()
 
+        powerStateManager = PowerStateManager(this)
+        powerStateManager.registerObserver(this)
+        powerStateManager.registerObserver(clockManager)
+        powerStateManager.registerObserver(weatherGetter)
         // Load any saved custom background image from prefs (if set)
         loadSavedBackground()
 
@@ -505,7 +524,7 @@ class MainActivity : AppCompatActivity() {
                         val uri = Uri.parse(it)
                         applyImageBackground(uri, backgroundManager.getBlurIntensity())
                     } catch (e: Exception) {
-                        Log.w("MainActivity", "Failed to reapply custom background: ${e.message}")
+                        Logger.w("MainActivity"){"Failed to reapply custom background: ${e.message}"}
                     }
                 }
             }
@@ -522,6 +541,58 @@ class MainActivity : AppCompatActivity() {
         }
 
 
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // 1. if the background bottom sheet is open
+                if (backgroundBottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN &&
+                    backgroundBottomSheetBehavior.state != BottomSheetBehavior.STATE_COLLAPSED) {
+
+                    if (previewBackgroundUri != null) {
+                        if (!wasMusicBackgroundApplied) {
+                            val savedUri = backgroundManager.getSavedBackgroundUri()
+                            restoreUserBackground(savedUri)
+                        }
+                        previewBackgroundUri = null
+                    }
+                    hideBackgroundBottomSheet()
+                    return
+                }
+
+                // 2. If customization bottom sheet is open
+                if (bottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN &&
+                    bottomSheetBehavior.state != BottomSheetBehavior.STATE_COLLAPSED) {
+
+                    // The "Back" button works as "Cancel" - discard unsaved changes
+                    fontManager.loadFont()
+                    widgetMover.restoreOrderAndPositions()
+                    hideBottomSheet()
+                    return
+                }
+
+                // 3. if tutorial is running
+                if (tutorialLayout.visibility == View.VISIBLE) {
+                    tutorialLayout.animate().alpha(0f).setDuration(300)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                tutorialLayout.visibility = View.GONE
+                                isTutorialRunning = false
+                            }
+                        })
+                    return
+                }
+
+                // 4. if edit mode is active
+                if (isEditMode) {
+                    exitEditMode()
+                    return
+                }
+
+                // 5. if none of the above, proceed with normal back action
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        })
         // Start updates
         restoreSavedWeatherState()
         startUpdates()
@@ -550,7 +621,13 @@ class MainActivity : AppCompatActivity() {
                 val track = state.track
                 val trackInfoText = "${track.artist} - ${track.title}"
                 nowPlayingTextView.text = trackInfoText
+                val isTextDifferent = trackInfoText != lastTrackInfo
                 lastTrackInfo = trackInfoText
+                val hasNewArt = !wasMusicBackgroundApplied &&
+                        (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
+                if (isTextDifferent || hasNewArt) {
+                    handleBackgroundUpdate(track)
+                }
             } else {
                 nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
                 lastTrackInfo = null
@@ -560,6 +637,9 @@ class MainActivity : AppCompatActivity() {
 
         when (state) {
             is PluginState.Playing -> {
+                pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
+                pendingRestoreRunnable = null
+
                 val track = state.track
                 val trackInfoText = "${track.artist} - ${track.title}"
                 val isTextDifferent = trackInfoText != lastTrackInfo
@@ -578,18 +658,21 @@ class MainActivity : AppCompatActivity() {
                     if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
                         lastfmLayout.visibility = View.VISIBLE
                         lastfmLayout.alpha = 0f
+                        lastfmLayout.translationX = 10f
                         nowPlayingTextView.text = trackInfoText
                         nowPlayingTextView.isSelected = true
 
                         lastfmLayout.animate()
                             .alpha(1f)
-                            .setDuration(400)
+                            .translationX(0f)
+                            .setDuration(500)
                             .setListener(null)
                             .start()
                     } else {
                         lastfmLayout.animate()
                             .alpha(0f)
-                            .setDuration(200)
+                            .translationX(-10f)
+                            .setDuration(500)
                             .setListener(object : AnimatorListenerAdapter() {
                                 override fun onAnimationEnd(animation: Animator) {
                                     if (!isEditMode) {
@@ -597,7 +680,8 @@ class MainActivity : AppCompatActivity() {
                                         nowPlayingTextView.isSelected = true
                                         lastfmLayout.animate()
                                             .alpha(1f)
-                                            .setDuration(200)
+                                            .translationX(0f)
+                                            .setDuration(500)
                                             .setListener(null)
                                             .start()
                                     }
@@ -609,28 +693,40 @@ class MainActivity : AppCompatActivity() {
             }
 
             is PluginState.Idle, is PluginState.Disabled -> {
-                lastfmLayout.animate().cancel()
-
-                if (lastfmLayout.visibility == View.VISIBLE) {
-                    lastfmLayout.animate()
-                        .alpha(0f)
-                        .setDuration(400)
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator) {
-                                if (!isEditMode) {
-                                    lastfmLayout.visibility = View.GONE
-                                }
-                            }
-                        })
-                        .start()
+                if (pendingRestoreRunnable == null) {
+                    val runnable = Runnable {
+                        performMusicIdleState()
+                        pendingRestoreRunnable = null
+                    }
+                    pendingRestoreRunnable = runnable
+                    handler.postDelayed(runnable, 800) // 800ms delay
                 }
-                if (wasMusicBackgroundApplied) {
-                    restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-                    wasMusicBackgroundApplied = false
-                }
-                lastTrackInfo = null
             }
         }
+    }
+    private fun performMusicIdleState() {
+        lastfmLayout.animate().cancel()
+
+        if (lastfmLayout.visibility == View.VISIBLE) {
+            lastfmLayout.animate()
+                .alpha(0f)
+                .translationX(10f)
+                .setDuration(500)
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        if (!isEditMode) {
+                            lastfmLayout.visibility = View.GONE
+                        }
+                    }
+                })
+                .start()
+        }
+
+        if (wasMusicBackgroundApplied) {
+            restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+            wasMusicBackgroundApplied = false
+        }
+        lastTrackInfo = null
     }
 
     private fun handleBackgroundUpdate(track: MusicTrack) {
@@ -644,14 +740,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (track.artworkBitmap != null) {
-            Log.d("MainActivity", "Applying bitmap album art background")
+            Logger.d("MainActivity"){"Applying bitmap album art background"}
             applyBitmapBackground(track.artworkBitmap, blurIntensity)
 
             wasMusicBackgroundApplied = true
             isMusicBgAppliedThisTrack = true
         }
         else if (!track.artworkUrl.isNullOrEmpty()) {
-            Log.d("MainActivity", "Applying URL album art background: ${track.artworkUrl}")
+            Logger.d("MainActivity"){"Applying URL album art background: ${track.artworkUrl}"}
             applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
 
             wasMusicBackgroundApplied = true
@@ -667,90 +763,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-//    private val musicCallback: (()->Unit) = callback@{
-//       if (isEditMode) {
-//       // if edit mode is active, do nothing
-//           return@callback
-//       } else {
-//           if (musicGetter.enabled) {
-//               if (musicGetter.currentTrack != lastTrackInfo) {
-//                   lastfmLayout.visibility = View.VISIBLE
-//                   lastfmLayout.animate().alpha(0f).setDuration(400)
-//                       .setListener(object : AnimatorListenerAdapter() {
-//                           override fun onAnimationEnd(animation: Animator) {
-//                               if (!isEditMode) {
-//                                   nowPlayingTextView.text = musicGetter.currentTrack
-//                                   nowPlayingTextView.isSelected = true
-//                                   lastfmLayout.animate().alpha(1f).setDuration(400).setListener(null)
-//                                       .start()
-//                               }
-//                           }
-//                       })
-//                   lastTrackInfo = musicGetter.currentTrack
-//
-//                   // flag to track if we applied music background for this track
-//                   var isMusicBgAppliedThisTrack = false
-//
-//                   if (musicGetter.currentAlbumArtUrl != null) {
-//                       Log.d(
-//                           "MainActivity",
-//                           "Applying album art background: ${musicGetter.currentAlbumArtUrl}"
-//                       )
-//                       applyImageBackground(
-//                           Uri.parse(musicGetter.currentAlbumArtUrl),
-//                           backgroundManager.getBlurIntensity()
-//                       )
-//                       wasMusicBackgroundApplied =
-//                           true // flag to indicate that music is controlling the background
-//                       isMusicBgAppliedThisTrack = true // flag for this track
-//
-//                   } else if (musicGetter.userPreselectedBackgroundUri != null) {
-//                       Log.d(
-//                           "MainActivity",
-//                           "Applying user preselected background: ${musicGetter.userPreselectedBackgroundUri}"
-//                       )
-//                       applyImageBackground(
-//                           Uri.parse(musicGetter.userPreselectedBackgroundUri),
-//                           backgroundManager.getBlurIntensity()
-//                       )
-//                       wasMusicBackgroundApplied = true
-//                       isMusicBgAppliedThisTrack = true
-//                   }
-//                   // If no new art for this track, and music had applied background before, restore user background
-//                   if (!isMusicBgAppliedThisTrack && wasMusicBackgroundApplied) {
-//                       Log.d(
-//                           "MainActivity",
-//                           "Restoring user background (track changed, no new art)"
-//                       )
-//                       restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-//                       wasMusicBackgroundApplied = false // reset flag
-//                   }
-//               }
-//           } else {
-//               Log.d("MusicCallback", "Hiding lastfmLayout with animation")
-//               lastfmLayout.animate().alpha(0f).setDuration(400)
-//                   .setListener(object : AnimatorListenerAdapter() {
-//                       override fun onAnimationEnd(animation: Animator) {
-//                           Log.d("MusicCallback", "Animation end: isEditMode=$isEditMode")
-//                           if (!isEditMode) {
-//                               lastfmLayout.visibility = View.GONE
-//                           }
-//                       }
-//                   })
-//
-//               // If music background was applied, restore user background
-//               if (wasMusicBackgroundApplied) {
-//                   restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-//                   Log.d(
-//                       "MainActivity",
-//                       "Restoring user background after music background disabled, bgUri=${backgroundManager.getSavedBackgroundUri()}"
-//                   )
-//                   wasMusicBackgroundApplied = false // reset flag
-//               }
-//           }
-//       }
-//    }
 
 
     private fun applyHeavyBlurToLayer(view: ImageView) {
@@ -776,38 +788,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun togglePowerSavingMode(enable: Boolean) {
-        if (enable == isPowerSavingMode) return // Already in the correct state
-
-        isPowerSavingMode = enable
-
-        if (enable) {
-            // --- ENABLE POWER SAVING ---
-
-            // Stop frequent updates
-            //musicGetter.setPowerSavingMode(true)
-            gradientManager.stopUpdates()
-            clockManager.setPowerSavingMode(true)
-            weatherGetter.setPowerSavingMode(true)
-
-            // Set screen brightness to low
-            val layoutParams = window.attributes
-            layoutParams.screenBrightness = minPowerSaveBrightness
-            window.attributes = layoutParams
-
-        } else {
-            // --- DISABLE POWER SAVING ---
-            //musicGetter.setPowerSavingMode(false)
-            gradientManager.startUpdates()
-            clockManager.setPowerSavingMode(false)
-            weatherGetter.setPowerSavingMode(false)
-
-            // Restore brightness
-            val layoutParams = window.attributes
-            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE // System default
-            window.attributes = layoutParams
-        }
-    }
 
     private fun checkLocationPermissionsAndLoadData() {
         // check location permissions
@@ -1097,10 +1077,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 applyImageBackground(uri, blurIntensity)
                 hasCustomImageBackground = true
-                Log.d(
-                    "MainActivity",
-                    "Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"
-                )
+                Logger.d("MainActivity") {"Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"}
                 // Apply saved dimming settings
 //                setBackgroundDimming(
 //                    backgroundManager.getDimMode(),
@@ -1110,7 +1087,7 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 backgroundManager.setSavedBackgroundUri(null)
                 hasCustomImageBackground = false
-                Log.w("MainActivity", "Failed to load saved background: ${e.message}")
+                Logger.w("MainActivity") {"Failed to load saved background: ${e.message}"}
             }
         } else {
             // ensure image view is hidden and gradient updates run
@@ -1199,10 +1176,57 @@ class MainActivity : AppCompatActivity() {
                     transition: Transition<in Drawable>?
                 ) {
                     setBackgroundProgressVisible(false)
-                    backgroundImageView.setImageDrawable(resource)
 
-                    if (fontManager.isDynamicColorEnabled()) {
-                        val bitmap = (resource as? BitmapDrawable)?.bitmap
+                    val bitmap = (resource as? BitmapDrawable)?.bitmap
+                    var noiseColor = Color.WHITE
+                    if (bitmap != null) {
+                        val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
+
+                        val dominantColor = palette.getMutedColor(
+                            palette.getDominantColor(Color.LTGRAY)
+                        )
+
+                        noiseColor = androidx.core.graphics.ColorUtils.setAlphaComponent(dominantColor, 128)
+                        if (isAdvancedGraphicsEnabled) {
+                            turbulenceOverlay.playAnimation(noiseColor) {}
+                        }
+                            backgroundImageView.setImageDrawable(resource)
+                            if (usePlatformBlur) {
+                                try {
+                                    val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
+                                    val renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                        radiusPx,
+                                        radiusPx,
+                                        android.graphics.Shader.TileMode.CLAMP
+                                    )
+                                    backgroundImageView.setRenderEffect(renderEffect)
+                                } catch (e: Throwable) { /* ignore */ }
+                            } else {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    backgroundImageView.setRenderEffect(null)
+                                }
+                            }
+
+                                    backgroundImageView.visibility = View.VISIBLE
+                                    val currentTargetMode = backgroundManager.getDimMode()
+                            val currentTargetIntensity = backgroundManager.getDimIntensity()
+                        val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
+                        val finalZoom = calculateZoom(currentEffectiveIntensity)
+
+                        backgroundImageView.scaleX = finalZoom + 0.4f
+                        backgroundImageView.scaleY = finalZoom + 0.4f
+
+                        backgroundImageView.animate()
+                            .scaleX(finalZoom)
+                            .scaleY(finalZoom)
+                            .alpha(1.0f)
+                            .setDuration(700)
+                            .setListener(object : AnimatorListenerAdapter() {
+                                override fun onAnimationEnd(animation: Animator) {
+                                    updateBackgroundFilters()
+                                }
+                            }).start()
+                    }
                         if (bitmap != null) {
                             fontManager.updateDynamicColors(bitmap) {
                                 fontManager.applyNightShiftTransition(
@@ -1212,44 +1236,8 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
                         }
-                    }
-
-                    if (usePlatformBlur) {
-                        try {
-                            val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
-                            val renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                radiusPx,
-                                radiusPx,
-                                android.graphics.Shader.TileMode.CLAMP
-                            )
-                            backgroundImageView.setRenderEffect(renderEffect)
-                        } catch (e: Throwable) { /* ignore */ }
-                    } else {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            backgroundImageView.setRenderEffect(null)
-                        }
-                    }
-
-                    backgroundImageView.visibility = View.VISIBLE
-                    val currentTargetMode = backgroundManager.getDimMode()
-                    val currentTargetIntensity = backgroundManager.getDimIntensity()
-                    val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
-                    val finalZoom = calculateZoom(currentEffectiveIntensity)
-
-                    backgroundImageView.scaleX = finalZoom + 0.4f
-                    backgroundImageView.scaleY = finalZoom + 0.4f
-
-                    backgroundImageView.animate()
-                        .scaleX(finalZoom)
-                        .scaleY(finalZoom)
-                        .alpha(1.0f)
-                        .setDuration(700)
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator) {
-                                updateBackgroundFilters()
-                            }
-                        }).start()
                 }
+
 
                 override fun onLoadCleared(placeholder: Drawable?) {
                     setBackgroundProgressVisible(false)
@@ -1258,7 +1246,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onLoadFailed(errorDrawable: Drawable?) {
                     super.onLoadFailed(errorDrawable)
                     setBackgroundProgressVisible(false)
-                    Log.w("MainActivity", "Glide failed to load background: $model")
+                    Logger.w("MainActivity") {"Glide failed to load background: $model"}
 
                     try {
                         val savedUri = backgroundManager.getSavedBackgroundUri()
@@ -1266,7 +1254,7 @@ class MainActivity : AppCompatActivity() {
                             restoreUserBackground(savedUri)
                         }
                     } catch (e: Exception) {
-                        Log.e("MainActivity", "Failed to restore user background", e)
+                        Logger.e("MainActivity"){"Failed to restore user background"}
                     }
                 }
 
@@ -1290,7 +1278,7 @@ class MainActivity : AppCompatActivity() {
 
         } catch (e: Exception) {
             setBackgroundProgressVisible(false)
-            Log.e("MainActivity", "loadBackgroundInternal failed", e)
+            Logger.e("MainActivity"){"loadBackgroundInternal failed"}
         }
     }
 
@@ -1703,6 +1691,217 @@ class MainActivity : AppCompatActivity() {
             backgroundBottomSheet.bringToFront()
     }
 
+    private fun initCustomizationControls() {
+        // --- 1. Initialize Views (MOVED TO TOP) ---
+        bsTitle = bottomSheet.findViewById(R.id.customization_title)
+
+        // Initialize bsColorRecyclerView FIRST to avoid UninitializedPropertyAccessException
+        bsColorRecyclerView = bottomSheet.findViewById(R.id.color_recycler_view)
+        bsColorRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
+        bsSizeSeekBar = bottomSheet.findViewById(R.id.size_seekbar)
+        bsSizeValue = bottomSheet.findViewById(R.id.size_value)
+        bsTransparencySeekBar = bottomSheet.findViewById(R.id.transparency_seekbar)
+        bsTransparencyPreview = bottomSheet.findViewById(R.id.transparency_preview)
+        bsFontRecyclerView = bottomSheet.findViewById(R.id.font_recycler_view)
+
+        bsApplyButton = bottomSheet.findViewById(R.id.apply_button)
+        bsCancelButton = bottomSheet.findViewById(R.id.cancel_button)
+
+        bsNightShiftSwitch = bottomSheet.findViewById(R.id.night_shift_switch)
+        bsFreeModeSwitch = bottomSheet.findViewById(R.id.free_mode_switch)
+        bsGridSnapSwitch = bottomSheet.findViewById(R.id.grid_snap_switch)
+
+        bsTimeFormatGroup = bottomSheet.findViewById(R.id.time_format_radio_group)
+        bsShowAMPMSwitch = bottomSheet.findViewById(R.id.show_am_pm_switch)
+        bsDateFormatGroup = bottomSheet.findViewById(R.id.date_format_radio_group)
+        bsTimeFormatLabel = bottomSheet.findViewById(R.id.time_format_label)
+        bsDateFormatLabel = bottomSheet.findViewById(R.id.date_format_label)
+        bsTextGravityGroup = bottomSheet.findViewById(R.id.text_gravity_toggle_group)
+        bsHorizontalAlignGroup = bottomSheet.findViewById(R.id.alignment_toggle_group)
+        bsVerticalAlignGroup = bottomSheet.findViewById(R.id.vertical_alignment_group)
+        bsMoveUpBtn = bottomSheet.findViewById(R.id.move_up_button)
+        bsMoveDownBtn = bottomSheet.findViewById(R.id.move_down_button)
+
+        bsVarTitle = bottomSheet.findViewById(R.id.variable_properties_title)
+        bsVarWeightContainer = bottomSheet.findViewById(R.id.var_weight_container)
+        bsVarWeightSeekBar = bottomSheet.findViewById(R.id.var_weight_seekbar)
+        bsVarWeightValue = bottomSheet.findViewById(R.id.var_weight_value)
+        bsVarWidthContainer = bottomSheet.findViewById(R.id.var_width_container)
+        bsVarWidthSeekBar = bottomSheet.findViewById(R.id.var_width_seekbar)
+        bsVarWidthValue = bottomSheet.findViewById(R.id.var_width_value)
+        bsVarRoundnessContainer = bottomSheet.findViewById(R.id.var_roundness_container)
+        bsVarRoundnessSeekBar = bottomSheet.findViewById(R.id.var_roundness_seekbar)
+        bsVarRoundnessValue = bottomSheet.findViewById(R.id.var_roundness_value)
+
+        // --- 2. Listeners ---
+
+        bsSizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || focusedView == null) return
+                val size = (progress + 20).toFloat()
+                bsSizeValue.text = getString(R.string.size_value_format, size.toInt())
+                fontManager.setFontSize(focusedView!!, size)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        bsTransparencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || focusedView == null) return
+                val alpha = progress / 100f
+                bsTransparencyPreview.alpha = alpha
+                fontManager.setFontAlpha(focusedView!!, alpha)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        val variationsListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || focusedView == null) return
+                bsVarWeightValue.text = bsVarWeightSeekBar.progress.toString()
+                bsVarWidthValue.text = bsVarWidthSeekBar.progress.toString()
+                bsVarRoundnessValue.text = bsVarRoundnessSeekBar.progress.toString()
+
+                fontManager.setFontVariations(
+                    focusedView!!,
+                    weight = bsVarWeightSeekBar.progress,
+                    width = bsVarWidthSeekBar.progress,
+                    roundness = bsVarRoundnessSeekBar.progress
+                )
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+
+        bsVarWeightSeekBar.setOnSeekBarChangeListener(variationsListener)
+        bsVarWidthSeekBar.setOnSeekBarChangeListener(variationsListener)
+        bsVarRoundnessSeekBar.setOnSeekBarChangeListener(variationsListener)
+
+        val fontAdapter = FontAdapter(
+            fontManager.getFonts(),
+            onFontSelected = { fontIndex ->
+                focusedView?.let { view ->
+                    fontManager.setFontIndex(view, fontIndex)
+                    updateVariationVisibility()
+                }
+            },
+            onAddFontClicked = {
+                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
+                    }
+                } else {
+                    Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
+                }
+                try {
+                    startActivityForResult(intent, 400)
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(this, "File manager not found", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+        bsFontRecyclerView.adapter = fontAdapter
+
+        bsNightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
+            isNightShiftEnabled = isChecked
+            fontManager.setNightShiftEnabled(isChecked)
+        }
+
+        bsFreeModeSwitch.setOnCheckedChangeListener { _, isChecked ->
+            widgetMover.setFreeMovementEnabled(isChecked)
+        }
+
+        bsGridSnapSwitch.setOnCheckedChangeListener { _, isChecked ->
+            widgetMover.setGridSnapEnabled(isChecked)
+        }
+
+        bsTextGravityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.gravity_left_button -> widgetMover.GRAVITY_START
+                R.id.gravity_center_button -> widgetMover.GRAVITY_CENTER
+                R.id.gravity_right_button -> widgetMover.GRAVITY_END
+                else -> widgetMover.GRAVITY_CENTER
+            }
+            widgetMover.setTextGravity(focusedView!!, mode)
+        }
+
+        bsHorizontalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.left_button -> 0
+                R.id.center_button -> 1
+                R.id.right_button -> 2
+                else -> 0
+            }
+            widgetMover.alignViewHorizontal(focusedView!!, mode)
+        }
+
+        bsVerticalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.align_top_button -> 0
+                R.id.align_center_vertical_button -> 1
+                R.id.align_bottom_button -> 2
+                else -> 0
+            }
+            widgetMover.alignViewVertical(focusedView!!, mode)
+        }
+
+        bsMoveUpBtn.setOnClickListener {
+            focusedView?.let { widgetMover.moveWidgetOrder(it, true) }
+        }
+
+        bsMoveDownBtn.setOnClickListener {
+            focusedView?.let { widgetMover.moveWidgetOrder(it, false) }
+        }
+
+        bsTimeFormatGroup.setOnCheckedChangeListener { _, checkedId ->
+            if (focusedView?.id == R.id.time_text) {
+                val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else if (bsShowAMPMSwitch.isChecked) "hh:mm a" else "hh:mm"
+                bsShowAMPMSwitch.isEnabled = (checkedId != R.id.time_24_radio)
+                fontManager.setTimeFormatPattern(pattern)
+                clockManager.updateTimeText()
+            }
+        }
+
+        bsShowAMPMSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (focusedView?.id == R.id.time_text) {
+                val pattern = if (isChecked) "hh:mm a" else "hh:mm"
+                fontManager.setTimeFormatPattern(pattern)
+                clockManager.updateTimeText()
+            }
+        }
+
+        bsDateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
+            if (focusedView?.id == R.id.date_text) {
+                val pattern = when (checkedId) {
+                    R.id.date_format_1 -> "MMM dd"
+                    R.id.date_format_2 -> "EEE, MMM dd"
+                    R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"
+                    else -> "EEE, MMM dd"
+                }
+                fontManager.setDateFormatPattern(pattern)
+                clockManager.updateDateText()
+            }
+        }
+
+        bsApplyButton.setOnClickListener {
+            fontManager.saveSettings()
+            hideBottomSheet()
+        }
+
+        bsCancelButton.setOnClickListener {
+            fontManager.loadFont()
+            widgetMover.restoreOrderAndPositions()
+            hideBottomSheet()
+        }
+    }
     private fun showCustomizationBottomSheet(viewToCustomize: View) {
         isBottomSheetInitializing = true
         focusedView = viewToCustomize
@@ -1809,6 +2008,24 @@ class MainActivity : AppCompatActivity() {
             updateVariationVisibility()
         }
 
+        val colorAdapter = ColorAdapter(
+            items = fontManager.getColorsList(),
+            selectedSettings = settings,
+            currentDynamicColor = fontManager.getDynamicColor(),
+            onColorSelected = { item ->
+                if (focusedView == null) return@ColorAdapter
+
+                when (item) {
+                    is ColorItem.Dynamic -> fontManager.setDynamicColorEnabledForWidget(focusedView!!)
+                    is ColorItem.Solid -> fontManager.setFontColor(focusedView!!, item.color)
+                    is ColorItem.AddNew -> { /* PICKER LOGIC HERE */ }
+                }
+
+                bsColorRecyclerView.adapter = createColorAdapter(focusedView!!, settings)
+            }
+        )
+        bsColorRecyclerView.adapter = colorAdapter
+
         bsNightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
         bsFreeModeSwitch.isChecked = widgetMover.isFreeMovementEnabled()
         bsGridSnapSwitch.isChecked = widgetMover.isGridSnapEnabled()
@@ -1852,11 +2069,28 @@ class MainActivity : AppCompatActivity() {
         bottomSheetBehavior.state = STATE_EXPANDED
     }
 
+    private fun createColorAdapter(view: View, oldSettings: FontSettings?): ColorAdapter {
+        val newSettings = fontManager.getSettings(view)
+        return ColorAdapter(
+            items = fontManager.getColorsList(),
+            selectedSettings = newSettings,
+            currentDynamicColor = fontManager.getDynamicColor(),
+            onColorSelected = { item ->
+                when (item) {
+                    is ColorItem.Dynamic -> fontManager.setDynamicColorEnabledForWidget(view)
+                    is ColorItem.Solid -> fontManager.setFontColor(view, item.color)
+                    else -> {}
+                }
+                bsColorRecyclerView.adapter = createColorAdapter(view, newSettings)
+            }
+        )
+    }
+
     private fun updateVariationVisibility() {
         if (focusedView == null) return
 
         val axes = fontManager.getSupportedAxesForCurrentIndex(focusedView!!)
-        Log.d("ClockDesk", "Updating visibility for view ${focusedView?.id}. Found Axes: $axes")
+        Logger.d("FontManager"){"Updating visibility for view ${focusedView?.id}. Found Axes: $axes"}
 
         val hasWeight = axes.contains("wght")
         val hasWidth = axes.contains("wdth")
@@ -1864,7 +2098,7 @@ class MainActivity : AppCompatActivity() {
 
         fun setVisible(view: View?, visible: Boolean) {
             if (view == null) {
-                Log.w("ClockDesk", "View is null! Check XML IDs.")
+                Logger.w("ClockDesk"){"View is null! Check XML IDs."}
                 return
             }
             if (visible) {
@@ -2224,16 +2458,8 @@ class MainActivity : AppCompatActivity() {
          val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
          enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
-         clockManager.setAdditionalLogging(enableAdditionalLogging)
-         fontManager.setAdditionalLogging(enableAdditionalLogging)
-        if (batteryLevelReceiver == null) {
-            batteryLevelReceiver = BatteryLevelReceiver()
-            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-            registerReceiver(batteryLevelReceiver, filter)
-        }
-        lightSensor?.let {
-            sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
-        }
+//         clockManager.setAdditionalLogging(enableAdditionalLogging)
+//         fontManager.setAdditionalLogging(enableAdditionalLogging)
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
         smartChipManager.updateAllChips()
@@ -2263,231 +2489,6 @@ class MainActivity : AppCompatActivity() {
         gradientManager.startUpdates()
     }
 
-    private fun initCustomizationControls() {
-        // --- 1. Инициализация View ---
-        bsTitle = bottomSheet.findViewById(R.id.customization_title)
-        bsSizeSeekBar = bottomSheet.findViewById(R.id.size_seekbar)
-        bsSizeValue = bottomSheet.findViewById(R.id.size_value)
-        bsTransparencySeekBar = bottomSheet.findViewById(R.id.transparency_seekbar)
-        bsTransparencyPreview = bottomSheet.findViewById(R.id.transparency_preview)
-        bsFontRecyclerView = bottomSheet.findViewById(R.id.font_recycler_view)
-
-        // Кнопки действий
-        bsApplyButton = bottomSheet.findViewById(R.id.apply_button)
-        bsCancelButton = bottomSheet.findViewById(R.id.cancel_button)
-
-        // Переключатели
-        bsNightShiftSwitch = bottomSheet.findViewById(R.id.night_shift_switch)
-        bsFreeModeSwitch = bottomSheet.findViewById(R.id.free_mode_switch)
-        bsGridSnapSwitch = bottomSheet.findViewById(R.id.grid_snap_switch)
-
-        // Группы выравнивания и форматы (оставляем как есть, они специфичны)
-        bsTimeFormatGroup = bottomSheet.findViewById(R.id.time_format_radio_group)
-        bsShowAMPMSwitch = bottomSheet.findViewById(R.id.show_am_pm_switch)
-        bsDateFormatGroup = bottomSheet.findViewById(R.id.date_format_radio_group)
-        bsTimeFormatLabel = bottomSheet.findViewById(R.id.time_format_label)
-        bsDateFormatLabel = bottomSheet.findViewById(R.id.date_format_label)
-        bsTextGravityGroup = bottomSheet.findViewById(R.id.text_gravity_toggle_group)
-        bsHorizontalAlignGroup = bottomSheet.findViewById(R.id.alignment_toggle_group)
-        bsVerticalAlignGroup = bottomSheet.findViewById(R.id.vertical_alignment_group)
-        bsMoveUpBtn = bottomSheet.findViewById(R.id.move_up_button)
-        bsMoveDownBtn = bottomSheet.findViewById(R.id.move_down_button)
-
-        // --- Новые Variable Controls ---
-        bsVarTitle = bottomSheet.findViewById(R.id.variable_properties_title)
-
-        bsVarWeightContainer = bottomSheet.findViewById(R.id.var_weight_container)
-        bsVarWeightSeekBar = bottomSheet.findViewById(R.id.var_weight_seekbar)
-        bsVarWeightValue = bottomSheet.findViewById(R.id.var_weight_value)
-
-        bsVarWidthContainer = bottomSheet.findViewById(R.id.var_width_container)
-        bsVarWidthSeekBar = bottomSheet.findViewById(R.id.var_width_seekbar)
-        bsVarWidthValue = bottomSheet.findViewById(R.id.var_width_value)
-
-        bsVarRoundnessContainer = bottomSheet.findViewById(R.id.var_roundness_container)
-        bsVarRoundnessSeekBar = bottomSheet.findViewById(R.id.var_roundness_seekbar)
-        bsVarRoundnessValue = bottomSheet.findViewById(R.id.var_roundness_value)
-
-        // --- 2. Слушатели (Listeners) ---
-
-        // Размер (Size) - Универсальный
-        bsSizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || focusedView == null) return
-                val size = (progress + 20).toFloat()
-                bsSizeValue.text = getString(R.string.size_value_format, size.toInt())
-
-                // Clean Code: одна строка вместо switch
-                fontManager.setFontSize(focusedView!!, size)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        // Прозрачность (Alpha) - Универсальный
-        bsTransparencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || focusedView == null) return
-                val alpha = progress / 100f
-                bsTransparencyPreview.alpha = alpha
-
-                fontManager.setFontAlpha(focusedView!!, alpha)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        val variationsListener = object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || focusedView == null) return
-
-                bsVarWeightValue.text = bsVarWeightSeekBar.progress.toString()
-                bsVarWidthValue.text = bsVarWidthSeekBar.progress.toString()
-                bsVarRoundnessValue.text = bsVarRoundnessSeekBar.progress.toString()
-
-                fontManager.setFontVariations(
-                    focusedView!!,
-                    weight = bsVarWeightSeekBar.progress,
-                    width = bsVarWidthSeekBar.progress,
-                    roundness = bsVarRoundnessSeekBar.progress
-                )
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        }
-
-        bsVarWeightSeekBar.setOnSeekBarChangeListener(variationsListener)
-        bsVarWidthSeekBar.setOnSeekBarChangeListener(variationsListener)
-        bsVarRoundnessSeekBar.setOnSeekBarChangeListener(variationsListener)
-
-
-        val fontAdapter = FontAdapter(
-            fontManager.getFonts(),
-            onFontSelected = { fontIndex ->
-                focusedView?.let { view ->
-                    fontManager.setFontIndex(view, fontIndex)
-                    updateVariationVisibility()
-                }
-            },
-            onAddFontClicked = {
-                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "*/*"
-                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
-                    }
-                } else {
-                    Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
-                }
-                try {
-                    startActivityForResult(intent, 400) // PICK_FONT_REQUEST
-                } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(this, "File manager not found", Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
-        bsFontRecyclerView.adapter = fontAdapter
-
-
-        bsNightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
-            isNightShiftEnabled = isChecked
-            fontManager.setNightShiftEnabled(isChecked)
-        }
-
-        bsFreeModeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            widgetMover.setFreeMovementEnabled(isChecked)
-        }
-
-        bsGridSnapSwitch.setOnCheckedChangeListener { _, isChecked ->
-            widgetMover.setGridSnapEnabled(isChecked)
-        }
-
-        bsTextGravityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
-            val mode = when (checkedId) {
-                R.id.gravity_left_button -> widgetMover.GRAVITY_START
-                R.id.gravity_center_button -> widgetMover.GRAVITY_CENTER
-                R.id.gravity_right_button -> widgetMover.GRAVITY_END
-                else -> widgetMover.GRAVITY_CENTER
-            }
-            widgetMover.setTextGravity(focusedView!!, mode)
-        }
-
-        bsHorizontalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
-            val mode = when (checkedId) {
-                R.id.left_button -> 0
-                R.id.center_button -> 1
-                R.id.right_button -> 2
-                else -> 0
-            }
-            widgetMover.alignViewHorizontal(focusedView!!, mode)
-        }
-
-        bsVerticalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
-            val mode = when (checkedId) {
-                R.id.align_top_button -> 0
-                R.id.align_center_vertical_button -> 1
-                R.id.align_bottom_button -> 2
-                else -> 0
-            }
-            widgetMover.alignViewVertical(focusedView!!, mode)
-        }
-
-        bsMoveUpBtn.setOnClickListener {
-            focusedView?.let { widgetMover.moveWidgetOrder(it, true) }
-        }
-
-        bsMoveDownBtn.setOnClickListener {
-            focusedView?.let { widgetMover.moveWidgetOrder(it, false) }
-        }
-
-        bsTimeFormatGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (focusedView?.id == R.id.time_text) {
-                val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else if (bsShowAMPMSwitch.isChecked) "hh:mm a" else "hh:mm"
-                if (checkedId == R.id.time_24_radio) {
-                    bsShowAMPMSwitch.isEnabled = false
-                } else {
-                    bsShowAMPMSwitch.isEnabled = true
-                }
-                fontManager.setTimeFormatPattern(pattern)
-                clockManager.updateTimeText()
-            }
-        }
-
-        bsShowAMPMSwitch.setOnCheckedChangeListener { _, isChecked ->
-            if (focusedView?.id == R.id.time_text) {
-                val pattern = if (isChecked) "hh:mm a" else "hh:mm"
-                fontManager.setTimeFormatPattern(pattern)
-                clockManager.updateTimeText()
-            }
-        }
-
-        bsDateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (focusedView?.id == R.id.date_text) {
-                val pattern = when (checkedId) {
-                    R.id.date_format_1 -> "MMM dd"
-                    R.id.date_format_2 -> "EEE, MMM dd"
-                    R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"
-                    else -> "EEE, MMM dd"
-                }
-                fontManager.setDateFormatPattern(pattern)
-                clockManager.updateDateText()
-            }
-        }
-
-        bsApplyButton.setOnClickListener {
-            fontManager.saveSettings()
-            hideBottomSheet()
-        }
-
-        bsCancelButton.setOnClickListener {
-            fontManager.loadFont()
-            widgetMover.restoreOrderAndPositions()
-            hideBottomSheet()
-        }
-    }
     private fun initBackgroundControls() {
         val sheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         bgRecycler = sheet.findViewById(R.id.background_recycler_view)
@@ -2536,7 +2537,7 @@ class MainActivity : AppCompatActivity() {
             when (id) {
                 "__DEFAULT_GRADIENT__" -> {
                     previewBackgroundUri = "__DEFAULT_GRADIENT__"
-                    fontManager.clearDynamicColors()
+                   // fontManager.clearDynamicColors()
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
                         dayTimeGetter,
@@ -2571,7 +2572,7 @@ class MainActivity : AppCompatActivity() {
                         applyImageBackground(uri, intensity)
                         previewBackgroundUri = id
                     } catch (e: Exception) {
-                        Log.e("MainActivity", "Error selecting background: $id", e)
+                        Logger.e("MainActivity"){"Error selecting background: $id"}
                     }
                 }
             }
@@ -2703,7 +2704,7 @@ class MainActivity : AppCompatActivity() {
             hasCustomImageBackground = false
 
             backgroundImageView.setImageDrawable(null)
-            fontManager.clearDynamicColors()
+            //fontManager.clearDynamicColors()
             fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -2774,14 +2775,14 @@ class MainActivity : AppCompatActivity() {
             when (previewBackgroundUri) {
                 "__DEFAULT_GRADIENT__" -> {
                     backgroundManager.setSavedBackgroundUri(null)
-                    Log.d("MainActivity", "Saved: user wants default gradient (will apply after music stops)")
+                    Logger.d("MainActivity"){"Saved: user wants default gradient (will apply after music stops)"}
                 }
                 null -> {
-                    Log.d("MainActivity", "No new background selected, keeping current settings")
+                    Logger.d("MainActivity"){"No new background selected, keeping current settings"}
                 }
                 else -> {
                     backgroundManager.setSavedBackgroundUri(previewBackgroundUri)
-                    Log.d("MainActivity", "Saved new background URI: $previewBackgroundUri")
+                    Logger.d("MainActivity"){"Saved new background URI: $previewBackgroundUri"}
                 }
             }
 
@@ -2801,7 +2802,7 @@ class MainActivity : AppCompatActivity() {
             "__DEFAULT_GRADIENT__" -> {
                 backgroundManager.setSavedBackgroundUri(null)
                 hasCustomImageBackground = false
-                fontManager.clearDynamicColors()
+                //fontManager.clearDynamicColors()
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
                 backgroundImageView.visibility = View.GONE
                 gradientManager.startUpdates()
@@ -2814,7 +2815,7 @@ class MainActivity : AppCompatActivity() {
                         hasCustomImageBackground = true
                         updateBackgroundFilters()
                     } catch (e: Exception) {
-                        Log.w("MainActivity", "Failed to re-apply existing background", e)
+                        Logger.w("MainActivity"){"Failed to re-apply existing background"}
                     }
                 }
             }
@@ -2825,7 +2826,7 @@ class MainActivity : AppCompatActivity() {
                     hasCustomImageBackground = true
                     updateBackgroundFilters()
                 } catch (e: Exception) {
-                    Log.w("MainActivity", "Failed to apply new background", e)
+                    Logger.w("MainActivity"){"Failed to apply new background"}
                 }
             }
         }
@@ -2841,7 +2842,7 @@ class MainActivity : AppCompatActivity() {
                 applyImageBackground(uri, blur)
                 hasCustomImageBackground = true
             } catch (e: Exception) {
-                Log.e("MainActivity", "Failed to restore user background", e)
+                Logger.e("MainActivity"){"Failed to restore user background"}
                 restoreGradientBackground()
             }
         } else {
@@ -2851,10 +2852,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        batteryLevelReceiver?.let {
-            unregisterReceiver(it)
-            batteryLevelReceiver = null
-        }
         burnInProtectionManager?.stop()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
@@ -2875,51 +2872,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    private inner class BatteryLevelReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
-                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-                val isAutoPowerSaveEnabled = prefs.getBoolean("automatic_battery_saver_mode", true)
 
-                if (!isAutoPowerSaveEnabled) {
-                    // If the user disabled the feature, do nothing.
-                    // If the mode was on, you might want to disable it.
-                    if (isAutoPowerSavingActive) {
-                        togglePowerSavingMode(false)
-                    }
-                    return
-                }
-
-                // Get battery status
-                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                        status == BatteryManager.BATTERY_STATUS_FULL
-
-                // Get battery level
-                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                val batteryPct = (level.toFloat() / scale.toFloat() * 100).toInt()
-
-                // Get user's threshold
-                val threshold = prefs.getInt("battery_saver_trigger", 15)
-
-                // --- Logic ---
-                if (batteryPct <= threshold && !isCharging) {
-                    // Battery is low and not charging: Turn ON power saving
-                    if (!isPowerSavingMode) {
-                        Log.d("BatteryReceiver", "Battery low ($batteryPct%), enabling power-saving mode.")
-                        togglePowerSavingMode(true)
-                        isAutoPowerSavingActive = true // Flag that this was an automatic change
-                    }
-                } else {
-                    // Battery is OK or charging: Turn OFF power saving (if we turned it on)
-                    if (isPowerSavingMode && isAutoPowerSavingActive) {
-                        Log.d("BatteryReceiver", "Battery OK ($batteryPct%) or charging, disabling auto power-saving mode.")
-                        togglePowerSavingMode(false)
-                        isAutoPowerSavingActive = false // Clear the flag
-                    }
-                }
-            }
-        }
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        isPowerSavingMode = isEnabled
     }
 }

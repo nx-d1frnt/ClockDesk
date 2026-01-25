@@ -15,6 +15,7 @@ import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.music.ui.LastFmSettingsFragment
 import com.nxd1frnt.clockdesk2.network.NetworkManager
+import com.nxd1frnt.clockdesk2.utils.Logger
 import org.json.JSONException
 
 class LastFmPlugin(private val context: Context) : IMusicPlugin {
@@ -44,13 +45,13 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "lastfm_username", "lastfm_api_key", "enable_lastfm" -> {
-                Log.d("LastFmPlugin", "[$instanceId] Critical settings changed, restarting loop...")
+                Logger.d("LastFmPlugin"){"[$instanceId] Critical settings changed, restarting loop..."}
                 loadPrefs()
                 restartLoop()
             }
             "last_fm_refresh_interval" -> {
                 loadPrefs()
-                Log.d("LastFmPlugin", "[$instanceId] Interval updated to ${refreshInterval / 1000}s")
+                Logger.d("LastFmPlugin"){"[$instanceId] Interval updated to ${refreshInterval / 1000}s"}
             }
         }
     }
@@ -66,7 +67,7 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
     }
 
     override fun init() {
-        Log.d("LastFmPlugin", "[$instanceId] INIT called")
+        Logger.d("LastFmPlugin"){"[$instanceId] INIT called"}
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         loadPrefs()
@@ -85,7 +86,7 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
         // Log.v("LastFmPlugin", "[$instanceId] Loaded prefs: enabled=$isEnabled, interval=$rawInterval")
 
         if (apiKey.isEmpty() || username.isEmpty()) {
-            if (isEnabled) Log.w("LastFmPlugin", "[$instanceId] Missing credentials")
+            if (isEnabled) Logger.w("LastFmPlugin"){"[$instanceId] Missing credentials"}
             isEnabled = false
             callback?.invoke(PluginState.Disabled)
         }
@@ -111,7 +112,7 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
             .build()
             .toString()
 
-        Log.v("LastFmPlugin", "[$instanceId] Ping Last.fm")
+        Logger.i("LastFmPlugin"){"[$instanceId] Ping Last.fm"}
 
         val request = JsonObjectRequest(Request.Method.GET, url, null,
             { response ->
@@ -154,12 +155,12 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
                         callback?.invoke(PluginState.Idle)
                     }
                 } catch (e: JSONException) {
-                    Log.e("LastFmPlugin", "[$instanceId] Parse error", e)
+                    Logger.e("LastFmPlugin"){"[$instanceId] Parse error: ${e.message}"}
                     callback?.invoke(PluginState.Idle)
                 }
             },
             { error ->
-                Log.e("LastFmPlugin", "[$instanceId] Network error: ${error.message}")
+                Logger.e("LastFmPlugin"){"[$instanceId] Network error: ${error.message}"}
                 callback?.invoke(PluginState.Idle)
             }
         )
@@ -178,7 +179,7 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
     }
 
     override fun destroy() {
-        Log.d("LastFmPlugin", "[$instanceId] DESTROY called")
+        Logger.d("LastFmPlugin"){"[$instanceId] DESTROY called"}
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         handler.removeCallbacks(updateRunnable)

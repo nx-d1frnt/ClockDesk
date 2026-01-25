@@ -5,6 +5,7 @@ import android.util.Log
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.utils.Logger
 
 class OpenMeteoAPI(
     context: Context,
@@ -51,17 +52,17 @@ class OpenMeteoAPI(
                         null
                     }
 
-                    Log.d("OpenMeteoApi", "Weather: Code=$weatherCode, Wind=$windSpeed km/h, " +
-                            "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m")
+                    Logger.d("OpenMeteoApi"){"Weather: Code=$weatherCode, Wind=$windSpeed km/h, " +
+                            "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m"}
 
                     onWeatherUpdated()
 
                 } catch (e: Exception) {
-                    Log.e("OpenMeteoApi", "Error parsing weather JSON", e)
+                    Logger.e("OpenMeteoApi"){"Error parsing weather JSON ${e.message}"}
                 }
             },
             {
-                Log.e("OpenMeteoApi", "Error fetching weather: ${it.message}")
+                Logger.e("OpenMeteoApi"){"Error fetching weather: ${it.message}"}
             }
         )
         requestQueue.add(request)

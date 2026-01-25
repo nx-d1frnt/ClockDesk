@@ -205,6 +205,22 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Color"
+                android:textSize="16sp"
+                android:paddingBottom="8dp"
+                android:paddingTop="8dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/color_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"/>
+
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/night_shift_switch"
                 android:layout_width="match_parent"

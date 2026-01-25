@@ -19,6 +19,7 @@ import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.Logger
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -74,7 +75,7 @@ class WidgetMover(
     // ============================================================================
 
     init {
-        log("WidgetMover initialized with ${views.size} views")
+        Logger.d("WidgetMover"){"WidgetMover initialized with ${views.size} views"}
         loadInitialState()
     }
 
@@ -85,15 +86,11 @@ class WidgetMover(
             LayoutMode.StackMode
         }
         isGridSnapEnabled = prefs.getBoolean("grid_snap_enabled", true)
-        log("Initial mode: $currentMode")
+        Logger.d("WidgetMover"){"Initial mode: $currentMode"}
     }
 
     fun setOnInteractionListener(listener: (Boolean) -> Unit) {
         this.onInteractionListener = listener
-    }
-
-    private fun log(message: String) {
-        if (isLoggingEnabled) Log.d(TAG, message)
     }
 
 
@@ -129,12 +126,11 @@ class WidgetMover(
         val targetMode = if (enabled) LayoutMode.FreeMode else LayoutMode.StackMode
 
         if (currentMode == targetMode) {
-            log("Already in $targetMode, skipping")
+            Logger.d("WidgetMover"){"Already in $targetMode, skipping"}
             return
         }
 
-        log("Switching mode: $currentMode -> $targetMode")
-
+        Logger.d("WidgetMover"){"Switching mode: $currentMode -> $targetMode"}
         // Save current positions before switching
         if (currentMode == LayoutMode.FreeMode) {
             views.forEach { savePosition(it) }
@@ -174,7 +170,7 @@ class WidgetMover(
 
         // Fix inconsistent state
         if (savedFreeMode && savedStackMode) {
-            log("Inconsistent state detected! Forcing Stack Mode.")
+            Logger.d("WidgetMover"){"Inconsistent state detected! Forcing Stack Mode."}
             prefs.edit()
                 .putBoolean("free_movement_beta_enabled", false)
                 .putBoolean("is_vertical_stack_mode", true)
@@ -192,7 +188,7 @@ class WidgetMover(
 
     private fun checkAndInitializeDefaults() {
         if (!prefs.contains("is_layout_initialized")) {
-            log("First run detected! Applying default layout settings.")
+            Logger.d("WidgetMover"){"First run detected! Applying default layout settings."}
             val editor = prefs.edit()
             editor.putBoolean("is_vertical_stack_mode", true)
             editor.putBoolean("free_movement_beta_enabled", false)
@@ -210,14 +206,14 @@ class WidgetMover(
 
             editor.putBoolean("is_layout_initialized", true)
             editor.apply()
-            log("Default settings initialized")
+            Logger.d("WidgetMover"){"Default settings initialized"}
         }
     }
 
     private fun initializeDefaultFreePositions() {
         if (parentView !is ConstraintLayout) return
 
-        log("Initializing default Free Mode positions...")
+        Logger.d("WidgetMover"){"Initializing default Free Mode positions..."}
 
         parentView.post {
             val set = ConstraintSet()
@@ -257,12 +253,11 @@ class WidgetMover(
 
     fun restoreOrderAndPositions() {
         if (parentView !is ConstraintLayout) {
-            log("Parent is not ConstraintLayout, cannot restore")
+            Logger.d("WidgetMover"){"Parent is not ConstraintLayout, cannot restore"}
             return
         }
 
-        log("=== Restoring Order and Positions ===")
-
+        Logger.d("WidgetMover"){"=== Restoring Order and Positions ==="}
         // Load state
         loadInitialState()
         checkAndInitializeDefaults()
@@ -282,11 +277,11 @@ class WidgetMover(
             // Step 2: Apply layout based on mode
             when (currentMode) {
                 LayoutMode.StackMode -> {
-                    log("Restoring Stack Mode")
+                    Logger.d("WidgetMover"){"Restoring Stack Mode"}
                     applySmartStack(saveOrder = false)
                 }
                 LayoutMode.FreeMode -> {
-                    log("Restoring Free Mode")
+                    Logger.d("WidgetMover"){"Restoring Free Mode"}
                     restoreFreeMode()
                 }
             }
@@ -296,7 +291,7 @@ class WidgetMover(
     private fun restoreFreeMode() {
         if (parentView !is ConstraintLayout) return
 
-        log("Applying Free Mode layout...")
+        Logger.d("WidgetMover"){"Applying Free Mode layout..."}
 
         val set = ConstraintSet()
         set.clone(parentView)
@@ -315,7 +310,7 @@ class WidgetMover(
             val savedX = prefs.getFloat("${idName}_x", 0f)
             val savedY = prefs.getFloat("${idName}_y", 0f)
 
-            log("Restoring $idName: x=$savedX, y=$savedY")
+            Logger.d("WidgetMover"){"Restoring $idName: x=$savedX, y=$savedY"}
 
             parentView.post {
                 sanitizeAndApplyPosition(view, savedX, savedY)
@@ -329,7 +324,7 @@ class WidgetMover(
     private fun applySmartStack(saveOrder: Boolean) {
         if (parentView !is ConstraintLayout) return
 
-        log("Applying Smart Stack (saveOrder=$saveOrder)...")
+        Logger.d("WidgetMover"){"Applying Smart Stack (saveOrder=$saveOrder)..."}
 
         val set = ConstraintSet()
         set.clone(parentView)
@@ -391,7 +386,7 @@ class WidgetMover(
 
         beginLayoutTransition()
         set.applyTo(parentView)
-        log("✓ Smart Stack applied")
+        Logger.d("WidgetMover"){"✓ Smart Stack applied"}
     }
 
     // ============================================================================
@@ -418,7 +413,7 @@ class WidgetMover(
         view.translationX = finalX
         view.translationY = finalY
 
-        log("Sanitized position for ${getResourceName(view.id)}: ($desiredX, $desiredY) -> ($finalX, $finalY)")
+        Logger.d("WidgetMover"){"Sanitized position for ${getResourceName(view.id)}: ($desiredX, $desiredY) -> ($finalX, $finalY)"}
     }
 
     // ============================================================================
@@ -489,8 +484,8 @@ class WidgetMover(
         isDragging = true
         onInteractionListener?.invoke(true)
 
-        log("Started dragging ${getResourceName(view.id)}")
 
+        Logger.d("WidgetMover"){"Started dragging ${getResourceName(view.id)}"}
         // Prepare layout for drag
         transitionToFreeMode()
         healOrphans(view)
@@ -549,11 +544,11 @@ class WidgetMover(
 
     private fun handleDragEnd(view: View) {
         if (checkCollision(view)) {
-            log("Collision detected, reverting position")
+            Logger.d("WidgetMover"){"Collision detected, reverting position"}
             Toast.makeText(context, "Cannot place here - overlaps another widget", Toast.LENGTH_SHORT).show()
             restoreOrderAndPositions()
         } else {
-            log("Drag ended, saving position")
+            Logger.d("WidgetMover"){"Drag ended, saving position"}
             savePosition(view)
         }
     }
@@ -568,7 +563,7 @@ class WidgetMover(
 
     private fun transitionToFreeMode() {
         if (currentMode is LayoutMode.StackMode) {
-            log("Transitioning from Stack to Free Mode")
+            Logger.d("WidgetMover"){"Transitioning from Stack to Free Mode"}
             currentMode = LayoutMode.FreeMode
             prefs.edit()
                 .putBoolean("is_vertical_stack_mode", false)
@@ -598,7 +593,7 @@ class WidgetMover(
     private fun healOrphans(draggingView: View) {
         if (parentView !is ConstraintLayout) return
 
-        log("Healing orphans (excluding ${getResourceName(draggingView.id)})")
+        Logger.d("WidgetMover"){"Healing orphans (excluding ${getResourceName(draggingView.id)})"}
 
         val set = ConstraintSet()
         set.clone(parentView)
@@ -671,7 +666,7 @@ class WidgetMover(
 
             val otherRect = getViewRect(other)
             if (Rect.intersects(activeRect, otherRect)) {
-                log("Collision: ${getResourceName(activeView.id)} <-> ${getResourceName(other.id)}")
+                Logger.d("WidgetMover"){"Collision: ${getResourceName(activeView.id)} <-> ${getResourceName(other.id)}"}
                 return true
             }
         }
@@ -690,7 +685,7 @@ class WidgetMover(
     // ============================================================================
 
     fun moveWidgetOrder(activeView: View, moveUp: Boolean) {
-        log("Move order: ${getResourceName(activeView.id)} ${if (moveUp) "UP" else "DOWN"}")
+        Logger.d("WidgetMover"){"Move order: ${getResourceName(activeView.id)} ${if (moveUp) "UP" else "DOWN"}"}
 
         val sortedViews = views.sortedBy {
             prefs.getInt("${getResourceName(it.id)}_order_index", 0)
@@ -720,7 +715,7 @@ class WidgetMover(
     }
 
     fun alignViewVertical(view: View, mode: Int) {
-        log("Align vertical: ${getResourceName(view.id)} -> $mode")
+        Logger.d("WidgetMover"){"Align vertical: ${getResourceName(view.id)} -> $mode"}
         saveAlignmentOnlyV(view, mode)
 
         currentMode = LayoutMode.StackMode
@@ -731,7 +726,7 @@ class WidgetMover(
     }
 
     fun alignViewHorizontal(view: View, mode: Int) {
-        log("Align horizontal: ${getResourceName(view.id)} -> $mode")
+        Logger.d("WidgetMover"){"Align horizontal: ${getResourceName(view.id)} -> $mode"}
 
         //start the layout transition
         beginLayoutTransition()
@@ -746,7 +741,7 @@ class WidgetMover(
     }
 
     fun setTextGravity(view: View, mode: Int) {
-        log("Set text gravity: ${getResourceName(view.id)} -> $mode")
+        Logger.d("WidgetMover"){"Set text gravity: ${getResourceName(view.id)} -> $mode"}
         applyInternalGravity(view, mode)
         saveInternalGravity(view, mode)
         view.invalidate()
@@ -865,7 +860,7 @@ class WidgetMover(
 
     fun setEditMode(enabled: Boolean) {
         isEditMode = enabled
-        log("Edit mode: $enabled")
+        Logger.d("WidgetMover"){"Edit mode: $enabled"}
 
         if (enabled) {
             restoreOrderAndPositions()
@@ -917,7 +912,7 @@ class WidgetMover(
     fun setGridSnapEnabled(enabled: Boolean) {
         isGridSnapEnabled = enabled
         prefs.edit().putBoolean("grid_snap_enabled", enabled).apply()
-        log("Grid snap: $enabled")
+        Logger.d("WidgetMover"){"Grid snap: $enabled"}
     }
 
     fun isGridSnapEnabled(): Boolean = isGridSnapEnabled
@@ -936,7 +931,7 @@ class WidgetMover(
             .putFloat("${idName}_x", x)
             .putFloat("${idName}_y", y)
             .apply()
-        log("Saved position for $idName: ($x, $y)")
+        Logger.d("WidgetMover"){"Saved position for $idName: ($x, $y)"}
     }
 
     private fun saveAlignmentOnlyV(view: View, v: Int) {
@@ -984,12 +979,12 @@ class WidgetMover(
     fun debugPrintPositions() {
         if (!isLoggingEnabled) return
 
-        log("=== DEBUG: Widget Positions ===")
+        Logger.d("WidgetMover"){"=== DEBUG: Widget Positions ==="}
         views.forEach { view ->
             val idName = getResourceName(view.id)
             val savedX = prefs.getFloat("${idName}_x", -1f)
             val savedY = prefs.getFloat("${idName}_y", -1f)
-            log("""
+            Logger.d("WidgetMover"){"""
                 $idName:
                   Visual: x=${view.x}, y=${view.y}
                   Translation: x=${view.translationX}, y=${view.translationY}
@@ -997,10 +992,10 @@ class WidgetMover(
                   Align H: ${getAlignmentOnlyH(view)}
                   Align V: ${getAlignmentOnlyV(view)}
                   Gravity: ${getInternalGravity(view)}
-            """.trimIndent())
+            """.trimIndent()}
         }
-        log("Mode: $currentMode")
-        log("================================")
+        Logger.d("WidgetMover"){"Mode: $currentMode"}
+        Logger.d("WidgetMover"){"================================"}
     }
 
     // ============================================================================

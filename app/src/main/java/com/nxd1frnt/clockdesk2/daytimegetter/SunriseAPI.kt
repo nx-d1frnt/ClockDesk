@@ -6,6 +6,7 @@ import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.utils.Logger
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -31,7 +32,7 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
             dawnTime = Date(prefs.getLong("dawn_$cacheKey", 0L))
             duskTime = Date(prefs.getLong("dusk_$cacheKey", 0L))
             solarNoonTime = Date(prefs.getLong("solar_noon_$cacheKey", 0L))
-            Log.d("SunTimes", "Loaded cached sun times: sunrise=$sunriseTime, sunset=$sunsetTime")
+            Logger.d("SunTimes"){"Loaded cached sun times: sunrise=$sunriseTime, sunset=$sunsetTime"}
             callback()
             return
         }
@@ -49,12 +50,12 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
                     putLong("solar_noon_$cacheKey", solarNoonTime?.time ?: 0L)
                     apply()
                 }
-                Log.d("SunTimes", "Fetched and cached: sunrise=$sunriseTime, sunset=$sunsetTime")
+                Logger.d("SunTimes"){"Fetched and cached: sunrise=$sunriseTime, sunset=$sunsetTime"}
                 callback()
             },
             {
                 setDefault()
-                Log.d("SunTimes", "Used fallback times")
+                Logger.d("SunTimes"){"Used fallback times"}
                 callback()
             }
         )
@@ -82,7 +83,7 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
                 cal.set(Calendar.DAY_OF_MONTH, today.get(Calendar.DAY_OF_MONTH))
                 cal.time
             } catch (e: Exception) {
-                Log.e("SunTimes", "Failed to parse time: $time", e)
+                Logger.e("SunTimes"){"Failed to parse time: $time ${e.message}"}
                 null
             }
         }
@@ -95,13 +96,13 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
 
         // Validate times
         if (sunriseTime == null || sunsetTime == null || dawnTime == null || duskTime == null || solarNoonTime == null) {
-            Log.w("SunTimes", "One or more sun times are null, using fallbacks")
+            Logger.w("SunTimes"){"One or more sun times are null, using fallbacks"}
             setDefault()
         } else if (sunriseTime!!.after(sunsetTime) || dawnTime!!.after(sunriseTime) || duskTime!!.before(sunsetTime)) {
-            Log.w("SunTimes", "Invalid sun times detected: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime")
+            Logger.w("SunTimes"){"Invalid sun times detected: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime"}
             setDefault()
         } else {
-            Log.d("SunTimes", "Parsed: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime")
+            Logger.d("SunTimes"){"Parsed: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime"}
         }
     }
 }

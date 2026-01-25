@@ -6,13 +6,25 @@ import android.os.Looper
 import android.util.Log
 import com.nxd1frnt.clockdesk2.LocationManager
 import com.nxd1frnt.clockdesk2.network.NetworkManager
+import com.nxd1frnt.clockdesk2.utils.Logger
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 
-// Добавляем callback в конструктор, как в MusicGetter
 open class WeatherGetter(
     private val context: Context,
     private val locationManager: LocationManager,
     private val callback: () -> Unit
-) {
+) : PowerSaveObserver {
+    private var interval = 30 * 60 * 1000L
+
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        if (isEnabled) {
+            interval = 60*60*1000L
+            Logger.d("WeatherGetter"){"Power saving mode enabled. Setting interval to 3600000 ms"}
+        } else {
+            interval = 30*60*1000L
+            Logger.d("WeatherGetter"){"Power saving mode disabled. Setting interval to 1800000 ms"}
+        }
+    }
     val requestQueue = NetworkManager.getRequestQueue(context)
 
     var temperature: Double? = null
@@ -24,22 +36,16 @@ open class WeatherGetter(
     var cloudCover: Int? = null
     var visibility: Double? = null
     private val handler = Handler(Looper.getMainLooper())
-    private var isPowerSavingMode = false
     private var lastLatitude: Double? = null
     private var lastLongitude: Double? = null
-
-    private val intervalNormal = 30 * 60 * 1000L
-    private val intervalPowerSave = 60 * 60 * 1000L
 
     private val updateRunnable = object : Runnable {
         override fun run() {
             if (lastLatitude != null && lastLongitude != null) {
-                Log.d("WeatherGetter", "Auto-refreshing weather data...")
+                Logger.d("WeatherGetter"){"Auto-refreshing weather data..."}
                 fetch(lastLatitude!!, lastLongitude!!)
             }
-
-            val nextInterval = if (isPowerSavingMode) intervalPowerSave else intervalNormal
-            handler.postDelayed(this, nextInterval)
+            handler.postDelayed(this, interval)
         }
     }
 
@@ -53,10 +59,6 @@ open class WeatherGetter(
 
     fun stopUpdates() {
         handler.removeCallbacks(updateRunnable)
-    }
-
-    fun setPowerSavingMode(enabled: Boolean) {
-        isPowerSavingMode = enabled
     }
 
     open fun fetch(latitude: Double, longitude: Double) {

@@ -13,6 +13,7 @@ import com.nxd1frnt.clockdesk2.music.ClockDeskMediaService
 import com.nxd1frnt.clockdesk2.music.IMusicPlugin
 import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
+import com.nxd1frnt.clockdesk2.utils.Logger
 
 class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
     override val id = "system_media"
@@ -55,7 +56,7 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
         } catch (e: SecurityException) {
             callback?.invoke(PluginState.Disabled)
         } catch (e: Exception) {
-            Log.e("SystemMediaPlugin", "Error starting monitoring", e)
+            Logger.e("SystemMediaPlugin"){"Error starting monitoring"}
         }
     }
 
@@ -127,7 +128,7 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
             val artUri = meta?.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: meta?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
 
-            Log.d("SystemMediaPlugin", "Update: ${controller.packageName}, hasBitmap=${bitmap != null}, uri=$artUri")
+            Logger.d("SystemMediaPlugin"){"Update: ${controller.packageName}, hasBitmap=${bitmap != null}, uri=$artUri"}
 
             val track = MusicTrack(
                 title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown",

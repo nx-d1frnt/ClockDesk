@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import android.location.LocationManager
 import android.util.Log
+import com.nxd1frnt.clockdesk2.utils.Logger
 
 class LocationManager(private val context: Context, private val permissionRequestCode: Int) {
     fun loadCoordinates(callback: (Double, Double) -> Unit) {
@@ -13,7 +14,7 @@ class LocationManager(private val context: Context, private val permissionReques
         if (prefs.getBoolean("useManualCoordinates", false)) {
             val latitude: Any = prefs.getString("latitude", "40.7128f")?.toDouble() ?: 40.7128f
             val longitude: Any = prefs.getString("longitude", "-74.0060f")?.toDouble() ?: -74.0060f
-            Log.d("LocationManager", "Using manual coordinates: lat=$latitude, lon=$longitude")
+            Logger.d("LocationManager"){"Using manual coordinates: lat=$latitude, lon=$longitude"}
             callback(latitude as Double, longitude as Double) } else { fetchLocation(callback) }
     }
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray, callback: (Double, Double) -> Unit) {
@@ -21,13 +22,13 @@ class LocationManager(private val context: Context, private val permissionReques
             fetchLocation(callback)
         } else {
             callback(40.7128, -74.0060) // Fallback: New York
-            Log.d("LocationManager", "Location permission denied, using fallback: New York")
+            Logger.d("LocationManager"){"Location permission denied, using fallback: New York"}
         }
     }
 
     fun fetchLocation(callback: (Double, Double) -> Unit) {
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.w("LocationManager", "Location permission denied, using fallback: New York")
+            Logger.w("LocationManager"){"Location permission denied, using fallback: New York"}
             callback(40.7128, -74.0060)
             return
         }
@@ -36,14 +37,14 @@ class LocationManager(private val context: Context, private val permissionReques
             val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             if (location != null) {
-                Log.d("LocationManager", "Fetched location: lat=${location.latitude}, lon=${location.longitude}")
+                Logger.d("LocationManager"){"Fetched location: lat=${location.latitude}, lon=${location.longitude}"}
                 callback(location.latitude, location.longitude)
             } else {
-                Log.w("LocationManager", "No location available, using fallback: New York")
+                Logger.w("LocationManager"){"No location available, using fallback: New York"}
                 callback(40.7128, -74.0060)
             }
         } catch (e: SecurityException) {
-            Log.e("LocationManager", "Security exception fetching location", e)
+            Logger.e("LocationManager"){"Security exception fetching location: ${e.message}"}
             callback(40.7128, -74.0060)
         }
     }

@@ -5,6 +5,7 @@ import android.os.Handler
 import android.util.Log
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -18,10 +19,17 @@ class ClockManager(
     private val debugCallback: (String, String, String) -> Unit,
     private val onTimeChanged: (Date) -> Unit,
     initialLoggingState: Boolean
-) {
+) : PowerSaveObserver {
+
+    private var isLowPower = false
+
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        isLowPower = isEnabled
+        updateTimeText()
+        Log.d("ClockManager", "Power saving mode changed: isLowPower=$isLowPower")
+    }
     private var isDebugMode = false
     private val debugCycleInterval = 5L // milliseconds
-    private var isPowerSavingMode = false
     private var simulatedTime: Calendar = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
@@ -36,22 +44,12 @@ class ClockManager(
             updateClock()
             val interval = when {
                 isDebugMode -> debugCycleInterval
-                isPowerSavingMode -> 60000L // 1 minute
+                isLowPower -> 60000L // 1 minute
                 else -> 1000L // 1 second
             }
             handler.postDelayed(this, interval)
             if (additionalLoggingEnabled) Log.d("ClockUpdate", "Clock updated at ${System.currentTimeMillis()}")
         }
-    }
-
-    fun setPowerSavingMode(enabled: Boolean) {
-        if (isPowerSavingMode == enabled) return
-
-        isPowerSavingMode = enabled
-        Log.d("ClockManager", "Power saving mode set to $enabled")
-
-        // Re-post the runnable to apply the new interval immediately
-        startUpdates()
     }
 
     fun setAdditionalLogging(enabled: Boolean) {

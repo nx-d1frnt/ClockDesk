@@ -22,6 +22,8 @@ import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
+import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
 import kotlin.text.compareTo
 
@@ -49,7 +51,8 @@ class SmartChipManager(
     }
 
     private val internalPlugins: List<ISmartChip> = listOf(
-        BatteryAlertPlugin(context)
+        BatteryAlertPlugin(context),
+        UpdatePlugin(context)
     )
     var externalPlugins: List<ExternalChipPlugin> = emptyList()
     private val allChips = mutableListOf<ChipInfo>()
@@ -179,7 +182,7 @@ class SmartChipManager(
                         allChips.add(ChipInfo(packageName, view, priority))
                     }
                 } catch (e: Exception) {
-                    Log.w("SmartChipManager", "Failed to parse plugin metadata from $packageName", e)
+                    Logger.w("SmartChipManager"){"Failed to parse plugin metadata from $packageName"}
                 }
             }
         }
@@ -196,13 +199,13 @@ class SmartChipManager(
                 iconView.setImageDrawable(ResourcesCompat.getDrawable(pluginRes, iconId, null))
                 textView.text = text
                 textView.isSelected = true // Required for marquee
-                Log.d("SmartChipManager", "Updated external chip from $pkg: $text")
+                Logger.d("SmartChipManager"){"Updated external chip from $pkg: $text"}
                 return true
             } else {
-                Log.w("SmartChipManager", "Icon not found: $iconName in $pkg")
+                Logger.w("SmartChipManager"){"Icon not found: $iconName in $pkg"}
             }
         } catch (e: Exception) {
-            Log.e("SmartChipManager", "Failed to update external chip view for $pkg", e)
+            Logger.e("SmartChipManager"){"Failed to update external chip view for $pkg"}
         }
         return false
     }

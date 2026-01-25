@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ClockDeskMediaService
 import com.nxd1frnt.clockdesk2.music.ExternalPluginContract
+import com.nxd1frnt.clockdesk2.utils.Logger
 import java.util.Collections
 
 class MusicSourcesFragment : Fragment() {
@@ -107,7 +108,7 @@ class MusicSourcesFragment : Fragment() {
                                 startActivity(intent)
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Cannot open settings", Toast.LENGTH_SHORT).show()
-                                Log.e("MusicSources", "Error launching settings", e)
+                                Logger.e("MusicSources"){"Error launching settings for $pluginId"}
                             }
                         }
                     }
@@ -198,7 +199,7 @@ class MusicSourcesFragment : Fragment() {
                         eventType = parser.next()
                     }
                 } catch (e: Exception) {
-                    Log.e("MusicSourcesFragment", "Failed to parse plugin info for $packageName", e)
+                    Logger.e("MusicSourcesFragment"){"Failed to parse plugin info for $packageName"}
                 }
             }
 

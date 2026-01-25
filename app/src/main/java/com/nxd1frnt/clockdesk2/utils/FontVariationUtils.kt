@@ -111,7 +111,7 @@ object FontVariationUtils {
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing font: ${e.message}")
+            Logger.e(TAG){"Error parsing font: ${e.message}"}
         }
 
         return axesList

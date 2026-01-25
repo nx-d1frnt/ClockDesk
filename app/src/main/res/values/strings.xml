@@ -155,4 +155,7 @@
     <string name="variable_properties_weight">Weight</string>
     <string name="variable_properties_roundness">Round</string>
     <string name="show_am_pm">Show AM/PM indicator</string>
+    <string name="update_available_text">Update available</string>
+    <string name="show_updates_chip">Show app updates</string>
+    <string name="show_updates_chip_summary">Show a chip with app update notifications</string>
 </resources>

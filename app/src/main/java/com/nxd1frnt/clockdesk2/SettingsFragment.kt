@@ -8,6 +8,7 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import com.nxd1frnt.clockdesk2.smartchips.ChipPluginContract
+import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
 
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -26,7 +27,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val smartChipCategory = findPreference<PreferenceCategory>("smart_chips_category")
 
         if (smartChipCategory == null) {
-            Log.e("SettingsFragment", "Could not find 'smart_chips_category' in preferences.xml")
+            Logger.e("SettingsFragment"){"Could not find 'smart_chips_category' in preferences.xml"}
             return // If category doesn't exist, stop
         }
 
@@ -40,7 +41,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         // Query the package manager for all broadcast receivers that match our action
         val receivers = pm.queryBroadcastReceivers(queryIntent, PackageManager.GET_META_DATA)
 
-        Log.d("SettingsFragment", "Found ${receivers.size} potential plugins.")
+        Logger.d("SettingsFragment"){"Found ${receivers.size} potential plugins."}
 
         for (resolveInfo in receivers) {
             val activityInfo = resolveInfo.activityInfo ?: continue
@@ -78,10 +79,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
                         // 5. Add the new preference to our category
                         category.addPreference(pluginPref)
-                        Log.d("SettingsFragment", "Added plugin to settings: $dispName ($prefKey)")
+                        Logger.d("SettingsFragment"){"Added plugin to settings: $dispName ($prefKey)"}
                     }
                 } catch (e: Exception) {
-                    Log.e("SettingsFragment", "Failed to parse plugin info from $packageName", e)
+                    Logger.e("SettingsFragment"){"Failed to parse plugin info from $packageName: ${e.message}"}
                 }
             }
         }

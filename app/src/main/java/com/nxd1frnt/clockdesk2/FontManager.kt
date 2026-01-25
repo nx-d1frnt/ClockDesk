@@ -31,8 +31,15 @@ data class FontSettings(
     var alpha: Float = 1.0f,
     var weight: Int = 400,
     var width: Int = 100,
-    var roundness: Int = 0
+    var roundness: Int = 0,
+    var color: Int = Color.WHITE,
+    var useDynamicColor: Boolean = false
 )
+sealed class ColorItem {
+    object Dynamic : ColorItem()
+    data class Solid(val color: Int) : ColorItem()
+    object AddNew : ColorItem() // TODO: COLOR PICKER
+}
 
 class FontManager(
     private val context: Context,
@@ -82,10 +89,25 @@ class FontManager(
     )
 
     private var isNightShiftEnabled = false
-    private var isDynamicColorEnabled = false
+    var isDynamicColorEnabled = false
     private var dynamicColor: Int? = null
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
+
+    private val defaultColors = listOf(
+        Color.WHITE,
+        Color.BLACK,
+        Color.parseColor("#FF8A80"), // Red
+        Color.parseColor("#FFD180"), // Orange
+        Color.parseColor("#FFFF8D"), // Yellow
+        Color.parseColor("#CCFF90"), // Light Green
+        Color.parseColor("#A7FFEB"), // TealAccent
+        Color.parseColor("#80D8FF"), // Light Blue
+        Color.parseColor("#82B1FF"), // Blue
+        Color.parseColor("#B388FF"), // Purple
+        Color.parseColor("#F48FB1")  // Pink
+    )
+
 
     init {
         rebuildFontList()
@@ -95,6 +117,13 @@ class FontManager(
         }
     }
 
+    fun getColorsList(): List<ColorItem> {
+        val list = mutableListOf<ColorItem>()
+        list.add(ColorItem.Dynamic)
+        // list.add(ColorItem.AddNew)
+        list.addAll(defaultColors.map { ColorItem.Solid(it) })
+        return list
+    }
     private fun getDefaultSettingsFor(id: Int): FontSettings {
         val size = when (id) {
             R.id.time_text -> 128f
@@ -238,6 +267,8 @@ class FontManager(
             settings.weight = prefs.getInt("${prefix}Weight", defaults.weight)
             settings.width = prefs.getInt("${prefix}Width", defaults.width)
             settings.roundness = prefs.getInt("${prefix}Roundness", defaults.roundness)
+            settings.color = prefs.getInt("${prefix}Color", Color.WHITE)
+            settings.useDynamicColor = prefs.getBoolean("${prefix}UseDynamicColor", false)
         }
 
         applyAll()
@@ -261,6 +292,8 @@ class FontManager(
             editor.putInt("${prefix}Weight", settings.weight)
             editor.putInt("${prefix}Width", settings.width)
             editor.putInt("${prefix}Roundness", settings.roundness)
+            editor.putInt("${prefix}Color", settings.color)
+            editor.putBoolean("${prefix}UseDynamicColor", settings.useDynamicColor)
         }
         editor.apply()
     }
@@ -306,17 +339,24 @@ class FontManager(
         val settings = settingsMap[viewId] ?: return
         val typeface = getTypeface(settings.fontIndex)
 
+        val finalColor = if (settings.useDynamicColor && dynamicColor != null) {
+            dynamicColor!!
+        } else {
+            settings.color
+        }
+
         when (viewId) {
-            R.id.time_text -> applyStyleToTextView(timeText, settings, typeface)
-            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface)
+            R.id.time_text -> applyStyleToTextView(timeText, settings, typeface, finalColor)
+            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface, finalColor)
             R.id.lastfm_layout -> {
-                applyStyleToTextView(lastfmText, settings, typeface)
+                applyStyleToTextView(lastfmText, settings, typeface, finalColor)
                 lastfmIcon.alpha = settings.alpha
+                lastfmIcon.setColorFilter(finalColor)
             }
         }
     }
 
-    private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface) {
+    private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int) {
        // Apply typeface and size
         textView.typeface = typeface
         textView.textSize = settings.size
@@ -324,7 +364,9 @@ class FontManager(
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             textView.fontVariationSettings = null
-
+            if (!isNightShiftEnabled) {
+                textView.setTextColor(color)
+            }
             // Form the variation settings string
             val variationSettings = "'wght' ${settings.weight}, 'wdth' ${settings.width}, 'ROND' ${settings.roundness}"
             textView.fontVariationSettings = variationSettings
@@ -364,12 +406,26 @@ class FontManager(
         Palette.from(bitmap).generate { palette ->
             val accentColor = palette?.vibrantSwatch?.rgb ?: palette?.lightVibrantSwatch?.rgb ?: palette?.dominantSwatch?.rgb ?: Color.WHITE
             dynamicColor = accentColor
+            applyAll()
             onComplete()
         }
     }
-    fun clearDynamicColors() { dynamicColor = null }
-    fun setDynamicColorEnabled(enabled: Boolean) { isDynamicColorEnabled = enabled; saveSettings() }
-    fun isDynamicColorEnabled() = isDynamicColorEnabled
+
+    fun setFontColor(view: View, color: Int) {
+        updateSettings(view.id) {
+            it.color = color
+            it.useDynamicColor = false
+        }
+    }
+
+    fun setDynamicColorEnabledForWidget(view: View) {
+        updateSettings(view.id) {
+            it.useDynamicColor = true
+            it.color = dynamicColor ?: Color.WHITE
+        }
+    }
+
+    fun getDynamicColor(): Int? = dynamicColor
 
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {

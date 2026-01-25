@@ -83,6 +83,11 @@
                 app:title="@string/show_battery_alert_chip"
                 app:summary="@string/show_battery_alert_chip_summary"
                 app:defaultValue="true" />
+            <SwitchPreferenceCompat
+                app:key="show_updates"
+                app:title="@string/show_updates_chip"
+                app:summary="@string/show_updates_chip_summary"
+                app:defaultValue="true" />
         </PreferenceCategory>
     </PreferenceCategory>
 </PreferenceScreen>
