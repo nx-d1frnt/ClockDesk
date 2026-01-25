@@ -12,8 +12,9 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ColorAdapter(
     private val items: List<ColorItem>,
-    private val selectedSettings: FontSettings?,
-    private val currentDynamicColor: Int?,
+    private var selectedColor: Int,
+    private var useDynamic: Boolean,
+    private var selectedRole: String?,
     private val onColorSelected: (ColorItem) -> Unit
 ) : RecyclerView.Adapter<ColorAdapter.ColorViewHolder>() {
 
@@ -21,6 +22,13 @@ class ColorAdapter(
         val colorPreview: View = itemView.findViewById(R.id.color_preview)
         val selectionRing: View = itemView.findViewById(R.id.selection_ring)
         val icon: ImageView = itemView.findViewById(R.id.color_icon)
+    }
+
+    fun updateSelection(newColor: Int, newUseDynamic: Boolean, newRole: String?) {
+        this.selectedColor = newColor
+        this.useDynamic = newUseDynamic
+        this.selectedRole = newRole
+        notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ColorViewHolder {
@@ -39,7 +47,7 @@ class ColorAdapter(
 
         when (item) {
             is ColorItem.Dynamic -> {
-                val color = currentDynamicColor ?: Color.LTGRAY
+                val color = item.color
                 drawable?.setColor(color)
 
                 holder.icon.visibility = View.VISIBLE
@@ -48,15 +56,16 @@ class ColorAdapter(
                 val luminance = ColorUtils.calculateLuminance(color)
                 holder.icon.setColorFilter(if (luminance > 0.5) Color.BLACK else Color.WHITE)
 
-                isSelected = selectedSettings?.useDynamicColor == true
+                isSelected = useDynamic && selectedRole == item.roleKey
             }
             is ColorItem.Solid -> {
                 drawable?.setColor(item.color)
                 holder.icon.visibility = View.GONE
 
-                isSelected = (selectedSettings?.useDynamicColor == false && selectedSettings.color == item.color)
+                isSelected = (!useDynamic && selectedColor == item.color)
             }
             is ColorItem.AddNew -> {
+                // Логика пикера
             }
         }
 
@@ -64,10 +73,8 @@ class ColorAdapter(
         // Set selection ring visibility
         if (isSelected) {
             holder.selectionRing.visibility = View.VISIBLE
-            (holder.selectionRing.background as? GradientDrawable)?.setStroke(
-                6,
-                ContextCompat.getColor(context, R.color.md_theme_primary)
-            )
+            val ringColor = if (item is ColorItem.Dynamic) item.color else ContextCompat.getColor(context, R.color.md_theme_primary)
+            (holder.selectionRing.background as? GradientDrawable)?.setStroke(6, ringColor)
         } else {
             holder.selectionRing.visibility = View.GONE
         }

@@ -51,6 +51,7 @@ import android.os.Build
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.children
 import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
@@ -72,6 +73,7 @@ import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.ui.WidgetMover
 import com.nxd1frnt.clockdesk2.ui.view.WeatherView
+import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import com.nxd1frnt.clockdesk2.utils.PowerStateManager
@@ -141,6 +143,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private lateinit var bsColorRecyclerView: RecyclerView
 
+    private var isEditingBackground = false
+    private lateinit var bsEditBackgroundSwitch: com.google.android.material.materialswitch.MaterialSwitch
+
     // Background Bottom Sheet UI elements
     private lateinit var bgRecycler: RecyclerView
     private lateinit var bgBlurSwitch: com.google.android.material.materialswitch.MaterialSwitch
@@ -191,6 +196,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var lightSensor: Sensor? = null
     private val minPowerSaveBrightness = 0.01f
     private lateinit var smartChipManager: SmartChipManager
+    private lateinit var chipContainer: ConstraintLayout
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var pendingRestoreRunnable: Runnable? = null
 
@@ -329,17 +335,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
 
-        fontManager = FontManager(
-            this,
-            timeText,
-            dateText,
-            lastfmLayout,
-            nowPlayingTextView,
-            lastfmIcon,
-            weatherText,
-            weatherIcon,
-            enableAdditionalLogging
-        )
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
@@ -372,6 +367,27 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         //musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
         // musicgetter was replaced with music plugin manager
         setupMusicSystem()
+        chipContainer = findViewById<ConstraintLayout>(R.id.smart_chip_container)
+
+        fontManager = FontManager(
+            this,
+            timeText,
+            dateText,
+            lastfmLayout,
+            nowPlayingTextView,
+            lastfmIcon,
+            weatherText,
+            weatherIcon,
+            chipContainer,
+            enableAdditionalLogging
+        )
+
+        smartChipManager = SmartChipManager(
+            this,
+            chipContainer,
+            prefs,
+            fontManager
+        )
         clockManager = ClockManager(
             timeText,
             dateText,
@@ -408,12 +424,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             enableAdditionalLogging
         )
 
-        val chipContainer = findViewById<ConstraintLayout>(R.id.smart_chip_container)
-        smartChipManager = SmartChipManager(
-            this,
-            chipContainer,
-            prefs
-        )
+
         burnInProtectionManager = BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
         burnInProtectionManager.start()
         preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -1180,14 +1191,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     val bitmap = (resource as? BitmapDrawable)?.bitmap
                     var noiseColor = Color.WHITE
                     if (bitmap != null) {
-                        val palette = androidx.palette.graphics.Palette.from(bitmap).generate()
+                        ColorExtractor.extractColor(bitmap) { seedColor ->
 
-                        val dominantColor = palette.getMutedColor(
-                            palette.getDominantColor(Color.LTGRAY)
-                        )
-
-                        noiseColor = androidx.core.graphics.ColorUtils.setAlphaComponent(dominantColor, 128)
-                        if (isAdvancedGraphicsEnabled) {
+                            fontManager.setDynamicScheme(seedColor)
+                            val noiseColor = androidx.core.graphics.ColorUtils.setAlphaComponent(seedColor, 128)
+                            if (isAdvancedGraphicsEnabled) {
                             turbulenceOverlay.playAnimation(noiseColor) {}
                         }
                             backgroundImageView.setImageDrawable(resource)
@@ -1236,6 +1244,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 )
                             }
                         }
+                    }
                 }
 
 
@@ -1699,6 +1708,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bsColorRecyclerView = bottomSheet.findViewById(R.id.color_recycler_view)
         bsColorRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
+        bsEditBackgroundSwitch = bottomSheet.findViewById(R.id.edit_background_switch)
+
         bsSizeSeekBar = bottomSheet.findViewById(R.id.size_seekbar)
         bsSizeValue = bottomSheet.findViewById(R.id.size_value)
         bsTransparencySeekBar = bottomSheet.findViewById(R.id.transparency_seekbar)
@@ -1736,10 +1747,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         // --- 2. Listeners ---
 
+        if (focusedView?.id != R.id.smart_chip_container) {
+            bsEditBackgroundSwitch.setOnCheckedChangeListener(null)
+            bsEditBackgroundSwitch.isChecked = false
+            isEditingBackground = false
+            bsEditBackgroundSwitch.setOnCheckedChangeListener { _, isChecked ->
+                isEditingBackground = isChecked
+                if (focusedView != null) {
+                    bsColorRecyclerView.adapter = createColorAdapter(focusedView!!)
+                }
+            }
+        }
+
         bsSizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser || focusedView == null) return
-                val size = (progress + 20).toFloat()
+
+                val sizeOffset = 8f
+                val size = (progress + sizeOffset)
+
                 bsSizeValue.text = getString(R.string.size_value_format, size.toInt())
                 fontManager.setFontSize(focusedView!!, size)
             }
@@ -1806,6 +1832,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         )
         bsFontRecyclerView.adapter = fontAdapter
+
+        bsEditBackgroundSwitch.setOnCheckedChangeListener { _, isChecked ->
+            isEditingBackground = isChecked
+            if (focusedView != null) {
+                bsColorRecyclerView.adapter = createColorAdapter(focusedView!!)
+            }
+        }
 
         bsNightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
             isNightShiftEnabled = isChecked
@@ -1937,7 +1970,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsDateFormatGroup.visibility = View.GONE
                 bsDateFormatLabel.visibility = View.GONE
                 bsShowAMPMSwitch.isEnabled = !bsTimeFormatGroup.checkedRadioButtonId.equals(R.id.time_24_radio)
-
+                bsTextGravityGroup.visibility = View.VISIBLE
+                bsHorizontalAlignGroup.visibility = View.VISIBLE
+                bsVerticalAlignGroup.visibility = View.VISIBLE
+                bsMoveUpBtn.visibility = View.VISIBLE
+                bsMoveDownBtn.visibility = View.VISIBLE
+                bsFreeModeSwitch.visibility = View.VISIBLE
+                bsGridSnapSwitch.visibility = View.VISIBLE
+                bsEditBackgroundSwitch.visibility = View.GONE
                 bsTimeFormatGroup.check(
                     if (fontManager.getTimeFormatPattern().contains("H")) R.id.time_24_radio else R.id.time_12_radio
                 )
@@ -1949,7 +1989,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsShowAMPMSwitch.visibility = View.GONE
                 bsDateFormatGroup.visibility = View.VISIBLE
                 bsDateFormatLabel.visibility = View.VISIBLE
-
+                bsTextGravityGroup.visibility = View.VISIBLE
+                bsHorizontalAlignGroup.visibility = View.VISIBLE
+                bsVerticalAlignGroup.visibility = View.VISIBLE
+                bsMoveUpBtn.visibility = View.VISIBLE
+                bsMoveDownBtn.visibility = View.VISIBLE
+                bsFreeModeSwitch.visibility = View.VISIBLE
+                bsGridSnapSwitch.visibility = View.VISIBLE
+                bsEditBackgroundSwitch.visibility = View.GONE
                 val pattern = fontManager.getDateFormatPattern()
                 val id = when (pattern) {
                     "MMM dd" -> R.id.date_format_1
@@ -1966,6 +2013,31 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsTimeFormatLabel.visibility = View.GONE
                 bsDateFormatLabel.visibility = View.GONE
                 bsShowAMPMSwitch.visibility = View.GONE
+                bsTextGravityGroup.visibility = View.VISIBLE
+                bsHorizontalAlignGroup.visibility = View.VISIBLE
+                bsVerticalAlignGroup.visibility = View.VISIBLE
+                bsMoveUpBtn.visibility = View.VISIBLE
+                bsMoveDownBtn.visibility = View.VISIBLE
+                bsFreeModeSwitch.visibility = View.VISIBLE
+                bsGridSnapSwitch.visibility = View.VISIBLE
+                bsEditBackgroundSwitch.visibility = View.GONE
+            }
+            R.id.smart_chip_container -> {
+                bsTitle.text = getString(R.string.customize_smart_chips)
+                bsTimeFormatGroup.visibility = View.GONE
+                bsDateFormatGroup.visibility = View.GONE
+                bsTimeFormatLabel.visibility = View.GONE
+                bsDateFormatLabel.visibility = View.GONE
+                bsShowAMPMSwitch.visibility = View.GONE
+
+                bsTextGravityGroup.visibility = View.GONE
+                bsHorizontalAlignGroup.visibility = View.GONE
+                bsVerticalAlignGroup.visibility = View.GONE
+                bsMoveUpBtn.visibility = View.GONE
+                bsMoveDownBtn.visibility = View.GONE
+                bsFreeModeSwitch.visibility = View.GONE
+                bsGridSnapSwitch.visibility = View.GONE
+                bsEditBackgroundSwitch.visibility = View.VISIBLE
             }
             else -> {
                 hideBottomSheet()
@@ -1973,13 +2045,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         }
 
-        val settings = fontManager.getSettings(focusedView!!)
-
+        val settings = fontManager.getSettings(focusedView!!) ?: return
         if (settings != null) {
             // Size
+            val sizeOffset = 8
             val maxvalue = (metrics.widthPixels / metrics.density * 0.3).toInt()
-            bsSizeSeekBar.max = maxvalue - 20
-            bsSizeSeekBar.progress = (settings.size - 20).toInt()
+            bsSizeSeekBar.max = maxvalue - sizeOffset
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                bsSizeSeekBar.min = 0
+            }
+            bsSizeSeekBar.progress = (settings.size - sizeOffset).toInt()
             bsSizeValue.text = getString(R.string.size_value_format, settings.size.toInt())
 
             // Alpha
@@ -2008,20 +2083,48 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             updateVariationVisibility()
         }
 
+        val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
+        val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
+        val currentRole = if (isEditingBackground) settings.dynamicBackgroundColorRole else settings.dynamicColorRole
+
         val colorAdapter = ColorAdapter(
             items = fontManager.getColorsList(),
-            selectedSettings = settings,
-            currentDynamicColor = fontManager.getDynamicColor(),
+            selectedColor = currentColor,
+            useDynamic = useDynamic,
+            selectedRole = currentRole,
             onColorSelected = { item ->
                 if (focusedView == null) return@ColorAdapter
 
-                when (item) {
-                    is ColorItem.Dynamic -> fontManager.setDynamicColorEnabledForWidget(focusedView!!)
-                    is ColorItem.Solid -> fontManager.setFontColor(focusedView!!, item.color)
-                    is ColorItem.AddNew -> { /* PICKER LOGIC HERE */ }
+                if (isEditingBackground) {
+                    when (item) {
+                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(focusedView!!, item.roleKey)
+                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(focusedView!!, item.color)
+                        else -> {}
+                    }
+                } else {
+                    when (item) {
+                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(focusedView!!, item.roleKey)
+                        is ColorItem.Solid -> fontManager.setFontColor(focusedView!!, item.color)
+                        is ColorItem.AddNew -> { /* Picker */ }
+                    }
                 }
 
-                bsColorRecyclerView.adapter = createColorAdapter(focusedView!!, settings)
+                if (fontManager.isNightShiftEnabled()) {
+                    fontManager.applyNightShiftTransition(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter,
+                        true
+                    )
+                }
+
+                val updatedSettings = fontManager.getSettings(focusedView!!)
+                if (updatedSettings != null) {
+                    val nextColor = if (isEditingBackground) updatedSettings.backgroundColor else updatedSettings.color
+                    val nextDynamic = if (isEditingBackground) updatedSettings.useDynamicBackgroundColor else updatedSettings.useDynamicColor
+                    val nextRole = if (isEditingBackground) updatedSettings.dynamicBackgroundColorRole else updatedSettings.dynamicColorRole
+
+                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(nextColor, nextDynamic, nextRole)
+                }
             }
         )
         bsColorRecyclerView.adapter = colorAdapter
@@ -2069,19 +2172,50 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bottomSheetBehavior.state = STATE_EXPANDED
     }
 
-    private fun createColorAdapter(view: View, oldSettings: FontSettings?): ColorAdapter {
-        val newSettings = fontManager.getSettings(view)
+
+    private fun createColorAdapter(view: View): ColorAdapter {
+        val settings = fontManager.getSettings(view) ?: return ColorAdapter(emptyList(), 0, false, null) {}
+
+        val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
+        val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
+        val currentRole = if (isEditingBackground) settings.dynamicBackgroundColorRole else settings.dynamicColorRole
+
         return ColorAdapter(
             items = fontManager.getColorsList(),
-            selectedSettings = newSettings,
-            currentDynamicColor = fontManager.getDynamicColor(),
+            selectedColor = currentColor,
+            useDynamic = useDynamic,
+            selectedRole = currentRole,
             onColorSelected = { item ->
-                when (item) {
-                    is ColorItem.Dynamic -> fontManager.setDynamicColorEnabledForWidget(view)
-                    is ColorItem.Solid -> fontManager.setFontColor(view, item.color)
-                    else -> {}
+                if (isEditingBackground) {
+                    when (item) {
+                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(view, item.roleKey)
+                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(view, item.color)
+                        else -> {}
+                    }
+                } else {
+                    when (item) {
+                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(view, item.roleKey)
+                        is ColorItem.Solid -> fontManager.setFontColor(view, item.color)
+                        else -> {}
+                    }
                 }
-                bsColorRecyclerView.adapter = createColorAdapter(view, newSettings)
+
+                if (fontManager.isNightShiftEnabled()) {
+                    fontManager.applyNightShiftTransition(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter,
+                        true
+                    )
+                }
+
+                val updSettings = fontManager.getSettings(view)
+                if (updSettings != null) {
+                    val nextColor = if (isEditingBackground) updSettings.backgroundColor else updSettings.color
+                    val nextDynamic = if (isEditingBackground) updSettings.useDynamicBackgroundColor else updSettings.useDynamicColor
+                    val nextRole = if (isEditingBackground) updSettings.dynamicBackgroundColorRole else updSettings.dynamicColorRole
+
+                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(nextColor, nextDynamic, nextRole)
+                }
             }
         )
     }
@@ -2262,6 +2396,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         isEditMode = !isEditMode
        // musicGetter.stopUpdates()
         //widgetMover.resetLayoutConstraints()
+        smartChipManager.setEditMode(isEditMode) { clickedView ->
+            showCustomizationBottomSheet(clickedView)
+            resetEditModeTimeout()
+        }
         widgetMover.setEditMode(isEditMode)
         val targetRadius = dpToPx(36f)
         if (isEditMode) {
@@ -2296,10 +2434,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .alpha(1f)
                 .setDuration(animationDuration)
                 .start()
-
             timeText.setBackgroundResource(R.drawable.editable_border)
             dateText.setBackgroundResource(R.drawable.editable_border)
             lastfmLayout.setBackgroundResource(R.drawable.editable_border)
+            chipContainer.setBackgroundResource(R.drawable.editable_border)
             lastfmLayout.animate().cancel()
             lastfmLayout.clearAnimation()
             lastfmLayout.post {
@@ -2384,6 +2522,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         } else
             lastfmLayout.setBackgroundDrawable(null)
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            chipContainer.background = null
+        } else {
+            chipContainer.setBackgroundDrawable(null)
+        }
         val isMusicPlaying = !nowPlayingTextView.text.isNullOrEmpty() &&
                 lastTrackInfo != null &&
                 lastfmLayout.alpha > 0
@@ -2483,6 +2626,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             } catch (_: Throwable) {}
         }
 //        backgroundImageView.clearColorFilter()
+        fontManager.clearDynamicColors()
         hasCustomImageBackground = false
         editModeBlurLayer.setImageDrawable(null)
         editModeBlurLayer.visibility = View.GONE
@@ -2537,7 +2681,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             when (id) {
                 "__DEFAULT_GRADIENT__" -> {
                     previewBackgroundUri = "__DEFAULT_GRADIENT__"
-                   // fontManager.clearDynamicColors()
+                    fontManager.clearDynamicColors()
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
                         dayTimeGetter,
@@ -2704,7 +2848,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             hasCustomImageBackground = false
 
             backgroundImageView.setImageDrawable(null)
-            //fontManager.clearDynamicColors()
+            fontManager.clearDynamicColors()
             fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -2775,6 +2919,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             when (previewBackgroundUri) {
                 "__DEFAULT_GRADIENT__" -> {
                     backgroundManager.setSavedBackgroundUri(null)
+                    fontManager.clearDynamicColors()
+                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
                     Logger.d("MainActivity"){"Saved: user wants default gradient (will apply after music stops)"}
                 }
                 null -> {

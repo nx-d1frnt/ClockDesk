@@ -9,6 +9,7 @@
     app:cardElevation="0dp">
 
     <LinearLayout
+        android:id="@+id/chip_content_layout"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:orientation="horizontal"

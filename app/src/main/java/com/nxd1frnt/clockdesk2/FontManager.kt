@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -11,9 +12,12 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
 import androidx.palette.graphics.Palette
+import com.google.android.material.color.utilities.Scheme
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.FontNameUtils
 import com.nxd1frnt.clockdesk2.utils.FontVariationUtils
 import java.io.File
@@ -33,12 +37,21 @@ data class FontSettings(
     var width: Int = 100,
     var roundness: Int = 0,
     var color: Int = Color.WHITE,
-    var useDynamicColor: Boolean = false
+    var useDynamicColor: Boolean = false,
+    var dynamicColorRole: String? = null,
+    var backgroundColor: Int = Color.DKGRAY,
+    var useDynamicBackgroundColor: Boolean = false,
+    var dynamicBackgroundColorRole: String? = null
 )
 sealed class ColorItem {
-    object Dynamic : ColorItem()
+    data class Dynamic(
+        val color: Int,
+        val roleKey: String,
+        val name: String
+    ) : ColorItem()
+
     data class Solid(val color: Int) : ColorItem()
-    object AddNew : ColorItem() // TODO: COLOR PICKER
+    object AddNew : ColorItem()
 }
 
 class FontManager(
@@ -50,18 +63,21 @@ class FontManager(
     private val lastfmIcon: ImageView,
     private val weatherText: TextView,
     private val weatherIcon: ImageView,
+    private val smartChipContainer: ConstraintLayout,
     initialLoggingState: Boolean
 ) {
 
     private val keyPrefixMap = mapOf(
         R.id.time_text to "time",
         R.id.date_text to "date",
-        R.id.lastfm_layout to "lastfm"
+        R.id.lastfm_layout to "lastfm",
+        R.id.smart_chip_container to "chips"
     )
 
     private val settingsMap = mutableMapOf<Int, FontSettings>()
     private val fonts: MutableList<FontItem> = mutableListOf()
-
+    @SuppressLint("RestrictedApi")
+    private var currentScheme: Scheme? = null
     private val resourceFontIds = listOf(
         R.font.googlesansflex,
         R.font.anton_regular,
@@ -94,6 +110,9 @@ class FontManager(
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
 
+    private val baseChipContainerSizeDp = 165f
+    private val baseChipFontSizeSp = 14f
+
     private val defaultColors = listOf(
         Color.WHITE,
         Color.BLACK,
@@ -117,9 +136,25 @@ class FontManager(
         }
     }
 
+    @SuppressLint("RestrictedApi")
     fun getColorsList(): List<ColorItem> {
         val list = mutableListOf<ColorItem>()
-        list.add(ColorItem.Dynamic)
+
+        currentScheme?.let { scheme ->
+            list.add(ColorItem.Dynamic(scheme.primary, "primary", "Primary"))
+            list.add(ColorItem.Dynamic(scheme.primaryContainer, "primary_container", "Primary Cont."))
+            list.add(ColorItem.Dynamic(scheme.secondary, "secondary", "Secondary"))
+            list.add(ColorItem.Dynamic(scheme.secondaryContainer, "secondary_container", "Sec. Cont."))
+            list.add(ColorItem.Dynamic(scheme.tertiary, "tertiary", "Tertiary"))
+            list.add(ColorItem.Dynamic(scheme.tertiaryContainer, "tertiary_container", "Ter. Cont."))
+            list.add(ColorItem.Dynamic(scheme.surfaceVariant, "surface_variant", "Surface Var."))
+            list.add(ColorItem.Dynamic(scheme.outline, "outline", "Outline"))
+            list.add(ColorItem.Dynamic(scheme.surface, "surface", "Surface"))
+            list.add(ColorItem.Dynamic(scheme.surfaceVariant, "surface_variant", "Surface Var."))
+            list.add(ColorItem.Dynamic(scheme.inverseSurface, "inverse_surface", "Inv. Surface"))
+            list.add(ColorItem.Dynamic(scheme.primaryContainer, "primary_container", "Pri. Cont."))
+        }
+
         // list.add(ColorItem.AddNew)
         list.addAll(defaultColors.map { ColorItem.Solid(it) })
         return list
@@ -129,13 +164,23 @@ class FontManager(
             R.id.time_text -> 128f
             R.id.date_text -> 48f
             R.id.lastfm_layout -> 32f
+            R.id.smart_chip_container -> 14f
             else -> 24f
         }
         val weight = when (id) {
             R.id.time_text -> 700 //Time is bold
             R.id.date_text -> 500 // Date is medium
             R.id.lastfm_layout -> 400 // LastFM is regular
+            R.id.smart_chip_container -> 400 // Chips are regular
             else -> 400
+        }
+
+        val color = when (id) {
+            R.id.time_text -> Color.WHITE
+            R.id.date_text -> Color.WHITE
+            R.id.lastfm_layout -> Color.WHITE
+            R.id.smart_chip_container -> Color.WHITE
+            else -> Color.WHITE
         }
         val fontIndex = if (fonts.size > 1) 1 else 0
 
@@ -269,6 +314,10 @@ class FontManager(
             settings.roundness = prefs.getInt("${prefix}Roundness", defaults.roundness)
             settings.color = prefs.getInt("${prefix}Color", Color.WHITE)
             settings.useDynamicColor = prefs.getBoolean("${prefix}UseDynamicColor", false)
+            settings.dynamicColorRole = prefs.getString("${prefix}DynamicRole", "primary")
+            settings.backgroundColor = prefs.getInt("${prefix}BgColor", Color.DKGRAY)
+            settings.useDynamicBackgroundColor = prefs.getBoolean("${prefix}UseDynamicBgColor", false)
+            settings.dynamicBackgroundColorRole = prefs.getString("${prefix}DynamicBgRole", "surface_variant")
         }
 
         applyAll()
@@ -294,6 +343,10 @@ class FontManager(
             editor.putInt("${prefix}Roundness", settings.roundness)
             editor.putInt("${prefix}Color", settings.color)
             editor.putBoolean("${prefix}UseDynamicColor", settings.useDynamicColor)
+            editor.putString("${prefix}DynamicRole", settings.dynamicColorRole)
+            editor.putInt("${prefix}BgColor", settings.backgroundColor)
+            editor.putBoolean("${prefix}UseDynamicBgColor", settings.useDynamicBackgroundColor)
+            editor.putString("${prefix}DynamicBgRole", settings.dynamicBackgroundColorRole)
         }
         editor.apply()
     }
@@ -339,8 +392,8 @@ class FontManager(
         val settings = settingsMap[viewId] ?: return
         val typeface = getTypeface(settings.fontIndex)
 
-        val finalColor = if (settings.useDynamicColor && dynamicColor != null) {
-            dynamicColor!!
+        val finalColor = if (settings.useDynamicColor && currentScheme != null) {
+            getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
         } else {
             settings.color
         }
@@ -353,7 +406,108 @@ class FontManager(
                 lastfmIcon.alpha = settings.alpha
                 lastfmIcon.setColorFilter(finalColor)
             }
+            R.id.smart_chip_container -> {
+                for (i in 0 until smartChipContainer.childCount) {
+                    val chipView = smartChipContainer.getChildAt(i)
+                    applyStyleToSmartChip(chipView, settings, typeface, finalColor)
+                }
+            }
         }
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun getColorFromScheme(scheme: Scheme, role: String?): Int {
+        return when (role) {
+            "primary" -> scheme.primary
+            "primary_container" -> scheme.primaryContainer
+            "secondary" -> scheme.secondary
+            "secondary_container" -> scheme.secondaryContainer
+            "tertiary" -> scheme.tertiary
+            "tertiary_container" -> scheme.tertiaryContainer
+            "surface_variant" -> scheme.surfaceVariant
+            "outline" -> scheme.outline
+            else -> scheme.primary
+        }
+    }
+
+    @SuppressLint("RestrictedApi")
+    fun setDynamicScheme(seedColor: Int) {
+        this.currentScheme = Scheme.dark(seedColor) // or Scheme.light(seedColor)
+        applyAll()
+    }
+
+    fun applyStyleToSmartChip(view: View) {
+        val settings = settingsMap[R.id.smart_chip_container] ?: return
+        val typeface = getTypeface(settings.fontIndex)
+
+        val finalColor = if (settings.useDynamicColor && currentScheme != null) {
+            getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
+        } else {
+            settings.color
+        }
+
+        applyStyleToSmartChip(view, settings, typeface, finalColor)
+    }
+
+    private fun applyStyleToSmartChip(view: View, settings: FontSettings, typeface: Typeface, color: Int) {
+        val textView = view.findViewById<TextView>(R.id.chip_text)
+        val iconView = view.findViewById<ImageView>(R.id.chip_icon)
+
+        view.alpha = settings.alpha
+
+        val scaleFactor = settings.size / baseChipFontSizeSp
+        if (textView != null) {
+            applyStyleToTextView(textView, settings, typeface, color)
+            textView.alpha = 1.0f
+        }
+
+        if (iconView != null) {
+            iconView.setColorFilter(color)
+            iconView.alpha = 1.0f
+
+            val baseIconSize = 20 * context.resources.displayMetrics.density
+            val newIconSize = (baseIconSize * scaleFactor).toInt()
+
+            val params = iconView.layoutParams
+            if (params.width != newIconSize) {
+                params.width = newIconSize
+                params.height = newIconSize
+                iconView.layoutParams = params
+            }
+        }
+
+        val parentContainer = view.parent as? View
+        val grandParent = parentContainer?.parent as? View // smart_chip_scrollview
+
+        if (grandParent is android.widget.ScrollView) {
+            val density = context.resources.displayMetrics.density
+
+            val newSizePx = (baseChipContainerSizeDp * density * scaleFactor).toInt()
+
+            val params = grandParent.layoutParams
+            if (params.width != newSizePx || params.height != newSizePx) {
+                params.width = newSizePx
+                params.height = newSizePx
+                grandParent.layoutParams = params
+            }
+        }
+
+        val density = context.resources.displayMetrics.density
+        val basePadV = (8 * density).toInt()
+        val basePadEnd = (12 * density).toInt()
+        val newPadV = (basePadV * scaleFactor).toInt()
+        val newPadEnd = (basePadEnd * scaleFactor).toInt()
+
+        val layout = textView?.parent as? View
+        layout?.setPaddingRelative(newPadV, newPadV, newPadEnd, newPadV)
+
+        val cardView = view as? com.google.android.material.card.MaterialCardView
+        val bgColor = if (settings.useDynamicBackgroundColor && currentScheme != null) {
+            getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+        } else {
+            settings.backgroundColor
+        }
+        cardView?.setCardBackgroundColor(bgColor)
     }
 
     private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int) {
@@ -362,11 +516,10 @@ class FontManager(
         textView.textSize = settings.size
         textView.alpha = settings.alpha
 
+            textView.setTextColor(color)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             textView.fontVariationSettings = null
-            if (!isNightShiftEnabled) {
-                textView.setTextColor(color)
-            }
             // Form the variation settings string
             val variationSettings = "'wght' ${settings.weight}, 'wdth' ${settings.width}, 'ROND' ${settings.roundness}"
             textView.fontVariationSettings = variationSettings
@@ -402,13 +555,20 @@ class FontManager(
 
     fun setAdditionalLogging(enabled: Boolean) { }
 
+    @SuppressLint("RestrictedApi")
     fun updateDynamicColors(bitmap: Bitmap, onComplete: () -> Unit) {
-        Palette.from(bitmap).generate { palette ->
-            val accentColor = palette?.vibrantSwatch?.rgb ?: palette?.lightVibrantSwatch?.rgb ?: palette?.dominantSwatch?.rgb ?: Color.WHITE
-            dynamicColor = accentColor
+        ColorExtractor.extractColor(bitmap) { seedColor ->
+
+            val scheme = Scheme.light(seedColor) // Или .dark()
+            dynamicColor = scheme.secondary
+
             applyAll()
             onComplete()
         }
+    }
+    fun setDynamicColorFromSeed(seedColor: Int) {
+        this.dynamicColor = seedColor
+        applyAll()
     }
 
     fun setFontColor(view: View, color: Int) {
@@ -418,43 +578,99 @@ class FontManager(
         }
     }
 
-    fun setDynamicColorEnabledForWidget(view: View) {
+
+    fun setDynamicColorForWidget(view: View, role: String) {
         updateSettings(view.id) {
             it.useDynamicColor = true
-            it.color = dynamicColor ?: Color.WHITE
+            it.dynamicColorRole = role
+        }
+    }
+
+    fun setSmartChipBackgroundColor(view: View, color: Int) {
+        updateSettings(view.id) {
+            it.backgroundColor = color
+            it.useDynamicBackgroundColor = false
+        }
+    }
+
+    fun setSmartChipDynamicBackgroundColor(view: View, role: String) {
+        updateSettings(view.id) {
+            it.useDynamicBackgroundColor = true
+            it.dynamicBackgroundColorRole = role
         }
     }
 
     fun getDynamicColor(): Int? = dynamicColor
 
+    fun clearDynamicColors() {
+        currentScheme = null
+        dynamicColor = null
+        applyAll()
+    }
+
+    private fun getTargetColorForView(viewId: Int): Int {
+        val settings = settingsMap[viewId] ?: return Color.WHITE
+
+        if (settings.useDynamicColor && currentScheme != null) {
+            return getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
+        }
+        return settings.color
+    }
+
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
-            timeText.setTextColor(Color.WHITE)
-            dateText.setTextColor(Color.WHITE)
-            lastfmText.setTextColor(Color.WHITE)
-            lastfmIcon.setColorFilter(Color.WHITE)
+            applyAll()
             return
         }
-        // ... [Night Shift Logic remains same] ...
+
         val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
         val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+
         val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
         val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
         val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
-        val reddish = Color.rgb(255, 104, 104)
-        val normal = Color.WHITE
 
-        val color = when {
-            currentTime.before(preSunrise) -> reddish
-            currentTime.before(sunrise) -> interpolateColor(reddish, normal, (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
-            currentTime.before(postSunset) -> normal
-            currentTime.before(fullNight) -> interpolateColor(normal, reddish, (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time))
-            else -> reddish
+        val nightFactor = when {
+            currentTime.before(preSunrise) -> 1.0f
+            currentTime.before(sunrise) -> {
+                1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
+            }
+            currentTime.before(postSunset) -> 0.0f // День
+            currentTime.before(fullNight) -> {
+                (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+            }
+            else -> 1.0f
         }
-        timeText.setTextColor(color)
-        dateText.setTextColor(color)
-        lastfmText.setTextColor(color)
-        lastfmIcon.setColorFilter(color)
+
+        val nightTint = Color.rgb(255, 104, 104)
+
+        updateViewColorWithNightShift(timeText, R.id.time_text, nightFactor, nightTint)
+        updateViewColorWithNightShift(dateText, R.id.date_text, nightFactor, nightTint)
+        updateViewColorWithNightShift(lastfmText, R.id.lastfm_layout, nightFactor, nightTint) // ID layout, цвет text
+
+        val targetIconColor = getTargetColorForView(R.id.lastfm_layout)
+        val finalIconColor = interpolateColor(targetIconColor, nightTint, nightFactor)
+        lastfmIcon.setColorFilter(finalIconColor)
+
+        val targetColor = getTargetColorForView(R.id.smart_chip_container)
+        val finalChipColor = interpolateColor(targetColor, nightTint, nightFactor)
+
+        for (i in 0 until smartChipContainer.childCount) {
+            val chipView = smartChipContainer.getChildAt(i)
+            val textView = chipView.findViewById<TextView>(R.id.chip_text)
+            val iconView = chipView.findViewById<ImageView>(R.id.chip_icon)
+
+            textView?.setTextColor(finalChipColor)
+            iconView?.setColorFilter(finalChipColor)
+        }
+    }
+
+    private fun updateViewColorWithNightShift(textView: TextView, settingsId: Int, nightFactor: Float, nightTint: Int) {
+        val targetColor = getTargetColorForView(settingsId)
+
+        val finalColor = interpolateColor(targetColor, nightTint, nightFactor)
+
+        textView.setTextColor(finalColor)
     }
 
     private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {

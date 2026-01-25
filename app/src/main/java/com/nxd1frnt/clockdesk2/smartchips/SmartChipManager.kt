@@ -20,6 +20,7 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
+import com.nxd1frnt.clockdesk2.FontManager
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
@@ -30,7 +31,8 @@ import kotlin.text.compareTo
 class SmartChipManager(
     private val context: Context,
     private val chipContainer: ViewGroup,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val fontManager: FontManager
 ) {
     private data class ChipInfo(
         val id: String,
@@ -56,6 +58,14 @@ class SmartChipManager(
     )
     var externalPlugins: List<ExternalChipPlugin> = emptyList()
     private val allChips = mutableListOf<ChipInfo>()
+
+    private var isEditMode = false
+    private var onEditClickListener: ((View) -> Unit)? = null
+
+    fun setEditMode(enabled: Boolean, listener: (View) -> Unit) {
+        isEditMode = enabled
+        onEditClickListener = listener
+    }
 
     private val dataUpdateReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
@@ -163,6 +173,10 @@ class SmartChipManager(
                                 isFocusable = true
                             }
                         view.setOnClickListener {
+                            if (isEditMode) {
+                                onEditClickListener?.invoke(chipContainer)
+                                return@setOnClickListener
+                            }
                             val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
                             chipInfo.clickActivityClassName?.let { className ->
                                 try {
@@ -267,6 +281,8 @@ class SmartChipManager(
             chipInfo.view.id = ViewCompat.generateViewId()
             chipInfo.view.visibility = View.VISIBLE
             container.addView(chipInfo.view)
+
+            fontManager.applyStyleToSmartChip(chipInfo.view)
         }
 
         val constraintSet = ConstraintSet().apply {

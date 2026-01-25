@@ -158,4 +158,6 @@
     <string name="update_available_text">Update available</string>
     <string name="show_updates_chip">Show app updates</string>
     <string name="show_updates_chip_summary">Show a chip with app update notifications</string>
+    <string name="customize_smart_chips">Customize Smart Chips</string>
+    <string name="edit_background">Edit background color</string>
 </resources>
