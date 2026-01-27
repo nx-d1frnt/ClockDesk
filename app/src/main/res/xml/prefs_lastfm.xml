@@ -30,6 +30,15 @@
         <SwitchPreference
             app:key="last_fm_dynamic_refresh_rate"
             app:summary="@string/last_fm_dynamic_refresh_rate_summary"
-            app:title="Dynamic Refresh" />
+            app:title="@string/dynamic_refresh_threshold" />
+
+        <SeekBarPreference
+            app:key="dynamic_refresh_threshold"
+            app:summary="@string/dynamic_refresh_threshold_summary"
+            android:min="1"
+            android:max="10"
+            android:defaultValue="5"
+            app:showSeekBarValue="true"
+            app:dependency="last_fm_dynamic_refresh_rate" />
     </PreferenceCategory>
 </PreferenceScreen>

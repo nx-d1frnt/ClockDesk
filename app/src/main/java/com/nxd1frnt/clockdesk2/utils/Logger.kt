@@ -27,4 +27,10 @@ object Logger {
             Log.i(tag, message())
         }
     }
+
+    inline fun v(tag: String, message: () -> String) {
+        if (isLoggingEnabled) {
+            Log.v(tag, message())
+        }
+    }
 }

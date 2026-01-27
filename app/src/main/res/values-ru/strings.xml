@@ -92,6 +92,8 @@
     <string name="last_fm_refresh_interval">Интервал обновления Last.fm (секунды)</string>
     <string name="last_fm_refresh_interval_summary">Установите, как часто обновлять данные Last.fm в секундах</string>
     <string name="last_fm_dynamic_refresh_rate_summary">Регулировать частоту обновления в зависимости от статуса воспроизведения (чаще при воспроизведении)</string>
+    <string name="dynamic_refresh_threshold">Динамическая частота обновления</string>
+    <string name="dynamic_refresh_threshold_summary">Установите интервал для частоты обновления в зависимости от статуса воспроизведения</string>
     <string name="performance_settings">Настройки производительности и батареи</string>
     <string name="enable_additional_logging">Включить дополнительное логирование</string>
     <string name="enable_additional_logging_summary">Включите для записи более подробной информации для отладки (может повлиять на производительность)</string>

@@ -92,6 +92,8 @@
     <string name="last_fm_refresh_interval">Last.fm Refresh Interval (seconds)</string>
     <string name="last_fm_refresh_interval_summary">Set how often to refresh Last.fm data in seconds</string>
     <string name="last_fm_dynamic_refresh_rate_summary">Adjust refresh rate based on playback status (more frequent when playing)</string>
+    <string name="dynamic_refresh_threshold">Dynamic Refresh Rate</string>
+    <string name="dynamic_refresh_threshold_summary">Set the interval for the refresh rate based on playback status</string>
     <string name="performance_settings">Performance and battery settings</string>
     <string name="enable_additional_logging">Enable Additional Logging</string>
     <string name="enable_additional_logging_summary">Enable to log more detailed information for debugging purposes (may affect performance)</string>

@@ -37,9 +37,15 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
     private var apiKey: String = ""
     private var username: String = ""
     private var isEnabled = false
-    private var refreshInterval = 30000L
+
+    private var userRefreshInterval = 30000L // User-defined refresh interval
+    private var dynamicRefreshEnabled = false // Dynamic refresh rate toggle
+    private var activeRefreshInterval = 5000L // Interval when music is playing
+
+    private var isPlaying = false
 
     //unique instanceid for debugging
+    private lateinit var prefs: SharedPreferences
     private val instanceId = System.identityHashCode(this)
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -47,11 +53,15 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
             "lastfm_username", "lastfm_api_key", "enable_lastfm" -> {
                 Logger.d("LastFmPlugin"){"[$instanceId] Critical settings changed, restarting loop..."}
                 loadPrefs()
-                restartLoop()
+                restartLoop(debounce = true)
             }
             "last_fm_refresh_interval" -> {
                 loadPrefs()
-                Logger.d("LastFmPlugin"){"[$instanceId] Interval updated to ${refreshInterval / 1000}s"}
+                Logger.d("LastFmPlugin"){"[$instanceId] Interval updated to ${userRefreshInterval / 1000}s"}
+            }
+            "dynamic_refresh_threshold", "last_fm_dynamic_refresh_rate" -> {
+                loadPrefs()
+                Logger.d("LastFmPlugin"){"[$instanceId] Dynamic refresh settings updated"}
             }
         }
     }
@@ -61,47 +71,74 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
             if (isEnabled) {
                 fetch()
             }
-            val delay = refreshInterval.coerceAtLeast(5000L)
-            handler.postDelayed(this, delay)
+
+            val nextInterval = if (dynamicRefreshEnabled && isPlaying) {
+                activeRefreshInterval
+            } else {
+                userRefreshInterval
+            }
+
+            val finalDelay = nextInterval.coerceAtLeast(5000L)
+
+            handler.postDelayed(this, finalDelay)
         }
     }
 
     override fun init() {
         Logger.d("LastFmPlugin"){"[$instanceId] INIT called"}
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         loadPrefs()
-        restartLoop()
+        restartLoop(debounce = false)
     }
 
     private fun loadPrefs() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         username = prefs.getString("lastfm_username", "") ?: ""
         apiKey = prefs.getString("lastfm_api_key", "") ?: ""
-        isEnabled = prefs.getBoolean("enable_lastfm", false)
 
+        // Считываем основные настройки
+        val switchEnabled = prefs.getBoolean("enable_lastfm", false)
         val rawInterval = prefs.getInt("last_fm_refresh_interval", 30)
-        refreshInterval = rawInterval.toLong() * 1000L
+        val dynamicRefreshThreshold = prefs.getInt("dynamic_refresh_threshold", 5)
 
-        // Log.v("LastFmPlugin", "[$instanceId] Loaded prefs: enabled=$isEnabled, interval=$rawInterval")
+        dynamicRefreshEnabled = prefs.getBoolean("last_fm_dynamic_refresh_rate", false)
 
-        if (apiKey.isEmpty() || username.isEmpty()) {
-            if (isEnabled) Logger.w("LastFmPlugin"){"[$instanceId] Missing credentials"}
+        userRefreshInterval = rawInterval.toLong() * 1000L
+        activeRefreshInterval = dynamicRefreshThreshold.toLong() * 1000L
+
+        if (switchEnabled) {
+            if (apiKey.isEmpty() || username.isEmpty()) {
+                if (isEnabled) Logger.w("LastFmPlugin"){"[$instanceId] Enabled but credentials missing"}
+                isEnabled = false
+                callback?.invoke(PluginState.Disabled)
+            } else {
+                isEnabled = true
+            }
+        } else {
             isEnabled = false
             callback?.invoke(PluginState.Disabled)
         }
     }
 
-    private fun restartLoop() {
+    private fun restartLoop(debounce: Boolean) {
         handler.removeCallbacks(updateRunnable)
+
         if (isEnabled) {
-            handler.post(updateRunnable)
+            if (debounce) {
+                handler.postDelayed(updateRunnable, 1000)
+            } else {
+                handler.post(updateRunnable)
+            }
         } else {
+            isPlaying = false
             callback?.invoke(PluginState.Disabled)
         }
     }
 
     private fun fetch() {
+        if (!isEnabled || apiKey.isEmpty() || username.isEmpty()) return
+
+        Logger.d("LastFmPlugin"){"[$instanceId] Fetching recent tracks for user: $username"}
         val url = Uri.parse("https://ws.audioscrobbler.com/2.0/")
             .buildUpon()
             .appendQueryParameter("method", "user.getrecenttracks")
@@ -111,8 +148,6 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
             .appendQueryParameter("limit", "1")
             .build()
             .toString()
-
-        Logger.i("LastFmPlugin"){"[$instanceId] Ping Last.fm"}
 
         val request = JsonObjectRequest(Request.Method.GET, url, null,
             { response ->
@@ -124,7 +159,11 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
                         val trackObj = trackArray.getJSONObject(0)
                         val attr = trackObj.optJSONObject("@attr")
 
-                        if (attr != null && attr.optString("nowplaying") == "true") {
+                        val isNowPlaying = attr != null && attr.optString("nowplaying") == "true"
+
+                        this.isPlaying = isNowPlaying
+
+                        if (isNowPlaying) {
                             val artist = trackObj.getJSONObject("artist").getString("#text")
                             val title = trackObj.getString("name")
                             val album = trackObj.optJSONObject("album")?.optString("#text")
@@ -140,6 +179,9 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
                                 imageUrl = null
                             }
 
+                            Logger.d("LastFmPlugin"){"[$instanceId] Now Playing: $artist - $title"}
+                            Logger.d("LastFmPlugin"){"[$instanceId] Artwork URL: ${imageUrl ?: "none"}"}
+
                             val track = MusicTrack(
                                 title = title,
                                 artist = artist,
@@ -152,15 +194,18 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
                             callback?.invoke(PluginState.Idle)
                         }
                     } else {
+                        this.isPlaying = false
                         callback?.invoke(PluginState.Idle)
                     }
                 } catch (e: JSONException) {
                     Logger.e("LastFmPlugin"){"[$instanceId] Parse error: ${e.message}"}
+                    this.isPlaying = false
                     callback?.invoke(PluginState.Idle)
                 }
             },
             { error ->
                 Logger.e("LastFmPlugin"){"[$instanceId] Network error: ${error.message}"}
+                this.isPlaying = false
                 callback?.invoke(PluginState.Idle)
             }
         )
@@ -181,7 +226,9 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
     override fun destroy() {
         Logger.d("LastFmPlugin"){"[$instanceId] DESTROY called"}
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
-        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        if (::prefs.isInitialized) {
+            prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        }
         handler.removeCallbacks(updateRunnable)
     }
 }

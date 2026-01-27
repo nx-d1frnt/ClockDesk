@@ -1176,7 +1176,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val finalReq = if (usePlatformBlur) {
                 req
             } else if (blurIntensity > 0) {
-                req.transform(CenterCrop(), BlurTransformation(blurIntensity))
+                req.transform(CenterCrop(), BlurTransformation(this, blurIntensity))
             } else {
                 req
             }
@@ -1299,7 +1299,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
 
         val finalAmbientReq = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            ambientReq.transform(FitCenter(), BlurTransformation(35))
+            ambientReq.transform(FitCenter(), BlurTransformation(this, 35))
         } else {
             ambientReq
         }
