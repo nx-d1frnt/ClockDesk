@@ -52,6 +52,7 @@ import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.children
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
@@ -77,6 +78,8 @@ import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import com.nxd1frnt.clockdesk2.utils.PowerStateManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var timeText: TextView
@@ -334,7 +337,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 //        backgroundButton.visibility = View.GONE
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
-
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
@@ -2472,6 +2474,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private fun exitEditMode() {
         isEditMode = false
+        smartChipManager.setEditMode(false) { }
+        widgetMover.setEditMode(false)
         mainLayout.animate()
             .scaleX(1f)
             .scaleY(1f)

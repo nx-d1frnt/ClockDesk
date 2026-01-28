@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
@@ -38,13 +39,19 @@ class ColorAdapter(
 
     override fun onBindViewHolder(holder: ColorViewHolder, position: Int) {
         val item = items[position]
+
+        // --- ФИКС: Безопасная установка фона для API 16 ---
+        // Устанавливаем фон для превью цвета
+        val previewBackground = AppCompatResources.getDrawable(holder.itemView.context, R.drawable.item_font_card)
+        // Копируем (mutate), чтобы цвета не смешивались между элементами
+        val drawable = previewBackground?.mutate() as? GradientDrawable
+
+        // Устанавливаем фон для кольца выбора (если оно есть)
+        val ringBackground = AppCompatResources.getDrawable(holder.itemView.context, R.drawable.color_selection_ring)
+        holder.selectionRing.background = ringBackground
+        // --------------------------------------------------
         val context = holder.itemView.context
-
-        val background = ContextCompat.getDrawable(context, R.drawable.item_font_card) as? GradientDrawable
-        val drawable = background?.constantState?.newDrawable()?.mutate() as? GradientDrawable
-
         var isSelected = false
-
         when (item) {
             is ColorItem.Dynamic -> {
                 val color = item.color

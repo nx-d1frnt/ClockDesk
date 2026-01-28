@@ -2,19 +2,16 @@ package com.nxd1frnt.clockdesk2.smartchips
 
 import android.content.*
 import android.content.pm.PackageManager
-import android.content.res.Resources
-import android.location.Location
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
@@ -26,7 +23,15 @@ import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
 import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
-import kotlin.text.compareTo
+import androidx.transition.ChangeBounds
+import androidx.transition.Fade
+import androidx.transition.TransitionSet
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import android.app.Activity
+import android.app.ActivityOptions
+import android.os.Bundle
+import android.util.Pair
+import android.view.Window
 
 class SmartChipManager(
     private val context: Context,
@@ -82,17 +87,11 @@ class SmartChipManager(
                 chipInfo.isVisible = false
                 chipInfo.clickActivityClassName = null
             } else if (text != null && iconName != null) {
-                // Only update if text has changed
-                if (text != chipInfo.currentText) {
-                    val success = updateExternalChipView(chipInfo.view, packageName, text, iconName)
-                    chipInfo.isVisible = success
-                    if (success)
-                    {
-                        chipInfo.currentText = text
-                        chipInfo.clickActivityClassName = clickActivity?.takeIf { it.isNotBlank() }
-                    }
-                } else {
-
+                val success = updateExternalChipView(chipInfo.view, packageName, text, iconName)
+                chipInfo.isVisible = success
+                if (success) {
+                    chipInfo.currentText = text
+                    chipInfo.clickActivityClassName = clickActivity?.takeIf { it.isNotBlank() }
                 }
             } else {
                 chipInfo.isVisible = false
@@ -104,7 +103,10 @@ class SmartChipManager(
 
     init {
         internalPlugins.forEach { plugin ->
-            val view = plugin.createView(context).apply { visibility = View.GONE }
+            val view = plugin.createView(context).apply {
+                visibility = View.GONE
+                tag = plugin.preferenceKey
+            }
             allChips.add(ChipInfo(plugin.preferenceKey, view, plugin.priority))
         }
         discoverExternalPlugins()
@@ -123,6 +125,7 @@ class SmartChipManager(
     }
 
     fun startUpdates() {
+        handler.removeCallbacks(periodicUpdateRunnable)
         handler.post(periodicUpdateRunnable)
     }
 
@@ -132,7 +135,9 @@ class SmartChipManager(
 
     fun destroy() {
         stopUpdates()
-        context.unregisterReceiver(dataUpdateReceiver)
+        try {
+            context.unregisterReceiver(dataUpdateReceiver)
+        } catch (e: Exception) { }
     }
 
     private fun discoverExternalPlugins() {
@@ -168,29 +173,47 @@ class SmartChipManager(
                         foundPlugins.add(ExternalChipPlugin(packageName, className, prefKey, dispName, priority))
                         val view = LayoutInflater.from(context)
                             .inflate(R.layout.smart_chip_layout, chipContainer, false)
-                            .apply { visibility = View.GONE
+                            .apply {
+                                visibility = View.GONE
                                 isClickable = true
                                 isFocusable = true
+                                tag = packageName
                             }
+
                         view.setOnClickListener {
                             if (isEditMode) {
                                 onEditClickListener?.invoke(chipContainer)
                                 return@setOnClickListener
                             }
                             val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
-                            chipInfo.clickActivityClassName?.let { className ->
+                            chipInfo.clickActivityClassName?.let { cls ->
                                 try {
-                                    // Resolve full class name
-                                    val fullClassName = if (className.startsWith(".")) {
-                                        chipInfo.id + className // packageName + .Activity
-                                    } else {
-                                        className // assume fully qualified
-                                    }
+                                    val fullClassName = if (cls.startsWith(".")) chipInfo.id + cls else cls
                                     val intent = Intent().setClassName(chipInfo.id, fullClassName)
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                }
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                    var options: Bundle? = null
+
+                                    if (context is Activity) {
+                                        val transitionName = "shared_chip_container"
+                                        view.transitionName = transitionName
+
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                            options = ActivityOptions.makeSceneTransitionAnimation(
+                                                context,
+                                                Pair.create(view, transitionName)
+                                            ).toBundle()
+                                        }
+                                        else {
+                                            options = ActivityOptions.makeScaleUpAnimation(
+                                                view, 0, 0, view.width, view.height
+                                            ).toBundle()
+                                        }
+                                    } else {
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+
+                                    context.startActivity(intent, options)
+                                } catch (e: Exception) { }
                             }
                         }
                         allChips.add(ChipInfo(packageName, view, priority))
@@ -211,12 +234,13 @@ class SmartChipManager(
             val iconId = pluginRes.getIdentifier(iconName, "drawable", pkg)
             if (iconId != 0) {
                 iconView.setImageDrawable(ResourcesCompat.getDrawable(pluginRes, iconId, null))
-                textView.text = text
-                textView.isSelected = true // Required for marquee
-                Logger.d("SmartChipManager"){"Updated external chip from $pkg: $text"}
+
+                if (textView.text.toString() != text) {
+                    textView.text = text
+                }
+
+                textView.isSelected = true
                 return true
-            } else {
-                Logger.w("SmartChipManager"){"Icon not found: $iconName in $pkg"}
             }
         } catch (e: Exception) {
             Logger.e("SmartChipManager"){"Failed to update external chip view for $pkg"}
@@ -233,8 +257,6 @@ class SmartChipManager(
                 chipInfo.isVisible = false
             } else {
                 val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
-                // For internal plugins, we assume update() handles text; we don't track text here
-                // If you want marquee preservation for internal too, add currentText tracking
                 chipInfo.isVisible = newIsVisible
             }
         }
@@ -262,14 +284,38 @@ class SmartChipManager(
             .filter { it.isVisible }
             .sortedByDescending { it.priority }
 
-        // Ensure container is ConstraintLayout
-        val container = chipContainer as? androidx.constraintlayout.widget.ConstraintLayout
+        val container = chipContainer as? ConstraintLayout
             ?: throw IllegalStateException("chipContainer must be ConstraintLayout")
 
-        // Use AutoTransition for smooth changes
-        val transition = AutoTransition().apply {
-            duration = 250
-            addTarget(container)
+        val currentTags = (0 until container.childCount).map { container.getChildAt(it).tag }
+        val newTags = visibleChips.map { it.id }
+
+        if (currentTags == newTags) {
+            visibleChips.forEach { chipInfo ->
+                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+
+                if (!textView.isSelected) textView.isSelected = true
+
+            }
+            return
+        }
+
+        val transition = TransitionSet().apply {
+            ordering = TransitionSet.ORDERING_TOGETHER
+            duration = 400
+            interpolator = FastOutSlowInInterpolator()
+
+            addTransition(ChangeBounds().apply {
+                resizeClip = false
+            })
+
+            addTransition(Fade(Fade.IN).apply {
+                duration = 300
+            })
+
+            addTransition(Fade(Fade.OUT).apply {
+                duration = 200
+            })
         }
         TransitionManager.beginDelayedTransition(container, transition)
 
@@ -278,9 +324,18 @@ class SmartChipManager(
         if (visibleChips.isEmpty()) return
 
         visibleChips.forEach { chipInfo ->
-            chipInfo.view.id = ViewCompat.generateViewId()
+            if (chipInfo.view.id == View.NO_ID) {
+                chipInfo.view.id = ViewCompat.generateViewId()
+            }
+            (chipInfo.view.parent as? ViewGroup)?.removeView(chipInfo.view)
+
             chipInfo.view.visibility = View.VISIBLE
+            chipInfo.view.tag = chipInfo.id
+
             container.addView(chipInfo.view)
+
+            val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+            textView?.isSelected = true
 
             fontManager.applyStyleToSmartChip(chipInfo.view)
         }
