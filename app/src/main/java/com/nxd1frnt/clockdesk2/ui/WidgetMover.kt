@@ -59,6 +59,7 @@ class WidgetMover(
     // View State Restoration
     private val originalViewStates = mutableMapOf<View, ViewState>()
 
+    private val defaultGapDp = 16
     // Constants
     val ALIGN_H_LEFT = 0
     val ALIGN_H_CENTER = 1
@@ -69,6 +70,7 @@ class WidgetMover(
     val GRAVITY_START = 0
     val GRAVITY_CENTER = 1
     val GRAVITY_END = 2
+
 
     private var onInteractionListener: ((Boolean) -> Unit)? = null
 
@@ -269,87 +271,127 @@ class WidgetMover(
         val stackedViews = allSorted.filter { !isFreeMovementEnabled(it) }
         val freeViews = allSorted.filter { isFreeMovementEnabled(it) }
 
-        val verticalGap = (10 * context.resources.displayMetrics.density).toInt()
+        val density = context.resources.displayMetrics.density
+        val normalGapPx = (defaultGapDp * density).toInt()
+        val smallGapPx = (5 * density).toInt()
 
-        // Очищаємо ВСІ constraint'и
-        views.forEach { view ->
-            clearAllConstraints(set, view)
-        }
+        views.forEach { clearAllConstraints(set, it) }
 
-        // --- ЛОГІКА ДЛЯ СТЕКА ---
         if (stackedViews.isNotEmpty()) {
-            stackedViews.forEachIndexed { index, view ->
-                val idName = getResourceName(view.id)
+            var lastTopIndex = -1
+            for (i in stackedViews.indices) {
+                if (getAlignmentOnlyV(stackedViews[i]) == ALIGN_V_TOP) lastTopIndex = i else break
+            }
 
-                val alignH = prefs.getInt("${idName}_align_h", ALIGN_H_CENTER)
-                applyHorizontalConstraintToSet(set, view, alignH)
+            var firstBottomIndex = stackedViews.size
+            for (i in stackedViews.indices.reversed()) {
+                if (getAlignmentOnlyV(stackedViews[i]) == ALIGN_V_BOTTOM) firstBottomIndex = i else break
+            }
 
-                when (index) {
-                    0 -> {
-                        set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP, verticalGap)
+            if (firstBottomIndex <= lastTopIndex) firstBottomIndex = lastTopIndex + 1
 
-                        if (stackedViews.size == 1) {
-                            set.connect(view.id, ConstraintSet.BOTTOM, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.BOTTOM, verticalGap)
-                        } else {
-                            val nextId = stackedViews[index + 1].id
-                            set.connect(view.id, ConstraintSet.BOTTOM, nextId, ConstraintSet.TOP, verticalGap)
-                        }
-                        set.setVerticalChainStyle(view.id, ConstraintSet.CHAIN_PACKED)
-                    }
-                    stackedViews.size - 1 -> {
-                        val prevId = stackedViews[index - 1].id
-                        set.connect(view.id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, verticalGap)
-                        set.connect(view.id, ConstraintSet.BOTTOM, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.BOTTOM, verticalGap)
-                    }
-                    else -> {
-                        val prevId = stackedViews[index - 1].id
-                        val nextId = stackedViews[index + 1].id
-                        set.connect(view.id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, verticalGap)
-                        set.connect(view.id, ConstraintSet.BOTTOM, nextId, ConstraintSet.TOP, verticalGap)
-                    }
+            for (i in 0..lastTopIndex) {
+                val view = stackedViews[i]
+                val prevView = if (i > 0) stackedViews[i - 1] else null
+
+                if (prevView == null) {
+                    set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP, 0)
+                } else {
+                    val gap = calculateSmartGap(prevView, view, normalGapPx, smallGapPx)
+                    set.connect(view.id, ConstraintSet.TOP, prevView.id, ConstraintSet.BOTTOM, gap)
+                }
+                applyHorizontalLogic(set, view)
+            }
+
+            for (i in stackedViews.size - 1 downTo firstBottomIndex) {
+                val view = stackedViews[i]
+                val nextView = if (i < stackedViews.size - 1) stackedViews[i + 1] else null
+
+                if (nextView == null) {
+                    set.connect(view.id, ConstraintSet.BOTTOM, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.BOTTOM, 0)
+                } else {
+                    val gap = calculateSmartGap(view, nextView, normalGapPx, smallGapPx)
+                    set.connect(view.id, ConstraintSet.BOTTOM, nextView.id, ConstraintSet.TOP, gap)
+                }
+                applyHorizontalLogic(set, view)
+            }
+
+            val middleStart = lastTopIndex + 1
+            val middleEnd = firstBottomIndex - 1
+
+            if (middleStart <= middleEnd) {
+                val head = stackedViews[middleStart]
+                val tail = stackedViews[middleEnd]
+
+                if (lastTopIndex >= 0) {
+                    val topAnchor = stackedViews[lastTopIndex]
+                    val gap = calculateSmartGap(topAnchor, head, normalGapPx, smallGapPx)
+                    set.connect(head.id, ConstraintSet.TOP, topAnchor.id, ConstraintSet.BOTTOM, gap)
+                } else {
+                    set.connect(head.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP, normalGapPx)
                 }
 
-                val alignV = prefs.getInt("${idName}_align_v", ALIGN_V_CENTER)
-                val bias = when (alignV) {
-                    ALIGN_V_TOP -> 0.0f
-                    ALIGN_V_BOTTOM -> 1.0f
-                    else -> 0.5f
+                if (firstBottomIndex < stackedViews.size) {
+                    val bottomAnchor = stackedViews[firstBottomIndex]
+                    val gap = calculateSmartGap(tail, bottomAnchor, normalGapPx, smallGapPx)
+                    set.connect(tail.id, ConstraintSet.BOTTOM, bottomAnchor.id, ConstraintSet.TOP, gap)
+                } else {
+                    set.connect(tail.id, ConstraintSet.BOTTOM, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.BOTTOM, normalGapPx)
                 }
-                set.setVerticalBias(view.id, bias)
 
-                view.animate()
-                    .translationX(0f)
-                    .translationY(0f)
-                    .setDuration(300)
-                    .start()
+                set.setVerticalChainStyle(head.id, ConstraintSet.CHAIN_PACKED)
+                set.setVerticalBias(head.id, 0.5f)
+
+                for (i in middleStart..middleEnd) {
+                    val view = stackedViews[i]
+                    applyHorizontalLogic(set, view)
+
+                    if (i > middleStart) {
+                        val prev = stackedViews[i - 1]
+
+                        val gap = calculateSmartGap(prev, view, normalGapPx, smallGapPx)
+
+                        set.connect(view.id, ConstraintSet.TOP, prev.id, ConstraintSet.BOTTOM, gap)
+                        set.connect(prev.id, ConstraintSet.BOTTOM, view.id, ConstraintSet.TOP, 0)
+                    }
+                }
+            }
+
+            stackedViews.forEach {
+                it.visibility = View.VISIBLE
+                it.animate().translationX(0f).translationY(0f).setDuration(300).start()
             }
         }
 
-        // --- ЛОГІКА ДЛЯ ВІЛЬНИХ ---
         freeViews.forEach { view ->
-            // Прив'язуємо до 0,0
+            val idName = getResourceName(view.id)
             set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
             set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
-            set.setHorizontalBias(view.id, 0f)
-            set.setVerticalBias(view.id, 0f)
+            val savedX = prefs.getFloat("${idName}_x", 0f)
+            val savedY = prefs.getFloat("${idName}_y", 0f)
+            parentView.post { sanitizeAndApplyPosition(view, savedX, savedY) }
         }
 
-        // Застосовуємо constraint'и
         beginLayoutTransition()
         set.applyTo(parentView)
-
-        // ПІСЛЯ застосування constraint'ів, відновлюємо позиції
-        parentView.post {
-            freeViews.forEach { view ->
-                val idName = getResourceName(view.id)
-                val savedX = prefs.getFloat("${idName}_x", 0f)
-                val savedY = prefs.getFloat("${idName}_y", 0f)
-
-                // Тепер це працюватиме правильно
-                sanitizeAndApplyPosition(view, savedX, savedY)
-            }
-        }
     }
+
+    private fun calculateSmartGap(topView: View, bottomView: View, normalGap: Int, smallGap: Int): Int {
+        val topAlign = getAlignmentOnlyV(topView)
+        val bottomAlign = getAlignmentOnlyV(bottomView)
+
+        if (topAlign == ALIGN_V_BOTTOM) return smallGap
+
+        if (bottomAlign == ALIGN_V_TOP) return smallGap
+
+        return normalGap
+    }
+
+    private fun applyHorizontalLogic(set: ConstraintSet, view: View) {
+        val alignH = prefs.getInt("${getResourceName(view.id)}_align_h", ALIGN_H_CENTER)
+        applyHorizontalConstraintToSet(set, view, alignH)
+    }
+
 
     private fun restoreFreeMode() {
         if (parentView !is ConstraintLayout) return
