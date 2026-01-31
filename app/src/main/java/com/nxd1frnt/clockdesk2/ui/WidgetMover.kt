@@ -23,7 +23,15 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Refactored WidgetMover with improved state management and bug fixes
+ * Total vibecode bruh since it's 1 AM already and I don't wanna deal with this properly
+ * Sorry for the mess in advance
+ * works somewhat okay now tho
+ */
+
+
+/**
+ * WidgetMover.kt
+ * Manages movable widgets within a parent view, allowing users to drag and reorder them.
  */
 class WidgetMover(
     private val context: Context,
@@ -97,7 +105,7 @@ class WidgetMover(
             LayoutMode.StackMode
         }
         isGridSnapEnabled = prefs.getBoolean("grid_snap_enabled", true)
-        isCollisionCheckEnabled = prefs.getBoolean("collision_check_enabled", true)  // ← ДОДАТИ ЦЕЙ РЯДОК
+        isCollisionCheckEnabled = prefs.getBoolean("collision_check_enabled", true)
         Logger.d("WidgetMover"){"Initial mode: $currentMode"}
     }
 
@@ -161,7 +169,6 @@ class WidgetMover(
             Logger.d("WidgetMover"){"First run detected! Applying default layout settings."}
             val editor = prefs.edit()
             editor.putBoolean("is_vertical_stack_mode", true)
-            editor.putBoolean("free_movement_beta_enabled", false)
             editor.putBoolean("grid_snap_enabled", true)
             editor.putBoolean("collision_check_enabled", true)
 
@@ -173,6 +180,7 @@ class WidgetMover(
                 editor.putInt("${idName}_internal_gravity", GRAVITY_CENTER)
                 editor.putFloat("${idName}_x", 0f)
                 editor.putFloat("${idName}_y", 0f)
+                editor.putBoolean("${idName}_individual_free_mode", false)
             }
 
             editor.putBoolean("is_layout_initialized", true)
