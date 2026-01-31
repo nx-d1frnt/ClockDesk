@@ -23,7 +23,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Total vibecode bruh since it's 1 AM already and I don't wanna deal with this properly
+ * Total vibecode bruh since it's 1 AM already and I don't wanna deal with this properly (someone help pls)
  * Sorry for the mess in advance
  * works somewhat okay now tho
  */
