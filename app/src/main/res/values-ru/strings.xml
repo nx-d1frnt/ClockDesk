@@ -163,4 +163,6 @@
     <string name="customize_smart_chips">Настроить умные чипы</string>
     <string name="edit_background">Изменить цвет фона</string>
     <string name="ignore_collision">Проверять столкновения</string>
+    <string name="music_sources_title">Источники музыки</string>
+    <string name="music_sources_summary">Сортировать источники музыки и настраивать провайдеров</string>
 </resources>

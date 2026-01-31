@@ -163,4 +163,6 @@
     <string name="customize_smart_chips">Налаштувати розумні чіпи</string>
     <string name="edit_background">Змінити колір фону</string>
     <string name="ignore_collision">Перевіряти зіткнення</string>
+    <string name="music_sources_title">Джерела музики</string>
+    <string name="music_sources_summary">Сортувати джерела музики та налаштовувати провайдерів</string>
 </resources>

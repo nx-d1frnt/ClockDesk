@@ -163,4 +163,6 @@
     <string name="customize_smart_chips">Customize Smart Chips</string>
     <string name="edit_background">Edit background color</string>
     <string name="ignore_collision">Check collisions</string>
+    <string name="music_sources_title">Music Sources</string>
+    <string name="music_sources_summary">Sort music sources and configure providers</string>
 </resources>

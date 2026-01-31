@@ -31,8 +31,8 @@
         app:title="@string/music_settings_title">
     <Preference
         app:key="music_sources_screen"
-        app:title="Music Sources"
-        app:summary="Manage priority and configure providers"
+        app:title="@string/music_sources_title"
+        app:summary="@string/music_sources_summary"
         app:fragment="com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment" />
         <SwitchPreference
             app:key="lastfm_albumart_background"
