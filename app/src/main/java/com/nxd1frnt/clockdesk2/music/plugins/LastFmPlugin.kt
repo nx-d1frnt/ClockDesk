@@ -44,6 +44,8 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
 
     private var isPlaying = false
 
+    private var currentAlbumArtUrl: String? = null
+
     //unique instanceid for debugging
     private lateinit var prefs: SharedPreferences
     private val instanceId = System.identityHashCode(this)
@@ -90,6 +92,62 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         loadPrefs()
         restartLoop(debounce = false)
+    }
+
+        private fun isGenericLastFmImage(url: String): Boolean {
+        return GENERIC_LASTFM_IMAGE_IDS.any { url.contains(it) } // Check if URL contains any known generic ID
+}
+
+     private fun fetchAlbumArtFromThirdParty(artist: String, songName: String, onResult: (String?) -> Unit) {
+        val searchTerm = "$artist - $songName"
+        val url = Uri.parse("https://itunes.apple.com/search")
+            .buildUpon()
+            .appendQueryParameter("term", searchTerm)
+            .appendQueryParameter("entity", "song") // Search for songs
+            .appendQueryParameter("limit", "1")
+            .build()
+            .toString()
+
+        Logger.d("LastFmPlugin"){"Fallback: Requesting from iTunes: $url"}
+
+        val itunesRequest = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
+                try {
+                    val resultCount = response.optInt("resultCount", 0)
+                    if (resultCount > 0) {
+                        val results = response.getJSONArray("results")
+                        val firstResult = results.getJSONObject(0)
+
+                        // Try to get 600x600 art, fall back to 100x100
+                        var artUrl = firstResult.optString("artworkUrl600")
+                        if (artUrl.isEmpty()) {
+                            artUrl = firstResult.optString("artworkUrl100")
+                        }
+
+                        if (artUrl.isNotEmpty()) {
+                            // Replace 100x100 with 600x600 for higher res
+                            val highResArtUrl = artUrl.replace("100x100", "600x600")
+                            Logger.d("LastFmPlugin"){"Fallback: Found iTunes art: $highResArtUrl"}
+                            onResult(highResArtUrl)
+                        } else {
+                            onResult(null)
+                        }
+                    } else {
+                        Logger.d("LastFmPlugin"){"Fallback: iTunes found no results for '$searchTerm'"}
+                        onResult(null)
+                    }
+                } catch (e: JSONException) {
+                    Logger.e("LastFmPlugin"){"Fallback: iTunes JSON parsing error${e.message}"}
+                    onResult(null)
+                }
+            },
+            { error ->
+                Logger.e("LastFmPlugin"){"Fallback: iTunes Volley error: ${error.message}"}
+                onResult(null)
+            }
+        )
+        requestQueue.add(itunesRequest)
     }
 
     private fun loadPrefs() {
@@ -175,9 +233,12 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
                                     ?.getString("#text")
                             }
 
-                            if (!imageUrl.isNullOrEmpty() && GENERIC_LASTFM_IMAGE_IDS.any { imageUrl!!.contains(it) }) {
-                                imageUrl = null
-                            }
+                        val isGeneric = !imageUrl.isNullOrEmpty() && isGenericLastFmImage(imageUrl) // Check for generic image
+
+                        if (!imageUrl.isNullOrEmpty() && !isGeneric) {
+                            // We have a good, non-generic URL from Last.fm
+                            Logger.d("LastFmPlugin"){"[$instanceId] Got Last.fm art: $imageUrl"}
+                            currentAlbumArtUrl = imageUrl
 
                             Logger.d("LastFmPlugin"){"[$instanceId] Now Playing: $artist - $title"}
                             Logger.d("LastFmPlugin"){"[$instanceId] Artwork URL: ${imageUrl ?: "none"}"}
@@ -190,6 +251,31 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
                                 sourcePackageName = "com.lastfm"
                             )
                             callback?.invoke(PluginState.Playing(track))
+                        } else {
+                            // Generic URL or no URL. Try to fetch from iTunes.
+                            // The fallback will invoke the plugin callback once it has a result.
+                            Logger.d("LastFmPlugin"){"[$instanceId] Last.fm art is generic or empty. Fetching from fallback."}
+                            fetchAlbumArtFromThirdParty(artist, title) { artUrl ->
+                                if (!artUrl.isNullOrEmpty()) {
+                                    Logger.d("LastFmPlugin"){"[$instanceId] Fallback art found: $artUrl"}
+                                    currentAlbumArtUrl = artUrl
+                                } else {
+                                    Logger.d("LastFmPlugin"){"[$instanceId] Fallback returned no art"}
+                                }
+
+                                Logger.d("LastFmPlugin"){"[$instanceId] Now Playing: $artist - $title"}
+                                Logger.d("LastFmPlugin"){"[$instanceId] Artwork URL: ${artUrl ?: "none"}"}
+
+                                val track = MusicTrack(
+                                    title = title,
+                                    artist = artist,
+                                    album = album,
+                                    artworkUrl = artUrl,
+                                    sourcePackageName = "com.lastfm"
+                                )
+                                callback?.invoke(PluginState.Playing(track))
+                            }
+                        }
                         } else {
                             callback?.invoke(PluginState.Idle)
                         }

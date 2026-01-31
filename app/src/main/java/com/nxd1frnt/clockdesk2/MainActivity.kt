@@ -124,9 +124,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var bsDateFormatLabel: TextView
     private lateinit var bsFreeModeSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var bsGridSnapSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bsTextGravityTitle: TextView
     private lateinit var bsTextGravityGroup: MaterialButtonToggleGroup
+    private lateinit var bsWidgetOrderLabel: TextView
     private lateinit var bsHorizontalAlignGroup: MaterialButtonToggleGroup
+    private lateinit var bsAlignmentLabel: TextView
     private lateinit var bsVerticalAlignGroup: MaterialButtonToggleGroup
+    private lateinit var bsVerticalAlignmentLabel: TextView
     private lateinit var bsMoveUpBtn: Button
     private lateinit var bsMoveDownBtn: Button
     private lateinit var bsVarContainer: View
@@ -259,6 +263,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundManager: BackgroundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.google.android.material.color.DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
 
         // Full-screen and keep screen on
@@ -1730,9 +1735,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bsDateFormatGroup = bottomSheet.findViewById(R.id.date_format_radio_group)
         bsTimeFormatLabel = bottomSheet.findViewById(R.id.time_format_label)
         bsDateFormatLabel = bottomSheet.findViewById(R.id.date_format_label)
+        bsTextGravityTitle = bottomSheet.findViewById(R.id.gravity_label)
         bsTextGravityGroup = bottomSheet.findViewById(R.id.text_gravity_toggle_group)
+        bsAlignmentLabel = bottomSheet.findViewById(R.id.alignment_label)
         bsHorizontalAlignGroup = bottomSheet.findViewById(R.id.alignment_toggle_group)
+        bsVerticalAlignmentLabel = bottomSheet.findViewById(R.id.vertical_alignment_label)
         bsVerticalAlignGroup = bottomSheet.findViewById(R.id.vertical_alignment_group)
+        bsWidgetOrderLabel = bottomSheet.findViewById(R.id.widget_order_label)
         bsMoveUpBtn = bottomSheet.findViewById(R.id.move_up_button)
         bsMoveDownBtn = bottomSheet.findViewById(R.id.move_down_button)
 
@@ -1980,6 +1989,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsFreeModeSwitch.visibility = View.VISIBLE
                 bsGridSnapSwitch.visibility = View.VISIBLE
                 bsEditBackgroundSwitch.visibility = View.GONE
+                bsAlignmentLabel.visibility = View.VISIBLE
+                bsVerticalAlignmentLabel.visibility = View.VISIBLE
+                bsWidgetOrderLabel.visibility = View.VISIBLE
+                bsTextGravityTitle.visibility = View.VISIBLE
                 bsTimeFormatGroup.check(
                     if (fontManager.getTimeFormatPattern().contains("H")) R.id.time_24_radio else R.id.time_12_radio
                 )
@@ -1999,6 +2012,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsFreeModeSwitch.visibility = View.VISIBLE
                 bsGridSnapSwitch.visibility = View.VISIBLE
                 bsEditBackgroundSwitch.visibility = View.GONE
+                bsAlignmentLabel.visibility = View.VISIBLE
+                bsVerticalAlignmentLabel.visibility = View.VISIBLE
+                bsWidgetOrderLabel.visibility = View.VISIBLE
+                bsTextGravityTitle.visibility = View.VISIBLE
                 val pattern = fontManager.getDateFormatPattern()
                 val id = when (pattern) {
                     "MMM dd" -> R.id.date_format_1
@@ -2023,6 +2040,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsFreeModeSwitch.visibility = View.VISIBLE
                 bsGridSnapSwitch.visibility = View.VISIBLE
                 bsEditBackgroundSwitch.visibility = View.GONE
+                bsAlignmentLabel.visibility = View.VISIBLE
+                bsVerticalAlignmentLabel.visibility = View.VISIBLE
+                bsWidgetOrderLabel.visibility = View.VISIBLE
+                bsTextGravityTitle.visibility = View.VISIBLE
+
             }
             R.id.smart_chip_container -> {
                 bsTitle.text = getString(R.string.customize_smart_chips)
@@ -2040,6 +2062,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsFreeModeSwitch.visibility = View.GONE
                 bsGridSnapSwitch.visibility = View.GONE
                 bsEditBackgroundSwitch.visibility = View.VISIBLE
+                bsAlignmentLabel.visibility = View.GONE
+                bsVerticalAlignmentLabel.visibility = View.GONE
+                bsWidgetOrderLabel.visibility = View.GONE
+                bsTextGravityTitle.visibility = View.GONE
             }
             else -> {
                 hideBottomSheet()

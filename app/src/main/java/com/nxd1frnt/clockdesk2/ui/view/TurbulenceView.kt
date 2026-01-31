@@ -114,7 +114,7 @@ class TurbulenceView @JvmOverloads constructor(
 
             nativeController?.play(TurbulenceNoiseShader.Companion.Type.SIMPLEX_NOISE, config)
             postDelayed({ onReadyCallback() }, 400)
-            postDelayed({ nativeController?.finish() }, 4000)
+            postDelayed({ nativeController?.finish() }, 5000)
         }
     }
 
@@ -133,8 +133,8 @@ class TurbulenceView @JvmOverloads constructor(
 
             val config = LegacySimplexNoiseView.NoiseConfig(
                 color = color,
-                gridCount = 0.8f,
-                noiseMoveSpeedZ = 0.3f,
+                gridCount = 1.0f,
+                noiseMoveSpeedZ = 0.45f,
                 luminosityMultiplier = 1.0f,
                 octaves = 1
             )
@@ -144,7 +144,7 @@ class TurbulenceView @JvmOverloads constructor(
                 turbulence.playMain(config)
                 postDelayed({
                     turbulence.finish { visibility = View.GONE }
-                }, 4000)
+                }, 5000)
             }
         }
     }

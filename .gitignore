@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+gradle.properties
+.gitignore
+.stfolder/syncthing-folder-b8a200.txt

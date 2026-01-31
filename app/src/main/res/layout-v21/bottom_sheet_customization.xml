@@ -241,6 +241,7 @@
                 android:checked="false" />
 
             <TextView
+                android:id="@+id/alignment_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/horizontal_alignment"
@@ -257,7 +258,7 @@
 
                 <Button
                     android:id="@+id/left_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/Theme.ClockDesk.Button.Outlined"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
@@ -283,6 +284,7 @@
                     android:icon="@drawable/align_horizontal_right"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
             <TextView
+                android:id="@+id/vertical_alignment_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/vertical_alignment"
@@ -324,6 +326,7 @@
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <TextView
+                android:id="@+id/widget_order_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_order"
@@ -356,6 +359,7 @@
             </LinearLayout>
 
             <View
+                android:id="@+id/divider1"
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="0dp"
@@ -372,6 +376,7 @@
                 android:checked="false" />
 
             <TextView
+                android:id="@+id/gravity_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/text_gravity"
@@ -394,9 +399,7 @@
                     android:layout_marginEnd="16dp"
                     android:drawableStart="@drawable/align_horizontal_left"
                     android:icon="@drawable/align_horizontal_left"
-                    android:text="@string/align_start"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
-                    app:iconTint="@color/md_theme_onSurfaceVariant" />
+                    android:text="@string/align_start"/>
 
                 <Button
                     android:id="@+id/gravity_center_button"
@@ -405,9 +408,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:text="@string/align_center"
-                    android:icon="@drawable/align_horizontal_center"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
-                    app:iconTint="@color/md_theme_onSurfaceVariant"/>
+                    android:icon="@drawable/align_horizontal_center"/>
 
                 <Button
                     android:id="@+id/gravity_right_button"
@@ -415,9 +416,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/align_end"
-                    android:icon="@drawable/align_horizontal_right"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
-                    app:iconTint="@color/md_theme_onSurfaceVariant"/>
+                    android:icon="@drawable/align_horizontal_right"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <com.google.android.material.materialswitch.MaterialSwitch

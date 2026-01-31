@@ -246,6 +246,7 @@
                 android:layout_marginBottom="8dp"/>
 
             <TextView
+                android:id="@+id/alignment_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/horizontal_alignment"
@@ -290,6 +291,7 @@
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <TextView
+                android:id="@+id/vertical_alignment_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/vertical_alignment"
@@ -330,6 +332,7 @@
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <TextView
+                android:id="@+id/widget_order_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_order"
@@ -362,6 +365,7 @@
             </LinearLayout>
 
             <View
+                android:id="@+id/divider1"
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="12dp"
@@ -379,6 +383,7 @@
                 android:checked="false" />
 
             <TextView
+                android:id="@+id/gravity_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/text_alignment"
@@ -397,36 +402,30 @@
 
                 <Button
                     android:id="@+id/gravity_left_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/Theme.ClockDesk.Button.Outlined"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:layout_marginRight="16dp"
                     android:text="@string/align_start"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
-                    app:iconTint="@color/md_theme_onSurfaceVariant"
                     app:icon="@drawable/align_horizontal_left" />
 
                 <Button
                     android:id="@+id/gravity_center_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/Theme.ClockDesk.Button.Outlined"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:layout_marginRight="16dp"
                     android:text="Center"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
-                    app:iconTint="@color/md_theme_onSurfaceVariant"
                     app:icon="@drawable/align_horizontal_center"/>
 
                 <Button
                     android:id="@+id/gravity_right_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    style="@style/Theme.ClockDesk.Button.Outlined"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/align_end"
-                    android:textColor="@color/md_theme_onSurfaceVariant"
-                    app:iconTint="@color/md_theme_onSurfaceVariant"
                     app:icon="@drawable/align_horizontal_right"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
             <com.google.android.material.materialswitch.MaterialSwitch
