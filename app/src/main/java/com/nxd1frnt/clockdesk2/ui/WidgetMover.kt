@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.os.Build
-import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -32,8 +31,6 @@ class WidgetMover(
     private val parentView: View
 ) {
     private val TAG = "WidgetMover"
-    private val isLoggingEnabled = true
-
     private val prefs: SharedPreferences =
         context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
 
@@ -155,24 +152,6 @@ class WidgetMover(
         }
     }
 
-    private fun validateState(): Boolean {
-        val savedStackMode = prefs.getBoolean("is_vertical_stack_mode", true)
-        val savedFreeMode = prefs.getBoolean("free_movement_beta_enabled", false)
-
-        // Fix inconsistent state
-        if (savedFreeMode && savedStackMode) {
-            Logger.d("WidgetMover"){"Inconsistent state detected! Forcing Stack Mode."}
-            prefs.edit()
-                .putBoolean("free_movement_beta_enabled", false)
-                .putBoolean("is_vertical_stack_mode", true)
-                .apply()
-            currentMode = LayoutMode.StackMode
-            return false
-        }
-
-        return true
-    }
-
     // ============================================================================
     // INITIALIZATION & DEFAULTS
     // ============================================================================
@@ -202,42 +181,6 @@ class WidgetMover(
         }
     }
 
-    private fun initializeDefaultFreePositions() {
-        if (parentView !is ConstraintLayout) return
-
-        Logger.d("WidgetMover"){"Initializing default Free Mode positions..."}
-
-        parentView.post {
-            val set = ConstraintSet()
-            set.clone(parentView)
-
-            val density = context.resources.displayMetrics.density
-            val startY = 100f * density
-            val spacing = 150f * density
-
-            views.forEachIndexed { index, view ->
-                // Clear all constraints
-                clearAllConstraints(set, view)
-
-                // Anchor to top-left
-                set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
-                set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
-                set.setHorizontalBias(view.id, 0f)
-                set.setVerticalBias(view.id, 0f)
-
-                val x = 50f * density
-                val y = startY + (index * spacing)
-
-                view.post {
-                    sanitizeAndApplyPosition(view, x, y)
-                    savePosition(view)
-                }
-            }
-
-            beginLayoutTransition() // Animate initialization if possible
-            set.applyTo(parentView)
-        }
-    }
 
     // ============================================================================
     // RESTORE LOGIC
@@ -390,106 +333,6 @@ class WidgetMover(
     private fun applyHorizontalLogic(set: ConstraintSet, view: View) {
         val alignH = prefs.getInt("${getResourceName(view.id)}_align_h", ALIGN_H_CENTER)
         applyHorizontalConstraintToSet(set, view, alignH)
-    }
-
-
-    private fun restoreFreeMode() {
-        if (parentView !is ConstraintLayout) return
-
-        Logger.d("WidgetMover"){"Applying Free Mode layout..."}
-
-        val set = ConstraintSet()
-        set.clone(parentView)
-
-        views.forEach { view ->
-            val idName = getResourceName(view.id)
-
-            clearAllConstraints(set, view)
-
-            set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
-            set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
-            set.setHorizontalBias(view.id, 0f)
-            set.setVerticalBias(view.id, 0f)
-
-            // Load saved positions
-            val savedX = prefs.getFloat("${idName}_x", 0f)
-            val savedY = prefs.getFloat("${idName}_y", 0f)
-
-            Logger.d("WidgetMover"){"Restoring $idName: x=$savedX, y=$savedY"}
-
-            parentView.post {
-                sanitizeAndApplyPosition(view, savedX, savedY)
-            }
-        }
-
-        beginLayoutTransition()
-        set.applyTo(parentView)
-    }
-
-    private fun applySmartStack(saveOrder: Boolean) {
-        if (parentView !is ConstraintLayout) return
-
-        val set = ConstraintSet()
-        set.clone(parentView)
-
-        val sortedViews = views.sortedBy {
-            prefs.getInt("${getResourceName(it.id)}_order_index", 0)
-        }
-
-        val verticalGap = (10 * context.resources.displayMetrics.density).toInt()
-
-        sortedViews.forEachIndexed { index, view ->
-            val idName = getResourceName(view.id)
-
-            if (saveOrder) {
-                prefs.edit().putInt("${idName}_order_index", index).apply()
-            }
-
-            set.clear(view.id, ConstraintSet.TOP)
-            set.clear(view.id, ConstraintSet.BOTTOM)
-
-            val alignH = prefs.getInt("${idName}_align_h", ALIGN_H_CENTER)
-            applyHorizontalConstraintToSet(set, view, alignH)
-
-            val prevView = if (index > 0) sortedViews[index - 1] else null
-            val nextView = if (index < sortedViews.size - 1) sortedViews[index + 1] else null
-
-            val topAnchorId = prevView?.id ?: ConstraintLayout.LayoutParams.PARENT_ID
-            val topAnchorSide = if (prevView != null) ConstraintSet.BOTTOM else ConstraintSet.TOP
-            val bottomAnchorId = nextView?.id ?: ConstraintLayout.LayoutParams.PARENT_ID
-            val bottomAnchorSide = if (nextView != null) ConstraintSet.TOP else ConstraintSet.BOTTOM
-
-            set.connect(view.id, ConstraintSet.TOP, topAnchorId, topAnchorSide, verticalGap)
-            set.connect(view.id, ConstraintSet.BOTTOM, bottomAnchorId, bottomAnchorSide, verticalGap)
-
-            // Apply vertical bias
-            val alignV = prefs.getInt("${idName}_align_v", ALIGN_V_CENTER)
-            val bias = if (alignV == ALIGN_V_TOP) 0.0f else if (alignV == ALIGN_V_BOTTOM) 1.0f else 0.5f
-            set.setVerticalBias(view.id, bias)
-
-            if (index == 0) {
-                set.setVerticalChainStyle(view.id, ConstraintSet.CHAIN_PACKED)
-            }
-
-            val isIndividualFree = isFreeMovementEnabled(view)
-
-            view.animate().cancel()
-
-            if (isIndividualFree) {
-
-                val savedX = prefs.getFloat("${idName}_x", 0f)
-                val savedY = prefs.getFloat("${idName}_y", 0f)
-
-                sanitizeAndApplyPosition(view, savedX, savedY)
-
-            } else {
-                view.translationX = 0f
-                view.translationY = 0f
-            }
-        }
-
-        beginLayoutTransition()
-        set.applyTo(parentView)
     }
 
     // ============================================================================
@@ -681,16 +524,6 @@ class WidgetMover(
         }
     }
 
-    private fun transitionToFreeMode() {
-        if (currentMode is LayoutMode.StackMode) {
-            Logger.d("WidgetMover"){"Transitioning from Stack to Free Mode"}
-            currentMode = LayoutMode.FreeMode
-            prefs.edit()
-                .putBoolean("is_vertical_stack_mode", false)
-                .putBoolean("free_movement_beta_enabled", true)
-                .apply()
-        }
-    }
 
     private fun updateCollisionFeedback(view: View) {
         if (!isCollisionCheckEnabled) {
@@ -907,29 +740,6 @@ class WidgetMover(
         set.clear(view.id, ConstraintSet.RIGHT)
     }
 
-    private fun applyConstraintAlignment(view: View, mode: Int) {
-        val lp = view.layoutParams as? ConstraintLayout.LayoutParams ?: return
-
-        when (mode) {
-            ALIGN_H_LEFT -> {
-                lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
-                lp.endToEnd = ConstraintLayout.LayoutParams.UNSET
-                lp.horizontalBias = 0f
-            }
-            ALIGN_H_CENTER -> {
-                lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
-                lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
-                lp.horizontalBias = 0.5f
-            }
-            ALIGN_H_RIGHT -> {
-                lp.startToStart = ConstraintLayout.LayoutParams.UNSET
-                lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
-                lp.horizontalBias = 1f
-            }
-        }
-
-        view.layoutParams = lp
-    }
 
     private fun applyHorizontalConstraintToSet(set: ConstraintSet, view: View, mode: Int) {
         set.clear(view.id, ConstraintSet.START)
@@ -1134,8 +944,6 @@ class WidgetMover(
     }
 
     fun debugPrintPositions() {
-        if (!isLoggingEnabled) return
-
         Logger.d("WidgetMover"){"=== DEBUG: Widget Positions ==="}
         views.forEach { view ->
             val idName = getResourceName(view.id)
