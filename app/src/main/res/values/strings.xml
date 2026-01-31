@@ -162,4 +162,5 @@
     <string name="show_updates_chip_summary">Show a chip with app update notifications</string>
     <string name="customize_smart_chips">Customize Smart Chips</string>
     <string name="edit_background">Edit background color</string>
+    <string name="ignore_collision">Check collisions</string>
 </resources>

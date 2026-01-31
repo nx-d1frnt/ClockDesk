@@ -435,6 +435,13 @@
                 android:text="@string/snap_to_grid"
                 android:checked="true"
                 android:paddingBottom="8dp"/>
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/ignore_collision_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ignore_collision"
+                android:checked="false"
+                android:paddingBottom="8dp"/>
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

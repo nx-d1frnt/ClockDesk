@@ -157,4 +157,10 @@
     <string name="variable_properties_weight">Толщина</string>
     <string name="variable_properties_roundness">Скругления</string>
     <string name="show_am_pm">Показывать индикатор AM/PM</string>
+    <string name="update_available_text">Доступно обновление</string>
+    <string name="show_updates_chip">Показывать обновления приложения</string>
+    <string name="show_updates_chip_summary">Показывать уведомления об обновлениях приложения</string>
+    <string name="customize_smart_chips">Настроить умные чипы</string>
+    <string name="edit_background">Изменить цвет фона</string>
+    <string name="ignore_collision">Проверять столкновения</string>
 </resources>

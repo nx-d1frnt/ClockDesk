@@ -41,6 +41,8 @@ class WidgetMover(
     private var currentMode: LayoutMode = LayoutMode.StackMode
     private var isEditMode = false
     private var isGridSnapEnabled = true
+    private var isCollisionCheckEnabled = true
+
 
     // Touch Handling
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -77,6 +79,16 @@ class WidgetMover(
     init {
         Logger.d("WidgetMover"){"WidgetMover initialized with ${views.size} views"}
         loadInitialState()
+
+        parentView.post {
+            if (parentView.width > 0 && parentView.height > 0) {
+                Logger.d("WidgetMover"){"Auto-initializing widget positions..."}
+                checkAndInitializeDefaults()
+                restoreOrderAndPositions()
+            } else {
+                Logger.d("WidgetMover"){"Layout not ready, skipping auto-init"}
+            }
+        }
     }
 
     private fun loadInitialState() {
@@ -86,6 +98,7 @@ class WidgetMover(
             LayoutMode.StackMode
         }
         isGridSnapEnabled = prefs.getBoolean("grid_snap_enabled", true)
+        isCollisionCheckEnabled = prefs.getBoolean("collision_check_enabled", true)  // ← ДОДАТИ ЦЕЙ РЯДОК
         Logger.d("WidgetMover"){"Initial mode: $currentMode"}
     }
 
@@ -169,6 +182,7 @@ class WidgetMover(
             editor.putBoolean("is_vertical_stack_mode", true)
             editor.putBoolean("free_movement_beta_enabled", false)
             editor.putBoolean("grid_snap_enabled", true)
+            editor.putBoolean("collision_check_enabled", true)
 
             views.forEachIndexed { index, view ->
                 val idName = getResourceName(view.id)
@@ -257,10 +271,12 @@ class WidgetMover(
 
         val verticalGap = (10 * context.resources.displayMetrics.density).toInt()
 
+        // Очищаємо ВСІ constraint'и
         views.forEach { view ->
             clearAllConstraints(set, view)
         }
 
+        // --- ЛОГІКА ДЛЯ СТЕКА ---
         if (stackedViews.isNotEmpty()) {
             stackedViews.forEachIndexed { index, view ->
                 val idName = getResourceName(view.id)
@@ -293,7 +309,6 @@ class WidgetMover(
                     }
                 }
 
-                // Vertical Bias
                 val alignV = prefs.getInt("${idName}_align_v", ALIGN_V_CENTER)
                 val bias = when (alignV) {
                     ALIGN_V_TOP -> 0.0f
@@ -310,23 +325,30 @@ class WidgetMover(
             }
         }
 
+        // --- ЛОГІКА ДЛЯ ВІЛЬНИХ ---
         freeViews.forEach { view ->
-            val idName = getResourceName(view.id)
-
+            // Прив'язуємо до 0,0
             set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
             set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
-
             set.setHorizontalBias(view.id, 0f)
             set.setVerticalBias(view.id, 0f)
-
-            val savedX = prefs.getFloat("${idName}_x", 0f)
-            val savedY = prefs.getFloat("${idName}_y", 0f)
-
-            sanitizeAndApplyPosition(view, savedX, savedY)
         }
 
+        // Застосовуємо constraint'и
         beginLayoutTransition()
         set.applyTo(parentView)
+
+        // ПІСЛЯ застосування constraint'ів, відновлюємо позиції
+        parentView.post {
+            freeViews.forEach { view ->
+                val idName = getResourceName(view.id)
+                val savedX = prefs.getFloat("${idName}_x", 0f)
+                val savedY = prefs.getFloat("${idName}_y", 0f)
+
+                // Тепер це працюватиме правильно
+                sanitizeAndApplyPosition(view, savedX, savedY)
+            }
+        }
     }
 
     private fun restoreFreeMode() {
@@ -433,7 +455,7 @@ class WidgetMover(
     // ============================================================================
 
     private fun sanitizeAndApplyPosition(view: View, desiredX: Float, desiredY: Float) {
-        // Wait for layout if not ready
+        // Чекаємо поки layout буде готовий
         if (parentView.width == 0 || parentView.height == 0 || view.width == 0 || view.height == 0) {
             parentView.post {
                 sanitizeAndApplyPosition(view, desiredX, desiredY)
@@ -441,18 +463,32 @@ class WidgetMover(
             return
         }
 
-        val minTransX = -view.left.toFloat()
-        val maxTransX = (parentView.width - view.width).toFloat() - view.left
-        val minTransY = -view.top.toFloat()
-        val maxTransY = (parentView.height - view.height).toFloat() - view.top
+        val isFree = isFreeMovementEnabled(view)
 
-        val finalX = desiredX.coerceIn(minTransX, maxTransX)
-        val finalY = desiredY.coerceIn(minTransY, maxTransY)
+        val finalX: Float
+        val finalY: Float
+
+        if (isFree) {
+            val maxTransX = (parentView.width - view.width).toFloat().coerceAtLeast(0f)
+            val maxTransY = (parentView.height - view.height).toFloat().coerceAtLeast(0f)
+
+            finalX = desiredX.coerceIn(0f, maxTransX)
+            finalY = desiredY.coerceIn(0f, maxTransY)
+        } else {
+            // Для стекових віджетів: використовуємо відносні координати
+            val minTransX = -view.left.toFloat()
+            val maxTransX = (parentView.width - view.width).toFloat() - view.left
+            val minTransY = -view.top.toFloat()
+            val maxTransY = (parentView.height - view.height).toFloat() - view.top
+
+            finalX = desiredX.coerceIn(minTransX, maxTransX)
+            finalY = desiredY.coerceIn(minTransY, maxTransY)
+        }
 
         view.translationX = finalX
         view.translationY = finalY
 
-        Logger.d("WidgetMover"){"Sanitized position for ${getResourceName(view.id)}: ($desiredX, $desiredY) -> ($finalX, $finalY)"}
+        Logger.d("WidgetMover"){"Sanitized position for ${getResourceName(view.id)}: ($desiredX, $desiredY) -> ($finalX, $finalY) [free=$isFree]"}
     }
 
     // ============================================================================
@@ -585,7 +621,7 @@ class WidgetMover(
     }
 
     private fun handleDragEnd(view: View) {
-        if (checkCollision(view)) {
+        if (isCollisionCheckEnabled && checkCollision(view)) {
             Logger.d("WidgetMover"){"Collision detected, reverting position"}
             Toast.makeText(context, "Cannot place here - overlaps another widget", Toast.LENGTH_SHORT).show()
             restoreOrderAndPositions()
@@ -615,6 +651,15 @@ class WidgetMover(
     }
 
     private fun updateCollisionFeedback(view: View) {
+        if (!isCollisionCheckEnabled) {
+            view.background?.setColorFilter(
+                Color.argb(100, 0, 255, 0),
+                PorterDuff.Mode.SRC_ATOP
+            )
+            return
+        }
+
+        // Якщо перевірка увімкнена - показуємо червоний/зелений
         if (checkCollision(view)) {
             view.background?.setColorFilter(
                 Color.argb(100, 255, 0, 0),
@@ -627,6 +672,7 @@ class WidgetMover(
             )
         }
     }
+
 
     // ============================================================================
     // DRAG PREPARATION
@@ -976,7 +1022,15 @@ class WidgetMover(
         Logger.d("WidgetMover"){"Grid snap: $enabled"}
     }
 
+    fun setCollisionCheckEnabled(enabled: Boolean) {
+        isCollisionCheckEnabled = enabled
+        prefs.edit().putBoolean("collision_check_enabled", enabled).apply()
+        Logger.d("WidgetMover"){"Collision check: $enabled"}
+    }
+
     fun isGridSnapEnabled(): Boolean = isGridSnapEnabled
+
+    fun isCollisionCheckEnabled(): Boolean = isCollisionCheckEnabled
 
     // ============================================================================
     // PERSISTENCE

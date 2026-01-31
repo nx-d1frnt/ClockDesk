@@ -157,4 +157,10 @@
     <string name="variable_properties_weight">Товщина</string>
     <string name="variable_properties_roundness">Скруглення</string>
     <string name="show_am_pm">Показувати індикатор AM/PM</string>
+    <string name="update_available_text">Доступне оновлення</string>
+    <string name="show_updates_chip">Показувати оновлення додатку</string>
+    <string name="show_updates_chip_summary">Показувати сповіщення про оновлення додатку</string>
+    <string name="customize_smart_chips">Налаштувати розумні чіпи</string>
+    <string name="edit_background">Змінити колір фону</string>
+    <string name="ignore_collision">Перевіряти зіткнення</string>
 </resources>

@@ -124,6 +124,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var bsDateFormatLabel: TextView
     private lateinit var bsFreeModeSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var bsGridSnapSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bsIgnoreCollisionSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var bsTextGravityTitle: TextView
     private lateinit var bsTextGravityGroup: MaterialButtonToggleGroup
     private lateinit var bsWidgetOrderLabel: TextView
@@ -1727,6 +1728,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         bsNightShiftSwitch = bottomSheet.findViewById(R.id.night_shift_switch)
         bsFreeModeSwitch = bottomSheet.findViewById(R.id.free_mode_switch)
+        bsIgnoreCollisionSwitch = bottomSheet.findViewById(R.id.ignore_collision_switch)
         bsGridSnapSwitch = bottomSheet.findViewById(R.id.grid_snap_switch)
 
         bsTimeFormatGroup = bottomSheet.findViewById(R.id.time_format_radio_group)
@@ -1854,6 +1856,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             widgetMover.setGridSnapEnabled(isChecked)
         }
 
+        bsIgnoreCollisionSwitch.setOnCheckedChangeListener { _, isChecked ->
+            widgetMover.setCollisionCheckEnabled(isChecked)
+        }
+
         bsTextGravityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
             val mode = when (checkedId) {
@@ -1978,6 +1984,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsMoveDownBtn.visibility = View.VISIBLE
                 bsFreeModeSwitch.visibility = View.VISIBLE
                 bsGridSnapSwitch.visibility = View.VISIBLE
+                bsIgnoreCollisionSwitch.visibility = View.VISIBLE
                 bsEditBackgroundSwitch.visibility = View.GONE
                 bsAlignmentLabel.visibility = View.VISIBLE
                 bsVerticalAlignmentLabel.visibility = View.VISIBLE
@@ -2001,6 +2008,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsMoveDownBtn.visibility = View.VISIBLE
                 bsFreeModeSwitch.visibility = View.VISIBLE
                 bsGridSnapSwitch.visibility = View.VISIBLE
+                bsIgnoreCollisionSwitch.visibility = View.VISIBLE
                 bsEditBackgroundSwitch.visibility = View.GONE
                 bsAlignmentLabel.visibility = View.VISIBLE
                 bsVerticalAlignmentLabel.visibility = View.VISIBLE
@@ -2029,6 +2037,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsMoveDownBtn.visibility = View.VISIBLE
                 bsFreeModeSwitch.visibility = View.VISIBLE
                 bsGridSnapSwitch.visibility = View.VISIBLE
+                bsIgnoreCollisionSwitch.visibility = View.VISIBLE
                 bsEditBackgroundSwitch.visibility = View.GONE
                 bsAlignmentLabel.visibility = View.VISIBLE
                 bsVerticalAlignmentLabel.visibility = View.VISIBLE
@@ -2051,6 +2060,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsMoveDownBtn.visibility = View.GONE
                 bsFreeModeSwitch.visibility = View.GONE
                 bsGridSnapSwitch.visibility = View.GONE
+                bsIgnoreCollisionSwitch.visibility = View.GONE
                 bsEditBackgroundSwitch.visibility = View.VISIBLE
                 bsAlignmentLabel.visibility = View.GONE
                 bsVerticalAlignmentLabel.visibility = View.GONE
@@ -2163,7 +2173,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             widgetMover.setFreeMovementEnabled(viewToCustomize, isChecked)
         }
         bsGridSnapSwitch.isChecked = widgetMover.isGridSnapEnabled()
-
+        bsIgnoreCollisionSwitch.isChecked = widgetMover.isCollisionCheckEnabled()
 
         val savedGravity = widgetMover.getInternalGravity(viewToCustomize)
         val gravityBtnId = when (savedGravity) {
