@@ -735,6 +735,12 @@ class WidgetMover(
     fun moveWidgetOrder(activeView: View, moveUp: Boolean) {
         Logger.d("WidgetMover"){"Move order: ${getResourceName(activeView.id)} ${if (moveUp) "UP" else "DOWN"}"}
 
+        // Якщо віджет у вільному режимі, він не може бути переміщений в стеку
+        if (isFreeMovementEnabled(activeView)) {
+            Toast.makeText(context, "Cannot reorder free-moving widget. Disable free mode first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val sortedViews = views.sortedBy {
             prefs.getInt("${getResourceName(it.id)}_order_index", 0)
         }.toMutableList()
@@ -750,42 +756,46 @@ class WidgetMover(
         sortedViews[currentIndex] = sortedViews[targetIndex]
         sortedViews[targetIndex] = temp
 
-        // Switch to stack mode and save new order
-        currentMode = LayoutMode.StackMode
-        prefs.edit().putBoolean("is_vertical_stack_mode", true).apply()
-        prefs.edit().putBoolean("free_movement_beta_enabled", false).apply()
-
         sortedViews.forEachIndexed { index, view ->
             prefs.edit().putInt("${getResourceName(view.id)}_order_index", index).apply()
         }
 
-        applySmartStack(saveOrder = true)
+        restoreOrderAndPositions()
     }
 
     fun alignViewVertical(view: View, mode: Int) {
         Logger.d("WidgetMover"){"Align vertical: ${getResourceName(view.id)} -> $mode"}
         saveAlignmentOnlyV(view, mode)
-
-        currentMode = LayoutMode.StackMode
-        prefs.edit().putBoolean("is_vertical_stack_mode", true).apply()
-        prefs.edit().putBoolean("free_movement_beta_enabled", false).apply()
-
-        applySmartStack(saveOrder = false)
+        restoreOrderAndPositions()
     }
 
     fun alignViewHorizontal(view: View, mode: Int) {
         Logger.d("WidgetMover"){"Align horizontal: ${getResourceName(view.id)} -> $mode"}
 
-        //start the layout transition
-        beginLayoutTransition()
-
-        applyConstraintAlignment(view, mode)
-
-        view.animate().cancel()
-        view.translationX = 0f
-
-        savePositionRaw(view, 0f, view.translationY)
         saveAlignmentOnlyH(view, mode)
+
+        val isFree = isFreeMovementEnabled(view)
+
+        if (isFree) {
+            beginLayoutTransition()
+
+            if (parentView is ConstraintLayout) {
+                val set = ConstraintSet()
+                set.clone(parentView)
+
+                applyHorizontalConstraintToSet(set, view, mode)
+
+                set.applyTo(parentView)
+            }
+
+            val savedY = prefs.getFloat("${getResourceName(view.id)}_y", view.translationY)
+            view.translationX = 0f
+            savePositionRaw(view, 0f, savedY)
+
+        } else {
+            beginLayoutTransition()
+            restoreOrderAndPositions()
+        }
     }
 
     fun setTextGravity(view: View, mode: Int) {
@@ -834,10 +844,14 @@ class WidgetMover(
     }
 
     private fun applyHorizontalConstraintToSet(set: ConstraintSet, view: View, mode: Int) {
+        set.clear(view.id, ConstraintSet.START)
+        set.clear(view.id, ConstraintSet.END)
+        set.clear(view.id, ConstraintSet.LEFT)
+        set.clear(view.id, ConstraintSet.RIGHT)
+
         when (mode) {
             ALIGN_H_LEFT -> {
                 set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
-                set.clear(view.id, ConstraintSet.END)
                 set.setHorizontalBias(view.id, 0f)
             }
             ALIGN_H_CENTER -> {
@@ -846,7 +860,6 @@ class WidgetMover(
                 set.setHorizontalBias(view.id, 0.5f)
             }
             ALIGN_H_RIGHT -> {
-                set.clear(view.id, ConstraintSet.START)
                 set.connect(view.id, ConstraintSet.END, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.END)
                 set.setHorizontalBias(view.id, 1f)
             }
