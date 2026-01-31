@@ -186,12 +186,10 @@ class ClockManager(
         }
         updateTimeText()
         updateDateText()
-        if (fontManager.isNightShiftEnabled()) {
             fontManager.applyNightShiftTransition(
                 currentTime,
                 dayTimeGetter,
                 true
             )
-        }
     }
 }

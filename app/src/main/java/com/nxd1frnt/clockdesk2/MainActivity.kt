@@ -1247,8 +1247,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 fontManager.applyNightShiftTransition(
                                     clockManager.getCurrentTime(),
                                     dayTimeGetter,
-                                    fontManager.isNightShiftEnabled()
-                                )
+                                    true)
                             }
                         }
                     }
@@ -1851,15 +1850,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         }
 
-        bsNightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
-            isNightShiftEnabled = isChecked
-            fontManager.setNightShiftEnabled(isChecked)
-        }
-
-        bsFreeModeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            widgetMover.setFreeMovementEnabled(isChecked)
-        }
-
         bsGridSnapSwitch.setOnCheckedChangeListener { _, isChecked ->
             widgetMover.setGridSnapEnabled(isChecked)
         }
@@ -2137,7 +2127,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
 
-                if (fontManager.isNightShiftEnabled()) {
+                if (fontManager.isNightShiftEnabledForView(focusedView!!)) {
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
                         dayTimeGetter,
@@ -2157,8 +2147,21 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         )
         bsColorRecyclerView.adapter = colorAdapter
 
-        bsNightShiftSwitch.isChecked = fontManager.isNightShiftEnabled()
-        bsFreeModeSwitch.isChecked = widgetMover.isFreeMovementEnabled()
+        bsNightShiftSwitch.setOnCheckedChangeListener(null)
+        bsNightShiftSwitch.isChecked = fontManager.isNightShiftEnabledForView(viewToCustomize)
+        bsNightShiftSwitch.setOnCheckedChangeListener { _, isChecked ->
+            fontManager.setNightShiftEnabledForView(viewToCustomize, isChecked)
+            fontManager.applyNightShiftTransition(
+                clockManager.getCurrentTime(),
+                dayTimeGetter,
+                true
+            )
+        }
+        bsFreeModeSwitch.setOnCheckedChangeListener(null)
+        bsFreeModeSwitch.isChecked = widgetMover.isFreeMovementEnabled(viewToCustomize)
+        bsFreeModeSwitch.setOnCheckedChangeListener { _, isChecked ->
+            widgetMover.setFreeMovementEnabled(viewToCustomize, isChecked)
+        }
         bsGridSnapSwitch.isChecked = widgetMover.isGridSnapEnabled()
 
 
@@ -2228,13 +2231,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
 
-                if (fontManager.isNightShiftEnabled()) {
-                    fontManager.applyNightShiftTransition(
+                fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
                         dayTimeGetter,
-                        true
-                    )
-                }
+                        true)
 
                 val updSettings = fontManager.getSettings(view)
                 if (updSettings != null) {
@@ -2715,8 +2715,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
                         dayTimeGetter,
-                        fontManager.isNightShiftEnabled()
-                    )
+                        true)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         try {
@@ -2879,7 +2878,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
             backgroundImageView.setImageDrawable(null)
             fontManager.clearDynamicColors()
-            fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
+            fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
@@ -2950,7 +2949,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 "__DEFAULT_GRADIENT__" -> {
                     backgroundManager.setSavedBackgroundUri(null)
                     fontManager.clearDynamicColors()
-                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
+                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
                     Logger.d("MainActivity"){"Saved: user wants default gradient (will apply after music stops)"}
                 }
                 null -> {
@@ -2979,7 +2978,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 backgroundManager.setSavedBackgroundUri(null)
                 hasCustomImageBackground = false
                 //fontManager.clearDynamicColors()
-                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, fontManager.isNightShiftEnabled())
+                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
                 backgroundImageView.visibility = View.GONE
                 gradientManager.startUpdates()
             }

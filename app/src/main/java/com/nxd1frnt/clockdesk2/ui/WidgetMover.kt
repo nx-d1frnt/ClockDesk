@@ -122,40 +122,16 @@ class WidgetMover(
         }
     }
 
-    fun setFreeMovementEnabled(enabled: Boolean) {
-        val targetMode = if (enabled) LayoutMode.FreeMode else LayoutMode.StackMode
-
-        if (currentMode == targetMode) {
-            Logger.d("WidgetMover"){"Already in $targetMode, skipping"}
-            return
-        }
-
-        Logger.d("WidgetMover"){"Switching mode: $currentMode -> $targetMode"}
-        // Save current positions before switching
-        if (currentMode == LayoutMode.FreeMode) {
-            views.forEach { savePosition(it) }
-        }
-
-        currentMode = targetMode
-        prefs.edit().putBoolean("free_movement_beta_enabled", enabled).apply()
-        prefs.edit().putBoolean("is_vertical_stack_mode", !enabled).apply()
-
-        when (targetMode) {
-            LayoutMode.StackMode -> {
-                applySmartStack(saveOrder = true)
-            }
-            LayoutMode.FreeMode -> {
-                val hasValidPositions = checkSavedPositions()
-                if (hasValidPositions) {
-                    restoreFreeMode()
-                } else {
-                    initializeDefaultFreePositions()
-                }
-            }
-        }
+    fun setFreeMovementEnabled(view: View, enabled: Boolean) {
+        val idName = getResourceName(view.id)
+        prefs.edit().putBoolean("${idName}_individual_free_mode", enabled).apply()
+        restoreOrderAndPositions()
     }
 
-    fun isFreeMovementEnabled(): Boolean = currentMode is LayoutMode.FreeMode
+    fun isFreeMovementEnabled(view: View): Boolean {
+        val idName = getResourceName(view.id)
+        return prefs.getBoolean("${idName}_individual_free_mode", false)
+    }
 
     private fun checkSavedPositions(): Boolean {
         return views.any { view ->
@@ -252,20 +228,10 @@ class WidgetMover(
     // ============================================================================
 
     fun restoreOrderAndPositions() {
-        if (parentView !is ConstraintLayout) {
-            Logger.d("WidgetMover"){"Parent is not ConstraintLayout, cannot restore"}
-            return
-        }
+        if (parentView !is ConstraintLayout) return
 
-        Logger.d("WidgetMover"){"=== Restoring Order and Positions ==="}
-        // Load state
-        loadInitialState()
-        checkAndInitializeDefaults()
-
-        if (!validateState()) {
-            applySmartStack(saveOrder = false)
-            return
-        }
+        // loadInitialState()
+        // checkAndInitializeDefaults()
 
         parentView.post {
             views.forEach { view ->
@@ -274,18 +240,93 @@ class WidgetMover(
                 applyInternalGravity(view, internalGravity)
             }
 
-            // Step 2: Apply layout based on mode
-            when (currentMode) {
-                LayoutMode.StackMode -> {
-                    Logger.d("WidgetMover"){"Restoring Stack Mode"}
-                    applySmartStack(saveOrder = false)
+            applyHybridLayout()
+        }
+    }
+
+    private fun applyHybridLayout() {
+        val set = ConstraintSet()
+        set.clone(parentView as ConstraintLayout)
+
+        val allSorted = views.sortedBy {
+            prefs.getInt("${getResourceName(it.id)}_order_index", 0)
+        }
+
+        val stackedViews = allSorted.filter { !isFreeMovementEnabled(it) }
+        val freeViews = allSorted.filter { isFreeMovementEnabled(it) }
+
+        val verticalGap = (10 * context.resources.displayMetrics.density).toInt()
+
+        views.forEach { view ->
+            clearAllConstraints(set, view)
+        }
+
+        if (stackedViews.isNotEmpty()) {
+            stackedViews.forEachIndexed { index, view ->
+                val idName = getResourceName(view.id)
+
+                val alignH = prefs.getInt("${idName}_align_h", ALIGN_H_CENTER)
+                applyHorizontalConstraintToSet(set, view, alignH)
+
+                when (index) {
+                    0 -> {
+                        set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP, verticalGap)
+
+                        if (stackedViews.size == 1) {
+                            set.connect(view.id, ConstraintSet.BOTTOM, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.BOTTOM, verticalGap)
+                        } else {
+                            val nextId = stackedViews[index + 1].id
+                            set.connect(view.id, ConstraintSet.BOTTOM, nextId, ConstraintSet.TOP, verticalGap)
+                        }
+                        set.setVerticalChainStyle(view.id, ConstraintSet.CHAIN_PACKED)
+                    }
+                    stackedViews.size - 1 -> {
+                        val prevId = stackedViews[index - 1].id
+                        set.connect(view.id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, verticalGap)
+                        set.connect(view.id, ConstraintSet.BOTTOM, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.BOTTOM, verticalGap)
+                    }
+                    else -> {
+                        val prevId = stackedViews[index - 1].id
+                        val nextId = stackedViews[index + 1].id
+                        set.connect(view.id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, verticalGap)
+                        set.connect(view.id, ConstraintSet.BOTTOM, nextId, ConstraintSet.TOP, verticalGap)
+                    }
                 }
-                LayoutMode.FreeMode -> {
-                    Logger.d("WidgetMover"){"Restoring Free Mode"}
-                    restoreFreeMode()
+
+                // Vertical Bias
+                val alignV = prefs.getInt("${idName}_align_v", ALIGN_V_CENTER)
+                val bias = when (alignV) {
+                    ALIGN_V_TOP -> 0.0f
+                    ALIGN_V_BOTTOM -> 1.0f
+                    else -> 0.5f
                 }
+                set.setVerticalBias(view.id, bias)
+
+                view.animate()
+                    .translationX(0f)
+                    .translationY(0f)
+                    .setDuration(300)
+                    .start()
             }
         }
+
+        freeViews.forEach { view ->
+            val idName = getResourceName(view.id)
+
+            set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
+            set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
+
+            set.setHorizontalBias(view.id, 0f)
+            set.setVerticalBias(view.id, 0f)
+
+            val savedX = prefs.getFloat("${idName}_x", 0f)
+            val savedY = prefs.getFloat("${idName}_y", 0f)
+
+            sanitizeAndApplyPosition(view, savedX, savedY)
+        }
+
+        beginLayoutTransition()
+        set.applyTo(parentView)
     }
 
     private fun restoreFreeMode() {
@@ -324,8 +365,6 @@ class WidgetMover(
     private fun applySmartStack(saveOrder: Boolean) {
         if (parentView !is ConstraintLayout) return
 
-        Logger.d("WidgetMover"){"Applying Smart Stack (saveOrder=$saveOrder)..."}
-
         val set = ConstraintSet()
         set.clone(parentView)
 
@@ -345,18 +384,8 @@ class WidgetMover(
             set.clear(view.id, ConstraintSet.TOP)
             set.clear(view.id, ConstraintSet.BOTTOM)
 
-            // Apply horizontal alignment
             val alignH = prefs.getInt("${idName}_align_h", ALIGN_H_CENTER)
             applyHorizontalConstraintToSet(set, view, alignH)
-
-            // Reset translation animations safely
-            view.animate().cancel()
-            view.translationX = 0f
-            view.translationY = 0f
-
-            if (saveOrder) {
-                savePositionRaw(view, 0f, 0f)
-            }
 
             val prevView = if (index > 0) sortedViews[index - 1] else null
             val nextView = if (index < sortedViews.size - 1) sortedViews[index + 1] else null
@@ -371,22 +400,32 @@ class WidgetMover(
 
             // Apply vertical bias
             val alignV = prefs.getInt("${idName}_align_v", ALIGN_V_CENTER)
-            val bias = when (alignV) {
-                ALIGN_V_TOP -> 0.0f
-                ALIGN_V_BOTTOM -> 1.0f
-                else -> 0.5f
-            }
+            val bias = if (alignV == ALIGN_V_TOP) 0.0f else if (alignV == ALIGN_V_BOTTOM) 1.0f else 0.5f
             set.setVerticalBias(view.id, bias)
 
-            // Set chain style on first element
             if (index == 0) {
                 set.setVerticalChainStyle(view.id, ConstraintSet.CHAIN_PACKED)
+            }
+
+            val isIndividualFree = isFreeMovementEnabled(view)
+
+            view.animate().cancel()
+
+            if (isIndividualFree) {
+
+                val savedX = prefs.getFloat("${idName}_x", 0f)
+                val savedY = prefs.getFloat("${idName}_y", 0f)
+
+                sanitizeAndApplyPosition(view, savedX, savedY)
+
+            } else {
+                view.translationX = 0f
+                view.translationY = 0f
             }
         }
 
         beginLayoutTransition()
         set.applyTo(parentView)
-        Logger.d("WidgetMover"){"✓ Smart Stack applied"}
     }
 
     // ============================================================================
@@ -454,7 +493,10 @@ class WidgetMover(
 
     private fun handleTouchMove(view: View, rawX: Float, rawY: Float): Boolean {
         // Check if Free Mode is enabled
-        if (currentMode !is LayoutMode.FreeMode) {
+        val isIndividualFree = isFreeMovementEnabled(view)
+        val canMove = isIndividualFree
+
+        if (!canMove) {
             if (!isDragging) {
                 val moved = abs(rawX - initialTouchX) > touchSlop || abs(rawY - initialTouchY) > touchSlop
                 if (moved) {
@@ -484,12 +526,12 @@ class WidgetMover(
         isDragging = true
         onInteractionListener?.invoke(true)
 
-
         Logger.d("WidgetMover"){"Started dragging ${getResourceName(view.id)}"}
-        // Prepare layout for drag
-        transitionToFreeMode()
-        healOrphans(view)
-        prepareViewForDrag(view)
+
+        if (isFreeMovementEnabled(view)) {
+            healOrphans(view)
+            prepareViewForDrag(view)
+        }
 
         // Recalculate delta
         dX = view.translationX - rawX
@@ -601,6 +643,11 @@ class WidgetMover(
         views.forEach { view ->
             if (view === draggingView) return@forEach
 
+            if (!isFreeMovementEnabled(view)) {
+                Logger.d("WidgetMover"){"Skipping ${getResourceName(view.id)} - it's in stack mode"}
+                return@forEach
+            }
+
             val idName = getResourceName(view.id)
 
             // Load saved positions
@@ -629,19 +676,20 @@ class WidgetMover(
         val currentVisualY = view.y
         val savedGravity = getInternalGravity(view)
 
-        // Reset constraints to top-left anchor
-        val lp = view.layoutParams as? ConstraintLayout.LayoutParams ?: return
+        if (parentView !is ConstraintLayout) return
 
-        lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
-        lp.endToEnd = ConstraintLayout.LayoutParams.UNSET
-        lp.horizontalBias = 0f
-        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID
-        lp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET
-        lp.topToBottom = ConstraintLayout.LayoutParams.UNSET
-        lp.verticalBias = 0f
-        lp.setMargins(0, 0, 0, 0)
+        val set = ConstraintSet()
+        set.clone(parentView as ConstraintLayout)
 
-        view.layoutParams = lp
+        clearAllConstraints(set, view)
+
+        set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
+        set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
+        set.setVerticalBias(view.id, 0f)
+        set.setHorizontalBias(view.id, 0f)
+
+        set.applyTo(parentView)
+
         applyInternalGravity(view, savedGravity)
 
         // Maintain visual position using translation

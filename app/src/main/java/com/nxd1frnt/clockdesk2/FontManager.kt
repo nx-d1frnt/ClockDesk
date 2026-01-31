@@ -41,7 +41,8 @@ data class FontSettings(
     var dynamicColorRole: String? = null,
     var backgroundColor: Int = Color.DKGRAY,
     var useDynamicBackgroundColor: Boolean = false,
-    var dynamicBackgroundColorRole: String? = null
+    var dynamicBackgroundColorRole: String? = null,
+    var isNightShiftEnabled: Boolean = true
 )
 sealed class ColorItem {
     data class Dynamic(
@@ -196,6 +197,20 @@ class FontManager(
 
     fun getFonts(): List<FontItem> = fonts
 
+    private fun getOrCreateSettings(view: View): FontSettings {
+        return settingsMap.getOrPut(view.id) {
+            FontSettings()
+        }
+    }
+
+    private fun getResourceName(id: Int): String {
+        return try {
+            context.resources.getResourceEntryName(id)
+        } catch (e: Exception) {
+            "ID:$id"
+        }
+    }
+
     private fun rebuildFontList() {
         fonts.clear()
         fonts.add(FontItem.AddNew)
@@ -318,6 +333,7 @@ class FontManager(
             settings.backgroundColor = prefs.getInt("${prefix}BgColor", Color.DKGRAY)
             settings.useDynamicBackgroundColor = prefs.getBoolean("${prefix}UseDynamicBgColor", false)
             settings.dynamicBackgroundColorRole = prefs.getString("${prefix}DynamicBgRole", "surface_variant")
+            settings.isNightShiftEnabled = prefs.getBoolean("${prefix}isNightShiftEnabled", false)
         }
 
         applyAll()
@@ -347,6 +363,7 @@ class FontManager(
             editor.putInt("${prefix}BgColor", settings.backgroundColor)
             editor.putBoolean("${prefix}UseDynamicBgColor", settings.useDynamicBackgroundColor)
             editor.putString("${prefix}DynamicBgRole", settings.dynamicBackgroundColorRole)
+            editor.putBoolean("${prefix}isNightShiftEnabled", settings.isNightShiftEnabled)
         }
         editor.apply()
     }
@@ -550,10 +567,17 @@ class FontManager(
     fun getDateFormatPattern() = dateFormatPattern
     fun setDateFormatPattern(pattern: String) { dateFormatPattern = pattern; saveSettings() }
 
-    fun isNightShiftEnabled() = isNightShiftEnabled
-    fun setNightShiftEnabled(enabled: Boolean) { isNightShiftEnabled = enabled; saveSettings() }
+    fun setNightShiftEnabledForView(view: View, enabled: Boolean) {
+        val settings = getOrCreateSettings(view)
+        settings.isNightShiftEnabled = enabled
+        saveSettings()
+    }
 
-    fun setAdditionalLogging(enabled: Boolean) { }
+    fun isNightShiftEnabledForView(view: View): Boolean {
+        return getSettings(view)?.isNightShiftEnabled ?: true
+    }
+
+    fun isNightShiftEnabledGlobally(): Boolean = isNightShiftEnabled
 
     @SuppressLint("RestrictedApi")
     fun updateDynamicColors(bitmap: Bitmap, onComplete: () -> Unit) {
@@ -648,12 +672,18 @@ class FontManager(
         updateViewColorWithNightShift(dateText, R.id.date_text, nightFactor, nightTint)
         updateViewColorWithNightShift(lastfmText, R.id.lastfm_layout, nightFactor, nightTint) // ID layout, цвет text
 
+        val iconEffectiveFactor = if (settingsMap[R.id.lastfm_layout]?.isNightShiftEnabled != false) nightFactor else 0f
         val targetIconColor = getTargetColorForView(R.id.lastfm_layout)
-        val finalIconColor = interpolateColor(targetIconColor, nightTint, nightFactor)
+        val finalIconColor = interpolateColor(targetIconColor, nightTint, iconEffectiveFactor)
         lastfmIcon.setColorFilter(finalIconColor)
 
+        val chipSettings = settingsMap[R.id.smart_chip_container]
+
+        val chipEffectiveFactor = if (chipSettings?.isNightShiftEnabled != false) nightFactor else 0f
+
         val targetColor = getTargetColorForView(R.id.smart_chip_container)
-        val finalChipColor = interpolateColor(targetColor, nightTint, nightFactor)
+
+        val finalChipColor = interpolateColor(targetColor, nightTint, chipEffectiveFactor)
 
         for (i in 0 until smartChipContainer.childCount) {
             val chipView = smartChipContainer.getChildAt(i)
@@ -666,9 +696,12 @@ class FontManager(
     }
 
     private fun updateViewColorWithNightShift(textView: TextView, settingsId: Int, nightFactor: Float, nightTint: Int) {
-        val targetColor = getTargetColorForView(settingsId)
+        val settings = settingsMap[settingsId]
 
-        val finalColor = interpolateColor(targetColor, nightTint, nightFactor)
+        val effectiveFactor = if (settings?.isNightShiftEnabled == true) nightFactor else 0f
+
+        val targetColor = getTargetColorForView(settingsId)
+        val finalColor = interpolateColor(targetColor, nightTint, effectiveFactor)
 
         textView.setTextColor(finalColor)
     }
