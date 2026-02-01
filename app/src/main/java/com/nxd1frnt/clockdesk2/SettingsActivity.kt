@@ -11,37 +11,69 @@ import android.widget.Button
 import android.content.pm.ActivityInfo
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.color.DynamicColors
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
+import com.nxd1frnt.clockdesk2.music.ui.LastFmSettingsFragment
+import androidx.preference.Preference
+import androidx.preference.PreferenceFragmentCompat
+import com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment
 
 class SettingsActivity : AppCompatActivity() {
-    private lateinit var latitudeEditText: TextInputEditText
-    private lateinit var longitudeEditText: TextInputEditText
-    private lateinit var manualCoordinatesCheckBox: MaterialSwitch
-    private lateinit var saveButton: Button
-    private lateinit var chooseBackgroundButton: Button
-    private lateinit var clearBackgroundButton: Button
-
-    private val PICK_IMAGE_REQUEST = 200
+    private lateinit var toolbar: MaterialToolbar
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        com.google.android.material.color.DynamicColors.applyToActivityIfAvailable(this)
+        DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
-
-        // Enable full-screen mode and keep screen on
-        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        or View.SYSTEM_UI_FLAG_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                )
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
-
-
         setContentView(R.layout.activity_settings)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true) // Optional: add back button
+        toolbar = findViewById(R.id.toolbar)
+
+        setupWindowDisplay()
+        setupToolbar()
+    }
+
+    private fun setupWindowDisplay() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    private fun openFragment(fragment: androidx.fragment.app.Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.settings_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
+    private fun setupToolbar() {
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
+        supportFragmentManager.addOnBackStackChangedListener {
+            val currentFragment = supportFragmentManager.findFragmentById(R.id.settings_container)
+
+            title = when (currentFragment) {
+                is MusicSourcesFragment -> getString(R.string.music_sources_title)
+                is LastFmSettingsFragment -> getString(R.string.lastfm_plugin_name)
+                else -> getString(R.string.settings_title)
+            }
+
+            supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        }
+
+        toolbar.setNavigationOnClickListener {
+            if (supportFragmentManager.backStackEntryCount > 0) {
+                supportFragmentManager.popBackStack()
+            } else {
+                finish()
+            }
+        }
     }
 }
