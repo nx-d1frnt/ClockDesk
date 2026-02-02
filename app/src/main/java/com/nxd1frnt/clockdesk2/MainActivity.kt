@@ -106,6 +106,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var tutorialLayout: ConstraintLayout
     private lateinit var tutorialFinger: ImageView
     private lateinit var tutorialText: TextView
+    private lateinit var smartPixelManager: SmartPixelManager
+    private lateinit var smartPixelOverlay: View
 
     // Bottom Sheet UI elements (Customization)
     private lateinit var bsTitle: TextView
@@ -460,6 +462,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         }
 
+        smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
+
+        val smartPixelsEnabled = prefs.getBoolean("smart_pixels_enabled", false)
+
+        smartPixelManager = SmartPixelManager(this, smartPixelOverlay, timeoutMs = 10000L) // 10 секунд
+
+        if (smartPixelsEnabled) {
+            smartPixelManager.start()
+        }
+
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
 
@@ -615,6 +627,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         // Start updates
         restoreSavedWeatherState()
         startUpdates()
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+        // Уведомляем менеджер о касании
+        if (::smartPixelManager.isInitialized) {
+            smartPixelManager.onUserInteraction()
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     override fun onDestroy() {
@@ -2643,6 +2663,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
 //         clockManager.setAdditionalLogging(enableAdditionalLogging)
 //         fontManager.setAdditionalLogging(enableAdditionalLogging)
+        if (prefs.getBoolean("smart_pixels_enabled", false)) {
+            smartPixelManager.start()
+        }
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
         smartChipManager.updateAllChips()
@@ -3038,6 +3061,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     override fun onPause() {
         super.onPause()
         burnInProtectionManager?.stop()
+        smartPixelManager.stop()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)

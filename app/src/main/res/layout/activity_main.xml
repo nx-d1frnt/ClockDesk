@@ -300,4 +300,15 @@
         </LinearLayout>
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
     <include layout="@layout/tutorial_layout" />
+    <View
+        android:id="@+id/smart_pixel_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:alpha="0"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:visibility="visible" />
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -165,4 +165,6 @@
     <string name="ignore_collision">Перевіряти зіткнення</string>
     <string name="music_sources_title">Джерела музики</string>
     <string name="music_sources_summary">Сортувати джерела музики та налаштовувати провайдерів</string>
+    <string name="smart_pixels_title">Розумні пікселі</string>
+    <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану</string>
 </resources>

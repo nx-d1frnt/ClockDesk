@@ -74,6 +74,11 @@
             app:key="burn_in_protection"
             app:title="@string/burn_in_protection_title"
             app:summary="@string/burn_in_protection_summary" />
+            <SwitchPreference
+                app:key="smart_pixels_enabled"
+                app:title="@string/smart_pixels_title"
+                app:summary="@string/smart_pixels_summary"
+                app:dependency="burn_in_protection"/>
         </PreferenceCategory>
         <PreferenceCategory
             app:key="smart_chips_category"

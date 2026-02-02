@@ -165,4 +165,6 @@
     <string name="ignore_collision">Check collisions</string>
     <string name="music_sources_title">Music Sources</string>
     <string name="music_sources_summary">Sort music sources and configure providers</string>
+    <string name="smart_pixels_title">Smart Pixels</string>
+    <string name="smart_pixels_summary">Dims pixels in a checkerboard pattern after inactivity to save battery and screen (Screen may appear dimmer)</string>
 </resources>
