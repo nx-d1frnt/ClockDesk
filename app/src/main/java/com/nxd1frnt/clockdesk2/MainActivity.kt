@@ -1711,6 +1711,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             backgroundBottomSheet.bringToFront()
     }
 
+    private fun showDeleteConfirmationDialog(title: String, message: String, onConfirm: () -> Unit) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(getString(R.string.delete)) { dialog, _ ->
+                onConfirm()
+                dialog.dismiss()
+            }
+            .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
     private fun initCustomizationControls() {
         // --- 1. Initialize Views (MOVED TO TOP) ---
         bsTitle = bottomSheet.findViewById(R.id.customization_title)
@@ -1866,6 +1880,24 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     startActivityForResult(intent, 400)
                 } catch (e: ActivityNotFoundException) {
                     Toast.makeText(this, "File manager not found", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onFontLongClick = { fontIndex ->
+                showDeleteConfirmationDialog(
+                    getString(R.string.delete_font_title), // "Delete Font?"
+                    getString(R.string.delete_font_msg)    // "This custom font file will be permanently deleted."
+                ) {
+                    val success = fontManager.deleteCustomFont(fontIndex)
+                    if (success) {
+                        focusedView?.let { view ->
+                            val settings = fontManager.getSettings(view)
+                            if (settings?.fontIndex == fontIndex) {
+                                fontManager.setFontIndex(view, 1) 
+                        }
+                        bsFontRecyclerView.adapter?.notifyDataSetChanged()
+                    } else {
+                        Toast.makeText(this, "Failed to delete font", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         )
@@ -2114,6 +2146,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             bsSizeSeekBar.progress = (settings.size - sizeOffset).toInt()
             bsSizeValue.text = getString(R.string.size_value_format, settings.size.toInt())
 
+            val maxWidth = settings.maxWidthPercent
+            bsMaxWidthSeekBar.progress = maxWidth
+            bsMaxWidthValue.text = "$maxWidth%" 
             // Alpha
             bsTransparencySeekBar.max = 100
             bsTransparencySeekBar.progress = (settings.alpha * 100).toInt()
@@ -2727,7 +2762,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bgRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         bgRecycler.isNestedScrollingEnabled = false
 
-        backgroundsAdapter = BackgroundsAdapter(this, mutableListOf()) { id ->
+        backgroundsAdapter = BackgroundsAdapter(
+            this, 
+            mutableListOf(), 
+            onClick = { id ->
                 if (id == "__ADD__") {
                     val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                         Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -2794,7 +2832,27 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
             }
-        }
+        },
+        onLongClick = { id ->
+                showDeleteConfirmationDialog(
+                    getString(R.string.delete_background_title), // "Delete Background?"
+                    getString(R.string.delete_background_msg)    // "This custom background will be removed."
+                ) {
+                    backgroundManager.removeSavedUri(id)
+                    
+                    if (previewBackgroundUri == id || backgroundManager.getSavedBackgroundUri() == id) {
+                         bgClearBtn.performClick()
+                    }
+
+                    val items = mutableListOf<String>().apply {
+                        add("__DEFAULT_GRADIENT__")
+                        addAll(backgroundManager.getSavedUriSet())
+                        add("__ADD__")
+                    }
+                    backgroundsAdapter?.updateItems(items)
+                }
+            }
+        )
         bgRecycler.adapter = backgroundsAdapter
 
 

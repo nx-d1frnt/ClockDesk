@@ -26,7 +26,8 @@ sealed class FontItem {
 class FontAdapter(
     private val fonts: List<FontItem>,
     private val onFontSelected: (Int) -> Unit,
-    private val onAddFontClicked: () -> Unit
+    private val onAddFontClicked: () -> Unit,
+    private val onFontLongClick: (Int) -> Unit
 ) : RecyclerView.Adapter<FontAdapter.FontViewHolder>() {
 
     var selectedPosition: Int = -1
@@ -68,6 +69,7 @@ class FontAdapter(
 
                 holder.itemView.setOnClickListener { onAddFontClicked() }
                 applySelectionBorder(holder.fontPreview, null)
+                holder.itemView.setOnLongClickListener(null)
             }
             else -> {
                 val typeface = try {
@@ -89,6 +91,15 @@ class FontAdapter(
                 }
 
                 applySelectionBorder(holder.fontPreview, borderDrawable)
+
+                if (item is FontItem.CustomFont) {
+                    holder.itemView.setOnLongClickListener {
+                        onFontLongClick(holder.adapterPosition)
+                        true
+                    }
+                } else {
+                    holder.itemView.setOnLongClickListener(null)
+                }
 
                 holder.itemView.setOnClickListener {
                     val previousPosition = selectedPosition

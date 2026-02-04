@@ -271,6 +271,27 @@ class FontManager(
         }
     }
 
+    fun deleteCustomFont(index: Int): Boolean {
+        if (index !in fonts.indices) return false
+        val item = fonts[index]
+
+        if (item is FontItem.CustomFont) {
+            try {
+                val file = File(item.path)
+                if (file.exists()) {
+                    val deleted = file.delete()
+                    if (deleted) {
+                        rebuildFontList()
+                        return true
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return false
+    }
+
     private fun getFileName(uri: Uri): String? {
         var result: String? = null
         if (uri.scheme == "content") {
@@ -318,9 +339,19 @@ class FontManager(
             // Get or create settings object
             val settings = settingsMap.getOrPut(viewId) { defaults.copy() }
 
-            // Load data. If the key is not in the file, take the value from defaults (not hard 400!)
-            val rawIndex = prefs.getInt("${prefix}FontIndex", defaults.fontIndex)
-            settings.fontIndex = rawIndex.coerceIn(1, fonts.lastIndex)
+            val savedFontId = prefs.getString("${prefix}FontID", null)
+            var foundIndex = -1
+
+            if (savedFontId != null) {
+                foundIndex = fonts.indexOfFirst { getFontIdentifier(it) == savedFontId }
+            }
+
+            if (foundIndex != -1) {
+                settings.fontIndex = foundIndex
+            } else {
+                val rawIndex = prefs.getInt("${prefix}FontIndex", defaults.fontIndex)
+                settings.fontIndex = rawIndex.coerceIn(1, if (fonts.isNotEmpty()) fonts.lastIndex else 0)
+            }
 
             settings.size = prefs.getFloat("${prefix}Size", defaults.size)
             settings.alpha = prefs.getFloat("${prefix}Alpha", defaults.alpha)
@@ -341,6 +372,20 @@ class FontManager(
         applyAll()
     }
 
+    private fun getFontIdentifier(item: FontItem): String {
+        return when (item) {
+            is FontItem.ResourceFont -> {
+                try {
+                    "res:${context.resources.getResourceEntryName(item.resId)}"
+                } catch (e: Exception) {
+                    "res:${item.resId}"
+                }
+            }
+            is FontItem.CustomFont -> "file:${File(item.path).name}"
+            else -> "unknown"
+        }
+    }
+
     // Save current settings to SharedPreferences
     fun saveSettings() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
@@ -353,6 +398,9 @@ class FontManager(
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val settings = settingsMap[viewId] ?: return@forEach
+            val currentFontItem = if (settings.fontIndex in fonts.indices) fonts[settings.fontIndex] else null
+            val fontId = if (currentFontItem != null) getFontIdentifier(currentFontItem) else ""
+            editor.putString("${prefix}FontID", fontId)
             editor.putInt("${prefix}FontIndex", settings.fontIndex)
             editor.putFloat("${prefix}Size", settings.size)
             editor.putFloat("${prefix}Alpha", settings.alpha)

@@ -179,4 +179,9 @@
     <string name="stage_blurring">Applying blur...</string>
     <string name="stage_colors">Extracting palette...</string>
     <string name="stage_theme">Applying theme...</string>
+    <string name="delete_font_title">Delete Font?</string>
+    <string name="delete_font_msg">This custom font file will be permanently deleted.</string>
+    <string name="delete_background_title">Delete Background?</string>
+    <string name="delete_background_msg">This custom background will be permanently deleted.</string>
+    <string name="delete">Delete</string>
 </resources>

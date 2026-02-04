@@ -13,7 +13,8 @@ import com.nxd1frnt.clockdesk2.R
 class BackgroundsAdapter(
     private val context: Context,
     var items: List<String>,
-    private val onClick: (String) -> Unit
+    private val onClick: (String) -> Unit,
+    private val onLongClick: (String) -> Unit 
 ) : RecyclerView.Adapter<BackgroundsAdapter.VH>() {
 
     var selectedId: String? = null
@@ -34,6 +35,7 @@ class BackgroundsAdapter(
                 "__ADD__" -> {
                     holder.thumb.setImageResource(R.drawable.baseline_add_photo_alternate_24)
                     holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    holder.itemView.setOnLongClickListener(null) 
                 }
                 "__DEFAULT_GRADIENT__" -> {
                     // Load app drawable gradient as preview
@@ -41,6 +43,7 @@ class BackgroundsAdapter(
                         .load(R.drawable.gradient_background)
                         .centerCrop()
                         .into(holder.thumb)
+                    holder.itemView.setOnLongClickListener(null)
                 }
                 else -> {
                     holder.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -48,17 +51,20 @@ class BackgroundsAdapter(
                         .load(Uri.parse(id))
                         .centerCrop()
                         .into(holder.thumb)
+                    holder.itemView.setOnLongClickListener {
+                        onLongClick(id)
+                        true
+                    }
                 }
             }
         } catch (e: Exception) {
             // ignore and leave empty thumbnail
         }
-        holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
+    holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
         holder.itemView.setOnClickListener {
-            onClick(id) // Call the original click handler (for previewing)
-            updateSelection(id) // Update the visual selection
+            onClick(id)
+            updateSelection(id)
         }
-        holder.itemView.setOnClickListener { onClick(id) }
     }
 
     override fun getItemCount(): Int = items.size
