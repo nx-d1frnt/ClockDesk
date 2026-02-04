@@ -13,6 +13,7 @@ import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONException
+import com.nxd1frnt.clockdesk2.utils.Logger
 import java.io.File
 
 object UpdateManager {
@@ -20,7 +21,13 @@ object UpdateManager {
     private const val GITHUB_OWNER = "nx-d1frnt"
     private const val GITHUB_REPO = "clockdesk"
     private const val API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+    private const val PREFS_NAME = "update_prefs"
+    private const val KEY_LAST_CHECK = "last_check_time"
 
+    var isChecking: Boolean = false
+        private set
+    var releaseNotes: String? = null
+        private set
     var isUpdateAvailable: Boolean = false
         private set
     var downloadUrl: String? = null
@@ -29,13 +36,25 @@ object UpdateManager {
 
     var onUpdateStateChanged: (() -> Unit)? = null
 
-    fun checkForUpdates(context: Context) {
+  fun checkForUpdates(context: Context, force: Boolean = false) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0L)
+        val now = System.currentTimeMillis()
+
+        // Проверяем раз в 24 часа, если не форсировано
+        if (!force && (now - lastCheck) < 24 * 60 * 60 * 1000) return
+
+        isChecking = true
+        onUpdateStateChanged?.invoke()
+
         val request = JsonObjectRequest(Request.Method.GET, API_URL, null,
             { response ->
+                isChecking = false
                 try {
-                    val tagName = response.getString("tag_name") // "v1.3.0-beta3"
+                    val tagName = response.getString("tag_name")
+                    releaseNotes = response.optString("body", "") // Получаем ChangeLog
                     val serverVersion = tagName.removePrefix("v")
-
+                    
                     val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
                     val currentVersion = pInfo.versionName?.removePrefix("v") ?: "0"
                     Logger.d("UpdateManager"){"Current version: $currentVersion, Server version: $serverVersion"}
@@ -53,50 +72,107 @@ object UpdateManager {
                             }
                         }
                     }
+                    prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+                    onUpdateStateChanged?.invoke()
                 } catch (e: JSONException) {
                     e.printStackTrace()
+                    isChecking = false
+                    onUpdateStateChanged?.invoke()
                 }
             },
-            { error -> error.printStackTrace() }
+            { error -> 
+            error.printStackTrace() 
+            isChecking = false
+            onUpdateStateChanged?.invoke()}
         )
 
         Volley.newRequestQueue(context).add(request)
     }
 
-    private fun isNewer(server: String, current: String): Boolean {
-        if (server == current) return false
+   private fun isNewer(server: String, current: String): Boolean {
+    // 1. Убираем "v" в начале, если есть
+    val sClean = server.removePrefix("v")
+    val cClean = current.removePrefix("v")
+    
+    // Если строки идентичны — обновления нет
+    if (sClean == cClean) return false
 
-        Logger.d("UpdateManager"){"Comparing versions: server='$server', current='$current', isNewer=${server > current}"}
-        return server > current
+    // 2. Разбиваем на токены по точкам и дефисам
+    // Пример: "1.3.0-Beta5" -> ["1", "3", "0", "Beta5"]
+    val sParts = sClean.split("[.-]".toRegex())
+    val cParts = cClean.split("[.-]".toRegex())
+
+    val length = maxOf(sParts.size, cParts.size)
+
+    for (i in 0 until length) {
+        val sPart = sParts.getOrElse(i) { "" }
+        val cPart = cParts.getOrElse(i) { "" }
+
+        // Если части равны, идем дальше
+        if (sPart == cPart) continue
+
+        // Пытаемся превратить части в числа
+        val sNum = sPart.toIntOrNull()
+        val cNum = cPart.toIntOrNull()
+
+        // Логика сравнения:
+        if (sNum != null && cNum != null) {
+            // Оба числа (пример: 3 vs 4) -> сравниваем как числа
+            if (sNum > cNum) return true
+            if (sNum < cNum) return false
+        } else {
+            // Хотя бы одна часть — текст (или пустота).
+            // Нюанс: Обычно "1.0.0" > "1.0.0-beta". 
+            // То есть отсутствие суффикса круче, чем наличие суффикса.
+            
+            if (sPart.isEmpty()) return true // Server "1.0", App "1.0-beta" -> Server win
+            if (cPart.isEmpty()) return false // Server "1.0-beta", App "1.0" -> App win (no update)
+            
+            // Сравниваем как строки (Beta5 vs Beta6)
+            // Внимание: "Beta10" лексически меньше "Beta2". 
+            // Но для простых случаев (Alpha < Beta < RC) это сработает.
+            return sPart > cPart
+        }
+        Logger.d("UpdateManager"){"Compared parts: server='$sPart', current='$cPart'"}
     }
+    return false
+}
 
     fun downloadAndInstall(context: Context) {
         val url = downloadUrl ?: return
-        val fileName = "ClockDesk_Update.apk"
 
-        val destinationFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
-
-        if (destinationFile.exists()) destinationFile.delete()
-
-        val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("ClockDesk v$latestVersion")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-            .setMimeType("application/vnd.android.package-archive")
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
-
-        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val downloadId = manager.enqueue(request)
-
-        val onComplete = object : BroadcastReceiver() {
-            override fun onReceive(ctxt: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                if (downloadId == id) {
-                    installApk(ctxt, destinationFile)
-                    ctxt.unregisterReceiver(this)
-                }
-            }
+        try {
+        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        browserIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        context.startActivity(browserIntent)
+        } catch (e: Exception) {
+        Logger.e("UpdateManager") { "Could not open browser: ${e.message}" }
         }
-        context.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
+        // val fileName = "ClockDesk_Update.apk"
+
+        // val destinationFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
+
+        // if (destinationFile.exists()) destinationFile.delete()
+
+        // val request = DownloadManager.Request(Uri.parse(url))
+        //     .setTitle("ClockDesk $latestVersion")
+        //     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+        //     .setMimeType("application/vnd.android.package-archive")
+        //     .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
+
+        // val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        // val downloadId = manager.enqueue(request)
+
+        // val onComplete = object : BroadcastReceiver() {
+        //     override fun onReceive(ctxt: Context, intent: Intent) {
+        //         val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+        //         if (downloadId == id) {
+        //             installApk(ctxt, destinationFile)
+        //             ctxt.unregisterReceiver(this)
+        //         }
+        //     }
+        // }
+        // context.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
     }
 
     private fun installApk(context: Context, file: File) {

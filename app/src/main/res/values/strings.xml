@@ -158,6 +158,11 @@
     <string name="variable_properties_roundness">Round</string>
     <string name="show_am_pm">Show AM/PM indicator</string>
     <string name="update_available_text">Update available</string>
+    <string name="new_version_title">New version available</string>
+    <string name="update_description_default">A new version of the app is available. Please update to the latest version for the best experience.</string>
+    <string name="install_action">Install</string>
+    <string name="later_action">Later</string>
+    <string name="checking_updates">Checking for updates...</string>
     <string name="show_updates_chip">Show app updates</string>
     <string name="show_updates_chip_summary">Show a chip with app update notifications</string>
     <string name="customize_smart_chips">Customize Smart Chips</string>
@@ -167,4 +172,11 @@
     <string name="music_sources_summary">Sort music sources and configure providers</string>
     <string name="smart_pixels_title">Smart Pixels</string>
     <string name="smart_pixels_summary">Dims pixels in a checkerboard pattern after inactivity to save battery and screen (Screen may appear dimmer)</string>
+    <string name="max_width">Max Width</string>
+    <string name="show_background_progress_chip">Show Background Progress Chip</string>
+    <string name="show_background_progress_chip_summary">Show a chip indicating background image loading or processing status</string>
+    <string name="stage_downloading">Downloading image...</string>
+    <string name="stage_blurring">Applying blur...</string>
+    <string name="stage_colors">Extracting palette...</string>
+    <string name="stage_theme">Applying theme...</string>
 </resources>

@@ -68,6 +68,45 @@
                     android:text="48sp" />
             </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/max_width_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Max Width"
+                    android:textSize="16sp"
+                    android:paddingBottom="8dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingBottom="16dp">
+
+                    <SeekBar
+                        android:id="@+id/max_width_seekbar"
+                        style="@style/Widget.Material3.Slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100" 
+                        android:progress="100" />
+                        <TextView
+                        android:id="@+id/max_width_value"
+                        android:layout_width="45dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="end"
+                        android:text="100%" />
+                </LinearLayout>
+            </LinearLayout>
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

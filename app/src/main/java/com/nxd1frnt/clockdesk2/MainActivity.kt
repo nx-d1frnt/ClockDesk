@@ -78,6 +78,7 @@ import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import com.nxd1frnt.clockdesk2.utils.PowerStateManager
+import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -113,6 +114,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var bsTitle: TextView
     private lateinit var bsSizeSeekBar: SeekBar
     private lateinit var bsSizeValue: TextView
+    private lateinit var bsMaxWidthContainer: LinearLayout
+    private lateinit var bsMaxWidthSeekBar: SeekBar
+    private lateinit var bsMaxWidthValue: TextView
     private lateinit var bsTransparencySeekBar: SeekBar
     private lateinit var bsTransparencyPreview: View
     private lateinit var bsFontRecyclerView: RecyclerView
@@ -374,9 +378,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         }
         gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
-        //musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
-        // musicgetter was replaced with music plugin manager
-        setupMusicSystem()
         chipContainer = findViewById<ConstraintLayout>(R.id.smart_chip_container)
 
         fontManager = FontManager(
@@ -398,6 +399,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             prefs,
             fontManager
         )
+
+        //musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
+        // musicgetter was replaced with music plugin manager
+        setupMusicSystem()
+
         clockManager = ClockManager(
             timeText,
             dateText,
@@ -1182,12 +1188,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .setListener(null)
                 .start()
 
-            val loadingMessage = if (blurIntensity > 0)
-                getString(R.string.blur_applying_message)
-            else
-                getString(R.string.loading_background_message)
-
-            setBackgroundProgressVisible(true, loadingMessage)
+            val initialStage = if (blurIntensity > 0) 
+                BackgroundProgressPlugin.Stage.BLURRING 
+            else 
+                BackgroundProgressPlugin.Stage.DOWNLOADING
+                
+            updateBackgroundProgress(initialStage)
 
             val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val metrics = resources.displayMetrics
@@ -1214,14 +1220,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     resource: Drawable,
                     transition: Transition<in Drawable>?
                 ) {
-                    setBackgroundProgressVisible(false)
-
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.EXTRACTING_COLORS)
                     val bitmap = (resource as? BitmapDrawable)?.bitmap
                     var noiseColor = Color.WHITE
                     if (bitmap != null) {
                         ColorExtractor.extractColor(bitmap) { seedColor ->
-
+                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
                             fontManager.setDynamicScheme(seedColor)
+                            handler.postDelayed({
+                                updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                            }, 500)
                             val noiseColor = androidx.core.graphics.ColorUtils.setAlphaComponent(seedColor, 128)
                             if (isAdvancedGraphicsEnabled) {
                             turbulenceOverlay.playAnimation(noiseColor) {}
@@ -1276,14 +1284,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
 
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    setBackgroundProgressVisible(false)
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
                     super.onLoadFailed(errorDrawable)
-                    setBackgroundProgressVisible(false)
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
                     Logger.w("MainActivity") {"Glide failed to load background: $model"}
-
+                    handler.postDelayed({
+                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                    }, 2000)
                     try {
                         val savedUri = backgroundManager.getSavedBackgroundUri()
                         if (model.toString() != savedUri) {
@@ -1296,7 +1306,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                 override fun onLoadStarted(placeholder: Drawable?) {
                     super.onLoadStarted(placeholder)
-                    setBackgroundProgressVisible(true, loadingMessage)
+                    updateBackgroundProgress(initialStage)
                 }
             }
 
@@ -1313,7 +1323,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
 
         } catch (e: Exception) {
-            setBackgroundProgressVisible(false)
+            updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
+                handler.postDelayed({ 
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE) 
+                }, 2000)
             Logger.e("MainActivity"){"loadBackgroundInternal failed"}
         }
     }
@@ -1466,43 +1479,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
 
-    private fun setBackgroundProgressVisible(visible: Boolean, message: String? = null) {
+    private fun updateBackgroundProgress(stage: BackgroundProgressPlugin.Stage, messageOverride: String? = null) {
+        // Обновляем состояние в плагине
+        BackgroundProgressPlugin.currentStage = stage
+        BackgroundProgressPlugin.customMessage = messageOverride
+
+        // Форсируем обновление UI чипов
         runOnUiThread {
-            if (visible) {
-                backgroundProgressOverlay.visibility = View.VISIBLE
-                backgroundProgressOverlay.alpha = 0f
-                backgroundProgressOverlay.scaleX = 1.1f
-                backgroundProgressOverlay.scaleY = 1.1f
-                backgroundProgressOverlay.animate()
-                    .alpha(0.55f)
-                    .setDuration(300)
-                    .setListener(null)
-                    .start()
-                backgroundProgressOverlay.animate()
-                    .scaleX(1.0f)
-                    .scaleY(1.0f)
-                    .setDuration(300)
-                    .setListener(null)
-                    .start()
-            } else {
-                backgroundProgressOverlay.animate()
-                    .alpha(0f)
-                    .setDuration(300)
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator) {
-                            backgroundProgressOverlay.visibility = View.GONE
-                        }
-                    })
-                    .start()
-                backgroundProgressOverlay.animate()
-                    .scaleX(1.1f)
-                    .scaleY(1.1f)
-                    .setDuration(300)
-                    .setListener(null)
-                    .start()
-            }
-            backgroundProgressText.isSelected = true // enable marquee
-            if (message != null) backgroundProgressText.text = message
+            smartChipManager.updateAllChips()
         }
     }
 
@@ -1739,6 +1723,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         bsSizeSeekBar = bottomSheet.findViewById(R.id.size_seekbar)
         bsSizeValue = bottomSheet.findViewById(R.id.size_value)
+        bsMaxWidthContainer = bottomSheet.findViewById(R.id.max_width_container)
+        bsMaxWidthSeekBar = bottomSheet.findViewById(R.id.max_width_seekbar)
+        bsMaxWidthValue = bottomSheet.findViewById(R.id.max_width_value)
         bsTransparencySeekBar = bottomSheet.findViewById(R.id.transparency_seekbar)
         bsTransparencyPreview = bottomSheet.findViewById(R.id.transparency_preview)
         bsFontRecyclerView = bottomSheet.findViewById(R.id.font_recycler_view)
@@ -1800,6 +1787,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                 bsSizeValue.text = getString(R.string.size_value_format, size.toInt())
                 fontManager.setFontSize(focusedView!!, size)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        bsMaxWidthSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || focusedView == null) return
+                bsMaxWidthValue.text = "$progress%"
+                
+                // Применяем к текстовому полю внутри лейаута
+                if (focusedView!!.id == R.id.lastfm_layout) {
+                     // Находим TextView внутри LastFM layout
+                     val textView = focusedView!!.findViewById<TextView>(R.id.now_playing_text)
+                     if (textView != null) {
+                         // Мы обновляем настройки для Layout, но применяем стиль к TextView внутри FontManager
+                         fontManager.setMaxWidthPercent(focusedView!!, progress)
+                     }
+                }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -2010,6 +2016,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsVerticalAlignmentLabel.visibility = View.VISIBLE
                 bsWidgetOrderLabel.visibility = View.VISIBLE
                 bsTextGravityTitle.visibility = View.VISIBLE
+                bsMaxWidthContainer.visibility = View.GONE
                 bsTimeFormatGroup.check(
                     if (fontManager.getTimeFormatPattern().contains("H")) R.id.time_24_radio else R.id.time_12_radio
                 )
@@ -2034,6 +2041,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsVerticalAlignmentLabel.visibility = View.VISIBLE
                 bsWidgetOrderLabel.visibility = View.VISIBLE
                 bsTextGravityTitle.visibility = View.VISIBLE
+                bsMaxWidthContainer.visibility = View.GONE
                 val pattern = fontManager.getDateFormatPattern()
                 val id = when (pattern) {
                     "MMM dd" -> R.id.date_format_1
@@ -2063,7 +2071,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsVerticalAlignmentLabel.visibility = View.VISIBLE
                 bsWidgetOrderLabel.visibility = View.VISIBLE
                 bsTextGravityTitle.visibility = View.VISIBLE
-
+                bsMaxWidthContainer.visibility = View.VISIBLE
             }
             R.id.smart_chip_container -> {
                 bsTitle.text = getString(R.string.customize_smart_chips)
@@ -2086,6 +2094,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 bsVerticalAlignmentLabel.visibility = View.GONE
                 bsWidgetOrderLabel.visibility = View.GONE
                 bsTextGravityTitle.visibility = View.GONE
+                bsMaxWidthContainer.visibility = View.GONE
             }
             else -> {
                 hideBottomSheet()
@@ -2663,8 +2672,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
 //         clockManager.setAdditionalLogging(enableAdditionalLogging)
 //         fontManager.setAdditionalLogging(enableAdditionalLogging)
-        if (prefs.getBoolean("smart_pixels_enabled", false)) {
+        val smartPixelsEnabled = prefs.getBoolean("smart_pixels_enabled", false)
+        if (smartPixelsEnabled) {
             smartPixelManager.start()
+        } else {
+            smartPixelManager.stop()
         }
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)

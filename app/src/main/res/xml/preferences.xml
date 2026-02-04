@@ -93,6 +93,11 @@
                 app:title="@string/show_updates_chip"
                 app:summary="@string/show_updates_chip_summary"
                 app:defaultValue="true" />
+            <SwitchPreferenceCompat
+                app:key="system_bg_progress"
+                app:title="@string/show_background_progress_chip"
+                app:summary="@string/show_background_progress_chip_summary"
+                app:defaultValue="true" />
         </PreferenceCategory>
     </PreferenceCategory>
 </PreferenceScreen>

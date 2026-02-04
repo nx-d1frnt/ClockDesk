@@ -17,7 +17,9 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
     override val priority: Int = 150
 
     init {
-        UpdateManager.checkForUpdates(context)
+        UpdateManager.onUpdateStateChanged = {
+        }
+        UpdateManager.checkForUpdates(context, true)
     }
 
     override fun createView(context: Context): View {
@@ -25,23 +27,45 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
             .inflate(R.layout.smart_chip_layout, null, false)
 
         view.setOnClickListener {
-            if (UpdateManager.isUpdateAvailable) {
-                UpdateManager.downloadAndInstall(context)
+            if (UpdateManager.isUpdateAvailable) {          
+                showAppUpdateDialog()
             }
         }
         return view
     }
 
-    override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {
-        if (!UpdateManager.isUpdateAvailable) return false
+    private fun showAppUpdateDialog(){
+        val cleanNotes = UpdateManager.releaseNotes
+        ?.replace(Regex("###|##|#|\\*\\*|__"), "") // Убираем тяжелую разметку
+        ?.trim()
 
-        val iconView = view.findViewById<ImageView>(R.id.chip_icon)
-        val textView = view.findViewById<TextView>(R.id.chip_text)
+        val materialDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+        .setTitle(context.getString(R.string.new_version_title))
+        .setMessage(cleanNotes ?: context.getString(R.string.update_description_default))
+        .setPositiveButton(context.getString(R.string.install_action)) { _, _ ->
+            UpdateManager.downloadAndInstall(context)
+        }
+        .setNegativeButton(context.getString(R.string.later_action), null)
+        .create()
 
-        iconView.setImageResource(context.resources.getIdentifier("update", "drawable", context.packageName))
-
-        textView.text = context.getString(R.string.update_available_text)
-
-        return true
+        materialDialog.show()
     }
+
+override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {
+    val iconView = view.findViewById<ImageView>(R.id.chip_icon)
+    val textView = view.findViewById<TextView>(R.id.chip_text)
+
+    if (UpdateManager.isChecking) {
+        textView.text = context.getString(R.string.checking_updates) // "Проверка обновлений..."
+        iconView.setImageResource(R.drawable.update) // Желательно анимированный VectorDrawable
+        return true 
+    }
+
+    if (!UpdateManager.isUpdateAvailable) return false
+
+    iconView.setImageResource(context.resources.getIdentifier("update", "drawable", context.packageName))
+    textView.text = context.getString(R.string.update_available_text)
+    
+    return true
+}
 }

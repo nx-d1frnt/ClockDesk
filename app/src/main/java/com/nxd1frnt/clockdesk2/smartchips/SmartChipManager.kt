@@ -21,6 +21,7 @@ import com.nxd1frnt.clockdesk2.FontManager
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
 import androidx.transition.ChangeBounds
@@ -59,7 +60,8 @@ class SmartChipManager(
 
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
-        UpdatePlugin(context)
+        UpdatePlugin(context),
+        BackgroundProgressPlugin(context)
     )
     var externalPlugins: List<ExternalChipPlugin> = emptyList()
     private val allChips = mutableListOf<ChipInfo>()
@@ -252,7 +254,8 @@ class SmartChipManager(
         // Internal chips
         internalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
+            val isSystemChip = plugin.preferenceKey == "system_bg_progress"
+            val isEnabled = if (isSystemChip) true else sharedPreferences.getBoolean(plugin.preferenceKey, false)
             if (!isEnabled) {
                 chipInfo.isVisible = false
             } else {

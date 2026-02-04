@@ -42,7 +42,8 @@ data class FontSettings(
     var backgroundColor: Int = Color.DKGRAY,
     var useDynamicBackgroundColor: Boolean = false,
     var dynamicBackgroundColorRole: String? = null,
-    var isNightShiftEnabled: Boolean = true
+    var isNightShiftEnabled: Boolean = true,
+    var maxWidthPercent: Int = 100
 )
 sealed class ColorItem {
     data class Dynamic(
@@ -334,6 +335,7 @@ class FontManager(
             settings.useDynamicBackgroundColor = prefs.getBoolean("${prefix}UseDynamicBgColor", false)
             settings.dynamicBackgroundColorRole = prefs.getString("${prefix}DynamicBgRole", "surface_variant")
             settings.isNightShiftEnabled = prefs.getBoolean("${prefix}isNightShiftEnabled", false)
+            settings.maxWidthPercent = prefs.getInt("${prefix}MaxWidth", 100)
         }
 
         applyAll()
@@ -364,6 +366,7 @@ class FontManager(
             editor.putBoolean("${prefix}UseDynamicBgColor", settings.useDynamicBackgroundColor)
             editor.putString("${prefix}DynamicBgRole", settings.dynamicBackgroundColorRole)
             editor.putBoolean("${prefix}isNightShiftEnabled", settings.isNightShiftEnabled)
+            editor.putInt("${prefix}MaxWidth", settings.maxWidthPercent)
         }
         editor.apply()
     }
@@ -380,6 +383,10 @@ class FontManager(
 
     fun setFontSize(view: View, size: Float) {
         updateSettings(view.id) { it.size = size }
+    }
+
+    fun setMaxWidthPercent(view: View, percent: Int) {
+        updateSettings(view.id) { it.maxWidthPercent = percent }
     }
 
     fun setFontAlpha(view: View, alpha: Float) {
@@ -534,6 +541,15 @@ class FontManager(
         textView.alpha = settings.alpha
 
             textView.setTextColor(color)
+
+        if (settings.maxWidthPercent >= 100) {
+             textView.maxWidth = Int.MAX_VALUE
+        } else {
+             val displayMetrics = context.resources.displayMetrics
+             val screenWidth = displayMetrics.widthPixels
+             val targetWidthPx = (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
+             textView.maxWidth = targetWidthPx
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             textView.fontVariationSettings = null

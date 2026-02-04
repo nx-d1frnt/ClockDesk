@@ -44,7 +44,18 @@
     <style name="Theme.ClockDesk.Button.ToggleGroup" parent="Widget.Material3.MaterialButtonToggleGroup">
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
     </style>
-    
+
     <style name="Theme.ClockDesk" parent="Base.Theme.ClockDesk">
+    </style>
+
+    <style name="ClockDesk.Dialog.Theme" parent="Theme.Material3.DayNight.Dialog">
+        <item name="dialogCornerRadius">28dp</item>
+        <item name="colorSurface">?attr/colorSurfaceContainerLowest</item>
+        <item name="textAppearanceHeadlineSmall">@style/ClockDesk.Type.Headline</item>
+    </style>
+
+    <style name="ClockDesk.Type.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/googlesansflex</item>
+        <item name="android:letterSpacing">-0.01</item>
     </style>
 </resources>

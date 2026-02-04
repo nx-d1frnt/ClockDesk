@@ -6,7 +6,8 @@
     android:layout_marginBottom="8dp" xmlns:app="http://schemas.android.com/apk/res-auto"
     app:cardCornerRadius="16dp"
     app:cardBackgroundColor="@color/md_theme_surface"
-    app:cardElevation="0dp">
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
 
     <LinearLayout
         android:id="@+id/chip_content_layout"

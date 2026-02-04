@@ -13,4 +13,15 @@
         <item name="colorSurface">@color/material_dynamic_neutral10</item>
         <item name="colorOnSurface">@color/material_dynamic_neutral90</item>
     </style>
+
+    <style name="ClockDesk.Dialog.Theme" parent="Theme.Material3.DayNight.Dialog">
+        <item name="dialogCornerRadius">28dp</item>
+        <item name="colorSurface">?attr/colorSurfaceContainerLowest</item>
+        <item name="textAppearanceHeadlineSmall">@style/ClockDesk.Type.Headline</item>
+    </style>
+
+    <style name="ClockDesk.Type.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/googlesansflex</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
 </resources>

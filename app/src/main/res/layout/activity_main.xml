@@ -35,7 +35,8 @@
         app:cardBackgroundColor="@color/md_theme_background"
         app:cardCornerRadius="32dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toTopOf="parent"
+        android:visibility="gone">
 
         <LinearLayout
             android:layout_width="wrap_content"
