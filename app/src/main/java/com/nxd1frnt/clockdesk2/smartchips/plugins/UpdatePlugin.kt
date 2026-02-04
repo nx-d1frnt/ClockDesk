@@ -36,7 +36,7 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
 
     private fun showAppUpdateDialog(){
         val cleanNotes = UpdateManager.releaseNotes
-        ?.replace(Regex("###|##|#|\\*\\*|__"), "") // Убираем тяжелую разметку
+        ?.replace(Regex("###|##|#|\\*\\*|__"), "")
         ?.trim()
 
         val materialDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
@@ -56,8 +56,8 @@ override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {
     val textView = view.findViewById<TextView>(R.id.chip_text)
 
     if (UpdateManager.isChecking) {
-        textView.text = context.getString(R.string.checking_updates) // "Проверка обновлений..."
-        iconView.setImageResource(R.drawable.update) // Желательно анимированный VectorDrawable
+        textView.text = context.getString(R.string.checking_updates)
+        iconView.setImageResource(R.drawable.update)
         return true 
     }
 

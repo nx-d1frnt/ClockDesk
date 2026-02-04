@@ -85,21 +85,31 @@ class SmartChipManager(
             val iconName = intent.getStringExtra(ChipPluginContract.KEY_CHIP_ICON_NAME)
             val clickActivity = intent.getStringExtra(ChipPluginContract.KEY_CHIP_CLICK_ACTIVITY)
 
+            var contentChanged = false
+
             if (!isVisible) {
+                if (chipInfo.isVisible) contentChanged = true
                 chipInfo.isVisible = false
                 chipInfo.clickActivityClassName = null
             } else if (text != null && iconName != null) {
+                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                val oldText = textView.text.toString()
+
                 val success = updateExternalChipView(chipInfo.view, packageName, text, iconName)
+                
+                if (chipInfo.isVisible != success) contentChanged = true
+                if (success && oldText != text) contentChanged = true 
                 chipInfo.isVisible = success
                 if (success) {
                     chipInfo.currentText = text
                     chipInfo.clickActivityClassName = clickActivity?.takeIf { it.isNotBlank() }
                 }
             } else {
+                if (chipInfo.isVisible) contentChanged = true
                 chipInfo.isVisible = false
                 chipInfo.clickActivityClassName = null
             }
-            sortAndRedrawChips()
+            sortAndRedrawChips(contentChanged)
         }
     }
 
@@ -250,39 +260,58 @@ class SmartChipManager(
         return false
     }
 
-    fun updateAllChips() {
+fun updateAllChips() {
+        var isContentChanged = false
+
         // Internal chips
         internalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
             val isSystemChip = plugin.preferenceKey == "system_bg_progress"
             val isEnabled = if (isSystemChip) true else sharedPreferences.getBoolean(plugin.preferenceKey, false)
+
             if (!isEnabled) {
+                if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
                 chipInfo.isVisible = false
             } else {
+                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                val oldText = textView.text.toString()
+
                 val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+                
+                val newText = textView.text.toString()
+
+                if (chipInfo.isVisible != newIsVisible) {
+                    isContentChanged = true
+                } else if (newIsVisible && oldText != newText) {
+                    isContentChanged = true
+                }
+                
                 chipInfo.isVisible = newIsVisible
             }
         }
 
-        // External chips
         externalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.packageName } ?: return@forEach
             val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
+            
+            if (!isEnabled && chipInfo.isVisible) {
+                chipInfo.isVisible = false
+                isContentChanged = true
+            }
+            
             if (isEnabled) {
                 val requestIntent = Intent().apply {
                     action = ChipPluginContract.ACTION_REQUEST_DATA
                     component = ComponentName(plugin.packageName, plugin.receiverClassName)
                 }
                 context.sendBroadcast(requestIntent)
-            } else {
-                chipInfo.isVisible = false
             }
         }
 
-        sortAndRedrawChips()
+        sortAndRedrawChips(isContentChanged)
     }
 
-    private fun sortAndRedrawChips() {
+    private fun sortAndRedrawChips(contentChanged: Boolean = false) {
         val visibleChips = allChips
             .filter { it.isVisible }
             .sortedByDescending { it.priority }
@@ -293,37 +322,33 @@ class SmartChipManager(
         val currentTags = (0 until container.childCount).map { container.getChildAt(it).tag }
         val newTags = visibleChips.map { it.id }
 
-        if (currentTags == newTags) {
-            visibleChips.forEach { chipInfo ->
-                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
-
-                if (!textView.isSelected) textView.isSelected = true
-
-            }
-            return
-        }
-
         val transition = TransitionSet().apply {
             ordering = TransitionSet.ORDERING_TOGETHER
-            duration = 400
+            duration = 300 
             interpolator = FastOutSlowInInterpolator()
 
             addTransition(ChangeBounds().apply {
                 resizeClip = false
             })
-
-            addTransition(Fade(Fade.IN).apply {
-                duration = 300
-            })
-
-            addTransition(Fade(Fade.OUT).apply {
-                duration = 200
-            })
+            addTransition(Fade(Fade.IN))
+            addTransition(Fade(Fade.OUT))
         }
+
+        if (currentTags == newTags) {
+            visibleChips.forEach { chipInfo ->
+                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                if (!textView.isSelected) textView.isSelected = true
+            }
+            
+            if (contentChanged) {
+                TransitionManager.beginDelayedTransition(container, transition)
+            }
+            return
+        }
+
         TransitionManager.beginDelayedTransition(container, transition)
 
         container.removeAllViews()
-
         if (visibleChips.isEmpty()) return
 
         visibleChips.forEach { chipInfo ->
