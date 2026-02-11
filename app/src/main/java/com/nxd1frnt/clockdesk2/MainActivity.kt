@@ -1736,6 +1736,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun initCustomizationControls() {
         // --- 1. Initialize Views (MOVED TO TOP) ---
         bsTitle = bottomSheet.findViewById(R.id.customization_title)
+        bsMaxWidthContainer = bottomSheet.findViewById(R.id.max_width_container)
+        bsMaxWidthSeekBar = bottomSheet.findViewById(R.id.max_width_seekbar)
 
         // Initialize bsColorRecyclerView FIRST to avoid UninitializedPropertyAccessException
         bsColorRecyclerView = bottomSheet.findViewById(R.id.color_recycler_view)
@@ -1745,8 +1747,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         bsSizeSeekBar = bottomSheet.findViewById(R.id.size_seekbar)
         bsSizeValue = bottomSheet.findViewById(R.id.size_value)
-        bsMaxWidthContainer = bottomSheet.findViewById(R.id.max_width_container)
-        bsMaxWidthSeekBar = bottomSheet.findViewById(R.id.max_width_seekbar)
         bsMaxWidthValue = bottomSheet.findViewById(R.id.max_width_value)
         bsTransparencySeekBar = bottomSheet.findViewById(R.id.transparency_seekbar)
         bsTransparencyPreview = bottomSheet.findViewById(R.id.transparency_preview)

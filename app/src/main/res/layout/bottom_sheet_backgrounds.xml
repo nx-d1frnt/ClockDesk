@@ -42,14 +42,6 @@
                 android:paddingBottom="8dp" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/weather_bg_switch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:text="@string/weather_background" />
-
-            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/background_blur_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
