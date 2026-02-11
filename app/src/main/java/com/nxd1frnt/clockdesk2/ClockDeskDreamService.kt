@@ -129,7 +129,6 @@ class ClockDeskDreamService : DreamService() {
         findViewById<View>(R.id.background_button)?.visibility = View.GONE
         findViewById<View>(R.id.background_customization_fab)?.visibility = View.GONE
 
-        findViewById<View>(R.id.background_progress_overlay)?.visibility = View.GONE
         findViewById<View>(R.id.tutorial_overlay_root)?.visibility = View.GONE
     }
 

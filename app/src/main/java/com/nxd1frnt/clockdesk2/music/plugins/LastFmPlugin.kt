@@ -155,7 +155,7 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
         apiKey = prefs.getString("lastfm_api_key", "") ?: ""
 
         // Считываем основные настройки
-        val switchEnabled = prefs.getBoolean("enable_lastfm", false)
+        val switchEnabled = prefs.getBoolean("enable_lastfm", true)
         val rawInterval = prefs.getInt("last_fm_refresh_interval", 30)
         val dynamicRefreshThreshold = prefs.getInt("dynamic_refresh_threshold", 5)
 

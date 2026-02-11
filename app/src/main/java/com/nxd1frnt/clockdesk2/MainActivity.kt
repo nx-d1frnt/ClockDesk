@@ -186,6 +186,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     // private lateinit var musicGetter: MusicGetter
     // musicgetter was replaced with music plugin manager
    private var musicManager: MusicPluginManager? = null
+   private var currentMusicState: PluginState = PluginState.Idle
     private lateinit var widgetMover: WidgetMover
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private var isAdvancedGraphicsEnabled = false
@@ -265,8 +266,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundBottomSheetBehavior: BottomSheetBehavior<LinearLayout>
     private var previewBackgroundUri: String? = null
     private var backgroundsAdapter: BackgroundsAdapter? = null
-    private lateinit var backgroundProgressOverlay: View
-    private lateinit var backgroundProgressText: TextView
+    // private lateinit var backgroundProgressOverlay: View
+    // private lateinit var backgroundProgressText: TextView
     private lateinit var backgroundManager: BackgroundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -299,8 +300,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundImageView = findViewById(R.id.background_image_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
         weatherView = findViewById(R.id.weatherView)
-        backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
-        backgroundProgressText = findViewById(R.id.background_progress_text)
+        // backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
+        // backgroundProgressText = findViewById(R.id.background_progress_text)
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
         backgroundButton = findViewById(R.id.background_button)
@@ -464,6 +465,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging
+                }
+                "lastfm_albumart_background" -> {
+                    runOnUiThread {
+                        handleMusicStateUpdate(currentMusicState)
+                    }
                 }
             }
         }
@@ -661,6 +667,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun handleMusicStateUpdate(state: PluginState) {
+        currentMusicState = state
         if (isEditMode) {
             if (state is PluginState.Playing) {
                 val track = state.track
@@ -689,7 +696,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 val trackInfoText = "${track.artist} - ${track.title}"
                 val isTextDifferent = trackInfoText != lastTrackInfo
 
-                // 1. Сначала применяем фон (ваша логика)
                 val hasNewArt = !wasMusicBackgroundApplied &&
                         (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
                 if (isTextDifferent || hasNewArt) {
@@ -780,8 +786,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         val musicBgEnabled = prefs.getBoolean("lastfm_albumart_background", true)
         if (!musicBgEnabled) {
-            restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-            wasMusicBackgroundApplied = false
+            if (wasMusicBackgroundApplied) {
+                restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                wasMusicBackgroundApplied = false
+            }
             return
         }
         if (track.artworkBitmap != null) {
@@ -1138,7 +1146,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             // ensure image view is hidden and gradient updates run
             backgroundImageView.visibility = View.GONE
             hasCustomImageBackground = false
-            backgroundProgressOverlay.visibility = View.GONE
+            //backgroundProgressOverlay.visibility = View.GONE
             gradientManager.startUpdates()
             updateBackgroundFilters()
         }
@@ -1893,8 +1901,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             val settings = fontManager.getSettings(view)
                             if (settings?.fontIndex == fontIndex) {
                                 fontManager.setFontIndex(view, 1) 
-                        }
+                            }
                         bsFontRecyclerView.adapter?.notifyDataSetChanged()
+                        }
                     } else {
                         Toast.makeText(this, "Failed to delete font", Toast.LENGTH_SHORT).show()
                     }
