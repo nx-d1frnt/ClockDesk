@@ -167,4 +167,21 @@
     <string name="music_sources_summary">Сортировать источники музыки и настраивать провайдеров</string>
     <string name="smart_pixels_title">Умные пиксели</string>
     <string name="smart_pixels_summary">Затемняет пиксели в шахматном порядке после бездействия для экономии заряда батареи и экрана</string>
+    <string name="max_width">Максимальная ширина</string>
+    <string name="show_background_progress_chip">Индикатор загрузки фона</string>
+    <string name="show_background_progress_chip_summary">Отображать чип со статусом загрузки или обработки фонового изображения</string>
+    <string name="stage_downloading">Загрузка изображения…</string>
+    <string name="stage_blurring">Размытие…</string>
+    <string name="stage_colors">Извлечение палитры…</string>
+    <string name="stage_theme">Применение темы…</string>
+    <string name="delete_font_title">Удалить шрифт?</string>
+    <string name="delete_font_msg">Этот файл шрифта будет безвозвратно удален.</string>
+    <string name="delete_background_title">Удалить фон?</string>
+    <string name="delete_background_msg">Это фоновое изображение будет безвозвратно удалено.</string>
+    <string name="delete">Удалить</string>
+    <string name="new_version_title">Доступно обновление</string>
+    <string name="update_description_default">Доступна новая версия приложения. Рекомендуем обновиться для стабильной работы и новых возможностей.</string>
+    <string name="install_action">Установить</string>
+    <string name="later_action">Позже</string>
+    <string name="checking_updates">Поиск обновлений…</string>
 </resources>

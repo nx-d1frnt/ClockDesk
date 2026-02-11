@@ -167,4 +167,21 @@
     <string name="music_sources_summary">Сортувати джерела музики та налаштовувати провайдерів</string>
     <string name="smart_pixels_title">Розумні пікселі</string>
     <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану</string>
+    <string name="max_width">Максимальна ширина</string>
+    <string name="show_background_progress_chip">Індикатор завантаження фону</string>
+    <string name="show_background_progress_chip_summary">Показувати чип зі статусом завантаження або обробки фонового зображення</string>
+    <string name="stage_downloading">Завантаження зображення…</string>
+    <string name="stage_blurring">Застосування розмиття…</string>
+    <string name="stage_colors">Вилучення палітри…</string>
+    <string name="stage_theme">Застосування теми…</string>
+    <string name="delete_font_title">Видалити шрифт?</string>
+    <string name="delete_font_msg">Цей файл шрифту буде видалено назавжди.</string>
+    <string name="delete_background_title">Видалити фон?</string>
+    <string name="delete_background_msg">Це фонове зображення буде видалено назавжди.</string>
+    <string name="delete">Видалити</string>
+    <string name="new_version_title">Доступне оновлення</string>
+    <string name="update_description_default">Доступна нова версія додатка. Оновіться, щоб отримати покращений досвід та стабільну роботу.</string>
+    <string name="install_action">Встановити</string>
+    <string name="later_action">Пізніше</string>
+    <string name="checking_updates">Пошук оновлень…</string>
 </resources>

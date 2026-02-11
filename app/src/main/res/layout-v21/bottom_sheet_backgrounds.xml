@@ -78,7 +78,7 @@
                 android:id="@+id/dimming_toggle_group"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="16dp"
+                android:paddingBottom="8dp"
                 android:paddingTop="8dp"
                 app:singleSelection="true">
 
@@ -131,7 +131,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:background="?android:attr/listDivider"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"/>
 
             <TextView
@@ -239,7 +239,8 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="end"
-        android:paddingTop="12dp">
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
         <Button
             android:id="@+id/clear_background_button_bs"

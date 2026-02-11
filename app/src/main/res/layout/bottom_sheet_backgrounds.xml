@@ -82,7 +82,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingTop="8dp"
-                android:paddingBottom="16dp"
+                android:paddingBottom="8dp"
                 app:singleSelection="true">
 
                 <Button
@@ -136,7 +136,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"
                 android:background="?android:attr/listDivider" />
 
@@ -144,6 +144,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingBottom="8dp"
+                android:paddingTop="8dp"
                 android:text="@string/weather_effects_title"
                 android:textSize="16sp"
                 android:textStyle="bold" />
