@@ -184,4 +184,5 @@
     <string name="delete_background_title">Delete Background?</string>
     <string name="delete_background_msg">This custom background will be permanently deleted.</string>
     <string name="delete">Delete</string>
+    <string name="feature_not_supported">Your Android version doesn\'t support this feature</string>
 </resources>

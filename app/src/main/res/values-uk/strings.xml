@@ -184,4 +184,5 @@
     <string name="install_action">Встановити</string>
     <string name="later_action">Пізніше</string>
     <string name="checking_updates">Пошук оновлень…</string>
+    <string name="feature_not_supported">Функція не підтримується вашою версією Android</string>
 </resources>

@@ -2430,31 +2430,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-//    private fun highlightImageView(isHighlighted: Boolean) {
-//        if (isHighlighted) {
-//            val targetMode = backgroundManager.getDimMode()
-//            val targetIntensity = backgroundManager.getDimIntensity()
-//            val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
-//            val targetScale = calculateZoom(effectiveIntensity)
-//            backgroundImageView.animate()
-//                .scaleX(targetScale + 0.4f)
-//                .scaleY(targetScale + 0.4f)
-//                .setDuration(animationDuration)
-//                .start()
-//            //backgroundImageView.setBackgroundResource(R.drawable.editable_border)
-//        } else {
-//            val targetMode = backgroundManager.getDimMode()
-//            val targetIntensity = backgroundManager.getDimIntensity()
-//            val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
-//            val targetScale = calculateZoom(effectiveIntensity)
-//            backgroundImageView.animate()
-//                .scaleX(targetScale)
-//                .scaleY(targetScale)
-//                .setDuration(animationDuration)
-//                .start()
-//            // if (!isEditMode) backgroundImageView.background = null
-//        }
-//    }
 
     private fun startUpdates() {
         clockManager.startUpdates()

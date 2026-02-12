@@ -22,7 +22,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 findPreference<androidx.preference.SwitchPreference>("lastfm_albumart_background")
             albumArtBackgroundPref?.isEnabled = false
             albumArtBackgroundPref?.isChecked = false
-            albumArtBackgroundPref?.summary = "Sadly not supported on your Android version."
+            albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
         }
         val smartChipCategory = findPreference<PreferenceCategory>("smart_chips_category")
 
