@@ -278,10 +278,41 @@ class FontManager(
         if (item is FontItem.CustomFont) {
             try {
                 val file = File(item.path)
+                val deletedId = getFontIdentifier(item) //id of the deleted font
+
+                // Saving a "snapshot" of which fonts all widgets use
+                val viewFontMap = mutableMapOf<Int, String>()
+                settingsMap.forEach { (viewId, settings) ->
+                    if (settings.fontIndex in fonts.indices) {
+                        viewFontMap[viewId] = getFontIdentifier(fonts[settings.fontIndex])
+                    }
+                }
+
                 if (file.exists()) {
                     val deleted = file.delete()
                     if (deleted) {
-                        rebuildFontList()
+                        rebuildFontList() // Index list changed, calling the rebuild function
+
+                        // Recovering font indexes for all widgets
+                        viewFontMap.forEach { (viewId, oldFontId) ->
+                            val settings = settingsMap[viewId]
+                            if (settings != null) {
+                                if (oldFontId == deletedId) {
+                                    // If widget was using a deleted font -> reset to default
+                                    settings.fontIndex = 1
+                                } else {
+                                    val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
+                                    if (newIndex != -1) {
+                                        settings.fontIndex = newIndex
+                                    } else {
+                                        settings.fontIndex = 1
+                                    }
+                                }
+                            }
+                        }
+
+                        saveSettings()
+                        applyAll()
                         return true
                     }
                 }

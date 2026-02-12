@@ -1892,17 +1892,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             },
             onFontLongClick = { fontIndex ->
                 showDeleteConfirmationDialog(
-                    getString(R.string.delete_font_title), // "Delete Font?"
-                    getString(R.string.delete_font_msg)    // "This custom font file will be permanently deleted."
+                    getString(R.string.delete_font_title),
+                    getString(R.string.delete_font_msg)
                 ) {
+                    // FontManager updates all font indexes itself in deleteCustomFont
                     val success = fontManager.deleteCustomFont(fontIndex)
+
                     if (success) {
+                        bsFontRecyclerView.adapter?.notifyDataSetChanged()
+
                         focusedView?.let { view ->
                             val settings = fontManager.getSettings(view)
-                            if (settings?.fontIndex == fontIndex) {
-                                fontManager.setFontIndex(view, 1) 
-                            }
-                        bsFontRecyclerView.adapter?.notifyDataSetChanged()
+                            (bsFontRecyclerView.adapter as? FontAdapter)?.selectedPosition = settings?.fontIndex ?: 1
                         }
                     } else {
                         Toast.makeText(this, "Failed to delete font", Toast.LENGTH_SHORT).show()
