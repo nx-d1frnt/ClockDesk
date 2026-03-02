@@ -2,46 +2,20 @@ package com.nxd1frnt.clockdesk2.ui.view
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.PorterDuffXfermode
-import android.graphics.Shader
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.util.AttributeSet
 import android.view.View
-import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
-import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
 import androidx.annotation.RequiresApi
-import androidx.core.graphics.ColorUtils
-import com.nxd1frnt.clockdesk2.ui.view.TurbulenceNoiseAnimationConfig
-import com.nxd1frnt.clockdesk2.ui.view.TurbulenceNoiseController
-import com.nxd1frnt.clockdesk2.ui.view.TurbulenceNoiseView as NativeTurbulenceView
-import com.nxd1frnt.clockdesk2.ui.view.TurbulenceNoiseShader
-import java.util.Random
-import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.floor
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sin
+import com.nxd1frnt.clockdesk2.ui.view.TurbulenceNoiseView as NativeTurbulenceView
 
 class TurbulenceView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -49,6 +23,10 @@ class TurbulenceView @JvmOverloads constructor(
 
     private var nativeController: TurbulenceNoiseController? = null
     private var nativeView: NativeTurbulenceView? = null
+
+    //Used for lifecycle control
+    private var finishRunnable: Runnable? = null
+    private var readyRunnable: Runnable? = null
 
     // Legacy компоненты
     private var legacyTurbulenceView: LegacySimplexNoiseView? = null
@@ -85,6 +63,10 @@ class TurbulenceView @JvmOverloads constructor(
     fun playAnimation(color: Int? = null, onReadyCallback: () -> Unit) {
         val targetColor = color ?: Color.WHITE
 
+        // Finish all other runnables
+        finishRunnable?.let { removeCallbacks(it) }
+        readyRunnable?.let { removeCallbacks(it) }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             playNative(targetColor, onReadyCallback)
         } else {
@@ -113,8 +95,11 @@ class TurbulenceView @JvmOverloads constructor(
             )
 
             nativeController?.play(TurbulenceNoiseShader.Companion.Type.SIMPLEX_NOISE, config)
-            postDelayed({ onReadyCallback() }, 400)
-            postDelayed({ nativeController?.finish() }, 5000)
+            readyRunnable = Runnable { onReadyCallback() }
+            postDelayed(readyRunnable, 400)
+
+            finishRunnable = Runnable { nativeController?.finish() }
+            postDelayed(finishRunnable, 5000)
         }
     }
 
@@ -142,9 +127,11 @@ class TurbulenceView @JvmOverloads constructor(
             turbulence.playEaseIn(config) {
                 onReadyCallback()
                 turbulence.playMain(config)
-                postDelayed({
+
+                finishRunnable = Runnable {
                     turbulence.finish { visibility = View.GONE }
-                }, 5000)
+                }
+                postDelayed(finishRunnable, 5000)
             }
         }
     }
