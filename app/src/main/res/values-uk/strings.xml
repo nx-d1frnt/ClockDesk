@@ -148,7 +148,7 @@
     <string name="lastfm_plugin_description">API для скроблінга</string>
     <string name="music_settings_title">Налаштування музики</string>
     <string name="permission_required_title">Необхідні дозволи</string>
-    <string name="permission_notification_explanation">ClockDesk потребує доступу до сповіщень, щоб зчитувати в даний момент відтворювану музику з таких додатків, як Spotify або YouTube.\n\nБудь ласка, знайдіть ClockDesk у списку та увімкніть його.</string>
+    <string name="permission_notification_explanation">ClockDesk потребує доступу до сповіщень, щоб зчитувати наразі відтворювану музику з таких додатків, як Spotify або YouTube.\n\nБудь ласка, знайдіть ClockDesk у списку та увімкніть його.</string>
     <string name="open_settings">Відкрити налаштування</string>
     <string name="permission_already_granted">Доступ вже надано</string>
     <string name="text_alignment">Вирівнювання тексту</string>
@@ -185,4 +185,8 @@
     <string name="later_action">Пізніше</string>
     <string name="checking_updates">Пошук оновлень…</string>
     <string name="feature_not_supported">Функція не підтримується вашою версією Android</string>
+    <string name="manage_smart_chips">Управління розумними чипами</string>
+    <string name="manage_smart_chips_summary">Сортування та налаштування розумних чипів</string>
+    <string name="external_plugin_desc">Сторонній плагін</string>
+    <string name="error_opening_settings">Не вдалося відкрити налаштування</string>
 </resources>

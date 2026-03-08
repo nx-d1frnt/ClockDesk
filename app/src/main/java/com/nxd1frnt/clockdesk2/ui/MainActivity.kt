@@ -315,7 +315,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
-        loadingOverlay = findViewById(R.id.loading_animation_view)
         weatherView = findViewById(R.id.weatherView)
         // backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
         // backgroundProgressText = findViewById(R.id.background_progress_text)

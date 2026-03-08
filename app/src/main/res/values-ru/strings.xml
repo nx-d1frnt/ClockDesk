@@ -185,4 +185,8 @@
     <string name="later_action">Позже</string>
     <string name="checking_updates">Поиск обновлений…</string>
     <string name="feature_not_supported">Функция не поддерживается вашей версией Android</string>
+    <string name="manage_smart_chips">Управление умными чипами</string>
+    <string name="manage_smart_chips_summary">Сортировка и настройка умных чипов</string>
+    <string name="external_plugin_desc">Внешний плагин</string>
+    <string name="error_opening_settings">Ошибка открытия настроек</string>
 </resources>
