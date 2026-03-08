@@ -14,8 +14,6 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
 
     override val preferenceKey: String = "show_updates"
 
-    override val priority: Int = 150
-
     init {
         UpdateManager.onUpdateStateChanged = {
         }

@@ -13,8 +13,6 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
 
     override val preferenceKey: String = "system_bg_progress"
 
-    override val priority: Int = 200
-
     enum class Stage(val iconRes: Int, val defaultMessageRes: Int) {
         DOWNLOADING(R.drawable.image_refresh, R.string.stage_downloading),
         BLURRING(R.drawable.ic_blur, R.string.stage_blurring),            

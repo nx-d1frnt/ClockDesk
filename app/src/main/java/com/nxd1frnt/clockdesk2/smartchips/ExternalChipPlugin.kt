@@ -5,5 +5,4 @@ data class ExternalChipPlugin(
     val receiverClassName: String,
     val preferenceKey: String,
     val displayName: String,
-    val priority: Int
 )

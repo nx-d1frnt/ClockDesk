@@ -43,7 +43,7 @@ class SmartChipManager(
     private data class ChipInfo(
         val id: String,
         val view: View,
-        val priority: Int,
+       //val priority: Int,
         var isVisible: Boolean = false,
         var currentText: String? = null,
         var clickActivityClassName: String? = null
@@ -78,7 +78,10 @@ class SmartChipManager(
         override fun onReceive(c: Context?, intent: Intent?) {
             if (intent?.action != ChipPluginContract.ACTION_UPDATE_DATA) return
             val packageName = intent.getStringExtra(ChipPluginContract.KEY_PLUGIN_PACKAGE) ?: return
-            val chipInfo = allChips.find { it.id == packageName } ?: return
+
+            val plugin = externalPlugins.find { it.packageName == packageName } ?: return
+
+            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return
 
             val isVisible = intent.getBooleanExtra(ChipPluginContract.KEY_CHIP_VISIBLE, true)
             val text = intent.getStringExtra(ChipPluginContract.KEY_CHIP_TEXT)
@@ -119,7 +122,7 @@ class SmartChipManager(
                 visibility = View.GONE
                 tag = plugin.preferenceKey
             }
-            allChips.add(ChipInfo(plugin.preferenceKey, view, plugin.priority))
+            allChips.add(ChipInfo(plugin.preferenceKey, view))
         }
         discoverExternalPlugins()
 
@@ -171,27 +174,25 @@ class SmartChipManager(
                     val parser = pluginRes.getXml(resId)
                     var prefKey: String? = null
                     var dispName: String? = null
-                    var priority = 0
 
                     while (parser.next() != XmlPullParser.END_DOCUMENT) {
                         if (parser.eventType == XmlPullParser.START_TAG && parser.name == "smart-chip-plugin") {
                             prefKey = parser.getAttributeValue(null, "preferenceKey")
                             dispName = parser.getAttributeValue(null, "displayName")
-                            priority = parser.getAttributeValue(null, "priority")?.toIntOrNull() ?: 0
                         }
                     }
 
                     if (prefKey != null && dispName != null) {
-                        foundPlugins.add(ExternalChipPlugin(packageName, className, prefKey, dispName, priority))
+                        foundPlugins.add(ExternalChipPlugin(packageName, className, prefKey, dispName))
                         val view = LayoutInflater.from(context)
                             .inflate(R.layout.smart_chip_layout, chipContainer, false)
                             .apply {
                                 visibility = View.GONE
                                 isClickable = true
                                 isFocusable = true
-                                tag = packageName
+                                tag = prefKey
                             }
-
+                            Logger.d("SmartChipManager"){"Plugin $packageName loaded"}
                         view.setOnClickListener {
                             if (isEditMode) {
                                 onEditClickListener?.invoke(chipContainer)
@@ -200,8 +201,9 @@ class SmartChipManager(
                             val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
                             chipInfo.clickActivityClassName?.let { cls ->
                                 try {
-                                    val fullClassName = if (cls.startsWith(".")) chipInfo.id + cls else cls
-                                    val intent = Intent().setClassName(chipInfo.id, fullClassName)
+                                    val pluginPkg = externalPlugins.find { it.preferenceKey == chipInfo.id }?.packageName ?: return@let
+                                    val fullClassName = if (cls.startsWith(".")) pluginPkg + cls else cls
+                                    val intent = Intent().setClassName(pluginPkg, fullClassName)
                                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                     var options: Bundle? = null
 
@@ -228,7 +230,7 @@ class SmartChipManager(
                                 } catch (e: Exception) { }
                             }
                         }
-                        allChips.add(ChipInfo(packageName, view, priority))
+                        allChips.add(ChipInfo(prefKey, view))
                     }
                 } catch (e: Exception) {
                     Logger.w("SmartChipManager"){"Failed to parse plugin metadata from $packageName"}
@@ -267,8 +269,7 @@ fun updateAllChips() {
         internalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
             val isSystemChip = plugin.preferenceKey == "system_bg_progress"
-            val isEnabled = if (isSystemChip) true else sharedPreferences.getBoolean(plugin.preferenceKey, false)
-
+            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
             if (!isEnabled) {
                 if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
                 chipInfo.isVisible = false
@@ -291,7 +292,7 @@ fun updateAllChips() {
         }
 
         externalPlugins.forEach { plugin ->
-            val chipInfo = allChips.find { it.id == plugin.packageName } ?: return@forEach
+            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
             val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
             
             if (!isEnabled && chipInfo.isVisible) {
@@ -312,9 +313,20 @@ fun updateAllChips() {
     }
 
     private fun sortAndRedrawChips(contentChanged: Boolean = false) {
+        // Читаем порядок, заданный пользователем в настройках
+        val orderString = sharedPreferences.getString("smart_chip_order", "show_battery_alert,show_updates,system_bg_progress") ?: ""
+        Logger.d("SmartChipManager"){"orderString: $orderString"}
+        val orderList = orderString.split(",").map { it.trim() }
+
+        // Фильтруем видимые чипы и сортируем их по индексу в orderList
         val visibleChips = allChips
             .filter { it.isVisible }
-            .sortedByDescending { it.priority }
+            .sortedBy { chipInfo ->
+                val index = orderList.indexOf(chipInfo.id)
+                // Если плагина нет в списке (например, только что установлен), кидаем его в конец
+                if (index != -1) index else Int.MAX_VALUE
+            }
+        Logger.d("SmartChipManager"){"visibleChips: $visibleChips"}
 
         val container = chipContainer as? ConstraintLayout
             ?: throw IllegalStateException("chipContainer must be ConstraintLayout")
@@ -367,6 +379,7 @@ fun updateAllChips() {
 
             fontManager.applyStyleToSmartChip(chipInfo.view)
         }
+        Logger.d("SmartChipManager"){"Chips updated"}
 
         val constraintSet = ConstraintSet().apply {
             clone(container)

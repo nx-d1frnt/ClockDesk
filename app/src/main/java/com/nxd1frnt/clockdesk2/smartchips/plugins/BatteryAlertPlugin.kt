@@ -15,7 +15,6 @@ import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
 class BatteryAlertPlugin(private val context: Context) : ISmartChip {
 
     override val preferenceKey: String = "show_battery_alert"
-    override val priority: Int = 100 // Highest priority
 
     override fun createView(context: Context): View {
         return LayoutInflater.from(context)

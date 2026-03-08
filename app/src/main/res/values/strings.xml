@@ -104,8 +104,8 @@
     <string name="battery_saver_trigger_summary">Set the battery level (%) at which battery saver mode activates</string>
     <string name="battery_saver_settings_title">Battery saving settings</string>
     <string name="smart_chips_settings_title">Smart Chips Settings</string>
-    <string name="show_battery_alert_chip">Show Battery Alert Chip</string>
-    <string name="show_battery_alert_chip_summary">Shows a chip when battery is low or app battery saver is on</string>
+    <string name="show_battery_alert_chip">Battery Alert Chip</string>
+    <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
     <string name="battery_low">Battery Low</string>
     <string name="battery_saver_on">Saver On</string>
     <string name="snap_to_grid">Snap to grid\n</string>
@@ -163,7 +163,7 @@
     <string name="install_action">Install</string>
     <string name="later_action">Later</string>
     <string name="checking_updates">Checking for updates...</string>
-    <string name="show_updates_chip">Show app updates</string>
+    <string name="show_updates_chip">App updates plugin</string>
     <string name="show_updates_chip_summary">Show a chip with app update notifications</string>
     <string name="customize_smart_chips">Customize Smart Chips</string>
     <string name="edit_background">Edit background color</string>
@@ -173,8 +173,8 @@
     <string name="smart_pixels_title">Smart Pixels</string>
     <string name="smart_pixels_summary">Dims pixels in a checkerboard pattern after inactivity to save battery and screen (Screen may appear dimmer)</string>
     <string name="max_width">Max Width</string>
-    <string name="show_background_progress_chip">Show Background Progress Chip</string>
-    <string name="show_background_progress_chip_summary">Show a chip indicating background image loading or processing status</string>
+    <string name="show_background_progress_chip">Background Progress Chip</string>
+    <string name="show_background_progress_chip_summary">Chip indicating background image loading or processing status</string>
     <string name="stage_downloading">Downloading image...</string>
     <string name="stage_blurring">Applying blur...</string>
     <string name="stage_colors">Extracting palette...</string>
@@ -185,4 +185,8 @@
     <string name="delete_background_msg">This custom background will be permanently deleted.</string>
     <string name="delete">Delete</string>
     <string name="feature_not_supported">Your Android version doesn\'t support this feature</string>
+    <string name="manage_smart_chips">Manage Smart Chips plugins</string>
+    <string name="manage_smart_chips_summary">Sort and configure Smart Chips plugins</string>
+    <string name="external_plugin_desc">External plugin</string>
+    <string name="error_opening_settings">"Error opening plugin settings"</string>
 </resources>
