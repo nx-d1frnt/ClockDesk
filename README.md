@@ -2,59 +2,82 @@
 
 # ClockDesk
 
-**ClockDesk — a second life for your old smartphone as a stylish desk clock.**
+**Give your old Android device a second life as a stylish, functional desk clock.**
 
-ClockDesk is an Android app that turns any old device into a beautiful and functional desk clock. Perfect for bedside tables, work desks, or your kitchen counter.
+ClockDesk transforms your idle smartphone or tablet into a beautiful bedside or desk companion. Designed for simplicity and utility, it provides glanceable information through a highly customizable interface while protecting your device's longevity.
 
-![Alt text](screenshots/Clockdesk_Screenshot-landscape.png)
-
----
-
-## 🔧 Features
-
-- ⏰ Customizable clock display (font and size)
-- 🌅 Dynamic background that mimics the sky using Sunrise/Sunset API
-- 🎨 Basic UI customization options
-- 🖼️ User-selectable background images
-- 🎶 Now Playing widget with Last.fm integration (requires Last.fm API key)
-- 🏷️ Smart Chips - Small, glanceable bits of info with external plugins support
-
-### 📌 Planned Features:
-- 🌦️ Weather-aware animated effects for the background (inspired by Android 16 QPR1)
-- ⏲️ Timers and additional widgets
-- ⚙️ Extended customization settings
+![App Screenshot](screenshots/Clockdesk_Screenshot-landscape.png)
 
 ---
 
-## ⚙️ Tech Stack
+## ✨ Key Features
 
-- Language: Kotlin
-- IDE: Android Studio
-- API: Sunrise/Sunset API
+### 🕒 Personalized Clock Experience
+- **Typography & Style:** Choose from a variety of fonts, add your own and adjust sizes to fit any screen.
+- **Fluid Animations:** Smooth transitions and updates for a modern feel.
 
----
+### 🖼️ Dynamic & Interactive Backgrounds
+- **Day/Night Cycle:** Backgrounds evolve based on your local sunrise and sunset times.
+- **Weather-Aware Effects:** Live animated effects (Rain, snow, etc.) that react to real-time weather conditions.
+- **Deep Customization:** Apply blur, dimming, and custom images.
 
-## 🚀 Installation
+### 🔌 Smart Chips & Music Integration
+- **Smart Chips:** A modular plugin system for glanceable info like weather, battery status, and background progress.
+- **Now Playing Widget:** Integrated track info with support for various sources via a plugin architecture.
 
-ClockDesk supports devices running **Android 4.4 KitKat** (API 19) or higher.
-
-📦 Download an APK build from releases or clone this repository and build it.
-
-```git clone https://github.com/nx-d1frnt/ClockDesk.git```
-
----
-
-### 🤝 Contributing
-Pull requests and issues are welcome!
-I would love to see others contribute to ClockDesk in any of the following ways:
-
-- Improving the codebase
-- Designing new themes or UI ideas
-- Translating the interface
-- Testing on different devices
+### 🛡️ OLED Longevity
+- **Burn-in Protection:** Intelligent pixel shifting to prevent static image retention on OLED/AMOLED screens.
+- **Smart Pixels:** Reduces power consumption and heat by selectively turning off pixels.
 
 ---
 
-### 📃 License
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+## 🛠️ Built With
 
+- **Language:** 100% Kotlin
+- **Architecture:** Modular, plugin-based system for widgets and music.
+- **Libraries:**
+  - **Glide:** Advanced image processing and blurring.
+  - **AndroidX Palette:** For dynamic UI coloring based on backgrounds.
+  - **Volley:** Efficient networking for weather and time data.
+  - **Material 3:** Modern design components and theming.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Android Version:** API 22 *(Android 5.1 Lollipop)* (Recommended) or higher. Minimum supported: API 14 *(Android 4.0 Ice Cream Sandwich)* — experimental; use at your own risk, many features may be broken. 
+- **Recommended:** Keep the device connected to a power source for continuous use.
+
+### Installation
+1.  Download the latest APK from the [Releases](https://github.com/nx-d1frnt/ClockDesk/releases) section.
+2.  Install the APK (ensure "Install from Unknown Sources" is enabled).
+3.  Launch **ClockDesk** and customize your view!
+
+### Building from Source
+```bash
+git clone https://github.com/nx-d1frnt/ClockDesk.git
+cd ClockDesk
+./gradlew assembleDebug
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+*Created with ❤️ by nx-d1frnt*
