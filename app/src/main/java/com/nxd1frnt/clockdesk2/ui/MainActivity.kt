@@ -1228,8 +1228,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val metrics = resources.displayMetrics
             val maxDim = 1080
-            val targetW = minOf(metrics.widthPixels, maxDim)
-            val targetH = minOf(metrics.heightPixels, maxDim)
+
+            // Downscale aggressively when blur is heavy — blurred images need far less resolution.
+            // blurIntensity 0..100 → scaleFactor 1.0 down to 0.25 (quarter resolution at max blur)
+            val blurScaleFactor = if (blurIntensity <= 0) 1.0f else {
+                val normalized = blurIntensity.coerceIn(0, 100) / 100f
+                1.0f - (normalized * 0.75f) // 0 blur = 1.0x, 100 blur = 0.25x
+            }
+
+            val targetW = (minOf(metrics.widthPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
+            val targetH = (minOf(metrics.heightPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
 
             val req = RequestOptions()
                 .transform(CenterCrop())
@@ -1273,7 +1281,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             backgroundImageView.setImageDrawable(resource)
                             if (usePlatformBlur) {
                                 try {
-                                    val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
+                                    val radiusPx = (blurIntensity * blurScaleFactor).coerceAtLeast(1f)
                                     val renderEffect = RenderEffect.createBlurEffect(
                                         radiusPx,
                                         radiusPx,
