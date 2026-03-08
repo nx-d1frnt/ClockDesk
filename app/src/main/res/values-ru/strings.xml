@@ -189,4 +189,14 @@
     <string name="manage_smart_chips_summary">Сортировка и настройка умных чипов</string>
     <string name="external_plugin_desc">Внешний плагин</string>
     <string name="error_opening_settings">Ошибка открытия настроек</string>
+
+    <string name="backup_restore_title">Бекап и восстановление</string>
+    <string name="export_settings">Бекап настроек</string>
+    <string name="import_settings">Импорт настроек</string>
+    <string name="export_success">Бекап успешно сохранен</string>
+    <string name="export_failed">Не удалось сохранить бекап</string>
+    <string name="import_success">Настройки импортированы, перезапуск...</string>
+    <string name="import_failed">Не удалось импортировать настройки</string>
+    <string name="confirm_restore_title">Импортировать настройки?</string>
+    <string name="confirm_restore_message">Это действие перезапишет ваши текущие настройки и перезапустит приложение. Вы уверены, что хотите продолжить?</string>
 </resources>

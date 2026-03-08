@@ -189,4 +189,14 @@
     <string name="manage_smart_chips_summary">Сортування та налаштування розумних чипів</string>
     <string name="external_plugin_desc">Сторонній плагін</string>
     <string name="error_opening_settings">Не вдалося відкрити налаштування</string>
+
+    <string name="backup_restore_title">Бекап та відновлення</string>
+    <string name="export_settings">Бекап налаштувань</string>
+    <string name="import_settings">Імпорт налаштувань</string>
+    <string name="export_success">Бекап успішно збережено</string>
+    <string name="export_failed">Не вдалося зберегти налаштування</string>
+    <string name="import_success">Налаштування успішно імпортовано, перезапуск...</string>
+    <string name="import_failed">Не вдалося імпортувати налаштування</string>
+    <string name="confirm_restore_title">Відновити налаштування?</string>
+    <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування та не може бути скасована. Ви впевнені, що хочете продовжити?</string>
 </resources>

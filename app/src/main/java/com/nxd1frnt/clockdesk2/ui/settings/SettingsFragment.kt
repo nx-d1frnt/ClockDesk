@@ -1,12 +1,37 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
+import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreference
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.SettingsBackupManager
 
 class SettingsFragment : PreferenceFragmentCompat() {
+
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let {
+            val success = SettingsBackupManager.exportSettings(requireContext(), it)
+            if (success) {
+                Toast.makeText(requireContext(), R.string.export_success, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), R.string.export_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            confirmRestore(it)
+        }
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val preferenceManager = preferenceManager
         preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
@@ -19,67 +44,39 @@ class SettingsFragment : PreferenceFragmentCompat() {
             albumArtBackgroundPref?.isChecked = false
             albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
         }
-        //val smartChipCategory = findPreference<PreferenceCategory>("smart_chips_category")
 
-        //if (smartChipCategory == null) {
-         //   Logger.e("SettingsFragment"){"Could not find 'smart_chips_category' in preferences.xml"}
-         //   return // If category doesn't exist, stop
-       // }
+        findPreference<Preference>("export_settings")?.setOnPreferenceClickListener {
+            exportLauncher.launch("clockdesk_settings.json")
+            true
+        }
 
-        // 3. Discover external plugins and add them to the category
-//        discoverAndAddExternalPlugins(smartChipCategory)
+        findPreference<Preference>("import_settings")?.setOnPreferenceClickListener {
+            importLauncher.launch(arrayOf("application/json", "application/octet-stream"))
+            true
+        }
     }
-//    private fun discoverAndAddExternalPlugins(category: PreferenceCategory) {
-//        val pm = requireContext().packageManager
-//        val queryIntent = Intent(ChipPluginContract.ACTION_QUERY_PLUGINS)
-//
-//        // Query the package manager for all broadcast receivers that match our action
-//        val receivers = pm.queryBroadcastReceivers(queryIntent, PackageManager.GET_META_DATA)
-//
-//        Logger.d("SettingsFragment"){"Found ${receivers.size} potential plugins."}
-//
-//        for (resolveInfo in receivers) {
-//            val activityInfo = resolveInfo.activityInfo ?: continue
-//            val metaData = activityInfo.metaData ?: continue
-//            val packageName = activityInfo.packageName
-//
-//            // Check if the receiver has the required meta-data
-//            if (metaData.containsKey(ChipPluginContract.META_DATA_PLUGIN_INFO)) {
-//                val resId = metaData.getInt(ChipPluginContract.META_DATA_PLUGIN_INFO)
-//                try {
-//                    // Get resources from the *external plugin's* package
-//                    val pluginRes = pm.getResourcesForApplication(packageName)
-//                    val parser = pluginRes.getXml(resId)
-//
-//                    var prefKey: String? = null
-//                    var dispName: String? = null
-//
-//                    // Parse the plugin_info.xml
-//                    while (parser.next() != XmlPullParser.END_DOCUMENT) {
-//                        if (parser.eventType == XmlPullParser.START_TAG && parser.name == "smart-chip-plugin") {
-//                            prefKey = parser.getAttributeValue(null, "preferenceKey")
-//                            dispName = parser.getAttributeValue(null, "displayName")
-//                            break // Found what we need
-//                        }
-//                    }
-//
-//                    if (prefKey != null && dispName != null) {
-//                        // 4. Create a new SwitchPreference for this plugin
-//                        val pluginPref = SwitchPreferenceCompat(requireContext()).apply {
-//                            key = prefKey
-//                            title = dispName
-//                            summary = "External Plugin"
-//                            setDefaultValue(false) // Default to off
-//                        }
-//
-//                        // 5. Add the new preference to our category
-//                        category.addPreference(pluginPref)
-//                        Logger.d("SettingsFragment"){"Added plugin to settings: $dispName ($prefKey)"}
-//                    }
-//                } catch (e: Exception) {
-//                    Logger.e("SettingsFragment"){"Failed to parse plugin info from $packageName: ${e.message}"}
-//                }
-//            }
-//        }
-//    }
+
+    private fun confirmRestore(uri: android.net.Uri) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.confirm_restore_title)
+            .setMessage(R.string.confirm_restore_message)
+            .setPositiveButton(R.string.apply) { _, _ ->
+                val success = SettingsBackupManager.importSettings(requireContext(), uri)
+                if (success) {
+                    Toast.makeText(requireContext(), R.string.import_success, Toast.LENGTH_LONG).show()
+                    restartApp()
+                } else {
+                    Toast.makeText(requireContext(), R.string.import_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun restartApp() {
+        val intent = requireContext().packageManager.getLaunchIntentForPackage(requireContext().packageName)
+        intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+        Runtime.getRuntime().exit(0)
+    }
 }
