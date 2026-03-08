@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.utils
 
 import android.content.Context
 import android.graphics.Bitmap

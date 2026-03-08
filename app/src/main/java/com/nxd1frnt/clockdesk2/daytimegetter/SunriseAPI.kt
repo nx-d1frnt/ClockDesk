@@ -1,11 +1,9 @@
 package com.nxd1frnt.clockdesk2.daytimegetter
 
 import android.content.Context
-import android.util.Log
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
-import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import org.json.JSONObject
 import java.text.SimpleDateFormat

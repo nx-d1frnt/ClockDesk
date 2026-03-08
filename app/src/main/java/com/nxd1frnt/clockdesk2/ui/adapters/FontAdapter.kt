@@ -1,6 +1,7 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.ui.adapters
 
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +11,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
-import java.io.File
+import com.nxd1frnt.clockdesk2.R
 
 sealed class FontItem {
     abstract val name: String
@@ -116,7 +117,7 @@ class FontAdapter(
         }
     }
 
-    private fun applySelectionBorder(view: View, drawable: android.graphics.drawable.Drawable?) {
+    private fun applySelectionBorder(view: View, drawable: Drawable?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             view.foreground = drawable
         } else if (view is FrameLayout) {

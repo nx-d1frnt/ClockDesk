@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -11,15 +11,15 @@ import android.provider.OpenableColumns
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
-import androidx.palette.graphics.Palette
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.utilities.Scheme
+import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
-import com.nxd1frnt.clockdesk2.utils.ColorExtractor
-import com.nxd1frnt.clockdesk2.utils.FontNameUtils
-import com.nxd1frnt.clockdesk2.utils.FontVariationUtils
+import com.nxd1frnt.clockdesk2.ui.adapters.FontItem
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
@@ -533,11 +533,31 @@ class FontManager(
         }
     }
 
+    fun getColorfromRole(role: String?): Int {
+        if (currentScheme == null) return context.getColor(R.color.md_theme_primary)
+        return when (role) {
+            "primary" -> currentScheme!!.primary
+            "primary_container" -> currentScheme!!.primaryContainer
+            "secondary" -> currentScheme!!.secondary
+            "secondary_container" -> currentScheme!!.secondaryContainer
+            "tertiary" -> currentScheme!!.tertiary
+            "tertiary_container" -> currentScheme!!.tertiaryContainer
+            "surface_variant" -> currentScheme!!.surfaceVariant
+            "outline" -> currentScheme!!.outline
+            else -> currentScheme!!.primary
+        } as Int
+    }
     @SuppressLint("RestrictedApi")
     fun setDynamicScheme(seedColor: Int) {
         this.currentScheme = Scheme.dark(seedColor) // or Scheme.light(seedColor)
         applyAll()
     }
+
+    fun getDynamicScheme(): Scheme? {
+        if (currentScheme == null) return null
+        return currentScheme
+    }
+
 
     fun applyStyleToSmartChip(view: View) {
         val settings = settingsMap[R.id.smart_chip_container] ?: return
@@ -582,7 +602,7 @@ class FontManager(
         val parentContainer = view.parent as? View
         val grandParent = parentContainer?.parent as? View // smart_chip_scrollview
 
-        if (grandParent is android.widget.ScrollView) {
+        if (grandParent is ScrollView) {
             val density = context.resources.displayMetrics.density
 
             val newSizePx = (baseChipContainerSizeDp * density * scaleFactor).toInt()
@@ -604,7 +624,7 @@ class FontManager(
         val layout = textView?.parent as? View
         layout?.setPaddingRelative(newPadV, newPadV, newPadEnd, newPadV)
 
-        val cardView = view as? com.google.android.material.card.MaterialCardView
+        val cardView = view as? MaterialCardView
         val bgColor = if (settings.useDynamicBackgroundColor && currentScheme != null) {
             getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
         } else {

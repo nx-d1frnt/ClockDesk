@@ -1,10 +1,9 @@
 package com.nxd1frnt.clockdesk2.weathergetter
 
 import android.content.Context
-import android.util.Log
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
-import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 
 class OpenMeteoAPI(

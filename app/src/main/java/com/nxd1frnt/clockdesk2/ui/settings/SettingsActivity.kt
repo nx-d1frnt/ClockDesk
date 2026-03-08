@@ -1,26 +1,17 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.ui.settings
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.content.pm.ActivityInfo
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.fragment.app.Fragment
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.color.DynamicColors
-import com.google.android.material.materialswitch.MaterialSwitch
-import com.google.android.material.textfield.TextInputEditText
 import com.nxd1frnt.clockdesk2.music.ui.LastFmSettingsFragment
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
+import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment
 
 class SettingsActivity : AppCompatActivity() {
@@ -46,7 +37,7 @@ class SettingsActivity : AppCompatActivity() {
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
-    private fun openFragment(fragment: androidx.fragment.app.Fragment) {
+    private fun openFragment(fragment: Fragment) {
         supportFragmentManager.beginTransaction()
             .replace(R.id.settings_container, fragment)
             .addToBackStack(null)

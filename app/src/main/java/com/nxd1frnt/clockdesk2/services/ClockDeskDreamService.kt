@@ -1,27 +1,30 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.services
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
+import android.content.pm.ActivityInfo
+import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.service.dreams.DreamService
+import android.util.Log
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.GradientManager
 import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
-import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.ui.view.WeatherView
-import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
-import com.nxd1frnt.clockdesk2.BurnInProtectionManager
+import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
+import com.nxd1frnt.clockdesk2.utils.ClockManager
+import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.utils.LocationManager
+import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 
 class ClockDeskDreamService : DreamService() {
 
@@ -57,7 +60,7 @@ class ClockDeskDreamService : DreamService() {
 
             window?.attributes = window?.attributes?.apply {
 
-                screenOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                screenOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             }
 
             locationManager = LocationManager(this, 101)
@@ -73,12 +76,12 @@ class ClockDeskDreamService : DreamService() {
             initManagers()
 
         } catch (e: Exception) {
-            android.util.Log.e("ClockDeskDream", "CRASH in onAttachedToWindow", e)
+            Log.e("ClockDeskDream", "CRASH in onAttachedToWindow", e)
             val errorView = TextView(this).apply {
                 text = "ClockDesk Error: ${e.message}"
-                setTextColor(android.graphics.Color.RED)
+                setTextColor(Color.RED)
                 textSize = 24f
-                gravity = android.view.Gravity.CENTER
+                gravity = Gravity.CENTER
             }
             setContentView(errorView)
         }
@@ -88,7 +91,7 @@ class ClockDeskDreamService : DreamService() {
         super.onDreamingStarted()
 
         if (!::locationManager.isInitialized || !::clockManager.isInitialized) {
-            android.util.Log.e("ClockDeskDream", "Managers not initialized. Skipping updates.")
+            Log.e("ClockDeskDream", "Managers not initialized. Skipping updates.")
             return
         }
 

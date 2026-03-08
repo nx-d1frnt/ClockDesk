@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.ui.adapters
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -10,6 +10,8 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
+import com.nxd1frnt.clockdesk2.utils.ColorItem
+import com.nxd1frnt.clockdesk2.R
 
 class ColorAdapter(
     private val items: List<ColorItem>,

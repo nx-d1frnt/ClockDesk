@@ -1,12 +1,10 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.utils
 
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import android.location.LocationManager
-import android.util.Log
-import com.nxd1frnt.clockdesk2.utils.Logger
 
 class LocationManager(private val context: Context, private val permissionRequestCode: Int) {
     fun loadCoordinates(callback: (Double, Double) -> Unit) {

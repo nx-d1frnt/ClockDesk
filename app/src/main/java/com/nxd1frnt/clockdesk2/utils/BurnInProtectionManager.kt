@@ -1,4 +1,4 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.utils
 
 import android.os.Handler
 import android.os.Looper

@@ -10,7 +10,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.View
-import com.nxd1frnt.clockdesk2.calculateWeatherIntensity
+import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random

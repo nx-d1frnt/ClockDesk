@@ -15,9 +15,8 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
-import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
-import com.nxd1frnt.clockdesk2.FontManager
+import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
@@ -32,7 +31,6 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.os.Bundle
 import android.util.Pair
-import android.view.Window
 
 class SmartChipManager(
     private val context: Context,

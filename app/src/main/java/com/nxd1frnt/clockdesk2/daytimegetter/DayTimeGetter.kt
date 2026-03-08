@@ -2,7 +2,7 @@ package com.nxd1frnt.clockdesk2.daytimegetter
 
 import android.content.Context
 import android.util.Log
-import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.network.NetworkManager
 import java.util.Calendar
 import java.util.Date

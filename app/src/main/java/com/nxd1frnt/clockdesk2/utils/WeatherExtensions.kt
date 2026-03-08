@@ -1,8 +1,7 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.utils
 
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
-import android.util.Log
 import android.widget.ImageView
 import kotlin.math.min
 

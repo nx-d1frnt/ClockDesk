@@ -1,11 +1,9 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.utils
 
-import android.content.Context
 import android.os.Handler
 import android.util.Log
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
-import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import java.text.SimpleDateFormat
 import java.util.*
 

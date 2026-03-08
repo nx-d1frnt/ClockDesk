@@ -1,11 +1,11 @@
-package com.nxd1frnt.clockdesk2
+package com.nxd1frnt.clockdesk2.ui
 
 import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -14,7 +14,10 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.Outline
 import android.graphics.PorterDuff
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -27,7 +30,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
@@ -37,6 +42,7 @@ import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
@@ -51,28 +57,37 @@ import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
-import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_COLLAPSED
-import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_DRAGGING
-import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
-import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HALF_EXPANDED
-import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_HIDDEN
-import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_SETTLING
-import com.google.android.material.bottomsheet.BottomSheetBehavior.from
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
+import com.nxd1frnt.clockdesk2.utils.ClockManager
+import com.nxd1frnt.clockdesk2.utils.ColorItem
+import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.network.GlideApp
+import com.nxd1frnt.clockdesk2.utils.LocationManager
+import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.ui.settings.SettingsActivity
+import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.background.BlurTransformation
 import com.nxd1frnt.clockdesk2.background.GradientManager
+import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
+import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
 import com.nxd1frnt.clockdesk2.music.MusicPluginManager
 import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
-import com.nxd1frnt.clockdesk2.ui.WidgetMover
+import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
+import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
+import com.nxd1frnt.clockdesk2.ui.view.LoadingAnimationView
+import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 import com.nxd1frnt.clockdesk2.ui.view.WeatherView
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.Logger
@@ -92,7 +107,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var nowPlayingTextView: TextView
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
-    private lateinit var turbulenceOverlay: com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
+    private lateinit var turbulenceOverlay: TurbulenceView
+    private lateinit var loadingOverlay: LoadingAnimationView
     private lateinit var weatherView: WeatherView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
@@ -121,15 +137,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var bsFontRecyclerView: RecyclerView
     private lateinit var bsApplyButton: Button
     private lateinit var bsCancelButton: Button
-    private lateinit var bsNightShiftSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bsNightShiftSwitch: MaterialSwitch
     private lateinit var bsTimeFormatGroup: RadioGroup
-    private lateinit var bsShowAMPMSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bsShowAMPMSwitch: MaterialSwitch
     private lateinit var bsDateFormatGroup: RadioGroup
     private lateinit var bsTimeFormatLabel: TextView
     private lateinit var bsDateFormatLabel: TextView
-    private lateinit var bsFreeModeSwitch: com.google.android.material.materialswitch.MaterialSwitch
-    private lateinit var bsGridSnapSwitch: com.google.android.material.materialswitch.MaterialSwitch
-    private lateinit var bsIgnoreCollisionSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bsFreeModeSwitch: MaterialSwitch
+    private lateinit var bsGridSnapSwitch: MaterialSwitch
+    private lateinit var bsIgnoreCollisionSwitch: MaterialSwitch
     private lateinit var bsTextGravityTitle: TextView
     private lateinit var bsTextGravityGroup: MaterialButtonToggleGroup
     private lateinit var bsWidgetOrderLabel: TextView
@@ -157,18 +173,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var bsColorRecyclerView: RecyclerView
 
     private var isEditingBackground = false
-    private lateinit var bsEditBackgroundSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bsEditBackgroundSwitch: MaterialSwitch
 
     // Background Bottom Sheet UI elements
     private lateinit var bgRecycler: RecyclerView
-    private lateinit var bgBlurSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bgBlurSwitch: MaterialSwitch
     private lateinit var bgBlurSeek: SeekBar
     private lateinit var bgDimToggleGroup: MaterialButtonToggleGroup
     private lateinit var bgDimSeek: SeekBar
     private lateinit var bgClearBtn: Button
     private lateinit var bgApplyBtn: Button
-    private lateinit var bgWeatherSwitch: com.google.android.material.materialswitch.MaterialSwitch
-    private lateinit var bgManualWeatherSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var bgWeatherSwitch: MaterialSwitch
+    private lateinit var bgManualWeatherSwitch: MaterialSwitch
     private lateinit var bgManualWeatherScroll: View
     private lateinit var bgWeatherToggleGroup: MaterialButtonToggleGroup
     private lateinit var bgIntensityContainer: View
@@ -251,8 +267,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private val editModeTimeoutRunnable = Runnable {
-        if (bottomSheetBehavior.state != STATE_HIDDEN ||
-            backgroundBottomSheetBehavior.state != STATE_HIDDEN) {
+        if (bottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN ||
+            backgroundBottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN
+        ) {
             return@Runnable
         }
 
@@ -270,7 +287,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundManager: BackgroundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        com.google.android.material.color.DynamicColors.applyToActivityIfAvailable(this)
+        DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
 
         // Full-screen and keep screen on
@@ -298,6 +315,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
+        loadingOverlay = findViewById(R.id.loading_animation_view)
         weatherView = findViewById(R.id.weatherView)
         // backgroundProgressOverlay = findViewById(R.id.background_progress_overlay)
         // backgroundProgressText = findViewById(R.id.background_progress_text)
@@ -310,8 +328,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bottomSheet = findViewById(R.id.bottom_sheet)
         backgroundBottomSheet = findViewById<LinearLayout>(R.id.background_bottom_sheet)
         // main bottom sheet behavior
-        bottomSheetBehavior = from(bottomSheet).apply {
-            state = STATE_HIDDEN
+        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet).apply {
+            state = BottomSheetBehavior.STATE_HIDDEN
         }
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
@@ -336,8 +354,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
 
-        backgroundBottomSheetBehavior = from(backgroundBottomSheet).apply {
-            state = STATE_HIDDEN
+        backgroundBottomSheetBehavior = BottomSheetBehavior.from(backgroundBottomSheet).apply {
+            state = BottomSheetBehavior.STATE_HIDDEN
         }
 
         // Initially hide edit-only controls (alpha 0)
@@ -413,7 +431,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             locationManager,
             { _, _, _ ->
                 if (isDemoMode) {
-                    Logger.d("MainActivity"){"debug sun times callback (demo mode)"}
+                    Logger.d("MainActivity") { "debug sun times callback (demo mode)" }
                 }
             },
             { currentTime -> // onTimeChanged callback (called in both real and demo)
@@ -421,27 +439,28 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 try {
                     gradientManager.updateSimulatedTime(currentTime)
                 } catch (e: Exception) {
-                    Logger.w("MainActivity"){"Failed to update gradient simulated time: ${e.message}"}
+                    Logger.w("MainActivity") { "Failed to update gradient simulated time: ${e.message}" }
                 }
 
                 // If a custom image background is visible and dim mode is dynamic, recompute/apply dimming
                 try {
                     if (backgroundImageView.visibility == View.VISIBLE) {
                         val mode = backgroundManager.getDimMode()
-                        if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
+                        if (mode == BackgroundManager.Companion.DIM_MODE_DYNAMIC) {
 //                            setBackgroundDimming(mode, backgroundManager.getDimIntensity())
                             updateBackgroundFilters()
                         }
                     }
                 } catch (e: Exception) {
-                    Logger.w("MainActivity"){"Failed to update dynamic dimming: ${e.message}"}
+                    Logger.w("MainActivity") { "Failed to update dynamic dimming: ${e.message}" }
                 }
             },
             enableAdditionalLogging
         )
 
 
-        burnInProtectionManager = BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
+        burnInProtectionManager =
+            BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
         burnInProtectionManager.start()
         preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             // Check if the key that changed is one of our smart chip toggles
@@ -477,7 +496,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         val smartPixelsEnabled = prefs.getBoolean("smart_pixels_enabled", false)
 
-        smartPixelManager = SmartPixelManager(this, smartPixelOverlay, timeoutMs = 10000L) // 10 секунд
+        smartPixelManager =
+            SmartPixelManager(this, smartPixelOverlay, timeoutMs = 10000L) // 10 секунд
 
         if (smartPixelsEnabled) {
             smartPixelManager.start()
@@ -499,7 +519,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         // Ensure dim is applied if image already set
         val dimModeInit = backgroundManager.getDimMode()
         backgroundManager.getDimIntensity()
-        if (dimModeInit != BackgroundManager.DIM_MODE_OFF) {
+        if (dimModeInit != BackgroundManager.Companion.DIM_MODE_OFF) {
 //            setBackgroundDimming(
 //                dimModeInit,
 //                dimIntensity
@@ -583,7 +603,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
 
 
-        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // 1. if the background bottom sheet is open
                 if (backgroundBottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN &&
@@ -640,7 +660,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         startUpdates()
     }
 
-    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         // Уведомляем менеджер о касании
         if (::smartPixelManager.isInitialized) {
             smartPixelManager.onUserInteraction()
@@ -655,7 +675,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         musicManager?.destroy()
     }
     private fun setupMusicSystem() {
-        val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
 
         //music manager will find all plugins by itself
         musicManager = MusicPluginManager(this, prefs) { state ->
@@ -782,7 +802,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun handleBackgroundUpdate(track: MusicTrack) {
         val blurIntensity = backgroundManager.getBlurIntensity()
         var isMusicBgAppliedThisTrack = false
-        val prefs = getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val musicBgEnabled = prefs.getBoolean("lastfm_albumart_background", true)
         if (!musicBgEnabled) {
             if (wasMusicBackgroundApplied) {
@@ -821,8 +841,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val blurRadius = 45f
             view.setRenderEffect(
-                android.graphics.RenderEffect.createBlurEffect(
-                    blurRadius, blurRadius, android.graphics.Shader.TileMode.CLAMP
+                RenderEffect.createBlurEffect(
+                    blurRadius, blurRadius, Shader.TileMode.CLAMP
                 )
             )
         }
@@ -987,7 +1007,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                                                         .setListener(object : AnimatorListenerAdapter() {
                                                                             override fun onAnimationEnd(animation: Animator) {
                                                                                 toggleEditMode()
-                                                                                tutorialText.text = getString(R.string.tutorial_text_3)
+                                                                                tutorialText.text = getString(
+                                                                                    R.string.tutorial_text_3)
                                                                                 val targetX = timeText.x + (timeText.width / 2f) - (tutorialFinger.width / 2f)
                                                                                 val targetY = timeText.y + (timeText.height / 2f) - (tutorialFinger.height / 2f)
 
@@ -1010,7 +1031,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                                                                                             .setStartDelay(200)
                                                                                                             .setListener(object : AnimatorListenerAdapter() {
                                                                                                                 override fun onAnimationEnd(animation: Animator) {
-                                                                                                                    tutorialText.text = getString(R.string.tutorial_text_4)
+                                                                                                                    tutorialText.text = getString(
+                                                                                                                        R.string.tutorial_text_4)
                                                                                                                     tutorialFinger.animate()
                                                                                                                         .alpha(0f)
                                                                                                                         .y(targetY - 200)
@@ -1194,12 +1216,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .setDuration(700)
                 .setListener(null)
                 .start()
+            //loadingOverlay.targetView = backgroundImageView
+            //loadingOverlay.playLoadingAnimation()
 
-            val initialStage = if (blurIntensity > 0) 
-                BackgroundProgressPlugin.Stage.BLURRING 
-            else 
+            val initialStage = if (blurIntensity > 0)
+                BackgroundProgressPlugin.Stage.BLURRING
+            else
                 BackgroundProgressPlugin.Stage.DOWNLOADING
-                
+
             updateBackgroundProgress(initialStage)
 
             val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -1237,18 +1261,24 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             handler.postDelayed({
                                 updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
                             }, 500)
-                            val noiseColor = androidx.core.graphics.ColorUtils.setAlphaComponent(seedColor, 128)
+                            if (fontManager.getDynamicScheme() == null) {
+                                noiseColor = getColor(R.color.md_theme_primary)
+                            } else {
+                                noiseColor = fontManager.getDynamicScheme()!!.primary
+                            }
                             if (isAdvancedGraphicsEnabled) {
                             turbulenceOverlay.playAnimation(noiseColor) {}
-                        }
+                                //loadingOverlay.playRevealAnimation()
+
+                            }
                             backgroundImageView.setImageDrawable(resource)
                             if (usePlatformBlur) {
                                 try {
                                     val radiusPx = blurIntensity.coerceAtLeast(1).toFloat()
-                                    val renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                    val renderEffect = RenderEffect.createBlurEffect(
                                         radiusPx,
                                         radiusPx,
-                                        android.graphics.Shader.TileMode.CLAMP
+                                        Shader.TileMode.CLAMP
                                     )
                                     backgroundImageView.setRenderEffect(renderEffect)
                                 } catch (e: Throwable) { /* ignore */ }
@@ -1331,8 +1361,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         } catch (e: Exception) {
             updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
-                handler.postDelayed({ 
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE) 
+                handler.postDelayed({
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
                 }, 2000)
             Logger.e("MainActivity"){"loadBackgroundInternal failed"}
         }
@@ -1375,7 +1405,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun getEffectiveDimIntensity(mode: Int, userIntensity: Int): Int {
-        val intensity = if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
+        val intensity = if (mode == BackgroundManager.Companion.DIM_MODE_DYNAMIC) {
             try {
                 backgroundManager.computeEffectiveDimIntensity(
                     clockManager.getCurrentTime(),
@@ -1488,8 +1518,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private fun updateBackgroundProgress(stage: BackgroundProgressPlugin.Stage, messageOverride: String? = null) {
         // Обновляем состояние в плагине
-        BackgroundProgressPlugin.currentStage = stage
-        BackgroundProgressPlugin.customMessage = messageOverride
+        BackgroundProgressPlugin.Companion.currentStage = stage
+        BackgroundProgressPlugin.Companion.customMessage = messageOverride
 
         // Форсируем обновление UI чипов
         runOnUiThread {
@@ -1536,9 +1566,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         val dimIntensity = backgroundManager.getDimIntensity()
 
         when (dimMode) {
-            BackgroundManager.DIM_MODE_OFF -> bgDimToggleGroup.check(R.id.off_button)
-            BackgroundManager.DIM_MODE_CONTINUOUS -> bgDimToggleGroup.check(R.id.continuous_button)
-            BackgroundManager.DIM_MODE_DYNAMIC -> bgDimToggleGroup.check(R.id.dynamic_button)
+            BackgroundManager.Companion.DIM_MODE_OFF -> bgDimToggleGroup.check(R.id.off_button)
+            BackgroundManager.Companion.DIM_MODE_CONTINUOUS -> bgDimToggleGroup.check(R.id.continuous_button)
+            BackgroundManager.Companion.DIM_MODE_DYNAMIC -> bgDimToggleGroup.check(R.id.dynamic_button)
             else -> bgDimToggleGroup.check(R.id.off_button)
         }
         bgDimSeek.progress = dimIntensity
@@ -1569,11 +1599,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         isUpdatingBackgroundUi = false
 
-        backgroundBottomSheetBehavior.state = STATE_EXPANDED
+        backgroundBottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
     }
 
     private fun applyWeatherState(previewManual: Boolean? = null) {
-        val isEnabled = findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.weather_effect_switch)?.isChecked
+        val isEnabled = findViewById<MaterialSwitch>(R.id.weather_effect_switch)?.isChecked
             ?: backgroundManager.isWeatherEffectsEnabled()
 
         if (!isEnabled) {
@@ -1651,20 +1681,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bottomSheetBehavior.isHideable = true
         // Allow dragging the bottom sheet (ensures NestedScrollView can pass drag gestures)
         bottomSheetBehavior.isDraggable = true
-        bottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
+        bottomSheetBehavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
-                if (newState == STATE_HIDDEN) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
                     //highlightImageView(false)
                     when (newState) {
-                        STATE_DRAGGING,
-                        STATE_SETTLING,
-                        STATE_EXPANDED,
-                        STATE_HALF_EXPANDED -> {
+                        BottomSheetBehavior.STATE_DRAGGING,
+                        BottomSheetBehavior.STATE_SETTLING,
+                        BottomSheetBehavior.STATE_EXPANDED,
+                        BottomSheetBehavior.STATE_HALF_EXPANDED -> {
                             stopHideUiTimer()
                         }
 
-                        STATE_COLLAPSED,
-                        STATE_HIDDEN -> {
+                        BottomSheetBehavior.STATE_COLLAPSED,
+                        BottomSheetBehavior.STATE_HIDDEN -> {
                             resetEditModeTimeout()
                             hideBottomSheet()
                         }
@@ -1677,18 +1707,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundBottomSheetBehavior.peekHeight = 0
         backgroundBottomSheetBehavior.isHideable = true
         backgroundBottomSheetBehavior.isDraggable = true
-        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
+        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
                 when (newState) {
-                    STATE_DRAGGING,
-                    STATE_SETTLING,
-                    STATE_EXPANDED,
-                    STATE_HALF_EXPANDED -> {
+                    BottomSheetBehavior.STATE_DRAGGING,
+                    BottomSheetBehavior.STATE_SETTLING,
+                    BottomSheetBehavior.STATE_EXPANDED,
+                    BottomSheetBehavior.STATE_HALF_EXPANDED -> {
                         stopHideUiTimer()
                     }
 
-                    STATE_COLLAPSED,
-                    STATE_HIDDEN -> {
+                    BottomSheetBehavior.STATE_COLLAPSED,
+                    BottomSheetBehavior.STATE_HIDDEN -> {
                         mainLayout.animate()
                             .scaleX(0.90f)
                             .scaleY(0.90f)
@@ -1719,7 +1749,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun showDeleteConfirmationDialog(title: String, message: String, onConfirm: () -> Unit) {
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton(getString(R.string.delete)) { dialog, _ ->
@@ -1740,7 +1770,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         // Initialize bsColorRecyclerView FIRST to avoid UninitializedPropertyAccessException
         bsColorRecyclerView = bottomSheet.findViewById(R.id.color_recycler_view)
-        bsColorRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        bsColorRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
         bsEditBackgroundSwitch = bottomSheet.findViewById(R.id.edit_background_switch)
 
@@ -1817,7 +1848,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser || focusedView == null) return
                 bsMaxWidthValue.text = "$progress%"
-                
+
                 // Применяем к текстовому полю внутри лейаута
                 if (focusedView!!.id == R.id.lastfm_layout) {
                      // Находим TextView внутри LastFM layout
@@ -1902,7 +1933,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                         focusedView?.let { view ->
                             val settings = fontManager.getSettings(view)
-                            (bsFontRecyclerView.adapter as? FontAdapter)?.selectedPosition = settings?.fontIndex ?: 1
+                            (bsFontRecyclerView.adapter as? FontAdapter)?.selectedPosition =
+                                settings?.fontIndex ?: 1
                         }
                     } else {
                         Toast.makeText(this, "Failed to delete font", Toast.LENGTH_SHORT).show()
@@ -2157,7 +2189,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
             val maxWidth = settings.maxWidthPercent
             bsMaxWidthSeekBar.progress = maxWidth
-            bsMaxWidthValue.text = "$maxWidth%" 
+            bsMaxWidthValue.text = "$maxWidth%"
             // Alpha
             bsTransparencySeekBar.max = 100
             bsTransparencySeekBar.progress = (settings.alpha * 100).toInt()
@@ -2198,15 +2230,28 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                 if (isEditingBackground) {
                     when (item) {
-                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(focusedView!!, item.roleKey)
-                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(focusedView!!, item.color)
+                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(
+                            focusedView!!,
+                            item.roleKey
+                        )
+
+                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(
+                            focusedView!!,
+                            item.color
+                        )
+
                         else -> {}
                     }
                 } else {
                     when (item) {
-                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(focusedView!!, item.roleKey)
+                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(
+                            focusedView!!,
+                            item.roleKey
+                        )
+
                         is ColorItem.Solid -> fontManager.setFontColor(focusedView!!, item.color)
-                        is ColorItem.AddNew -> { /* Picker */ }
+                        is ColorItem.AddNew -> { /* Picker */
+                        }
                     }
                 }
 
@@ -2220,11 +2265,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                 val updatedSettings = fontManager.getSettings(focusedView!!)
                 if (updatedSettings != null) {
-                    val nextColor = if (isEditingBackground) updatedSettings.backgroundColor else updatedSettings.color
-                    val nextDynamic = if (isEditingBackground) updatedSettings.useDynamicBackgroundColor else updatedSettings.useDynamicColor
-                    val nextRole = if (isEditingBackground) updatedSettings.dynamicBackgroundColorRole else updatedSettings.dynamicColorRole
+                    val nextColor =
+                        if (isEditingBackground) updatedSettings.backgroundColor else updatedSettings.color
+                    val nextDynamic =
+                        if (isEditingBackground) updatedSettings.useDynamicBackgroundColor else updatedSettings.useDynamicColor
+                    val nextRole =
+                        if (isEditingBackground) updatedSettings.dynamicBackgroundColorRole else updatedSettings.dynamicColorRole
 
-                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(nextColor, nextDynamic, nextRole)
+                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(
+                        nextColor,
+                        nextDynamic,
+                        nextRole
+                    )
                 }
             }
         )
@@ -2283,12 +2335,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
 
         isBottomSheetInitializing = false
-        bottomSheetBehavior.state = STATE_EXPANDED
+        bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
     }
 
 
     private fun createColorAdapter(view: View): ColorAdapter {
-        val settings = fontManager.getSettings(view) ?: return ColorAdapter(emptyList(), 0, false, null) {}
+        val settings = fontManager.getSettings(view) ?: return ColorAdapter(
+            emptyList(),
+            0,
+            false,
+            null
+        ) {}
 
         val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
         val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
@@ -2302,30 +2359,50 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             onColorSelected = { item ->
                 if (isEditingBackground) {
                     when (item) {
-                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(view, item.roleKey)
-                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(view, item.color)
+                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(
+                            view,
+                            item.roleKey
+                        )
+
+                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(
+                            view,
+                            item.color
+                        )
+
                         else -> {}
                     }
                 } else {
                     when (item) {
-                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(view, item.roleKey)
+                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(
+                            view,
+                            item.roleKey
+                        )
+
                         is ColorItem.Solid -> fontManager.setFontColor(view, item.color)
                         else -> {}
                     }
                 }
 
                 fontManager.applyNightShiftTransition(
-                        clockManager.getCurrentTime(),
-                        dayTimeGetter,
-                        true)
+                    clockManager.getCurrentTime(),
+                    dayTimeGetter,
+                    true
+                )
 
                 val updSettings = fontManager.getSettings(view)
                 if (updSettings != null) {
-                    val nextColor = if (isEditingBackground) updSettings.backgroundColor else updSettings.color
-                    val nextDynamic = if (isEditingBackground) updSettings.useDynamicBackgroundColor else updSettings.useDynamicColor
-                    val nextRole = if (isEditingBackground) updSettings.dynamicBackgroundColorRole else updSettings.dynamicColorRole
+                    val nextColor =
+                        if (isEditingBackground) updSettings.backgroundColor else updSettings.color
+                    val nextDynamic =
+                        if (isEditingBackground) updSettings.useDynamicBackgroundColor else updSettings.useDynamicColor
+                    val nextRole =
+                        if (isEditingBackground) updSettings.dynamicBackgroundColorRole else updSettings.dynamicColorRole
 
-                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(nextColor, nextDynamic, nextRole)
+                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(
+                        nextColor,
+                        nextDynamic,
+                        nextRole
+                    )
                 }
             }
         )
@@ -2372,7 +2449,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         setVisible(bsVarTitle, hasWeight || hasWidth || hasRound)
     }
     private fun hideBottomSheet() {
-        bottomSheetBehavior.state = STATE_HIDDEN
+        bottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
         highlightFocusedView(false) // Use the new unified function
         restoreMainLayoutState()
         focusedView = null
@@ -2389,7 +2466,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun hideBackgroundBottomSheet() {
-        backgroundBottomSheetBehavior.state = STATE_HIDDEN
+        backgroundBottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
         restoreMainLayoutState()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             backgroundCustomizationTab.visibility = View.VISIBLE
@@ -2457,14 +2534,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private fun animateCornerRadius(view: View, fromRadius: Float, toRadius: Float) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val animator = android.animation.ValueAnimator.ofFloat(fromRadius, toRadius)
+            val animator = ValueAnimator.ofFloat(fromRadius, toRadius)
             animator.duration = animationDuration-100L
 
             animator.addUpdateListener { animation ->
                 val value = animation.animatedValue as Float
 
-                view.outlineProvider = object : android.view.ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                view.outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
                         outline.setRoundRect(0, 0, view.width, view.height, value)
                     }
                 }
@@ -2747,8 +2824,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         bgRecycler.isNestedScrollingEnabled = false
 
         backgroundsAdapter = BackgroundsAdapter(
-            this, 
-            mutableListOf(), 
+            this,
+            mutableListOf(),
             onClick = { id ->
                 if (id == "__ADD__") {
                     val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -2769,63 +2846,64 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
 
-            previewBackgroundUri = id
+                previewBackgroundUri = id
 
-            if (wasMusicBackgroundApplied) {
-                return@BackgroundsAdapter
-            }
-
-            when (id) {
-                "__DEFAULT_GRADIENT__" -> {
-                    previewBackgroundUri = "__DEFAULT_GRADIENT__"
-                    fontManager.clearDynamicColors()
-                    fontManager.applyNightShiftTransition(
-                        clockManager.getCurrentTime(),
-                        dayTimeGetter,
-                        true)
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        try {
-                            backgroundImageView.setRenderEffect(null)
-                        } catch (_: Throwable) {
-                        }
-                    }
-                    backgroundImageView.setImageDrawable(null)
-                    backgroundImageView.visibility = View.GONE
-                    gradientManager.startUpdates()
+                if (wasMusicBackgroundApplied) {
+                    return@BackgroundsAdapter
                 }
 
-                else -> {
-                    try {
-                        val uri = Uri.parse(id)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                when (id) {
+                    "__DEFAULT_GRADIENT__" -> {
+                        previewBackgroundUri = "__DEFAULT_GRADIENT__"
+                        fontManager.clearDynamicColors()
+                        fontManager.applyNightShiftTransition(
+                            clockManager.getCurrentTime(),
+                            dayTimeGetter,
+                            true
+                        )
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             try {
-                                contentResolver.takePersistableUriPermission(
-                                    uri,
-                                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                )
-                            } catch (e: Exception) { /* ignore */
+                                backgroundImageView.setRenderEffect(null)
+                            } catch (_: Throwable) {
                             }
                         }
-                        val intensity = bgBlurSeek.progress
-                        gradientManager.stopUpdates()
-                        applyImageBackground(uri, intensity)
-                        previewBackgroundUri = id
-                    } catch (e: Exception) {
-                        Logger.e("MainActivity"){"Error selecting background: $id"}
+                        backgroundImageView.setImageDrawable(null)
+                        backgroundImageView.visibility = View.GONE
+                        gradientManager.startUpdates()
+                    }
+
+                    else -> {
+                        try {
+                            val uri = Uri.parse(id)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                try {
+                                    contentResolver.takePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    )
+                                } catch (e: Exception) { /* ignore */
+                                }
+                            }
+                            val intensity = bgBlurSeek.progress
+                            gradientManager.stopUpdates()
+                            applyImageBackground(uri, intensity)
+                            previewBackgroundUri = id
+                        } catch (e: Exception) {
+                            Logger.e("MainActivity") { "Error selecting background: $id" }
+                        }
                     }
                 }
-            }
-        },
-        onLongClick = { id ->
+            },
+            onLongClick = { id ->
                 showDeleteConfirmationDialog(
                     getString(R.string.delete_background_title), // "Delete Background?"
                     getString(R.string.delete_background_msg)    // "This custom background will be removed."
                 ) {
                     backgroundManager.removeSavedUri(id)
-                    
+
                     if (previewBackgroundUri == id || backgroundManager.getSavedBackgroundUri() == id) {
-                         bgClearBtn.performClick()
+                        bgClearBtn.performClick()
                     }
 
                     val items = mutableListOf<String>().apply {
@@ -2866,12 +2944,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
 
             val previewMode = when (checkedId) {
-                R.id.off_button -> BackgroundManager.DIM_MODE_OFF
-                R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
-                R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
-                else -> BackgroundManager.DIM_MODE_OFF
+                R.id.off_button -> BackgroundManager.Companion.DIM_MODE_OFF
+                R.id.continuous_button -> BackgroundManager.Companion.DIM_MODE_CONTINUOUS
+                R.id.dynamic_button -> BackgroundManager.Companion.DIM_MODE_DYNAMIC
+                else -> BackgroundManager.Companion.DIM_MODE_OFF
             }
-            if (previewMode == BackgroundManager.DIM_MODE_OFF) bgDimSeek.progress = 0
+            if (previewMode == BackgroundManager.Companion.DIM_MODE_OFF) bgDimSeek.progress = 0
             if (backgroundImageView.visibility == View.VISIBLE) updateBackgroundFilters()
         }
 
@@ -2927,14 +3005,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             applyWeatherState(previewManual = isChecked)
         }
 
-        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetCallback() {
+        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
             override fun onStateChanged(bottomSheet: View, newState: Int) {
                 when (newState) {
-                    STATE_DRAGGING, STATE_SETTLING, STATE_EXPANDED, STATE_HALF_EXPANDED -> {
+                    BottomSheetBehavior.STATE_DRAGGING, BottomSheetBehavior.STATE_SETTLING, BottomSheetBehavior.STATE_EXPANDED, BottomSheetBehavior.STATE_HALF_EXPANDED -> {
                         stopHideUiTimer()
                     }
 
-                    STATE_HIDDEN -> {
+                    BottomSheetBehavior.STATE_HIDDEN -> {
                         if (previewBackgroundUri != null) {
                             if (!wasMusicBackgroundApplied) {
                                 val savedUri = backgroundManager.getSavedBackgroundUri()
@@ -2973,7 +3051,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             backgroundImageView.visibility = View.GONE
             backgroundManager.clearDim()
             gradientManager.startUpdates()
-            backgroundBottomSheetBehavior.state = STATE_HIDDEN
+            backgroundBottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
         }
 
         bgApplyBtn.setOnClickListener {
@@ -3004,10 +3082,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         val checkedId = bgDimToggleGroup.checkedButtonId
         val modeToSave = when (checkedId) {
-            R.id.off_button -> BackgroundManager.DIM_MODE_OFF
-            R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
-            R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
-            else -> BackgroundManager.DIM_MODE_OFF
+            R.id.off_button -> BackgroundManager.Companion.DIM_MODE_OFF
+            R.id.continuous_button -> BackgroundManager.Companion.DIM_MODE_CONTINUOUS
+            R.id.dynamic_button -> BackgroundManager.Companion.DIM_MODE_DYNAMIC
+            else -> BackgroundManager.Companion.DIM_MODE_OFF
         }
         backgroundManager.setDimMode(modeToSave)
         backgroundManager.setDimIntensity(bgDimSeek.progress)

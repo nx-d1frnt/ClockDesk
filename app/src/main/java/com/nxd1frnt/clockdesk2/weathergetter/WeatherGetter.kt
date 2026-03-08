@@ -3,8 +3,7 @@ package com.nxd1frnt.clockdesk2.weathergetter
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
-import com.nxd1frnt.clockdesk2.LocationManager
+import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.network.NetworkManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver

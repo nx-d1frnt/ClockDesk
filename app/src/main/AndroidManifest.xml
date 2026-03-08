@@ -24,7 +24,7 @@
         android:theme="@style/Theme.ClockDesk"
         tools:targetApi="31">
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:screenOrientation="sensorLandscape"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"
@@ -42,7 +42,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".SettingsActivity"
+            android:name=".ui.settings.SettingsActivity"
             android:label="@string/settings_title"
             android:screenOrientation="landscape"
             android:exported="false" />
