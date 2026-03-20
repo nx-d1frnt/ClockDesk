@@ -3,6 +3,8 @@ package com.nxd1frnt.clockdesk2.background
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.renderscript.Allocation
 import android.renderscript.Element
 import android.renderscript.RenderScript
@@ -11,17 +13,18 @@ import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import com.nxd1frnt.clockdesk2.utils.Logger
 import java.security.MessageDigest
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 class BlurTransformation(
     private val context: Context,
     private val radius: Int = 25,
-    private val sampling: Int = 1 // downsampling factor: 1 = original size, 2 = half size, etc.
+    private val sampling: Int = 1, // downsampling factor: 1 = original size, 2 = half size, etc.
+    private val onBlurStarted: (() -> Unit)? = null // Добавлен callback
 ) : BitmapTransformation() {
 
     override fun updateDiskCacheKey(messageDigest: MessageDigest) {
+        // Callback здесь НЕ участвует, чтобы не ломать кэш
         messageDigest.update("BlurTransformation(radius=$radius, sampling=$sampling)".toByteArray(Charsets.UTF_8))
     }
 
@@ -49,7 +52,14 @@ class BlurTransformation(
         paint.flags = android.graphics.Paint.FILTER_BITMAP_FLAG
         canvas.drawBitmap(toTransform, 0f, 0f, paint)
 
-        //Algorithm selection based on Android version
+        // Уведомляем главный поток о начале ресурсоемкой операции (RenderScript или BoxBlur)
+        onBlurStarted?.let { callback ->
+            Handler(Looper.getMainLooper()).post {
+                callback()
+            }
+        }
+
+        // Algorithm selection based on Android version
         var applied = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             try {
@@ -168,12 +178,14 @@ class BlurTransformation(
     }
 
     override fun equals(other: Any?): Boolean {
+        // Callback НЕ участвует в сравнении
         return other is BlurTransformation &&
                 other.radius == radius &&
                 other.sampling == sampling
     }
 
     override fun hashCode(): Int {
+        // Callback НЕ участвует в хэше
         return "BlurTransformation($radius,$sampling)".hashCode()
     }
 }

@@ -10,4 +10,9 @@
     <style name="Theme.ClockDesk" parent="Base.Theme.ClockDesk">
         <item name="android:windowSharedElementsUseOverlay">false</item>
     </style>
+
+    <style name="Theme.ClockDesk.Settings" parent="Base.Theme.ClockDesk">
+        <item name="android:windowSharedElementsUseOverlay">false</item>
+        <item name="android:statusBarColor">@color/md_theme_surface</item>
+    </style>
 </resources>

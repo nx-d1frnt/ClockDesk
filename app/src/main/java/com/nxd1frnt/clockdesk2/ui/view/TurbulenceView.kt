@@ -89,7 +89,7 @@ class TurbulenceView @JvmOverloads constructor(
                 pixelDensity = resources.displayMetrics.density,
                 gridCount = 1.0f,
                 noiseMoveSpeedZ = 0.45f,
-                luminosityMultiplier = 1.0f
+                luminosityMultiplier = 0.6f
             )
 
             nativeController?.play(TurbulenceNoiseShader.Companion.Type.SIMPLEX_NOISE, config)

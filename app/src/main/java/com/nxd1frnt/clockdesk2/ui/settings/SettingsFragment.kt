@@ -1,15 +1,14 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import androidx.preference.SwitchPreference
+import androidx.preference.SwitchPreferenceCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.SettingsBackupManager
 
@@ -36,10 +35,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val preferenceManager = preferenceManager
         preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
         setPreferencesFromResource(R.xml.preferences, rootKey)
+        
         // disable album art background option if android version < 4.4
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
             val albumArtBackgroundPref =
-                findPreference<SwitchPreference>("lastfm_albumart_background")
+                findPreference<SwitchPreferenceCompat>("lastfm_albumart_background")
             albumArtBackgroundPref?.isEnabled = false
             albumArtBackgroundPref?.isChecked = false
             albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
@@ -57,7 +57,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun confirmRestore(uri: android.net.Uri) {
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.confirm_restore_title)
             .setMessage(R.string.confirm_restore_message)
             .setPositiveButton(R.string.apply) { _, _ ->

@@ -1218,12 +1218,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             //loadingOverlay.targetView = backgroundImageView
             //loadingOverlay.playLoadingAnimation()
 
-            val initialStage = if (blurIntensity > 0)
-                BackgroundProgressPlugin.Stage.BLURRING
-            else
-                BackgroundProgressPlugin.Stage.DOWNLOADING
-
-            updateBackgroundProgress(initialStage)
 
             val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             val metrics = resources.displayMetrics
@@ -1248,7 +1242,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val finalReq = if (usePlatformBlur) {
                 req
             } else if (blurIntensity > 0) {
-                req.transform(CenterCrop(), BlurTransformation(this, blurIntensity))
+                req.transform(
+                    CenterCrop(),
+                    BlurTransformation(this, blurIntensity, 1) {
+                        if (!isDestroyed && !isFinishing) {
+                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING)
+                        }
+                    }
+                )
             } else {
                 req
             }
@@ -1344,13 +1345,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             restoreUserBackground(savedUri)
                         }
                     } catch (e: Exception) {
-                        Logger.e("MainActivity"){"Failed to restore user background"}
+                        Logger.e("MainActivity"){"Failed to restore user background with exception: ${e.message}"}
                     }
                 }
 
                 override fun onLoadStarted(placeholder: Drawable?) {
                     super.onLoadStarted(placeholder)
-                    updateBackgroundProgress(initialStage)
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.DOWNLOADING)
                 }
             }
 
@@ -1371,7 +1372,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 handler.postDelayed({
                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
                 }, 2000)
-            Logger.e("MainActivity"){"loadBackgroundInternal failed"}
+            Logger.e("MainActivity"){"loadBackgroundInternal failed with exception: ${e.message}"}
         }
     }
 
@@ -2897,7 +2898,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             applyImageBackground(uri, intensity)
                             previewBackgroundUri = id
                         } catch (e: Exception) {
-                            Logger.e("MainActivity") { "Error selecting background: $id" }
+                            Logger.e("MainActivity") { "Error selecting background: $id - ${e.message}" }
                         }
                     }
                 }

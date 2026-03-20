@@ -553,9 +553,9 @@ class FontManager(
         applyAll()
     }
 
-    fun getDynamicScheme(): Scheme? {
-        if (currentScheme == null) return null
-        return currentScheme
+    fun getDynamicScheme(): Scheme {
+        if (currentScheme == null) return Scheme.dark(context.getColor(R.color.md_theme_primary))
+        return currentScheme!!
     }
 
 

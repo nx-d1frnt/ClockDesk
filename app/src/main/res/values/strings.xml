@@ -200,4 +200,5 @@
     <string name="import_failed">Failed to restore settings</string>
     <string name="confirm_restore_title">Restore Settings?</string>
     <string name="confirm_restore_message">This will overwrite your current settings. The app will restart after the process.</string>
+    <string name="smart_chips_plugins_title">Manage Smart Chips</string>
 </resources>
