@@ -1,43 +1,50 @@
 package com.nxd1frnt.clockdesk2.smartchips
 
-import android.content.*
+import android.app.Activity
+import android.app.ActivityOptions
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Pair
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.constraintlayout.widget.ConstraintSet
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
-import androidx.transition.TransitionManager
-import com.nxd1frnt.clockdesk2.utils.FontManager
-import com.nxd1frnt.clockdesk2.R
-import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
-import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
-import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
-import com.nxd1frnt.clockdesk2.utils.Logger
-import org.xmlpull.v1.XmlPullParser
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.transition.ChangeBounds
 import androidx.transition.Fade
+import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
-import androidx.interpolator.view.animation.FastOutSlowInInterpolator
-import android.app.Activity
-import android.app.ActivityOptions
-import android.os.Bundle
-import android.util.Pair
+import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
+import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.utils.Logger
+import org.xmlpull.v1.XmlPullParser
 
 class SmartChipManager(
     private val context: Context,
     private val chipContainer: ViewGroup,
     private val sharedPreferences: SharedPreferences,
     private val fontManager: FontManager
-) {
+) : DefaultLifecycleObserver {
     private data class ChipInfo(
         val id: String,
         val view: View,
@@ -49,12 +56,15 @@ class SmartChipManager(
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateInterval = 5000L
-    private val periodicUpdateRunnable = object : Runnable {
-        override fun run() {
-            updateAllChips()
-            handler.postDelayed(this, updateInterval)
-        }
-    }
+
+    private val pluginTimers = mutableMapOf<String, Runnable>()
+
+//    private val periodicUpdateRunnable = object : Runnable {
+//        override fun run() {
+//            updateAllChips()
+//            handler.postDelayed(this, updateInterval)
+//        }
+//    }
 
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
@@ -66,6 +76,8 @@ class SmartChipManager(
 
     private var isEditMode = false
     private var onEditClickListener: ((View) -> Unit)? = null
+
+    private var isReceiverRegistered = false
 
     fun setEditMode(enabled: Boolean, listener: (View) -> Unit) {
         isEditMode = enabled
@@ -82,9 +94,11 @@ class SmartChipManager(
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return
 
             val isVisible = intent.getBooleanExtra(ChipPluginContract.KEY_CHIP_VISIBLE, true)
+            val updateIntervalSec = intent.getIntExtra("update_interval_seconds", -1)
             val text = intent.getStringExtra(ChipPluginContract.KEY_CHIP_TEXT)
             val iconName = intent.getStringExtra(ChipPluginContract.KEY_CHIP_ICON_NAME)
             val clickActivity = intent.getStringExtra(ChipPluginContract.KEY_CHIP_CLICK_ACTIVITY)
+
 
             var contentChanged = false
 
@@ -110,6 +124,7 @@ class SmartChipManager(
                 chipInfo.isVisible = false
                 chipInfo.clickActivityClassName = null
             }
+            managePluginTimer(packageName, updateIntervalSec, isVisible)
             sortAndRedrawChips(contentChanged)
         }
     }
@@ -121,36 +136,127 @@ class SmartChipManager(
                 tag = plugin.preferenceKey
             }
             allChips.add(ChipInfo(plugin.preferenceKey, view))
+            plugin.setOnStateChangeListener {
+                requestInitialState()
+            }
         }
         discoverExternalPlugins()
 
+        // We don't register receivers anymore in init
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        super.onStart(owner)
+        internalPlugins.forEach { it.startListening() } // Будим плагины
+        registerReceiver()
+        requestInitialState()
+        Logger.d("SmartChipManager") { "Started listening for chip updates." }
+    }
+
+    // Вызывается автоматически, когда экран скрывается
+    override fun onStop(owner: LifecycleOwner) {
+        super.onStop(owner)
+        internalPlugins.forEach { it.stopListening() }
+        pluginTimers.values.forEach { handler.removeCallbacks(it) }
+        pluginTimers.clear()
+        unregisterReceiver()
+        Logger.d("SmartChipManager") { "Stopped listening. App is sleeping." }
+    }
+
+    // Вызывается при полном уничтожении экрана (защита от утечек)
+    override fun onDestroy(owner: LifecycleOwner) {
+        super.onDestroy(owner)
+        unregisterReceiver() // На всякий случай
+    }
+
+    private fun registerReceiver() {
+        if (isReceiverRegistered) return
         val filter = IntentFilter(ChipPluginContract.ACTION_UPDATE_DATA)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Context.RECEIVER_EXPORTED
-            } else {
-                0
-            }
+            } else 0
             context.registerReceiver(dataUpdateReceiver, filter, flags)
         } else {
             ContextCompat.registerReceiver(context, dataUpdateReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
         }
+        isReceiverRegistered = true
     }
 
-    fun startUpdates() {
-        handler.removeCallbacks(periodicUpdateRunnable)
-        handler.post(periodicUpdateRunnable)
-    }
-
-    fun stopUpdates() {
-        handler.removeCallbacks(periodicUpdateRunnable)
-    }
-
-    fun destroy() {
-        stopUpdates()
+    private fun unregisterReceiver() {
+        if (!isReceiverRegistered) return
         try {
             context.unregisterReceiver(dataUpdateReceiver)
-        } catch (e: Exception) { }
+            isReceiverRegistered = false
+        } catch (e: IllegalArgumentException) {
+            // Игнорируем, если ресивер уже был отписан
+        }
+    }
+
+    private fun requestInitialState() {
+        var isContentChanged = false
+
+        // Обновляем внутренние плагины (они читают статус мгновенно)
+        internalPlugins.forEach { plugin ->
+            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
+            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
+
+            if (!isEnabled) {
+                if (chipInfo.isVisible) isContentChanged = true
+                chipInfo.isVisible = false
+            } else {
+                val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+                if (chipInfo.isVisible != newIsVisible) isContentChanged = true
+                chipInfo.isVisible = newIsVisible
+            }
+        }
+
+        // Запрашиваем данные у внешних плагинов
+        externalPlugins.forEach { plugin ->
+            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
+            if (isEnabled) {
+                val requestIntent = Intent().apply {
+                    action = ChipPluginContract.ACTION_REQUEST_DATA
+                    component = ComponentName(plugin.packageName, plugin.receiverClassName)
+                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES) // Forces system to deliver the broadcast even if the receiver is not active
+                    addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                }
+                context.sendBroadcast(requestIntent)
+            } else {
+                val chipInfo = allChips.find { it.id == plugin.preferenceKey }
+                if (chipInfo?.isVisible == true) {
+                    chipInfo.isVisible = false
+                    isContentChanged = true
+                }
+            }
+        }
+
+        if (isContentChanged) {
+            sortAndRedrawChips(true)
+        }
+    }
+
+    private fun managePluginTimer(packageName: String, intervalSec: Int, isVisible: Boolean) {
+        pluginTimers[packageName]?.let { handler.removeCallbacks(it) }
+        pluginTimers.remove(packageName)
+
+        if (intervalSec > 0 && isReceiverRegistered) {
+            val runnable = object : Runnable {
+                override fun run() {
+                    val plugin = externalPlugins.find { it.packageName == packageName } ?: return
+                    val requestIntent = Intent(ChipPluginContract.ACTION_REQUEST_DATA).apply {
+                        component = ComponentName(plugin.packageName, plugin.receiverClassName)
+                        addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES) // Пробиваем сон
+                    }
+                    context.sendBroadcast(requestIntent)
+                    Logger.d("SmartChipManager"){"Plugin timer triggered: $packageName"}
+                    handler.postDelayed(this, intervalSec * 1000L)
+                }
+            }
+            pluginTimers[packageName] = runnable
+            Logger.d("SmartChipManager"){"Plugin timer set: $packageName"}
+            handler.postDelayed(runnable, intervalSec * 1000L)
+        }
     }
 
     private fun discoverExternalPlugins() {
@@ -313,7 +419,7 @@ fun updateAllChips() {
     private fun sortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
         val orderString = sharedPreferences.getString("smart_chip_order", "show_battery_alert,show_updates,system_bg_progress") ?: ""
-        Logger.d("SmartChipManager"){"orderString: $orderString"}
+       // Logger.d("SmartChipManager"){"orderString: $orderString"}
         val orderList = orderString.split(",").map { it.trim() }
 
         // Фильтруем видимые чипы и сортируем их по индексу в orderList
@@ -324,7 +430,7 @@ fun updateAllChips() {
                 // Если плагина нет в списке (например, только что установлен), кидаем его в конец
                 if (index != -1) index else Int.MAX_VALUE
             }
-        Logger.d("SmartChipManager"){"visibleChips: $visibleChips"}
+      //  Logger.d("SmartChipManager"){"visibleChips: $visibleChips"}
 
         val container = chipContainer as? ConstraintLayout
             ?: throw IllegalStateException("chipContainer must be ConstraintLayout")

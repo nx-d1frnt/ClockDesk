@@ -23,7 +23,12 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
 
 companion object {
         var currentStage: Stage = Stage.IDLE
-        var customMessage: String? = null 
+        var customMessage: String? = null
+        var onGlobalStateChanged: (() -> Unit)? = null
+    }
+
+    override fun setOnStateChangeListener(listener: () -> Unit) {
+        onGlobalStateChanged = listener
     }
 
     override fun createView(context: Context): View {

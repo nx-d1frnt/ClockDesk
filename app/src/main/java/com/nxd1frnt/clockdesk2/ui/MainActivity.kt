@@ -36,6 +36,7 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RadioGroup
@@ -229,6 +230,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var chipContainer: ConstraintLayout
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var pendingRestoreRunnable: Runnable? = null
+    private lateinit var backgroundFrame: FrameLayout
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
@@ -416,6 +418,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             prefs,
             fontManager
         )
+
+        lifecycle.addObserver(smartChipManager)
 
         //musicGetter = LastFmAPI(this, musicCallback, backgroundManager)
         // musicgetter was replaced with music plugin manager
@@ -669,7 +673,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     override fun onDestroy() {
         super.onDestroy()
-        smartChipManager.destroy()
         weatherGetter.stopUpdates()
         musicManager?.destroy()
     }
@@ -1215,8 +1218,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .setDuration(700)
                 .setListener(null)
                 .start()
-            //loadingOverlay.targetView = backgroundImageView
-            //loadingOverlay.playLoadingAnimation()
+
+//            val loadingOverlayaccent = fontManager.getDynamicScheme().primary
+//            val loadingOverlayaccent2 = fontManager.getDynamicScheme().surfaceVariant
+//            loadingOverlay.updateColors(loadingOverlayaccent, loadingOverlayaccent2)
+//
+//            loadingOverlay.playLoadingAnimation()
 
 
             val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -1275,8 +1282,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 noiseColor = fontManager.getDynamicScheme()!!.primary
                             }
                             if (isAdvancedGraphicsEnabled) {
-                            turbulenceOverlay.playAnimation(noiseColor) {}
-                                //loadingOverlay.playRevealAnimation()
+                               // loadingOverlay.playRevealAnimation() {
+                                    turbulenceOverlay.playAnimation(noiseColor) {}
+                              //  }
 
                             }
                             backgroundImageView.setImageDrawable(resource)
@@ -1531,7 +1539,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         // Форсируем обновление UI чипов
         runOnUiThread {
-            smartChipManager.updateAllChips()
+            BackgroundProgressPlugin.onGlobalStateChanged?.invoke()
         }
     }
 
@@ -2522,7 +2530,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (!hasCustomImageBackground) {
             gradientManager.startUpdates()
         }
-        smartChipManager.startUpdates()
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val enableBurnInProtection = prefs.getBoolean("burn_in_protection", false)
         if (enableBurnInProtection) {
@@ -2536,7 +2543,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         clockManager.stopUpdates()
         //musicGetter.stopUpdates()
         gradientManager.stopUpdates()
-        smartChipManager.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
 

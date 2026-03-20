@@ -22,4 +22,9 @@ interface ISmartChip {
      * @return True if the chip should be visible, false if it should be hidden.
      */
     fun update(view: View, sharedPreferences: SharedPreferences): Boolean
+
+    fun setOnStateChangeListener(listener: () -> Unit) {}
+
+    fun startListening() {}
+    fun stopListening() {}
 }

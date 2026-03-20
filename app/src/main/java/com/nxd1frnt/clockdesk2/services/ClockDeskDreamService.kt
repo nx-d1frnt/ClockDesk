@@ -101,7 +101,6 @@ class ClockDeskDreamService : DreamService() {
         }
 
         if (::clockManager.isInitialized) clockManager.startUpdates()
-        if (::smartChipManager.isInitialized) smartChipManager.startUpdates()
         if (::burnInProtectionManager.isInitialized) burnInProtectionManager.start()
     }
 
@@ -111,7 +110,6 @@ class ClockDeskDreamService : DreamService() {
         if (::clockManager.isInitialized) clockManager.stopUpdates()
         if (::gradientManager.isInitialized) gradientManager.stopUpdates()
         if (::weatherGetter.isInitialized) weatherGetter.stopUpdates()
-        if (::smartChipManager.isInitialized) smartChipManager.stopUpdates()
         if (::burnInProtectionManager.isInitialized) burnInProtectionManager.stop()
     }
 
@@ -180,6 +178,5 @@ class ClockDeskDreamService : DreamService() {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        smartChipManager.destroy()
     }
 }
