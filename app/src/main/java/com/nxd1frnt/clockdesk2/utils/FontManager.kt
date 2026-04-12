@@ -26,16 +26,14 @@ import java.util.Calendar
 import java.util.Date
 
 /**
- Font settings data class to hold font properties for each widget.
- Default values are set here as well.
+ * Font settings data class to hold font properties for each widget.
+ * Default values are set here as well.
  */
 data class FontSettings(
     var fontIndex: Int = 1,
     var size: Float = 24f,
     var alpha: Float = 1.0f,
-    var weight: Int = 400,
-    var width: Int = 100,
-    var roundness: Int = 0,
+    var variationAxes: MutableMap<String, Float> = mutableMapOf(),
     var color: Int = Color.WHITE,
     var useDynamicColor: Boolean = false,
     var dynamicColorRole: String? = null,
@@ -45,6 +43,7 @@ data class FontSettings(
     var isNightShiftEnabled: Boolean = true,
     var maxWidthPercent: Int = 100
 )
+
 sealed class ColorItem {
     data class Dynamic(
         val color: Int,
@@ -129,7 +128,6 @@ class FontManager(
         Color.parseColor("#F48FB1")  // Pink
     )
 
-
     init {
         rebuildFontList()
         //initialize settings map with defaults
@@ -157,10 +155,10 @@ class FontManager(
             list.add(ColorItem.Dynamic(scheme.primaryContainer, "primary_container", "Pri. Cont."))
         }
 
-        // list.add(ColorItem.AddNew)
         list.addAll(defaultColors.map { ColorItem.Solid(it) })
         return list
     }
+
     private fun getDefaultSettingsFor(id: Int): FontSettings {
         val size = when (id) {
             R.id.time_text -> 128f
@@ -177,22 +175,13 @@ class FontManager(
             else -> 400
         }
 
-        val color = when (id) {
-            R.id.time_text -> Color.WHITE
-            R.id.date_text -> Color.WHITE
-            R.id.lastfm_layout -> Color.WHITE
-            R.id.smart_chip_container -> Color.WHITE
-            else -> Color.WHITE
-        }
         val fontIndex = if (fonts.size > 1) 1 else 0
 
         return FontSettings(
             fontIndex = fontIndex,
             size = size,
             alpha = 1.0f,
-            weight = weight,
-            width = 100,
-            roundness = 100 //Google Sans Flex default
+            variationAxes = mutableMapOf("wght" to weight.toFloat(), "wdth" to 100f, "ROND" to 100f)
         )
     }
 
@@ -200,7 +189,7 @@ class FontManager(
 
     private fun getOrCreateSettings(view: View): FontSettings {
         return settingsMap.getOrPut(view.id) {
-            FontSettings()
+            getDefaultSettingsFor(view.id)
         }
     }
 
@@ -222,25 +211,19 @@ class FontManager(
                 ?.filter { it.extension.equals("ttf", ignoreCase = true) || it.extension.equals("otf", ignoreCase = true) }
                 ?.sortedBy { it.name }
                 ?.forEach { file ->
-                    // Parsing font name from file
                     val parsedName = FontNameUtils.getFontName(file)
-                    // If parsing failed, use file name without extension
                     val displayName = parsedName ?: file.nameWithoutExtension
-
                     fonts.add(FontItem.CustomFont(file.absolutePath, displayName))
                 }
         }
 
-        // Parsing resource fonts
         fonts.addAll(resourceFontIds.map { resId ->
             val parsedName = FontNameUtils.getFontName {
                 context.resources.openRawResource(resId)
             }
-
-            // Fallback: use resource entry name, replace underscores with spaces and capitalize words
             val fallbackName = context.resources.getResourceEntryName(resId)
                 .replace("_", " ")
-                .capitalizeWords() // e.g., "googlesansflex" -> "Googlesansflex"
+                .capitalizeWords()
 
             FontItem.ResourceFont(resId, parsedName ?: fallbackName)
         })
@@ -263,8 +246,35 @@ class FontManager(
                     input.copyTo(output)
                 }
             }
+
+            val viewFontMap = mutableMapOf<Int, String>()
+            settingsMap.forEach { (viewId, settings) ->
+                if (settings.fontIndex in fonts.indices) {
+                    viewFontMap[viewId] = getFontIdentifier(fonts[settings.fontIndex])
+                }
+            }
+
             rebuildFontList()
-            1
+
+            viewFontMap.forEach { (viewId, oldFontId) ->
+                val settings = settingsMap[viewId]
+                if (settings != null) {
+                    val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
+                    if (newIndex != -1) {
+                        settings.fontIndex = newIndex
+                    } else {
+                        settings.fontIndex = 1
+                    }
+                }
+            }
+
+            saveSettings()
+            applyAll()
+
+            val newFontId = "file:$fileName"
+            val newlyAddedIndex = fonts.indexOfFirst { getFontIdentifier(it) == newFontId }
+
+            if (newlyAddedIndex != -1) newlyAddedIndex else 1
         } catch (e: Exception) {
             e.printStackTrace()
             -1
@@ -278,9 +288,8 @@ class FontManager(
         if (item is FontItem.CustomFont) {
             try {
                 val file = File(item.path)
-                val deletedId = getFontIdentifier(item) //id of the deleted font
+                val deletedId = getFontIdentifier(item)
 
-                // Saving a "snapshot" of which fonts all widgets use
                 val viewFontMap = mutableMapOf<Int, String>()
                 settingsMap.forEach { (viewId, settings) ->
                     if (settings.fontIndex in fonts.indices) {
@@ -291,14 +300,12 @@ class FontManager(
                 if (file.exists()) {
                     val deleted = file.delete()
                     if (deleted) {
-                        rebuildFontList() // Index list changed, calling the rebuild function
+                        rebuildFontList()
 
-                        // Recovering font indexes for all widgets
                         viewFontMap.forEach { (viewId, oldFontId) ->
                             val settings = settingsMap[viewId]
                             if (settings != null) {
                                 if (oldFontId == deletedId) {
-                                    // If widget was using a deleted font -> reset to default
                                     settings.fontIndex = 1
                                 } else {
                                     val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
@@ -354,7 +361,6 @@ class FontManager(
         }
     }
 
-    // Used during loading to populate settings from prefs
     fun loadFont() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
@@ -364,10 +370,7 @@ class FontManager(
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
 
         keyPrefixMap.forEach { (viewId, prefix) ->
-            // Get default settings for this view
             val defaults = getDefaultSettingsFor(viewId)
-
-            // Get or create settings object
             val settings = settingsMap.getOrPut(viewId) { defaults.copy() }
 
             val savedFontId = prefs.getString("${prefix}FontID", null)
@@ -387,9 +390,26 @@ class FontManager(
             settings.size = prefs.getFloat("${prefix}Size", defaults.size)
             settings.alpha = prefs.getFloat("${prefix}Alpha", defaults.alpha)
 
-            settings.weight = prefs.getInt("${prefix}Weight", defaults.weight)
-            settings.width = prefs.getInt("${prefix}Width", defaults.width)
-            settings.roundness = prefs.getInt("${prefix}Roundness", defaults.roundness)
+            val axesString = prefs.getString("${prefix}VariationAxes", null)
+            if (axesString != null) {
+                val map = mutableMapOf<String, Float>()
+                if (axesString.isNotBlank()) {
+                    axesString.split(";").forEach {
+                        val parts = it.split(":")
+                        if (parts.size == 2) {
+                            map[parts[0]] = parts[1].toFloatOrNull() ?: 0f
+                        }
+                    }
+                }
+                settings.variationAxes = map
+            } else {
+                // Legacy fallback for old saved settings
+                val w = prefs.getInt("${prefix}Weight", defaults.variationAxes["wght"]?.toInt() ?: 400).toFloat()
+                val wd = prefs.getInt("${prefix}Width", defaults.variationAxes["wdth"]?.toInt() ?: 100).toFloat()
+                val r = prefs.getInt("${prefix}Roundness", defaults.variationAxes["ROND"]?.toInt() ?: 0).toFloat()
+                settings.variationAxes = mutableMapOf("wght" to w, "wdth" to wd, "ROND" to r)
+            }
+
             settings.color = prefs.getInt("${prefix}Color", Color.WHITE)
             settings.useDynamicColor = prefs.getBoolean("${prefix}UseDynamicColor", false)
             settings.dynamicColorRole = prefs.getString("${prefix}DynamicRole", "primary")
@@ -417,7 +437,6 @@ class FontManager(
         }
     }
 
-    // Save current settings to SharedPreferences
     fun saveSettings() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         val editor = prefs.edit()
@@ -431,13 +450,15 @@ class FontManager(
             val settings = settingsMap[viewId] ?: return@forEach
             val currentFontItem = if (settings.fontIndex in fonts.indices) fonts[settings.fontIndex] else null
             val fontId = if (currentFontItem != null) getFontIdentifier(currentFontItem) else ""
+
             editor.putString("${prefix}FontID", fontId)
             editor.putInt("${prefix}FontIndex", settings.fontIndex)
             editor.putFloat("${prefix}Size", settings.size)
             editor.putFloat("${prefix}Alpha", settings.alpha)
-            editor.putInt("${prefix}Weight", settings.weight)
-            editor.putInt("${prefix}Width", settings.width)
-            editor.putInt("${prefix}Roundness", settings.roundness)
+
+            val axesString = settings.variationAxes.entries.joinToString(";") { "${it.key}:${it.value}" }
+            editor.putString("${prefix}VariationAxes", axesString)
+
             editor.putInt("${prefix}Color", settings.color)
             editor.putBoolean("${prefix}UseDynamicColor", settings.useDynamicColor)
             editor.putString("${prefix}DynamicRole", settings.dynamicColorRole)
@@ -450,7 +471,6 @@ class FontManager(
         editor.apply()
     }
 
-    // Getters and Setters for font properties
     fun getSettings(view: View): FontSettings? = settingsMap[view.id]
 
     fun setFontIndex(view: View, index: Int) {
@@ -472,12 +492,35 @@ class FontManager(
         updateSettings(view.id) { it.alpha = alpha.coerceIn(0f, 1f) }
     }
 
-    fun setFontVariations(view: View, weight: Int, width: Int, roundness: Int) {
+    fun setVariationAxis(view: View, tag: String, value: Float) {
         updateSettings(view.id) {
-            it.weight = weight
-            it.width = width
-            it.roundness = roundness
+            it.variationAxes[tag] = value
         }
+    }
+
+    fun getCurrentAxisValue(view: View, tag: String): Float? {
+        return getSettings(view)?.variationAxes?.get(tag)
+    }
+
+    fun getFontAxesDetails(view: View): List<FontAxis> {
+        val settings = getSettings(view) ?: return emptyList()
+        val index = settings.fontIndex
+        if (index !in fonts.indices) return emptyList()
+
+        val item = fonts[index]
+        return FontVariationUtils.scanAxesDetails {
+            try {
+                when (item) {
+                    is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
+                    is FontItem.CustomFont -> context.contentResolver.openInputStream(Uri.fromFile(File(item.path)))
+                    is FontItem.AddNew -> null
+                }
+            } catch (e: Exception) { null }
+        }
+    }
+
+    fun getSupportedAxesForCurrentIndex(view: View): List<String> {
+        return getFontAxesDetails(view).map { it.tag }
     }
 
     private inline fun updateSettings(viewId: Int, block: (FontSettings) -> Unit) {
@@ -485,7 +528,6 @@ class FontManager(
         block(settings)
         applyToView(viewId)
     }
-
 
     private fun applyAll() {
         keyPrefixMap.keys.forEach { applyToView(it) }
@@ -547,9 +589,10 @@ class FontManager(
             else -> currentScheme!!.primary
         } as Int
     }
+
     @SuppressLint("RestrictedApi")
     fun setDynamicScheme(seedColor: Int) {
-        this.currentScheme = Scheme.dark(seedColor) // or Scheme.light(seedColor)
+        this.currentScheme = Scheme.dark(seedColor)
         applyAll()
     }
 
@@ -557,7 +600,6 @@ class FontManager(
         if (currentScheme == null) return Scheme.dark(context.getColor(R.color.md_theme_primary))
         return currentScheme!!
     }
-
 
     fun applyStyleToSmartChip(view: View) {
         val settings = settingsMap[R.id.smart_chip_container] ?: return
@@ -600,11 +642,10 @@ class FontManager(
         }
 
         val parentContainer = view.parent as? View
-        val grandParent = parentContainer?.parent as? View // smart_chip_scrollview
+        val grandParent = parentContainer?.parent as? View
 
         if (grandParent is ScrollView) {
             val density = context.resources.displayMetrics.density
-
             val newSizePx = (baseChipContainerSizeDp * density * scaleFactor).toInt()
 
             val params = grandParent.layoutParams
@@ -634,45 +675,26 @@ class FontManager(
     }
 
     private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int) {
-       // Apply typeface and size
         textView.typeface = typeface
         textView.textSize = settings.size
         textView.alpha = settings.alpha
-
-            textView.setTextColor(color)
+        textView.setTextColor(color)
 
         if (settings.maxWidthPercent >= 100) {
-             textView.maxWidth = Int.MAX_VALUE
+            textView.maxWidth = Int.MAX_VALUE
         } else {
-             val displayMetrics = context.resources.displayMetrics
-             val screenWidth = displayMetrics.widthPixels
-             val targetWidthPx = (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
-             textView.maxWidth = targetWidthPx
+            val displayMetrics = context.resources.displayMetrics
+            val screenWidth = displayMetrics.widthPixels
+            val targetWidthPx = (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
+            textView.maxWidth = targetWidthPx
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             textView.fontVariationSettings = null
-            // Form the variation settings string
-            val variationSettings = "'wght' ${settings.weight}, 'wdth' ${settings.width}, 'ROND' ${settings.roundness}"
-            textView.fontVariationSettings = variationSettings
-        }
-    }
-
-    // Get supported axes for the currently selected font in the given view
-    fun getSupportedAxesForCurrentIndex(view: View): List<String> {
-        val settings = getSettings(view) ?: return emptyList()
-        val index = settings.fontIndex
-        if (index !in fonts.indices) return emptyList()
-
-        val item = fonts[index]
-        return FontVariationUtils.scanAxes {
-            try {
-                when (item) {
-                    is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
-                    is FontItem.CustomFont -> context.contentResolver.openInputStream(Uri.fromFile(File(item.path)))
-                    is FontItem.AddNew -> null
-                }
-            } catch (e: Exception) { null }
+            if (settings.variationAxes.isNotEmpty()) {
+                val variationSettings = settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
+                textView.fontVariationSettings = variationSettings
+            }
         }
     }
 
@@ -697,14 +719,13 @@ class FontManager(
     @SuppressLint("RestrictedApi")
     fun updateDynamicColors(bitmap: Bitmap, onComplete: () -> Unit) {
         ColorExtractor.extractColor(bitmap) { seedColor ->
-
-            val scheme = Scheme.light(seedColor) // Или .dark()
+            val scheme = Scheme.light(seedColor)
             dynamicColor = scheme.secondary
-
             applyAll()
             onComplete()
         }
     }
+
     fun setDynamicColorFromSeed(seedColor: Int) {
         this.dynamicColor = seedColor
         applyAll()
@@ -716,7 +737,6 @@ class FontManager(
             it.useDynamicColor = false
         }
     }
-
 
     fun setDynamicColorForWidget(view: View, role: String) {
         updateSettings(view.id) {
@@ -774,7 +794,7 @@ class FontManager(
             currentTime.before(sunrise) -> {
                 1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
             }
-            currentTime.before(postSunset) -> 0.0f // День
+            currentTime.before(postSunset) -> 0.0f
             currentTime.before(fullNight) -> {
                 (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
             }
@@ -785,7 +805,7 @@ class FontManager(
 
         updateViewColorWithNightShift(timeText, R.id.time_text, nightFactor, nightTint)
         updateViewColorWithNightShift(dateText, R.id.date_text, nightFactor, nightTint)
-        updateViewColorWithNightShift(lastfmText, R.id.lastfm_layout, nightFactor, nightTint) // ID layout, цвет text
+        updateViewColorWithNightShift(lastfmText, R.id.lastfm_layout, nightFactor, nightTint)
 
         val iconEffectiveFactor = if (settingsMap[R.id.lastfm_layout]?.isNightShiftEnabled != false) nightFactor else 0f
         val targetIconColor = getTargetColorForView(R.id.lastfm_layout)
@@ -793,11 +813,8 @@ class FontManager(
         lastfmIcon.setColorFilter(finalIconColor)
 
         val chipSettings = settingsMap[R.id.smart_chip_container]
-
         val chipEffectiveFactor = if (chipSettings?.isNightShiftEnabled != false) nightFactor else 0f
-
         val targetColor = getTargetColorForView(R.id.smart_chip_container)
-
         val finalChipColor = interpolateColor(targetColor, nightTint, chipEffectiveFactor)
 
         for (i in 0 until smartChipContainer.childCount) {
@@ -812,9 +829,7 @@ class FontManager(
 
     private fun updateViewColorWithNightShift(textView: TextView, settingsId: Int, nightFactor: Float, nightTint: Int) {
         val settings = settingsMap[settingsId]
-
         val effectiveFactor = if (settings?.isNightShiftEnabled == true) nightFactor else 0f
-
         val targetColor = getTargetColorForView(settingsId)
         val finalColor = interpolateColor(targetColor, nightTint, effectiveFactor)
 
