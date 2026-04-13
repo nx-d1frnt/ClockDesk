@@ -6,6 +6,7 @@ import android.widget.TextView
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class ClockManager(
     private val timeText: TextView,
@@ -37,6 +38,10 @@ class ClockManager(
 
     private var additionalLoggingEnabled = initialLoggingState
 
+    // Cache SimpleDateFormat instances to avoid recreation on every update
+    private val timeFormatCache = ConcurrentHashMap<String, SimpleDateFormat>()
+    private val dateFormatCache = ConcurrentHashMap<String, SimpleDateFormat>()
+
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
             updateClock()
@@ -61,13 +66,21 @@ class ClockManager(
     fun updateTimeText() {
         val currentTime = getCurrentTime()
         val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
-        timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
+        timeText.text = getCachedTimeFormatter(timePattern).format(currentTime)
     }
 
     fun updateDateText() {
         val currentTime = getCurrentTime()
         val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
-        dateText.text = SimpleDateFormat(datePattern, Locale.getDefault()).format(currentTime)
+        dateText.text = getCachedDateFormatter(datePattern).format(currentTime)
+    }
+
+    private fun getCachedTimeFormatter(pattern: String): SimpleDateFormat {
+        return timeFormatCache.getOrPut(pattern) { SimpleDateFormat(pattern, Locale.getDefault()) }
+    }
+
+    private fun getCachedDateFormatter(pattern: String): SimpleDateFormat {
+        return dateFormatCache.getOrPut(pattern) { SimpleDateFormat(pattern, Locale.getDefault()) }
     }
 
     fun startUpdates() {
@@ -153,21 +166,18 @@ class ClockManager(
             val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
             val datePattern = fontManager.getDateFormatPattern().ifBlank { "yyyy-MM-dd" }
 
-            val timeStr = SimpleDateFormat(timePattern, Locale.getDefault()).format(simulatedTime.time)
+            val timeStr = getCachedTimeFormatter(timePattern).format(simulatedTime.time)
             val sunriseStr = dayTimeGetter.sunriseTime?.let {
-                SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
+                getCachedTimeFormatter(timePattern).format(it)
             } ?: "06:00"
             val sunsetStr = dayTimeGetter.sunsetTime?.let {
-                SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
+                getCachedTimeFormatter(timePattern).format(it)
             } ?: "20:05"
             debugCallback(timeStr, sunriseStr, sunsetStr)
             Log.d(
                 "DemoMode",
                 "Simulated time: $timeStr, date: ${
-                    SimpleDateFormat(
-                        datePattern,
-                        Locale.getDefault()
-                    ).format(simulatedTime.time)
+                    getCachedDateFormatter(datePattern).format(simulatedTime.time)
                 }"
             )
             simulatedTime.time

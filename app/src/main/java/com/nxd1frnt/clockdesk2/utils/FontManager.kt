@@ -22,8 +22,11 @@ import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontItem
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Font settings data class to hold font properties for each widget.
@@ -79,6 +82,8 @@ class FontManager(
     private val fonts: MutableList<FontItem> = mutableListOf()
     @SuppressLint("RestrictedApi")
     private var currentScheme: Scheme? = null
+    // Cache for color interpolation to avoid redundant calculations
+    private val colorCache = ConcurrentHashMap<String, Int>()
     private val resourceFontIds = listOf(
         R.font.googlesansflex,
         R.font.anton_regular,
@@ -838,10 +843,17 @@ class FontManager(
 
     private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {
         val clamped = factor.coerceIn(0f, 1f)
-        return Color.rgb(
-            Color.red(color1) + ((Color.red(color2) - Color.red(color1)) * clamped).toInt(),
-            Color.green(color1) + ((Color.green(color2) - Color.green(color1)) * clamped).toInt(),
-            Color.blue(color1) + ((Color.blue(color2) - Color.blue(color1)) * clamped).toInt()
-        )
+        // Use integer math with fixed-point precision for faster computation
+        val factorInt = (clamped * 256).toInt()
+        val invFactorInt = 256 - factorInt
+        
+        val key = "${color1}_${color2}_${factorInt}"
+        return colorCache.getOrPut(key) {
+            Color.rgb(
+                (Color.red(color1) * invFactorInt + Color.red(color2) * factorInt) ushr 8,
+                (Color.green(color1) * invFactorInt + Color.green(color2) * factorInt) ushr 8,
+                (Color.blue(color1) * invFactorInt + Color.blue(color2) * factorInt) ushr 8
+            )
+        }
     }
 }

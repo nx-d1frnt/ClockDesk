@@ -34,6 +34,11 @@ object ColorExtractor {
 
                 val seedColor = if (ranked.isNotEmpty()) ranked[0] else null
 
+                // Recycle scaled bitmap only if we created it
+                if (scaledBitmap !== bitmap) {
+                    scaledBitmap.recycle()
+                }
+
                 handler.post {
                     if (seedColor != null) {
                         onColorReady(seedColor)

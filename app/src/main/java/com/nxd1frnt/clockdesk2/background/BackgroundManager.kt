@@ -4,6 +4,7 @@ import android.content.Context
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.util.Calendar
 import java.util.Date
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * BackgroundManager centralizes access to preferences related to backgrounds.
@@ -11,6 +12,10 @@ import java.util.Date
  */
 class BackgroundManager(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    
+    // Cache for night shift factor calculations to avoid redundant computations
+    private val nightShiftCache = ConcurrentHashMap<String, Float>()
+    private val dimIntensityCache = ConcurrentHashMap<String, Int>()
 
     companion object {
         const val PREFS_NAME = "ClockDeskPrefs"
@@ -103,24 +108,30 @@ class BackgroundManager(private val context: Context) {
     fun computeNightShiftFactor(currentTime: Date, sunTimeApi: DayTimeGetter): Float {
         if (!isNightShiftEnabled()) return 0f
 
+        // Create a cache key based on time and sun times
         val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
         val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+        
+        // Round time to nearest minute for cache efficiency
+        val timeKey = "${currentTime.time / 60000}_${sunrise.time / 60000}_${sunset.time / 60000}"
+        
+        return nightShiftCache.getOrPut(timeKey) {
+            val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
+            val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
+            val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
 
-        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
-        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
-        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
-
-        return when {
-            currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
-            currentTime.before(sunrise) -> {
-                1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
-            }
-            currentTime.before(postSunset) -> 0.0f // Daytime: no shift
-            currentTime.before(fullNight) -> {
-                (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
-            }
-            else -> 1.0f // Full night after fullNight
-        }.coerceIn(0f, 1f)
+            when {
+                currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
+                currentTime.before(sunrise) -> {
+                    1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
+                }
+                currentTime.before(postSunset) -> 0.0f // Daytime: no shift
+                currentTime.before(fullNight) -> {
+                    (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+                }
+                else -> 1.0f // Full night after fullNight
+            }.coerceIn(0f, 1f)
+        }
     }
 
     /**
@@ -135,27 +146,31 @@ class BackgroundManager(private val context: Context) {
         // DYNAMIC mode: mirror night transitions but produce an intensity factor 0..1
         val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
         val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+        
+        // Create a cache key based on time and sun times
+        val timeKey = "${currentTime.time / 60000}_${sunrise.time / 60000}_${sunset.time / 60000}_$userIntensity"
+        
+        return dimIntensityCache.getOrPut(timeKey) {
+            val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
+            val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
+            val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
 
-        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
-        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
-        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
+            val factor = when {
+                currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
+                currentTime.before(sunrise) -> {
+                    val f = (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time)
+                    (1.0f - f).coerceIn(0f, 1f) // transition to day: decrease dim
+                }
+                currentTime.before(postSunset) -> 0.0f // Daytime: no dim
+                currentTime.before(fullNight) -> {
+                    val f = (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+                    f.coerceIn(0f, 1f) // transition to full night: increase dim
+                }
+                else -> 1.0f // Full night after fullNight
+            }
 
-        val factor = when {
-            currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
-            currentTime.before(sunrise) -> {
-                val f = (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time)
-                (1.0f - f).coerceIn(0f, 1f) // transition to day: decrease dim
-            }
-            currentTime.before(postSunset) -> 0.0f // Daytime: no dim
-            currentTime.before(fullNight) -> {
-                val f = (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
-                f.coerceIn(0f, 1f) // transition to full night: increase dim
-            }
-            else -> 1.0f // Full night after fullNight
+            (userIntensity * factor).toInt().coerceIn(0, userIntensity)
         }
-
-        val result = (userIntensity * factor).toInt().coerceIn(0, userIntensity)
-        return result
     }
 
     fun clearDim() {
