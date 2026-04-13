@@ -5,7 +5,9 @@ import android.util.Log
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class ClockManager(
     private val timeText: TextView,
@@ -24,7 +26,7 @@ class ClockManager(
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
         isLowPower = isEnabled
         updateTimeText()
-        Log.d("ClockManager", "Power saving mode changed: isLowPower=$isLowPower")
+        Logger.d("ClockManager"){"Power saving mode changed: isLowPower=$isLowPower"}
     }
     private var isDebugMode = false
     private val debugCycleInterval = 5L // milliseconds
@@ -46,7 +48,7 @@ class ClockManager(
                 else -> 1000L // 1 second
             }
             handler.postDelayed(this, interval)
-            if (additionalLoggingEnabled) Log.d("ClockUpdate", "Clock updated at ${System.currentTimeMillis()}")
+            Logger.v("ClockUpdate"){"Clock updated at ${System.currentTimeMillis()}"}
         }
     }
 
@@ -117,10 +119,7 @@ class ClockManager(
         dayTimeGetter.dawnTime = normalizeTime(dayTimeGetter.dawnTime)
         dayTimeGetter.duskTime = normalizeTime(dayTimeGetter.duskTime)
         dayTimeGetter.solarNoonTime = normalizeTime(dayTimeGetter.solarNoonTime)
-        Log.d(
-            "ClockManager",
-            "Re-normalized sun times for ${today.time}: sunrise=${dayTimeGetter.sunriseTime}, sunset=${dayTimeGetter.sunsetTime}"
-        )
+        Logger.d("ClockManager"){"Re-normalized sun times for ${today.time}: sunrise=${dayTimeGetter.sunriseTime}, sunset=${dayTimeGetter.sunsetTime}"}
     }
 
     private fun checkAndUpdateSunTimesForRealTime(currentTime: Date) {
@@ -130,10 +129,7 @@ class ClockManager(
             if (additionalLoggingEnabled) Log.d("ClockManager", "Day changed to ${currentCal.time}, refreshing sun times")
             locationManager.loadCoordinates { lat, lon ->
                 dayTimeGetter.fetch(lat, lon) {
-                    Log.d(
-                        "ClockManager",
-                        "Sun times updated for new day: sunrise=${dayTimeGetter.sunriseTime}, sunset=${dayTimeGetter.sunsetTime}"
-                    )
+                    Logger.d("ClockManager"){"Sun times updated for new day: sunrise=${dayTimeGetter.sunriseTime}, sunset=${dayTimeGetter.sunsetTime}"}
                 }
             }
         }
@@ -161,15 +157,13 @@ class ClockManager(
                 SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
             } ?: "20:05"
             debugCallback(timeStr, sunriseStr, sunsetStr)
-            Log.d(
-                "DemoMode",
+            Logger.d("DemoMode"){
                 "Simulated time: $timeStr, date: ${
                     SimpleDateFormat(
                         datePattern,
                         Locale.getDefault()
                     ).format(simulatedTime.time)
-                }"
-            )
+                }"}
             simulatedTime.time
         } else {
             val realTime = Calendar.getInstance().time
@@ -180,7 +174,7 @@ class ClockManager(
         try {
             onTimeChanged(currentTime)
         } catch (e: Exception) {
-            Log.w("ClockManager", "onTimeChanged callback failed: ${e.message}")
+            Logger.w("ClockManager"){"onTimeChanged callback failed: ${e.message}"}
         }
         updateTimeText()
         updateDateText()

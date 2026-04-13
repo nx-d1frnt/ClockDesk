@@ -1,63 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:android="http://schemas.android.com/apk/res/android">
-    <PreferenceCategory
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
         app:key="suntimeapi_category"
         app:title="@string/sun_sunrise_api_settings">
 
-    <SwitchPreferenceCompat
-        app:key="useManualCoordinates"
-        app:title="@string/use_manual_coordinates"
-        app:summary="@string/use_manual_coordinates_summary" />
-    <EditTextPreference
-        app:key="latitude"
-        app:title="@string/latitude_label"
-        app:dialogTitle="@string/enter_latitude"
-        app:useSimpleSummaryProvider="true"
-        app:dependency="useManualCoordinates"
-        android:inputType="numberDecimal|numberSigned"/>/>
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="useManualCoordinates"
+            app:title="@string/use_manual_coordinates"
+            app:summary="@string/use_manual_coordinates_summary" />
 
-    <EditTextPreference
-        app:key="longitude"
-        app:title="@string/longitude"
-        app:dialogTitle="@string/enter_longitude"
-        app:useSimpleSummaryProvider="true"
-        app:dependency="useManualCoordinates"
-        android:inputType="numberDecimal|numberSigned" />/>
-    </PreferenceCategory>
+        <androidx.preference.EditTextPreference
+            app:key="latitude"
+            app:title="@string/latitude_label"
+            app:dialogTitle="@string/enter_latitude"
+            app:useSimpleSummaryProvider="true"
+            app:dependency="useManualCoordinates"
+            android:inputType="numberDecimal|numberSigned" />
 
-    <PreferenceCategory
+        <androidx.preference.EditTextPreference
+            app:key="longitude"
+            app:title="@string/longitude"
+            app:dialogTitle="@string/enter_longitude"
+            app:useSimpleSummaryProvider="true"
+            app:dependency="useManualCoordinates"
+            android:inputType="numberDecimal|numberSigned" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
         app:key="music_category"
         app:title="@string/music_settings_title">
-    <Preference
-        app:key="music_sources_screen"
-        app:title="@string/music_sources_title"
-        app:summary="@string/music_sources_summary"
-        app:fragment="com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment" />
-        <SwitchPreference
+
+        <androidx.preference.Preference
+            app:key="music_sources_screen"
+            app:title="@string/music_sources_title"
+            app:summary="@string/music_sources_summary"
+            app:fragment="com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment" />
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="lastfm_albumart_background"
             app:title="@string/set_album_art_as_background"
             app:summary="@string/set_album_art_as_background_summary" />
-    </PreferenceCategory>
-    <PreferenceCategory
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
         app:key="performance_category"
         app:title="@string/performance_settings">
-    <SwitchPreference
-        app:key="additional_logging"
-        app:title="@string/enable_additional_logging"
-        app:summary="@string/enable_additional_logging_summary" />
-        <SwitchPreference
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="additional_logging"
+            app:title="@string/enable_additional_logging"
+            app:summary="@string/enable_additional_logging_summary" />
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="advanced_graphics"
             app:title="@string/enable_advanced_graphics"
             app:summary="@string/enable_advanced_graphics_summary" />
-        <PreferenceCategory
-            app:key="battery_saver_category"
-            app:title="@string/battery_saver_settings_title">
-        <SwitchPreference
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="battery_saver_category"
+        app:title="@string/battery_saver_settings_title">
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="automatic_battery_saver_mode"
             app:title="@string/automatic_battery_saver_mode_title"
             app:summary="@string/automatic_battery_saver_mode_summary" />
-        <SeekBarPreference
+
+        <androidx.preference.SeekBarPreference
             app:key="battery_saver_trigger"
             app:title="@string/battery_saver_trigger_title"
             app:summary="@string/battery_saver_trigger_summary"
@@ -66,39 +77,45 @@
             android:defaultValue="15"
             app:showSeekBarValue="true"
             app:dependency="automatic_battery_saver_mode" />
-    </PreferenceCategory>
-        <PreferenceCategory
-            app:key="display_category"
-            app:title="@string/display_settings_title">
-        <SwitchPreference
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="display_category"
+        app:title="@string/display_settings_title">
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="burn_in_protection"
             app:title="@string/burn_in_protection_title"
             app:summary="@string/burn_in_protection_summary" />
-            <SwitchPreference
-                app:key="smart_pixels_enabled"
-                app:title="@string/smart_pixels_title"
-                app:summary="@string/smart_pixels_summary"
-                app:dependency="burn_in_protection"/>
-        </PreferenceCategory>
-        <PreferenceCategory
-            app:key="smart_chips_category"
-            app:title="@string/smart_chips_settings_title">
-            <Preference
-                app:key="smart_chips_screen"
-                app:title="@string/manage_smart_chips"
-                app:summary="@string/manage_smart_chips_summary"
-                app:fragment="com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment" />
-        </PreferenceCategory>
-    </PreferenceCategory>
 
-    <PreferenceCategory
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="smart_pixels_enabled"
+            app:title="@string/smart_pixels_title"
+            app:summary="@string/smart_pixels_summary"
+            app:dependency="burn_in_protection" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="smart_chips_category"
+        app:title="@string/smart_chips_settings_title">
+
+        <androidx.preference.Preference
+            app:key="smart_chips_screen"
+            app:title="@string/manage_smart_chips"
+            app:summary="@string/manage_smart_chips_summary"
+            app:fragment="com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
         app:key="backup_restore_category"
         app:title="@string/backup_restore_title">
-        <Preference
+
+        <androidx.preference.Preference
             app:key="export_settings"
             app:title="@string/export_settings" />
-        <Preference
+
+        <androidx.preference.Preference
             app:key="import_settings"
             app:title="@string/import_settings" />
-    </PreferenceCategory>
-</PreferenceScreen>
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

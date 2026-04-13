@@ -1357,14 +1357,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             combinedMatrix.postConcat(weatherMatrix)
         }
 
-        // Night Shift Factor for Background Harmony
+        // Night Shift Factor for Background
         val nightFactor = backgroundManager.computeNightShiftFactor(clockManager.getCurrentTime(), dayTimeGetter)
         if (nightFactor > 0f) {
             val nightShiftMatrix = ColorMatrix()
-            // Слегка уменьшаем зеленый и активно - синий, чтобы сделать картинку "теплее" без изменения исходных Asset'ов
             val rScale = 1.0f
-            val gScale = 1.0f - (0.25f * nightFactor)
-            val bScale = 1.0f - (0.55f * nightFactor)
+            val gScale = 1.0f - (0.55f * nightFactor)
+            val bScale = 1.0f - (0.80f * nightFactor)
             nightShiftMatrix.setScale(rScale, gScale, bScale, 1f)
             combinedMatrix.postConcat(nightShiftMatrix)
         }

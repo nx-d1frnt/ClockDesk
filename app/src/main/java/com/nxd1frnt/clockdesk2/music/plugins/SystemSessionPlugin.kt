@@ -6,7 +6,8 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
-import android.util.Log
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.fragment.app.Fragment
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ClockDeskMediaService
@@ -15,6 +16,7 @@ import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.utils.Logger
 
+@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
     override val id = "system_media"
     override val displayName = context.getString(R.string.system_media_plugin_name)

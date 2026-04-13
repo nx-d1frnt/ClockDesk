@@ -44,6 +44,7 @@
         <activity
             android:name=".ui.settings.SettingsActivity"
             android:label="@string/settings_title"
+            android:theme="@style/Theme.ClockDesk.Settings"
             android:screenOrientation="landscape"
             android:exported="false" />
         <service
