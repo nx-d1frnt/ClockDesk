@@ -162,8 +162,8 @@ class FontManager(
     private fun getDefaultSettingsFor(id: Int): FontSettings {
         val size = when (id) {
             R.id.time_text -> 128f
-            R.id.date_text -> 48f
-            R.id.lastfm_layout -> 32f
+            R.id.date_text -> 38f
+            R.id.lastfm_layout -> 19f
             R.id.smart_chip_container -> 14f
             else -> 24f
         }

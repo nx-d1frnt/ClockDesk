@@ -61,6 +61,8 @@ class BackgroundSheetManager(
     private val bgBlurSeek by lazy { bottomSheetView.findViewById<SeekBar>(R.id.blur_intensity_seekbar) }
     private val bgDimToggleGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
     private val bgDimSeek by lazy { bottomSheetView.findViewById<SeekBar>(R.id.dimming_intensity_seekbar) }
+    private val bgNightShiftSwitch: MaterialSwitch? by lazy { bottomSheetView.findViewById(R.id.background_night_shift_switch) }
+
     private val bgClearBtn by lazy { bottomSheetView.findViewById<Button>(R.id.clear_background_button_bs) }
     private val bgApplyBtn by lazy { bottomSheetView.findViewById<Button>(R.id.apply_background_button) }
     private val bgWeatherSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.weather_effect_switch) }
@@ -214,6 +216,20 @@ class BackgroundSheetManager(
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
+        // Night Shift Listener
+        bgNightShiftSwitch?.setOnCheckedChangeListener { _, _ ->
+            if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
+            // We temporarily save the value to manager so updateBackgroundFilters() picks it up correctly
+            // This is acceptable because if the user cancels, the old state restores correctly.
+            val wasEnabledBefore = backgroundManager.isNightShiftEnabled()
+            backgroundManager.setNightShiftEnabled(bgNightShiftSwitch?.isChecked == true)
+            debounceFilterUpdate {
+                onUpdateFilters()
+                // Revert state so that if User cancels sheet (doesn't press Apply), it ignores changes.
+                backgroundManager.setNightShiftEnabled(wasEnabledBefore)
+            }
+        }
+
         bgIntensitySeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) debounceFilterUpdate { applyWeatherPreview() }
@@ -315,6 +331,8 @@ class BackgroundSheetManager(
         })
         bgDimSeek.progress = backgroundManager.getDimIntensity()
 
+        bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
+
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isManual = backgroundManager.isManualWeatherEnabled()
 
@@ -349,6 +367,10 @@ class BackgroundSheetManager(
             else -> BackgroundManager.DIM_MODE_OFF
         })
         backgroundManager.setDimIntensity(bgDimSeek.progress)
+
+        bgNightShiftSwitch?.let {
+            backgroundManager.setNightShiftEnabled(it.isChecked)
+        }
 
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
@@ -448,7 +470,6 @@ class BackgroundSheetManager(
         previewTask?.let { bottomSheetView.removeCallbacks(it) }
         filterTask?.let { bottomSheetView.removeCallbacks(it) }
 
-        // Отсоединение адаптера позволяет сборщику мусора очистить ViewHolders и Bitmaps внутри них
         bgRecycler.adapter = null
         backgroundsAdapter = null
     }

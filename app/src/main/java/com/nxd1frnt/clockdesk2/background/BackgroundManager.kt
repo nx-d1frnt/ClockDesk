@@ -7,7 +7,7 @@ import java.util.Date
 
 /**
  * BackgroundManager centralizes access to preferences related to backgrounds.
- * It handles saved URIs, blur and dim settings.
+ * It handles saved URIs, blur, dim settings, and night shift.
  */
 class BackgroundManager(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -22,6 +22,7 @@ class BackgroundManager(private val context: Context) {
         private const val KEY_DIM_INTENSITY = "background_dim_intensity"
 
         private const val KEY_ZOOM_ENABLED = "background_zoom_enabled"
+        private const val KEY_NIGHT_SHIFT_ENABLED = "background_night_shift_enabled"
 
         const val DIM_MODE_OFF = 0
         const val DIM_MODE_CONTINUOUS = 1
@@ -66,9 +67,16 @@ class BackgroundManager(private val context: Context) {
 
     fun getDimIntensity(): Int = prefs.getInt(KEY_DIM_INTENSITY, 0)
     fun setDimIntensity(i: Int) { prefs.edit().putInt(KEY_DIM_INTENSITY, i).apply() }
+
     fun isWeatherEffectsEnabled(): Boolean = prefs.getBoolean(KEY_WEATHER_ENABLED, true)
     fun setWeatherEffectsEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_WEATHER_ENABLED, enabled).apply()
+    }
+
+    // Background Night Shift Feature
+    fun isNightShiftEnabled(): Boolean = prefs.getBoolean(KEY_NIGHT_SHIFT_ENABLED, false)
+    fun setNightShiftEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NIGHT_SHIFT_ENABLED, enabled).apply()
     }
 
     // Manual Mode Toggle
@@ -89,12 +97,34 @@ class BackgroundManager(private val context: Context) {
     }
 
     /**
+     * Compute the night shift factor (0.0 to 1.0) based on sun times.
+     * Synchronized with FontManager's logic for UI harmony.
+     */
+    fun computeNightShiftFactor(currentTime: Date, sunTimeApi: DayTimeGetter): Float {
+        if (!isNightShiftEnabled()) return 0f
+
+        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
+        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+
+        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
+        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
+        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
+
+        return when {
+            currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
+            currentTime.before(sunrise) -> {
+                1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
+            }
+            currentTime.before(postSunset) -> 0.0f // Daytime: no shift
+            currentTime.before(fullNight) -> {
+                (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+            }
+            else -> 1.0f // Full night after fullNight
+        }.coerceIn(0f, 1f)
+    }
+
+    /**
      * Compute the effective dim intensity for the provided time using sun times.
-     * Returns an integer in the same scale as user-configured intensity (0..max configured value).
-     * - If mode is OFF -> 0
-     * - If CONTINUOUS -> userIntensity
-     * - If DYNAMIC -> compute factor based on sunrise/sunset and scale userIntensity by that factor
-     * The transition windows mirror FontManager's night-shift logic.
      */
     fun computeEffectiveDimIntensity(currentTime: Date, sunTimeApi: DayTimeGetter): Int {
         val mode = getDimMode()
@@ -102,8 +132,7 @@ class BackgroundManager(private val context: Context) {
         if (mode == DIM_MODE_OFF || userIntensity <= 0) return 0
         if (mode == DIM_MODE_CONTINUOUS) return userIntensity
 
-        // DYNAMIC mode: mirror FontManager's night transitions but produce an intensity factor 0..1
-        // Ensure sun times are available; SunTimeApi may have fallback setters like in FontManager usage
+        // DYNAMIC mode: mirror night transitions but produce an intensity factor 0..1
         val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
         val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
 

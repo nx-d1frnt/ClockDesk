@@ -127,6 +127,14 @@
                 android:paddingTop="8dp"
                 android:paddingBottom="8dp" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/background_night_shift_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="@string/night_shift" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

@@ -199,7 +199,7 @@ class SmartChipManager(
         // Обновляем внутренние плагины (они читают статус мгновенно)
         internalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
+            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
 
             if (!isEnabled) {
                 if (chipInfo.isVisible) isContentChanged = true
@@ -373,7 +373,7 @@ fun updateAllChips() {
         internalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
             val isSystemChip = plugin.preferenceKey == "system_bg_progress"
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
+            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
             if (!isEnabled) {
                 if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
                 chipInfo.isVisible = false
