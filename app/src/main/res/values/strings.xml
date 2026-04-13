@@ -118,6 +118,11 @@
     <string name="widget_order_up">Move up</string>
     <string name="widget_order_down">Move down</string>
     <string name="free_mode_switch">Free movement (BETA)</string>
+    <string name="advanced_graphics_category">Advanced Graphics</string>
+    <string name="enable_turbulence_effect">Turbulence Effect</string>
+    <string name="enable_turbulence_effect_summary">Enable animated turbulence/noise overlay on backgrounds</string>
+    <string name="enable_edit_mode_blur">Edit Mode Blur</string>
+    <string name="enable_edit_mode_blur_summary">Apply heavy blur effect in edit mode</string>
     <string name="enable_advanced_graphics">Enable Advanced Graphics</string>
     <string name="enable_advanced_graphics_summary">Enable advanced graphics features (may impact performance on some devices)</string>
     <string name="weather_background">Dynamic weather background</string>

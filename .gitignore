@@ -4,72 +4,40 @@
 *.o
 *.obj
 *.out
-*.dll
-*.so
-*.a
-*.exe
+build/
+target/
 
 # Dependencies
 .gradle/
-build/
-target/
+node_modules/
+venv/
+.venv/
+__pycache__/
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
 
-# Editors
-.idea/
-.vscode/
-
 # Environment
 .env
 .env.local
 *.env.*
 
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
 # Coverage reports
 coverage/
 htmlcov/
-*.coverage
+.coverage
 
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-.pytest_cache/
+# MyPy cache
 .mypy_cache/
-
-# Node.js specific
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Compression files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+.pytest_cache/
 ```

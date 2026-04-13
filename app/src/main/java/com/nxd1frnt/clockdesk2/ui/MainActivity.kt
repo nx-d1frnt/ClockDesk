@@ -141,6 +141,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var widgetMover: WidgetMover
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private var isAdvancedGraphicsEnabled = false
+    private var isTurbulenceEffectEnabled = false
+    private var isEditModeBlurEnabled = false
     private var lastTrackInfo: String? = null
     private var wasMusicBackgroundApplied = false
     private var isEditMode = false
@@ -308,6 +310,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         Logger.isLoggingEnabled = enableAdditionalLogging
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        isTurbulenceEffectEnabled = prefs.getBoolean("enable_turbulence_effect", false) && isAdvancedGraphicsEnabled
+        isEditModeBlurEnabled = prefs.getBoolean("enable_edit_mode_blur", false) && isAdvancedGraphicsEnabled
 
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
@@ -693,6 +697,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging
+                }
+                "advanced_graphics" -> {
+                    isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+                    isTurbulenceEffectEnabled = prefs.getBoolean("enable_turbulence_effect", false) && isAdvancedGraphicsEnabled
+                    isEditModeBlurEnabled = prefs.getBoolean("enable_edit_mode_blur", false) && isAdvancedGraphicsEnabled
+                }
+                "enable_turbulence_effect" -> {
+                    isTurbulenceEffectEnabled = prefs.getBoolean("enable_turbulence_effect", false) && isAdvancedGraphicsEnabled
+                }
+                "enable_edit_mode_blur" -> {
+                    isEditModeBlurEnabled = prefs.getBoolean("enable_edit_mode_blur", false) && isAdvancedGraphicsEnabled
                 }
                 "lastfm_albumart_background" -> runOnUiThread { handleMusicStateUpdate(currentMusicState) }
             }
@@ -1153,7 +1168,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             } else {
                                 noiseColor = fontManager.getDynamicScheme()!!.primary
                             }
-                            if (isAdvancedGraphicsEnabled) {
+                            if (isTurbulenceEffectEnabled) {
                                 turbulenceOverlay.playAnimation(noiseColor) {}
                             }
                             backgroundImageView.setImageDrawable(resource)
@@ -1236,7 +1251,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .apply(finalReq)
                 .into(mainTarget)
 
-            if (isAdvancedGraphicsEnabled) {
+            if (isEditModeBlurEnabled) {
                 applyEditModeBlurLayer(model)
             } else {
                 editModeBlurLayer.setImageDrawable(null)
@@ -1557,7 +1572,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .setInterpolator(OvershootInterpolator())
                 .start()
             animateCornerRadius(mainLayout, 0f, targetRadius)
-            if (isAdvancedGraphicsEnabled && hasCustomImageBackground) {
+            if (isEditModeBlurEnabled && hasCustomImageBackground) {
                 editModeBlurLayer.visibility = View.VISIBLE
                 editModeBlurLayer.alpha = 1.0f
             }
@@ -1712,6 +1727,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        isTurbulenceEffectEnabled = prefs.getBoolean("enable_turbulence_effect", false) && isAdvancedGraphicsEnabled
+        isEditModeBlurEnabled = prefs.getBoolean("enable_edit_mode_blur", false) && isAdvancedGraphicsEnabled
         if (prefs.getBoolean("smart_pixels_enabled", false)) smartPixelManager.start() else smartPixelManager.stop()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)

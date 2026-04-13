@@ -46,10 +46,24 @@
         app:key="additional_logging"
         app:title="@string/enable_additional_logging"
         app:summary="@string/enable_additional_logging_summary" />
+        <PreferenceCategory
+            app:key="advanced_graphics_category"
+            app:title="@string/advanced_graphics_category">
         <SwitchPreference
             app:key="advanced_graphics"
             app:title="@string/enable_advanced_graphics"
             app:summary="@string/enable_advanced_graphics_summary" />
+        <SwitchPreference
+            app:key="enable_turbulence_effect"
+            app:title="@string/enable_turbulence_effect"
+            app:summary="@string/enable_turbulence_effect_summary"
+            app:dependency="advanced_graphics" />
+        <SwitchPreference
+            app:key="enable_edit_mode_blur"
+            app:title="@string/enable_edit_mode_blur"
+            app:summary="@string/enable_edit_mode_blur_summary"
+            app:dependency="advanced_graphics" />
+        </PreferenceCategory>
         <PreferenceCategory
             app:key="battery_saver_category"
             app:title="@string/battery_saver_settings_title">

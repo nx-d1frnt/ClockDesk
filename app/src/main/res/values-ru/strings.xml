@@ -118,6 +118,11 @@
     <string name="widget_order_up">Переместить вверх</string>
     <string name="widget_order_down">Переместить вниз</string>
     <string name="free_mode_switch">Свободное перемещение (БЕТА)</string>
+    <string name="advanced_graphics_category">Продвинутая графика</string>
+    <string name="enable_turbulence_effect">Эффект турбулентности</string>
+    <string name="enable_turbulence_effect_summary">Включить анимированное наложение шума/турбулентности на фон</string>
+    <string name="enable_edit_mode_blur">Размытие в режиме редактирования</string>
+    <string name="enable_edit_mode_blur_summary">Применять сильный эффект размытия в режиме редактирования</string>
     <string name="enable_advanced_graphics">Включить продвинутую графику</string>
     <string name="enable_advanced_graphics_summary">Включить продвинутые графические функции (может влиять на производительность на некоторых устройствах)</string>
     <string name="weather_background">Динамический погодный фон</string>
