@@ -14,6 +14,8 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 import kotlinx.coroutines.*
 import java.io.File
 import java.net.URL
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 /**
  * Bing Daily Wallpaper plugin - fetches the daily Bing wallpaper
@@ -123,7 +125,19 @@ class BingDailyWallpaperPlugin(
     
     private suspend fun fetchBingWallpaperUrl(): String? = withContext(Dispatchers.IO) {
         try {
-            val response = NetworkClient.instance.getString(BING_API_URL)
+            val response = suspendCoroutine<String?> { continuation ->
+                NetworkClient.getInstance().getString(
+                    BING_API_URL,
+                    onSuccess = { result -> continuation.resume(result) },
+                    onError = { error ->
+                        Logger.e("BingDailyPlugin") { "Network error: ${error.message}" }
+                        continuation.resume(null)
+                    }
+                )
+            }
+            
+            if (response == null) return@withContext null
+            
             // Parse JSON to extract image URL
             // Bing returns: {"images":[{"url":"/th?id=OHR.XXX_YYYY.jpg","...}]}
             val urlStart = response.indexOf("\"url\":\"/")
