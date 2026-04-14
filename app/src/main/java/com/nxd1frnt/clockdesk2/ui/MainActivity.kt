@@ -74,6 +74,7 @@ import com.nxd1frnt.clockdesk2.music.MusicPluginManager
 import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.network.GlideApp
+import com.nxd1frnt.clockdesk2.network.NetworkClient
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
@@ -215,6 +216,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     override fun onCreate(savedInstanceState: Bundle?) {
         DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
+
+        // Initialize NetworkClient for background plugins
+        NetworkClient.init(this)
 
         setupWindowFlags()
 
