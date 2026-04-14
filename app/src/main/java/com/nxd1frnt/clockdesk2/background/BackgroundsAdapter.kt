@@ -1,6 +1,7 @@
 package com.nxd1frnt.clockdesk2.background
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
@@ -31,18 +32,29 @@ class BackgroundsAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val id = items[position]
         try {
-            when (id) {
-                "__ADD__" -> {
+            when {
+                id == "__ADD__" -> {
                     holder.thumb.setImageResource(R.drawable.baseline_add_photo_alternate_24)
                     holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
                     holder.itemView.setOnLongClickListener(null) 
                 }
-                "__DEFAULT_GRADIENT__" -> {
+                id == "__DEFAULT_GRADIENT__" -> {
                     // Load app drawable gradient as preview
                     Glide.with(context)
                         .load(R.drawable.gradient_background)
                         .centerCrop()
                         .into(holder.thumb)
+                    holder.itemView.setOnLongClickListener(null)
+                }
+                id.startsWith("plugin:") -> {
+                    // Plugin-provided background - expect Bitmap data
+                    val pluginId = id.substring(7) // Remove "plugin:" prefix
+                    holder.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
+                    
+                    // The actual bitmap should be passed via a separate mechanism
+                    // For now, we'll use a placeholder and the actual image will be set by the manager
+                    holder.thumb.setImageResource(R.drawable.baseline_wallpaper_24)
+                    
                     holder.itemView.setOnLongClickListener(null)
                 }
                 else -> {
@@ -60,7 +72,7 @@ class BackgroundsAdapter(
         } catch (e: Exception) {
             // ignore and leave empty thumbnail
         }
-    holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
+        holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
         holder.itemView.setOnClickListener {
             onClick(id)
             updateSelection(id)
