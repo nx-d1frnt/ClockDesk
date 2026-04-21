@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -39,8 +40,6 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.RadioGroup
-import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -58,11 +57,9 @@ import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
@@ -76,17 +73,13 @@ import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.network.GlideApp
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
-import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
-import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.ui.settings.BackgroundSheetManager
 import com.nxd1frnt.clockdesk2.ui.settings.SettingsActivity
-import com.nxd1frnt.clockdesk2.ui.view.LoadingAnimationView
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
-import com.nxd1frnt.clockdesk2.ui.view.WeatherView
+import com.nxd1frnt.clockdesk2.ui.view.WeatherGLView
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
-import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
@@ -110,7 +103,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
     private lateinit var turbulenceOverlay: TurbulenceView
-    private lateinit var weatherView: WeatherView
+    private lateinit var weatherView: WeatherGLView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
     private lateinit var backgroundButton: Button
@@ -308,7 +301,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         Logger.isLoggingEnabled = enableAdditionalLogging
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
+        val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
 
+        weatherView.setFogTextures(fogBitmap, cloudsBitmap)
+        weatherView.setRenderScale(0.5f)
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
@@ -930,7 +927,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         if (backgroundManager.isManualWeatherEnabled()) {
             val typeOrdinal = backgroundManager.getManualWeatherType()
-            val type = WeatherView.WeatherType.values().getOrElse(typeOrdinal) { WeatherView.WeatherType.CLEAR }
+            val type = WeatherGLView.WeatherType.values().getOrElse(typeOrdinal) { WeatherGLView.WeatherType.CLEAR }
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
             weatherView.forceWeather(type, intensity, 5.0f, isNight)
         }
@@ -1181,7 +1178,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                             backgroundImageView.scaleX = finalZoom + 0.4f
                             backgroundImageView.scaleY = finalZoom + 0.4f
-
+                           // weatherView.setBackgroundImage(bitmap)
                             backgroundImageView.animate()
                                 .scaleX(finalZoom)
                                 .scaleY(finalZoom)
@@ -1330,14 +1327,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
             if (isManual) {
                 val typeOrdinal = backgroundManager.getManualWeatherType()
-                val type = WeatherView.WeatherType.values()[typeOrdinal]
+                val type = WeatherGLView.WeatherType.values()[typeOrdinal]
                 wmoCode = when (type) {
-                    WeatherView.WeatherType.CLEAR -> 0
-                    WeatherView.WeatherType.CLOUDY -> 3
-                    WeatherView.WeatherType.FOG -> 45
-                    WeatherView.WeatherType.RAIN -> 63
-                    WeatherView.WeatherType.SNOW -> 73
-                    WeatherView.WeatherType.THUNDERSTORM -> 95
+                    WeatherGLView.WeatherType.CLEAR -> 0
+                    WeatherGLView.WeatherType.CLOUDY -> 3
+                    WeatherGLView.WeatherType.FOG -> 45
+                    WeatherGLView.WeatherType.RAIN -> 63
+                    WeatherGLView.WeatherType.SNOW -> 73
+                    WeatherGLView.WeatherType.THUNDERSTORM -> 95
                     else -> 0
                 }
                 rawIntensity = backgroundManager.getManualWeatherIntensity() / 100f

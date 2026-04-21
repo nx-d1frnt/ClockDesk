@@ -96,7 +96,7 @@
                         android:layout_height="match_parent"
                         android:elevation="10dp"/>
                     
-                    <com.nxd1frnt.clockdesk2.ui.view.WeatherView
+                    <com.nxd1frnt.clockdesk2.ui.view.WeatherGLView
                         android:id="@+id/weatherView"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"/>

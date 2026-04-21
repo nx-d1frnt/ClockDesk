@@ -17,6 +17,7 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.ui.view.WeatherGLView
 import com.nxd1frnt.clockdesk2.ui.view.WeatherView
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
@@ -28,7 +29,7 @@ class BackgroundSheetManager(
     private val backgroundManager: BackgroundManager,
     private val dayTimeGetter: DayTimeGetter,
     private val weatherGetter: WeatherGetter,
-    private val weatherView: WeatherView,
+    private val weatherView: WeatherGLView,
     private val isMusicBackgroundApplied: () -> Boolean,
     private val onAddBackgroundRequested: () -> Unit,
     private val onPreviewImage: (Uri, blur: Int) -> Unit,
@@ -402,7 +403,7 @@ class BackgroundSheetManager(
                 R.id.btn_weather_thunder -> WeatherView.WeatherType.THUNDERSTORM.ordinal
                 else -> backgroundManager.getManualWeatherType()
             }
-            val type = WeatherView.WeatherType.values().getOrElse(typeOrdinal) { WeatherView.WeatherType.CLEAR }
+            val type = WeatherGLView.WeatherType.values().getOrElse(typeOrdinal) { WeatherGLView.WeatherType.CLEAR }
             val floatIntensity = bgIntensitySeek.progress / 100f
             weatherView.forceWeather(type, floatIntensity, 5.0f, isNight)
         } else {
