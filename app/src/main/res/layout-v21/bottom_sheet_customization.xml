@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:background="@drawable/main_activity_bg"
-    style="@style/Widget.Material3.BottomSheet.Modal"
     android:clickable="true"
     app:behavior_hideable="true"
+    app:maxWidth="480dp"
+    android:layout_gravity="center_horizontal"
+    style="@style/Widget.Material3.BottomSheet.Modal"
     android:focusable="true">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
@@ -18,56 +20,59 @@
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
+        android:layout_height="0dp"
         android:layout_weight="1"
+        android:fillViewport="true"
         android:focusableInTouchMode="true"
         android:clipToPadding="false"
-        android:paddingBottom="16dp">
+        android:paddingBottom="24dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp"
+            android:paddingHorizontal="24dp"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/customization_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="20sp"
+                android:textAppearance="?attr/textAppearanceHeadlineSmall"
                 android:textStyle="bold"
-                android:paddingBottom="16dp"/>
+                android:paddingBottom="24dp"/>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingBottom="8dp"
-                android:text="@string/font_size"
-                android:textSize="16sp" />
-
+            <!-- Размер шрифта -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:paddingBottom="16dp">
+                android:gravity="center_vertical"
+                android:paddingBottom="4dp">
 
-                <SeekBar
-                    android:id="@+id/size_seekbar"
-                    style="@style/Widget.Material3.Slider"
+                <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:text="@string/font_size"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" />
 
                 <TextView
                     android:id="@+id/size_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:paddingStart="8dp"
-                    android:text="48sp" />
+                    android:text="@string/default_size_value"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
 
+            <com.google.android.material.slider.Slider
+                android:id="@+id/size_seekbar"
+                style="@style/Widget.Material3.Slider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Max Width (Динамический блок) -->
             <LinearLayout
                 android:id="@+id/max_width_container"
                 android:layout_width="match_parent"
@@ -76,81 +81,94 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Max Width"
-                    android:textSize="16sp"
-                    android:paddingBottom="8dp"/>
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingBottom="16dp">
+                    android:paddingBottom="4dp">
 
-                    <SeekBar
-                        android:id="@+id/max_width_seekbar"
-                        style="@style/Widget.Material3.Slider"
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:max="100" 
-                        android:progress="100" />
-                        <TextView
+                        android:text="Max Width"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <TextView
                         android:id="@+id/max_width_value"
-                        android:layout_width="45dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="100%" />
+                        android:text="100%"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/max_width_seekbar"
+                    style="@style/Widget.Material3.Slider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:valueFrom="0.0"
+                    android:valueTo="100.0"
+                    android:value="100.0" />
             </LinearLayout>
 
+            <!-- Прозрачность -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:paddingBottom="8dp"
                 android:text="@string/transparency"
-                android:textSize="16sp" />
+                android:textAppearance="?attr/textAppearanceTitleMedium" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:paddingBottom="16dp">
+                android:gravity="center_vertical"
+                android:layout_marginBottom="24dp">
 
-                <SeekBar
+                <com.google.android.material.slider.Slider
                     android:id="@+id/transparency_seekbar"
-                    style="@style/Widget.AppCompat.SeekBar"
+                    style="@style/Widget.Material3.Slider"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
                     android:layout_weight="1" />
 
-                <View
-                    android:id="@+id/transparency_preview"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@android:color/white" />
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="16dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="?attr/colorOutline"
+                    app:strokeWidth="1dp">
+
+                    <View
+                        android:id="@+id/transparency_preview"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@android:color/white" />
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
+            <!-- Шрифты и свойства -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/font_recycler_view"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="16dp" />
 
             <TextView
                 android:id="@+id/variable_properties_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:paddingTop="8dp"
                 android:paddingBottom="8dp"
-                android:text="@string/variable_properties_title"
-                android:textSize="16sp"
-                android:layout_marginTop="8dp"/>
+                android:text="Variable Properties"
+                android:textAppearance="?attr/textAppearanceTitleMedium" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -158,101 +176,122 @@
                 android:orientation="vertical"
                 android:paddingBottom="16dp">
 
+                <!-- Вес (Weight) -->
                 <LinearLayout
                     android:id="@+id/var_weight_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
+
                     <TextView
                         android:layout_width="60dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/variable_properties_weight"
-                        android:textSize="12sp"/>
-                    <SeekBar
+                        android:text="Weight"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <com.google.android.material.slider.Slider
                         android:id="@+id/var_weight_seekbar"
                         style="@style/Widget.Material3.Slider"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:max="1000"
-                        android:min="1" />
+                        android:valueFrom="1.0"
+                        android:valueTo="1000.0"
+                        android:value="400.0" />
+
                     <TextView
                         android:id="@+id/var_weight_value"
                         android:layout_width="40dp"
                         android:layout_height="wrap_content"
                         android:gravity="end"
                         android:text="400"
-                        android:textSize="12sp"/>
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- Ширина (Width) -->
                 <LinearLayout
                     android:id="@+id/var_width_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="8dp">
+                    android:gravity="center_vertical">
+
                     <TextView
                         android:layout_width="60dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/variable_properties_width"
-                        android:textSize="12sp"/>
-                    <SeekBar
+                        android:text="Width"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <com.google.android.material.slider.Slider
                         android:id="@+id/var_width_seekbar"
                         style="@style/Widget.Material3.Slider"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:max="200"
-                        android:progress="100"/>
+                        android:valueFrom="0.0"
+                        android:valueTo="200.0"
+                        android:value="100.0"/>
+
                     <TextView
                         android:id="@+id/var_width_value"
                         android:layout_width="40dp"
                         android:layout_height="wrap_content"
                         android:gravity="end"
                         android:text="100"
-                        android:textSize="12sp"/>
-
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
+
+                <!-- Округлость (Roundness) -->
                 <LinearLayout
                     android:id="@+id/var_roundness_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="8dp">
+                    android:gravity="center_vertical">
+
                     <TextView
                         android:layout_width="60dp"
                         android:layout_height="wrap_content"
-                        android:singleLine="true"
-                        android:text="@string/variable_properties_roundness"
-                        android:textSize="12sp"/>
-                    <SeekBar
+                        android:text="Round"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <com.google.android.material.slider.Slider
                         android:id="@+id/var_roundness_seekbar"
                         style="@style/Widget.Material3.Slider"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:max="100"
-                        android:progress="0"/>
+                        android:valueFrom="0.0"
+                        android:valueTo="100.0"
+                        android:value="0.0"/>
+
                     <TextView
                         android:id="@+id/var_roundness_value"
                         android:layout_width="40dp"
                         android:layout_height="wrap_content"
                         android:gravity="end"
                         android:text="0"
-                        android:textSize="12sp"/>
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
             </LinearLayout>
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:dividerColor="?attr/colorOutlineVariant" />
+
+            <!-- Цвет -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Color"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"
-                android:paddingTop="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/color_recycler_view"
@@ -262,11 +301,14 @@
                 android:clipToPadding="false"
                 android:paddingBottom="16dp"/>
 
+            <!-- Переключатели (Свитчи) -->
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/edit_background_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:paddingVertical="12dp"
                 android:text="@string/edit_background"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:visibility="gone"
                 tools:visibility="visible"/>
 
@@ -274,19 +316,25 @@
                 android:id="@+id/night_shift_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:paddingVertical="12dp"
                 android:text="@string/night_shift"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:checked="false" />
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="16dp"
+                app:dividerColor="?attr/colorOutlineVariant" />
+
+            <!-- Выравнивание: Горизонтальное -->
             <TextView
                 android:id="@+id/alignment_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/horizontal_alignment"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"
-                android:paddingTop="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/alignment_toggle_group"
@@ -297,50 +345,53 @@
 
                 <Button
                     android:id="@+id/left_button"
-                    style="@style/Theme.ClockDesk.Button.Outlined"
-                    android:layout_width="wrap_content"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
+                    android:layout_weight="1"
                     android:checked="true"
-                    android:text="@string/align_left"
-                    android:icon="@drawable/align_horizontal_left"/>
+                    app:iconGravity="textStart"
+                    app:icon="@drawable/align_horizontal_left"/>
 
                 <Button
                     android:id="@+id/center_button"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
-                    android:text="@string/align_center"
-                    android:icon="@drawable/align_horizontal_center"/>
+                    android:layout_weight="1"
+                    app:iconGravity="textStart"
+                    app:icon="@drawable/align_horizontal_center"/>
 
                 <Button
                     android:id="@+id/right_button"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="@string/align_right"
-                    android:icon="@drawable/align_horizontal_right"/>
+                    android:layout_weight="1"
+                    app:iconGravity="textStart"
+                    app:icon="@drawable/align_horizontal_right"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <!-- Выравнивание: Вертикальное -->
             <TextView
                 android:id="@+id/vertical_alignment_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/vertical_alignment"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/vertical_alignment_group"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="16dp"
+                android:paddingBottom="24dp"
                 app:singleSelection="true">
 
                 <Button
                     android:id="@+id/align_top_button"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/align_top"/>
@@ -348,29 +399,81 @@
                 <Button
                     android:id="@+id/align_center_vertical_button"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:checked="true"
-                    android:text="@string/align_center"
-                    />
+                    android:text="@string/align_center" />
 
                 <Button
                     android:id="@+id/align_bottom_button"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/align_bottom"/>
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
+            <!-- Выравнивание текста (Gravity) -->
+            <TextView
+                android:id="@+id/gravity_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/text_alignment"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp"
+                android:visibility="visible"/>
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/text_gravity_toggle_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="16dp"
+                app:singleSelection="true"
+                android:visibility="visible">
+
+                <Button
+                    android:id="@+id/gravity_left_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:iconGravity="textStart"
+                    app:icon="@drawable/align_horizontal_left" />
+
+                <Button
+                    android:id="@+id/gravity_center_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:iconGravity="textStart"
+                    app:icon="@drawable/align_horizontal_center"/>
+
+                <Button
+                    android:id="@+id/gravity_right_button"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    app:iconGravity="textStart"
+                    app:icon="@drawable/align_horizontal_right"/>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="16dp"
+                app:dividerColor="?attr/colorOutlineVariant" />
+
+            <!-- Порядок виджетов -->
             <TextView
                 android:id="@+id/widget_order_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/widget_order"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp"/>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -397,132 +500,55 @@
                     android:text="@string/widget_order_down" />
             </LinearLayout>
 
-            <View
-                android:id="@+id/divider1"
+            <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="0dp"
-                android:layout_marginBottom="8dp"
-                android:background="?android:attr/listDivider" />
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="16dp"
+                app:dividerColor="?attr/colorOutlineVariant" />
 
+            <!-- Дополнительные настройки (Свободный режим, Сетка, Коллизии) -->
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/free_mode_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/free_mode_switch"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="?attr/colorError"
+                android:paddingVertical="12dp"
                 android:checked="false" />
-
-            <TextView
-                android:id="@+id/gravity_label"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/text_gravity"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"
-                android:paddingTop="8dp" />
-
-            <com.google.android.material.button.MaterialButtonToggleGroup
-                android:id="@+id/text_gravity_toggle_group"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingBottom="8dp"
-                app:singleSelection="true">
-
-                <Button
-                    android:id="@+id/gravity_left_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
-                    android:drawableStart="@drawable/align_horizontal_left"
-                    android:icon="@drawable/align_horizontal_left"
-                    android:text="@string/align_start"/>
-
-                <Button
-                    android:id="@+id/gravity_center_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
-                    android:text="@string/align_center"
-                    android:icon="@drawable/align_horizontal_center"/>
-
-                <Button
-                    android:id="@+id/gravity_right_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/align_end"
-                    android:icon="@drawable/align_horizontal_right"/>
-            </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/grid_snap_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/snap_to_grid"
-                android:checked="true"
-                android:paddingBottom="8dp"
-                android:paddingTop="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingVertical="12dp"
+                android:checked="true" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/ignore_collision_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/ignore_collision"
-                android:checked="false"
-                android:paddingBottom="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingVertical="12dp"
+                android:checked="false" />
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="8dp"
-                android:background="?android:attr/listDivider" />
-
-            <TextView
+            <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/layer_order"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"
-                android:visibility="gone"/>
+                android:layout_marginVertical="16dp"
+                app:dividerColor="?attr/colorOutlineVariant" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingBottom="16dp"
-                android:visibility="gone">
-
-                <Button
-                    android:id="@+id/send_backward_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:text="@string/send_backward" />
-
-                <Button
-                    android:id="@+id/bring_forward_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/bring_forward" />
-            </LinearLayout>
-            <!-- New: Time format selection -->
+            <!-- Форматы времени и даты -->
             <TextView
                 android:id="@+id/time_format_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/time_format"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp"/>
 
             <RadioGroup
                 android:id="@+id/time_format_radio_group"
@@ -536,7 +562,7 @@
                     style="@style/Widget.Material3.CompoundButton.RadioButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
+                    android:layout_marginEnd="24dp"
                     android:text="@string/time_24" />
 
                 <RadioButton
@@ -546,22 +572,24 @@
                     android:layout_height="wrap_content"
                     android:text="@string/time_12" />
             </RadioGroup>
+
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/show_am_pm_switch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/show_am_pm"
-                android:paddingBottom="16dp"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                android:paddingVertical="8dp"
+                android:layout_marginBottom="16dp"
                 android:checked="false" />
 
-            <!-- New: Date format selection -->
             <TextView
                 android:id="@+id/date_format_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/date_format"
-                android:textSize="16sp"
-                android:paddingBottom="8dp"/>
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:paddingBottom="12dp"/>
 
             <RadioGroup
                 android:id="@+id/date_format_radio_group"
@@ -575,7 +603,7 @@
                     style="@style/Widget.Material3.CompoundButton.RadioButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
+                    android:layout_marginBottom="8dp"
                     android:text="@string/date_format_short" />
 
                 <RadioButton
@@ -583,6 +611,7 @@
                     style="@style/Widget.Material3.CompoundButton.RadioButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
                     android:text="@string/date_format_medium" />
 
                 <RadioButton
@@ -592,23 +621,27 @@
                     android:layout_height="wrap_content"
                     android:text="@string/date_format_long" />
             </RadioGroup>
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
+
+    <!-- Нижняя панель с кнопками -->
     <LinearLayout
         android:id="@+id/buttons_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:background="@drawable/main_activity_bg"
+        android:background="?attr/colorSurfaceContainer"
         android:elevation="8dp"
-        android:padding="16dp">
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp">
 
         <Button
             android:id="@+id/cancel_button"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            style="@style/Widget.Material3.Button.TonalButton"
             android:text="@string/cancel" />
 
         <Space
@@ -617,9 +650,11 @@
 
         <Button
             android:id="@+id/apply_button"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/apply" />
     </LinearLayout>
+
 </LinearLayout>

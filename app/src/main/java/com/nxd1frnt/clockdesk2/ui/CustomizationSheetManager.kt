@@ -8,7 +8,6 @@ import android.view.animation.OvershootInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioGroup
-import android.widget.SeekBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -16,6 +15,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
@@ -44,14 +44,14 @@ class CustomizationSheetManager(
     private val animationDuration = 300L
 
     private val bsTitle by lazy { bottomSheetView.findViewById<TextView>(R.id.customization_title) }
-    private val bsSizeSeekBar by lazy { bottomSheetView.findViewById<SeekBar>(R.id.size_seekbar) }
+    private val bsSizeSeekBar by lazy { bottomSheetView.findViewById<Slider>(R.id.size_seekbar) }
     private val bsSizeValue by lazy { bottomSheetView.findViewById<TextView>(R.id.size_value) }
 
     private val bsMaxWidthContainer by lazy { bottomSheetView.findViewById<LinearLayout>(R.id.max_width_container) }
-    private val bsMaxWidthSeekBar by lazy { bottomSheetView.findViewById<SeekBar>(R.id.max_width_seekbar) }
+    private val bsMaxWidthSeekBar by lazy { bottomSheetView.findViewById<Slider>(R.id.max_width_seekbar) }
     private val bsMaxWidthValue by lazy { bottomSheetView.findViewById<TextView>(R.id.max_width_value) }
 
-    private val bsTransparencySeekBar by lazy { bottomSheetView.findViewById<SeekBar>(R.id.transparency_seekbar) }
+    private val bsTransparencySeekBar by lazy { bottomSheetView.findViewById<Slider>(R.id.transparency_seekbar) }
     private val bsTransparencyPreview by lazy { bottomSheetView.findViewById<View>(R.id.transparency_preview) }
 
     private val bsFontRecyclerView by lazy { bottomSheetView.findViewById<RecyclerView>(R.id.font_recycler_view) }
@@ -189,7 +189,6 @@ class CustomizationSheetManager(
             dynamicAxesContainer.visibility = View.VISIBLE
 
             axes.forEach { axis ->
-                // Получаем текущее значение или используем default
                 val currentValue = try { fontManager.getCurrentAxisValue(focusedView!!, axis.tag) } catch (e: Exception) { axis.defaultValue }
                 val sliderView = createDynamicSlider(axis, currentValue ?: axis.defaultValue)
                 dynamicAxesContainer.addView(sliderView)
@@ -222,29 +221,33 @@ class CustomizationSheetManager(
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.8f)
         }
 
-        val seekBar = SeekBar(context).apply {
+        val slider = Slider(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f)
-            max = 1000
 
-            val range = axis.maxValue - axis.minValue
-            progress = if (range > 0) (((initialValue - axis.minValue) / range) * 1000).toInt() else 0
+            // Material Slider works perfectly with floats, no more 0-1000 scaling hacks needed
+            val min = axis.minValue
+            val max = axis.maxValue
+            if (max > min) {
+                valueFrom = min
+                valueTo = max
+                value = initialValue.coerceIn(min, max)
+            } else {
+                valueFrom = 0f
+                valueTo = 1f
+                value = 0f
+                isEnabled = false
+            }
 
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    if (fromUser && focusedView != null) {
-                        val realValue = axis.minValue + (progress / 1000f) * range
-                        valueText.text = String.format("%.1f", realValue)
-                        // ВАЖНО: Добавьте этот метод в FontManager для передачи любого тега
-                        fontManager.setVariationAxis(focusedView!!, axis.tag, realValue)
-                    }
+            addOnChangeListener { _, sliderValue, fromUser ->
+                if (fromUser && focusedView != null) {
+                    valueText.text = String.format("%.1f", sliderValue)
+                    fontManager.setVariationAxis(focusedView!!, axis.tag, sliderValue)
                 }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-            })
+            }
         }
 
         container.addView(nameText)
-        container.addView(seekBar)
+        container.addView(slider)
         container.addView(valueText)
         return container
     }
@@ -369,16 +372,28 @@ class CustomizationSheetManager(
         val metrics = bottomSheetView.resources.displayMetrics
 
         val sizeOffset = 8
-        val maxvalue = (metrics.widthPixels / metrics.density * 0.3).toInt()
-        bsSizeSeekBar.max = maxvalue - sizeOffset
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) bsSizeSeekBar.min = 0
-        bsSizeSeekBar.progress = (settings.size - sizeOffset).toInt()
+        val maxvalue = (metrics.widthPixels / metrics.density * 0.3f)
+        val safeMax = (maxvalue - sizeOffset).coerceAtLeast(1f)
+
+        bsSizeSeekBar.apply {
+            valueFrom = 0f
+            valueTo = safeMax
+            value = (settings.size - sizeOffset).coerceIn(0f, safeMax)
+        }
         bsSizeValue.text = bottomSheetView.context.getString(R.string.size_value_format, settings.size.toInt())
 
-        bsMaxWidthSeekBar.progress = settings.maxWidthPercent
+        bsMaxWidthSeekBar.apply {
+            valueFrom = 0f
+            valueTo = 100f
+            value = settings.maxWidthPercent.toFloat().coerceIn(0f, 100f)
+        }
         bsMaxWidthValue.text = "${settings.maxWidthPercent}%"
-        bsTransparencySeekBar.max = 100
-        bsTransparencySeekBar.progress = (settings.alpha * 100).toInt()
+
+        bsTransparencySeekBar.apply {
+            valueFrom = 0f
+            valueTo = 100f
+            value = (settings.alpha * 100).coerceIn(0f, 100f)
+        }
         bsTransparencyPreview.alpha = settings.alpha
 
         (bsFontRecyclerView.adapter as? FontAdapter)?.apply {
@@ -434,39 +449,28 @@ class CustomizationSheetManager(
     }
 
     private fun setupSizeAndTransparency() {
-        bsSizeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || focusedView == null) return
-                val size = (progress + 8f)
-                bsSizeValue.text = bottomSheetView.context.getString(R.string.size_value_format, size.toInt())
-                fontManager.setFontSize(focusedView!!, size)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bsSizeSeekBar.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser || focusedView == null) return@addOnChangeListener
+            val size = (value + 8f)
+            bsSizeValue.text = bottomSheetView.context.getString(R.string.size_value_format, size.toInt())
+            fontManager.setFontSize(focusedView!!, size)
+        }
 
-        bsMaxWidthSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || focusedView == null) return
-                bsMaxWidthValue.text = "$progress%"
-                if (focusedView!!.id == R.id.lastfm_layout) {
-                    fontManager.setMaxWidthPercent(focusedView!!, progress)
-                }
+        bsMaxWidthSeekBar.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser || focusedView == null) return@addOnChangeListener
+            val progress = value.toInt()
+            bsMaxWidthValue.text = "$progress%"
+            if (focusedView!!.id == R.id.lastfm_layout) {
+                fontManager.setMaxWidthPercent(focusedView!!, progress)
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        }
 
-        bsTransparencySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (!fromUser || focusedView == null) return
-                val alpha = progress / 100f
-                bsTransparencyPreview.alpha = alpha
-                fontManager.setFontAlpha(focusedView!!, alpha)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bsTransparencySeekBar.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser || focusedView == null) return@addOnChangeListener
+            val alpha = value / 100f
+            bsTransparencyPreview.alpha = alpha
+            fontManager.setFontAlpha(focusedView!!, alpha)
+        }
     }
 
     private fun setupSwitchesAndToggles() {

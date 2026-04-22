@@ -6,13 +6,13 @@ import android.view.View
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.SeekBar
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
@@ -59,9 +59,9 @@ class BackgroundSheetManager(
     // Ленивая инициализация UI
     private val bgRecycler by lazy { bottomSheetView.findViewById<RecyclerView>(R.id.background_recycler_view) }
     private val bgBlurSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.background_blur_switch) }
-    private val bgBlurSeek by lazy { bottomSheetView.findViewById<SeekBar>(R.id.blur_intensity_seekbar) }
+    private val bgBlurSeek by lazy { bottomSheetView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
     private val bgDimToggleGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
-    private val bgDimSeek by lazy { bottomSheetView.findViewById<SeekBar>(R.id.dimming_intensity_seekbar) }
+    private val bgDimSeek by lazy { bottomSheetView.findViewById<Slider>(R.id.dimming_intensity_seekbar) }
     private val bgNightShiftSwitch: MaterialSwitch? by lazy { bottomSheetView.findViewById(R.id.background_night_shift_switch) }
 
     private val bgClearBtn by lazy { bottomSheetView.findViewById<Button>(R.id.clear_background_button_bs) }
@@ -71,7 +71,7 @@ class BackgroundSheetManager(
     private val bgManualWeatherScroll by lazy { bottomSheetView.findViewById<View>(R.id.manual_weather_scroll) }
     private val bgWeatherToggleGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.weather_type_toggle_group) }
     private val bgIntensityContainer by lazy { bottomSheetView.findViewById<View>(R.id.weather_intensity_container) }
-    private val bgIntensitySeek by lazy { bottomSheetView.findViewById<SeekBar>(R.id.weather_intensity_seekbar) }
+    private val bgIntensitySeek by lazy { bottomSheetView.findViewById<Slider>(R.id.weather_intensity_seekbar) }
 
     init {
         setupBehavior()
@@ -146,7 +146,7 @@ class BackgroundSheetManager(
                         debouncePreview {
                             try {
                                 val uri = Uri.parse(id)
-                                val intensity = bgBlurSeek.progress
+                                val intensity = bgBlurSeek.value.toInt()
                                 onPreviewImage(uri, intensity)
                             } catch (e: Exception) {
                                 Logger.e("BackgroundSheetManager") { "Error selecting background: $id - ${e.message}" }
@@ -178,22 +178,22 @@ class BackgroundSheetManager(
     private fun setupListeners() {
         bgBlurSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            if (!isChecked) bgBlurSeek.progress = 0
-            else if (bgBlurSeek.progress == 0) bgBlurSeek.progress = 25
+            if (!isChecked) bgBlurSeek.value = 0f
+            else if (bgBlurSeek.value == 0f) bgBlurSeek.value = 25f
         }
 
-        bgBlurSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) bgBlurSwitch.isChecked = progress > 0
-                // Размытие ресурсоемкое, поэтому применяем его немедленно только после отпускания ползунка (оптимизация Glide GlideApp)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+        bgBlurSeek.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) bgBlurSwitch.isChecked = value > 0f
+        }
+
+        bgBlurSeek.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
                 // Применяем актуальное размытие к текущему превью при отпускании ползунка
                 previewBackgroundUri?.let { id ->
                     if (id != "__DEFAULT_GRADIENT__" && !isMusicBackgroundApplied()) {
                         debouncePreview {
-                            onPreviewImage(Uri.parse(id), bgBlurSeek.progress)
+                            onPreviewImage(Uri.parse(id), slider.value.toInt())
                         }
                     }
                 }
@@ -205,39 +205,28 @@ class BackgroundSheetManager(
                 if (group.checkedButtonId == View.NO_ID && !isUpdatingBackgroundUi) group.check(checkedId)
                 return@addOnButtonCheckedListener
             }
-            if (checkedId == R.id.off_button) bgDimSeek.progress = 0
+            if (checkedId == R.id.off_button) bgDimSeek.value = 0f
             debounceFilterUpdate { onUpdateFilters() }
         }
 
-        bgDimSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) debounceFilterUpdate { onUpdateFilters() }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bgDimSeek.addOnChangeListener { _, _, fromUser ->
+            if (fromUser) debounceFilterUpdate { onUpdateFilters() }
+        }
 
         // Night Shift Listener
         bgNightShiftSwitch?.setOnCheckedChangeListener { _, _ ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            // We temporarily save the value to manager so updateBackgroundFilters() picks it up correctly
-            // This is acceptable because if the user cancels, the old state restores correctly.
             val wasEnabledBefore = backgroundManager.isNightShiftEnabled()
             backgroundManager.setNightShiftEnabled(bgNightShiftSwitch?.isChecked == true)
             debounceFilterUpdate {
                 onUpdateFilters()
-                // Revert state so that if User cancels sheet (doesn't press Apply), it ignores changes.
                 backgroundManager.setNightShiftEnabled(wasEnabledBefore)
             }
         }
 
-        bgIntensitySeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) debounceFilterUpdate { applyWeatherPreview() }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        bgIntensitySeek.addOnChangeListener { _, _, fromUser ->
+            if (fromUser) debounceFilterUpdate { applyWeatherPreview() }
+        }
 
         bgWeatherToggleGroup.addOnButtonCheckedListener { _, _, isChecked ->
             if (isChecked && !isUpdatingBackgroundUi) applyWeatherPreview()
@@ -305,7 +294,7 @@ class BackgroundSheetManager(
         updateAdapterItems()
         previewBackgroundUri = uriStr
         if (!isMusicBackgroundApplied()) {
-            onPreviewImage(Uri.parse(uriStr), bgBlurSeek.progress)
+            onPreviewImage(Uri.parse(uriStr), bgBlurSeek.value.toInt())
         }
     }
 
@@ -321,7 +310,7 @@ class BackgroundSheetManager(
         bgRecycler.scrollToPosition(0)
 
         val blurInt = backgroundManager.getBlurIntensity()
-        bgBlurSeek.progress = blurInt
+        bgBlurSeek.value = blurInt.toFloat()
         bgBlurSwitch.isChecked = blurInt > 0
 
         bgDimToggleGroup.check(when (backgroundManager.getDimMode()) {
@@ -330,7 +319,7 @@ class BackgroundSheetManager(
             BackgroundManager.DIM_MODE_DYNAMIC -> R.id.dynamic_button
             else -> R.id.off_button
         })
-        bgDimSeek.progress = backgroundManager.getDimIntensity()
+        bgDimSeek.value = backgroundManager.getDimIntensity().toFloat()
 
         bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
 
@@ -343,7 +332,7 @@ class BackgroundSheetManager(
 
         bgManualWeatherScroll.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
         bgIntensityContainer.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
-        bgIntensitySeek.progress = backgroundManager.getManualWeatherIntensity()
+        bgIntensitySeek.value = backgroundManager.getManualWeatherIntensity().toFloat()
 
         bgWeatherToggleGroup.check(when (backgroundManager.getManualWeatherType()) {
             WeatherView.WeatherType.RAIN.ordinal -> R.id.btn_weather_rain
@@ -359,7 +348,7 @@ class BackgroundSheetManager(
     }
 
     private fun applyBackgroundSettings() {
-        backgroundManager.setBlurIntensity(bgBlurSeek.progress)
+        backgroundManager.setBlurIntensity(bgBlurSeek.value.toInt())
 
         backgroundManager.setDimMode(when (bgDimToggleGroup.checkedButtonId) {
             R.id.off_button -> BackgroundManager.DIM_MODE_OFF
@@ -367,7 +356,7 @@ class BackgroundSheetManager(
             R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
             else -> BackgroundManager.DIM_MODE_OFF
         })
-        backgroundManager.setDimIntensity(bgDimSeek.progress)
+        backgroundManager.setDimIntensity(bgDimSeek.value.toInt())
 
         bgNightShiftSwitch?.let {
             backgroundManager.setNightShiftEnabled(it.isChecked)
@@ -375,7 +364,7 @@ class BackgroundSheetManager(
 
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
-        backgroundManager.setManualWeatherIntensity(bgIntensitySeek.progress)
+        backgroundManager.setManualWeatherIntensity(bgIntensitySeek.value.toInt())
 
         backgroundManager.setManualWeatherType(when (bgWeatherToggleGroup.checkedButtonId) {
             R.id.btn_weather_clear -> WeatherView.WeatherType.CLEAR.ordinal
@@ -404,7 +393,7 @@ class BackgroundSheetManager(
                 else -> backgroundManager.getManualWeatherType()
             }
             val type = WeatherGLView.WeatherType.values().getOrElse(typeOrdinal) { WeatherGLView.WeatherType.CLEAR }
-            val floatIntensity = bgIntensitySeek.progress / 100f
+            val floatIntensity = bgIntensitySeek.value / 100f
             weatherView.forceWeather(type, floatIntensity, 5.0f, isNight)
         } else {
             weatherView.updateFromOpenMeteoSmart(
