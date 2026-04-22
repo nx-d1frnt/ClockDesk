@@ -60,7 +60,7 @@ class TurbulenceView @JvmOverloads constructor(
     }
 
     fun playAnimation(color: Int? = null, onReadyCallback: () -> Unit) {
-        val targetColor = color ?: Color.WHITE
+        val targetColor = color ?: Color.parseColor("#5A7184")
 
         finishRunnable?.let { removeCallbacks(it) }
         readyRunnable?.let { removeCallbacks(it) }

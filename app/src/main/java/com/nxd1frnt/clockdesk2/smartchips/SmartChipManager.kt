@@ -260,88 +260,101 @@ class SmartChipManager(
     }
 
     private fun discoverExternalPlugins() {
-        val pm = context.packageManager
-        val queryIntent = Intent(ChipPluginContract.ACTION_QUERY_PLUGINS)
-        val receivers = pm.queryBroadcastReceivers(queryIntent, PackageManager.GET_META_DATA)
-        val foundPlugins = mutableListOf<ExternalChipPlugin>()
+        Thread {
+            val pm = context.packageManager
+            val queryIntent = Intent(ChipPluginContract.ACTION_QUERY_PLUGINS)
+            val receivers = pm.queryBroadcastReceivers(queryIntent, PackageManager.GET_META_DATA)
 
-        for (resolveInfo in receivers) {
-            val activityInfo = resolveInfo.activityInfo ?: continue
-            val metaData = activityInfo.metaData ?: continue
-            val packageName = activityInfo.packageName
-            val className = activityInfo.name
+            class DiscoveredPlugin(val pkg: String, val cls: String, val key: String, val name: String)
+            val foundData = mutableListOf<DiscoveredPlugin>()
 
-            if (metaData.containsKey(ChipPluginContract.META_DATA_PLUGIN_INFO)) {
-                val resId = metaData.getInt(ChipPluginContract.META_DATA_PLUGIN_INFO)
-                try {
-                    val pluginRes = pm.getResourcesForApplication(packageName)
-                    val parser = pluginRes.getXml(resId)
-                    var prefKey: String? = null
-                    var dispName: String? = null
+            for (resolveInfo in receivers) {
+                val activityInfo = resolveInfo.activityInfo ?: continue
+                val metaData = activityInfo.metaData ?: continue
+                val packageName = activityInfo.packageName
+                val className = activityInfo.name
 
-                    while (parser.next() != XmlPullParser.END_DOCUMENT) {
-                        if (parser.eventType == XmlPullParser.START_TAG && parser.name == "smart-chip-plugin") {
-                            prefKey = parser.getAttributeValue(null, "preferenceKey")
-                            dispName = parser.getAttributeValue(null, "displayName")
-                        }
-                    }
+                if (metaData.containsKey(ChipPluginContract.META_DATA_PLUGIN_INFO)) {
+                    val resId = metaData.getInt(ChipPluginContract.META_DATA_PLUGIN_INFO)
+                    try {
+                        val pluginRes = pm.getResourcesForApplication(packageName)
+                        val parser = pluginRes.getXml(resId)
+                        var prefKey: String? = null
+                        var dispName: String? = null
 
-                    if (prefKey != null && dispName != null) {
-                        foundPlugins.add(ExternalChipPlugin(packageName, className, prefKey, dispName))
-                        val view = LayoutInflater.from(context)
-                            .inflate(R.layout.smart_chip_layout, chipContainer, false)
-                            .apply {
-                                visibility = View.GONE
-                                isClickable = true
-                                isFocusable = true
-                                tag = prefKey
-                            }
-                            Logger.d("SmartChipManager"){"Plugin $packageName loaded"}
-                        view.setOnClickListener {
-                            if (isEditMode) {
-                                onEditClickListener?.invoke(chipContainer)
-                                return@setOnClickListener
-                            }
-                            val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
-                            chipInfo.clickActivityClassName?.let { cls ->
-                                try {
-                                    val pluginPkg = externalPlugins.find { it.preferenceKey == chipInfo.id }?.packageName ?: return@let
-                                    val fullClassName = if (cls.startsWith(".")) pluginPkg + cls else cls
-                                    val intent = Intent().setClassName(pluginPkg, fullClassName)
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                    var options: Bundle? = null
-
-                                    if (context is Activity) {
-                                        val transitionName = "shared_chip_container"
-                                        view.transitionName = transitionName
-
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                            options = ActivityOptions.makeSceneTransitionAnimation(
-                                                context,
-                                                Pair.create(view, transitionName)
-                                            ).toBundle()
-                                        }
-                                        else {
-                                            options = ActivityOptions.makeScaleUpAnimation(
-                                                view, 0, 0, view.width, view.height
-                                            ).toBundle()
-                                        }
-                                    } else {
-                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-
-                                    context.startActivity(intent, options)
-                                } catch (e: Exception) { }
+                        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "smart-chip-plugin") {
+                                prefKey = parser.getAttributeValue(null, "preferenceKey")
+                                dispName = parser.getAttributeValue(null, "displayName")
                             }
                         }
-                        allChips.add(ChipInfo(prefKey, view))
+
+                        if (prefKey != null && dispName != null) {
+                            foundData.add(DiscoveredPlugin(packageName, className, prefKey, dispName))
+                        }
+                    } catch (e: Exception) {
+                        Logger.w("SmartChipManager"){"Failed to parse plugin metadata from $packageName"}
                     }
-                } catch (e: Exception) {
-                    Logger.w("SmartChipManager"){"Failed to parse plugin metadata from $packageName"}
                 }
             }
-        }
-        this.externalPlugins = foundPlugins
+
+            handler.post {
+                val foundPlugins = mutableListOf<ExternalChipPlugin>()
+                foundData.forEach { data ->
+                    foundPlugins.add(ExternalChipPlugin(data.pkg, data.cls, data.key, data.name))
+                    val view = LayoutInflater.from(context)
+                        .inflate(R.layout.smart_chip_layout, chipContainer, false)
+                        .apply {
+                            visibility = View.GONE
+                            isClickable = true
+                            isFocusable = true
+                            tag = data.key
+                        }
+                    Logger.d("SmartChipManager"){"Plugin ${data.pkg} loaded"}
+
+                    view.setOnClickListener {
+                        if (isEditMode) {
+                            onEditClickListener?.invoke(chipContainer)
+                            return@setOnClickListener
+                        }
+                        val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
+                        chipInfo.clickActivityClassName?.let { cls ->
+                            try {
+                                val pluginPkg = externalPlugins.find { it.preferenceKey == chipInfo.id }?.packageName ?: return@let
+                                val fullClassName = if (cls.startsWith(".")) pluginPkg + cls else cls
+                                val intent = Intent().setClassName(pluginPkg, fullClassName)
+                                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                var options: Bundle? = null
+
+                                if (context is Activity) {
+                                    val transitionName = "shared_chip_container"
+                                    view.transitionName = transitionName
+
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                        options = ActivityOptions.makeSceneTransitionAnimation(
+                                            context,
+                                            Pair.create(view, transitionName)
+                                        ).toBundle()
+                                    }
+                                    else {
+                                        options = ActivityOptions.makeScaleUpAnimation(
+                                            view, 0, 0, view.width, view.height
+                                        ).toBundle()
+                                    }
+                                } else {
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+
+                                context.startActivity(intent, options)
+                            } catch (e: Exception) { }
+                        }
+                    }
+                    allChips.add(ChipInfo(data.key, view))
+                }
+                this.externalPlugins = foundPlugins
+                requestInitialState()
+            }
+        }.start()
     }
 
     private fun updateExternalChipView(view: View, pkg: String, text: String, iconName: String): Boolean {

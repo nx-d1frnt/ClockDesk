@@ -80,6 +80,7 @@ import com.nxd1frnt.clockdesk2.ui.view.WeatherGLView
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
+import com.nxd1frnt.clockdesk2.utils.EntranceAnimationManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
@@ -160,6 +161,37 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var pendingRestoreRunnable: Runnable? = null
     private lateinit var backgroundFrame: FrameLayout
 
+    private lateinit var entranceAnimationManager: EntranceAnimationManager
+    private var isWidgetLayoutComplete = false
+    private var isBackgroundReady = false
+    private var entranceAnimationPlayed = false
+    private val ENTRANCE_ANIMATION_TIMEOUT = 2500L
+    private val MIN_LOADER_DURATION = 800L
+    private var activityStartTime = 0L
+
+    private val entranceAnimationRunnable = Runnable {
+        checkAndPlayEntranceAnimation(force = true)
+    }
+
+    private fun checkAndPlayEntranceAnimation(force: Boolean = false) {
+        if (entranceAnimationPlayed) return
+        if (force || (isWidgetLayoutComplete && isBackgroundReady)) {
+            entranceAnimationPlayed = true
+            handler.removeCallbacks(entranceAnimationRunnable)
+
+            val timePassed = System.currentTimeMillis() - activityStartTime
+            val delay = if (force) 0L else maxOf(0L, MIN_LOADER_DURATION - timePassed)
+
+            mainLayout.postDelayed({
+                entranceAnimationManager.play()
+                handler.postDelayed({ setupMusicSystem()
+                                    widgetMover.restoreOrderAndPositions()
+                                    }, 850)
+            }, delay)
+
+        }
+    }
+
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
             if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
@@ -206,6 +238,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundManager: BackgroundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        activityStartTime = System.currentTimeMillis()
         DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
 
@@ -219,30 +252,21 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             state = BottomSheetBehavior.STATE_HIDDEN
         }
 
-
         backgroundBottomSheetBehavior = BottomSheetBehavior.from(backgroundBottomSheet).apply {
             state = BottomSheetBehavior.STATE_HIDDEN
         }
+
+        handler.postDelayed(entranceAnimationRunnable, ENTRANCE_ANIMATION_TIMEOUT)
 
         initCoreManagers()
         initUIManagers()
         setupListeners()
 
-        setupMusicSystem()
-
         loadSavedBackground()
 
-
-//        val dimModeInit = backgroundManager.getDimMode()
-//        backgroundManager.getDimIntensity()
-//        if (dimModeInit != BackgroundManager.Companion.DIM_MODE_OFF) {
-//            updateBackgroundFilters()
-//        }
         checkForFirstLaunchAnimation()
 
-
         setupBottomSheet()
-
 
         restoreSavedWeatherState()
         startUpdates()
@@ -294,6 +318,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         debugButton.visibility = View.GONE
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
+
+        entranceAnimationManager = EntranceAnimationManager(
+            rootView = mainLayout,
+            widgets = listOf(timeText, dateText, chipContainer, lastfmLayout)
+        )
+        entranceAnimationManager.prepareViews()
+
+        turbulenceOverlay.playAnimation(Color.parseColor("#5A7184")) {}
     }
 
     private fun initCoreManagers() {
@@ -301,11 +333,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         Logger.isLoggingEnabled = enableAdditionalLogging
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
-        val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
-        val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
-
-        weatherView.setFogTextures(fogBitmap, cloudsBitmap)
-        weatherView.setRenderScale(0.5f)
+        Thread {
+            val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
+            val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
+            handler.post {
+                if (!isDestroyed && !isFinishing) {
+                    weatherView.setFogTextures(fogBitmap, cloudsBitmap)
+                    weatherView.setRenderScale(0.5f)
+                }
+            }
+        }.start()
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
@@ -359,7 +396,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         )
         lifecycle.addObserver(smartChipManager)
 
-        musicManager = MusicPluginManager(this, prefs) { state -> runOnUiThread { handleMusicStateUpdate(state) } }
+        //musicManager = MusicPluginManager(this, prefs) { state -> runOnUiThread { handleMusicStateUpdate(state) } }
 
         clockManager = ClockManager(
             timeText,
@@ -398,7 +435,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
 
         widgetMover = WidgetMover(this, listOf(lastfmLayout, dateText, timeText), mainLayout)
-        widgetMover.restoreOrderAndPositions()
+
+        widgetMover.onInitialLayoutComplete = {
+            isWidgetLayoutComplete = true
+            checkAndPlayEntranceAnimation()
+        }
 
         smartPixelManager = SmartPixelManager(this, smartPixelOverlay, timeoutMs = 10000L)
         if (prefs.getBoolean("smart_pixels_enabled", false)) smartPixelManager.start()
@@ -511,6 +552,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         hasCustomImageBackground = false
                         fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
                         backgroundImageView.visibility = View.GONE
+                        backgroundManager.clearDim()
                         gradientManager.startUpdates()
                     }
                     null -> {
@@ -1038,7 +1080,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 } catch (e: Exception) {
 
                 }
-                applyImageBackground(uri, blurIntensity)
+                applyImageBackground(uri, blurIntensity) {
+                    isBackgroundReady = true
+                    checkAndPlayEntranceAnimation()
+                }
                 hasCustomImageBackground = true
                 Logger.d("MainActivity") {"Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"}
                 updateBackgroundFilters()
@@ -1046,24 +1091,30 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 backgroundManager.setSavedBackgroundUri(null)
                 hasCustomImageBackground = false
                 Logger.w("MainActivity") {"Failed to load saved background: ${e.message}"}
+
+                isBackgroundReady = true
+                checkAndPlayEntranceAnimation()
             }
         } else {
             backgroundImageView.visibility = View.GONE
             hasCustomImageBackground = false
             gradientManager.startUpdates()
             updateBackgroundFilters()
+
+            isBackgroundReady = true
+            checkAndPlayEntranceAnimation()
         }
     }
 
-    fun applyImageBackground(uri: Uri, blurIntensity: Int = 0) {
-        loadBackgroundInternal(uri, blurIntensity)
+    fun applyImageBackground(uri: Uri, blurIntensity: Int = 0, onComplete: (() -> Unit)? = null) {
+        loadBackgroundInternal(uri, blurIntensity, onComplete)
     }
 
-    fun applyBitmapBackground(bitmap: Bitmap, blurIntensity: Int = 0) {
-        loadBackgroundInternal(bitmap, blurIntensity)
+    fun applyBitmapBackground(bitmap: Bitmap, blurIntensity: Int = 0, onComplete: (() -> Unit)? = null) {
+        loadBackgroundInternal(bitmap, blurIntensity, onComplete)
     }
 
-    private fun loadBackgroundInternal(model: Any, blurIntensity: Int) {
+    private fun loadBackgroundInternal(model: Any, blurIntensity: Int, onComplete: (() -> Unit)? = null) {
         if (isFinishing) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
         try {
@@ -1076,7 +1127,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
             val gradientDrawable = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.BLACK, Color.BLACK)
+                intArrayOf(Color.parseColor("#0F141A"), Color.parseColor("#171E28"))
             )
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -1137,67 +1188,82 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 ) {
                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.EXTRACTING_COLORS)
                     val bitmap = (resource as? BitmapDrawable)?.bitmap
-                    var noiseColor = Color.WHITE
+
                     if (bitmap != null) {
-                        ColorExtractor.extractColor(bitmap) { seedColor ->
-                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
-                            fontManager.setDynamicScheme(seedColor)
-                            handler.postDelayed({
-                                updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-                            }, 500)
-                            if (fontManager.getDynamicScheme() == null) {
-                                noiseColor = getColor(R.color.md_theme_primary)
-                            } else {
-                                noiseColor = fontManager.getDynamicScheme()!!.primary
-                            }
-                            if (isAdvancedGraphicsEnabled) {
-                                turbulenceOverlay.playAnimation(noiseColor) {}
-                            }
-                            backgroundImageView.setImageDrawable(resource)
-                            if (usePlatformBlur) {
-                                try {
-                                    val radiusPx = (blurIntensity * blurScaleFactor).coerceAtLeast(1f)
-                                    val renderEffect = RenderEffect.createBlurEffect(
-                                        radiusPx,
-                                        radiusPx,
-                                        Shader.TileMode.CLAMP
+                        Thread {
+                            ColorExtractor.extractColor(bitmap) { seedColor ->
+                                handler.post {
+                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
+
+                                    fontManager.setDynamicScheme(seedColor)
+                                    fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
+
+                                    var noiseColor = Color.WHITE
+                                    if (fontManager.getDynamicScheme() == null) {
+                                        noiseColor = getColor(R.color.md_theme_primary)
+                                    } else {
+                                        noiseColor = fontManager.getDynamicScheme()!!.primary
+                                    }
+
+                                    if (isAdvancedGraphicsEnabled) {
+                                        turbulenceOverlay.playAnimation(noiseColor) {}
+                                    }
+
+                                    backgroundImageView.setImageDrawable(resource)
+
+                                    if (usePlatformBlur) {
+                                        try {
+                                            val radiusPx = (blurIntensity * blurScaleFactor).coerceAtLeast(1f)
+                                            val renderEffect = RenderEffect.createBlurEffect(
+                                                radiusPx,
+                                                radiusPx,
+                                                Shader.TileMode.CLAMP
+                                            )
+                                            backgroundImageView.setRenderEffect(renderEffect)
+                                        } catch (e: Throwable) { /* ignore */ }
+                                    } else {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            backgroundImageView.setRenderEffect(null)
+                                        }
+                                    }
+
+                                    backgroundImageView.visibility = View.VISIBLE
+                                    val currentTargetMode = backgroundManager.getDimMode()
+                                    val currentTargetIntensity = backgroundManager.getDimIntensity()
+                                    val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
+                                    val finalZoom = calculateZoom(currentEffectiveIntensity)
+
+                                    backgroundImageView.scaleX = finalZoom + 0.4f
+                                    backgroundImageView.scaleY = finalZoom + 0.4f
+
+                                    fontManager.applyNightShiftTransition(
+                                        clockManager.getCurrentTime(),
+                                        dayTimeGetter,
+                                        true
                                     )
-                                    backgroundImageView.setRenderEffect(renderEffect)
-                                } catch (e: Throwable) { /* ignore */ }
-                            } else {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                    backgroundImageView.setRenderEffect(null)
+
+                                    onComplete?.invoke()
+
+                                    backgroundImageView.animate()
+                                        .scaleX(finalZoom)
+                                        .scaleY(finalZoom)
+                                        .alpha(1.0f)
+                                        .setDuration(700)
+                                        .setListener(object : AnimatorListenerAdapter() {
+                                            override fun onAnimationEnd(animation: Animator) {
+                                                updateBackgroundFilters()
+                                                handler.postDelayed({
+                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                                                }, 500)
+                                            }
+                                        }).start()
                                 }
                             }
-
-                            backgroundImageView.visibility = View.VISIBLE
-                            val currentTargetMode = backgroundManager.getDimMode()
-                            val currentTargetIntensity = backgroundManager.getDimIntensity()
-                            val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
-                            val finalZoom = calculateZoom(currentEffectiveIntensity)
-
-                            backgroundImageView.scaleX = finalZoom + 0.4f
-                            backgroundImageView.scaleY = finalZoom + 0.4f
-                           // weatherView.setBackgroundImage(bitmap)
-                            backgroundImageView.animate()
-                                .scaleX(finalZoom)
-                                .scaleY(finalZoom)
-                                .alpha(1.0f)
-                                .setDuration(700)
-                                .setListener(object : AnimatorListenerAdapter() {
-                                    override fun onAnimationEnd(animation: Animator) {
-                                        updateBackgroundFilters()
-                                    }
-                                }).start()
-                        }
-                        if (bitmap != null) {
-                            fontManager.updateDynamicColors(bitmap) {
-                                fontManager.applyNightShiftTransition(
-                                    clockManager.getCurrentTime(),
-                                    dayTimeGetter,
-                                    true)
-                            }
-                        }
+                        }.start()
+                    } else {
+                        backgroundImageView.setImageDrawable(resource)
+                        backgroundImageView.visibility = View.VISIBLE
+                        onComplete?.invoke()
                     }
                 }
 
@@ -1212,6 +1278,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     handler.postDelayed({
                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
                     }, 2000)
+
+                    onComplete?.invoke()
+
                     try {
                         val savedUri = backgroundManager.getSavedBackgroundUri()
                         if (model.toString() != savedUri) {
@@ -1246,6 +1315,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
             }, 2000)
             Logger.e("MainActivity"){"loadBackgroundInternal failed with exception: ${e.message}"}
+            onComplete?.invoke()
         }
     }
 

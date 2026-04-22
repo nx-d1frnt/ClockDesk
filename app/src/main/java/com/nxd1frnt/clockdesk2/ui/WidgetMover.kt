@@ -48,6 +48,8 @@ class WidgetMover(
     private var isGridSnapEnabled = true
     private var isCollisionCheckEnabled = true
 
+    private var isFirstRestore = true
+    var onInitialLayoutComplete: (() -> Unit)? = null
 
     // Touch Handling
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -310,7 +312,12 @@ class WidgetMover(
 
             stackedViews.forEach {
                 it.visibility = View.VISIBLE
-                it.animate().translationX(0f).translationY(0f).setDuration(300).start()
+                if (isFirstRestore) {
+                    it.translationX = 0f
+                    it.translationY = 0f
+                } else {
+                    it.animate().translationX(0f).translationY(0f).setDuration(300).start()
+                }
             }
         }
 
@@ -320,11 +327,26 @@ class WidgetMover(
             set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
             val savedX = prefs.getFloat("${idName}_x", 0f)
             val savedY = prefs.getFloat("${idName}_y", 0f)
-            parentView.post { sanitizeAndApplyPosition(view, savedX, savedY) }
+
+            if (isFirstRestore) {
+                sanitizeAndApplyPosition(view, savedX, savedY)
+            } else {
+                parentView.post { sanitizeAndApplyPosition(view, savedX, savedY) }
+            }
         }
 
-        beginLayoutTransition()
+        if (!isFirstRestore) {
+            beginLayoutTransition()
+        }
+
         set.applyTo(parentView)
+
+        if (isFirstRestore) {
+            isFirstRestore = false
+            parentView.post {
+                onInitialLayoutComplete?.invoke()
+            }
+        }
     }
 
     private fun calculateSmartGap(topView: View, bottomView: View, normalGap: Int, smallGap: Int): Int {
@@ -818,6 +840,10 @@ class WidgetMover(
                     }
                 }
             }
+        }
+        view.post {
+            view.invalidate()
+            view.requestLayout()
         }
     }
 

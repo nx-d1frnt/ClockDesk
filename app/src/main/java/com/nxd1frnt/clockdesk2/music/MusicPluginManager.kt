@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
-import android.util.Log
 import com.nxd1frnt.clockdesk2.music.plugins.ExternalMusicPlugin
 import com.nxd1frnt.clockdesk2.music.plugins.LastFmPlugin
 import com.nxd1frnt.clockdesk2.music.plugins.SystemSessionPlugin
@@ -114,52 +113,65 @@ class MusicPluginManager(
     }
 
     private fun discoverAndRegisterExternalPlugins() {
-        val pm = context.packageManager
-        val queryIntent = Intent(ExternalPluginContract.ACTION_MUSIC_PLUGIN_SERVICE)
-        Logger.d("MusicManager"){"Querying plugins with action: ${queryIntent.action}"}
-        try {
-            val resolveInfos = pm.queryIntentServices(queryIntent, android.content.pm.PackageManager.GET_META_DATA)
-            Logger.d("MusicManager"){"Found ${resolveInfos.size} services"}
-            for (resolveInfo in resolveInfos) {
-                val serviceInfo = resolveInfo.serviceInfo ?: continue
-                val packageName = serviceInfo.packageName
-                if (plugins.containsKey(packageName)) continue
+        Thread {
+            val pm = context.packageManager
+            val queryIntent = Intent(ExternalPluginContract.ACTION_MUSIC_PLUGIN_SERVICE)
+            Logger.d("MusicManager"){"Querying plugins with action: ${queryIntent.action}"}
+            try {
+                val resolveInfos = pm.queryIntentServices(queryIntent, android.content.pm.PackageManager.GET_META_DATA)
 
-                var displayName = serviceInfo.loadLabel(pm).toString()
-                var description = "External Music Provider"
-                Logger.d("MusicManager"){"Found plugin: ${resolveInfo.serviceInfo.packageName}"}
-                val metaData = serviceInfo.metaData
-                if (metaData != null && metaData.containsKey(ExternalPluginContract.META_DATA_PLUGIN_INFO)) {
-                    val resId = metaData.getInt(ExternalPluginContract.META_DATA_PLUGIN_INFO)
-                    try {
-                        val pluginRes = pm.getResourcesForApplication(packageName)
-                        val parser = pluginRes.getXml(resId)
-                        var eventType = parser.eventType
-                        while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
-                            if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "music-plugin") {
-                                val nameAttr = parser.getAttributeValue(null, "displayName")
-                                val descAttr = parser.getAttributeValue(null, "description")
-                                if (!nameAttr.isNullOrEmpty()) displayName = nameAttr
-                                if (!descAttr.isNullOrEmpty()) description = descAttr
+                class PluginData(val pkg: String, val name: String, val desc: String)
+                val pendingPlugins = mutableListOf<PluginData>()
+
+                for (resolveInfo in resolveInfos) {
+                    val serviceInfo = resolveInfo.serviceInfo ?: continue
+                    val packageName = serviceInfo.packageName
+                    if (plugins.containsKey(packageName)) continue
+
+                    var displayName = serviceInfo.loadLabel(pm).toString()
+                    var description = "External Music Provider"
+
+                    val metaData = serviceInfo.metaData
+                    if (metaData != null && metaData.containsKey(ExternalPluginContract.META_DATA_PLUGIN_INFO)) {
+                        val resId = metaData.getInt(ExternalPluginContract.META_DATA_PLUGIN_INFO)
+                        try {
+                            val pluginRes = pm.getResourcesForApplication(packageName)
+                            val parser = pluginRes.getXml(resId)
+                            var eventType = parser.eventType
+                            while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                                if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "music-plugin") {
+                                    val nameAttr = parser.getAttributeValue(null, "displayName")
+                                    val descAttr = parser.getAttributeValue(null, "description")
+                                    if (!nameAttr.isNullOrEmpty()) displayName = nameAttr
+                                    if (!descAttr.isNullOrEmpty()) description = descAttr
+                                }
+                                eventType = parser.next()
                             }
-                            eventType = parser.next()
+                        } catch (e: Exception) {
+                            Logger.e("MusicManager"){"Failed to parse plugin info for $packageName: ${e.message}"}
                         }
-                    } catch (e: Exception) {
-                        Logger.e("MusicManager"){"Failed to parse plugin info for $packageName: ${e.message}"}
                     }
+                    pendingPlugins.add(PluginData(packageName, displayName, description))
                 }
 
-                val externalPlugin = ExternalMusicPlugin(
-                    context,
-                    id = packageName,
-                    displayName = displayName,
-                    description = description
-                )
-                registerPlugin(externalPlugin)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    pendingPlugins.forEach { data ->
+                        if (!plugins.containsKey(data.pkg)) {
+                            val externalPlugin = ExternalMusicPlugin(
+                                context,
+                                id = data.pkg,
+                                displayName = data.name,
+                                description = data.desc
+                            )
+                            registerPlugin(externalPlugin)
+                        }
+                    }
+                    reloadPriorities()
+                }
+            } catch (e: Exception) {
+                Logger.e("MusicManager"){"Error discovering external plugins: ${e.message}"}
             }
-        } catch (e: Exception) {
-            Logger.e("MusicManager"){"Error discovering external plugins: ${e.message}"}
-        }
+        }.start()
     }
 
     fun destroy() {

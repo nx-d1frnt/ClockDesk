@@ -1,14 +1,15 @@
 [versions]
 agp = "8.10.0"
 kotlin = "2.0.21"
-coreKtx = "1.10.1"
+coreKtx = "1.12.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
 appcompat = "1.6.1"
-material = "1.10.0"
+material = "1.14.0-beta01"
 activity = "1.8.0"
 constraintlayout = "2.1.4"
+media3ExoplayerHls = "1.2.0"
 paletteKtx = "1.0.0"
 volley = "1.2.1"
 glide = "4.15.1"
@@ -24,7 +25,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-material = { group = "com.google.android.material", name = "material", version = "1.11.0" }
+material = { group = "com.google.android.material", name = "material", version = "1.14.0-beta01" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 volley = { module = "com.android.volley:volley", version.ref = "volley" }
