@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingHorizontal="16dp"
+    android:background="@android:color/transparent"
+    android:focusable="true"
+    android:clickable="true">
+
+    <!-- Кнопка "Отмена" в левом верхнем углу -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/cancel_background_button"
+        style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        app:icon="@drawable/ic_arrow_left"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Кнопка "Применить" в правом верхнем углу -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/apply_background_button"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/apply"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Нижняя навигация (Pill) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/bottom_nav_card"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+        app:cardElevation="0dp"
+        app:layout_constraintWidth_max="400dp"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/bottom_nav_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="6dp"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <Button
+                android:id="@+id/nav_style"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="@string/backgrounds_title" />
+
+            <Button
+                android:id="@+id/nav_weather"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/weather_effects_title" />
+
+            <Button
+                android:id="@+id/nav_effects"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/nav_effects" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Основная карточка настроек со скроллом -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/settings_main_card"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="12dp"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+        app:cardElevation="0dp"
+        app:layout_constrainedHeight="true"
+        app:layout_constraintWidth_max="400dp"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.ExtraLarge"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav_card"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/cancel_background_button"
+        app:layout_constraintVertical_bias="1.0">
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:clipToPadding="false"
+            android:scrollbarStyle="outsideOverlay">
+
+            <FrameLayout
+                android:id="@+id/settings_content_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:animateLayoutChanges="true"
+                android:padding="24dp">
+
+                <!-- ВКЛАДКА 1: СТИЛЬ -->
+                <LinearLayout
+                    android:id="@+id/tab_style_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/background_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="88dp"
+                        android:layout_marginBottom="24dp"
+                        android:clipToPadding="false" />
+
+                    <!-- Размытие -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_blur_on"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/blur_intensity_seekbar"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:valueFrom="0.0"
+                            android:valueTo="50.0"
+                            app:thumbElevation="0dp"
+                            app:trackHeight="12dp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- ВКЛАДКА 2: ПОГОДА -->
+                <LinearLayout
+                    android:id="@+id/tab_weather_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/weather_effect_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/enable_weather_effects"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/manual_weather_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/manual_weather_control" />
+
+                    <HorizontalScrollView
+                        android:id="@+id/manual_weather_scroll"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:scrollbars="none">
+
+                        <com.google.android.material.button.MaterialButtonToggleGroup
+                            android:id="@+id/weather_type_toggle_group"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:selectionRequired="true"
+                            app:singleSelection="true">
+
+                            <Button android:id="@+id/btn_weather_clear" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_clear" />
+                            <Button android:id="@+id/btn_weather_cloudy" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_cloudy" />
+                            <Button android:id="@+id/btn_weather_rain" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_rain" />
+                            <Button android:id="@+id/btn_weather_snow" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_snow" />
+                            <Button android:id="@+id/btn_weather_fog" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_fog" />
+                            <Button android:id="@+id/btn_weather_thunder" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_storm" />
+                        </com.google.android.material.button.MaterialButtonToggleGroup>
+                    </HorizontalScrollView>
+
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/weather_intensity_seekbar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:valueFrom="0.0"
+                        android:valueTo="200.0"
+                        app:trackHeight="12dp" />
+                </LinearLayout>
+
+                <!-- ВКЛАДКА 3: ЭФФЕКТЫ -->
+                <LinearLayout
+                    android:id="@+id/tab_effects_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- Затемнение -->
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/dimming_toggle_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:singleSelection="true">
+
+                        <Button
+                            android:id="@+id/off_button"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/dimming_off" />
+
+                        <Button
+                            android:id="@+id/continuous_button"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/dimming_continuous" />
+
+                        <Button
+                            android:id="@+id/dynamic_button"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/dimming_dynamic" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_dim"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/dimming_intensity_seekbar"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:valueFrom="0.0"
+                            android:valueTo="50.0"
+                            app:thumbElevation="0dp"
+                            app:trackHeight="12dp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/background_zoom_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/background_zoom"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/background_night_shift_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/night_shift"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+                </LinearLayout>
+
+            </FrameLayout>
+        </androidx.core.widget.NestedScrollView>
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

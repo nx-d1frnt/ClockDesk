@@ -11,10 +11,11 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.sidesheet.SideSheetBehavior
+import com.google.android.material.sidesheet.SideSheetCallback
 import com.google.android.material.slider.Slider
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
@@ -26,7 +27,7 @@ import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
 
 class CustomizationSheetManager(
-    private val bottomSheetView: LinearLayout,
+    private val sideSheetView: LinearLayout,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
     private val fontManager: FontManager,
@@ -37,57 +38,57 @@ class CustomizationSheetManager(
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit
 ) {
 
-    private val behavior: BottomSheetBehavior<LinearLayout> = BottomSheetBehavior.from(bottomSheetView)
+    private val behavior: SideSheetBehavior<LinearLayout> = SideSheetBehavior.from(sideSheetView)
 
     private var focusedView: View? = null
     private var isEditingBackground = false
     private val animationDuration = 300L
 
-    private val bsTitle by lazy { bottomSheetView.findViewById<TextView>(R.id.customization_title) }
-    private val bsSizeSeekBar by lazy { bottomSheetView.findViewById<Slider>(R.id.size_seekbar) }
-    private val bsSizeValue by lazy { bottomSheetView.findViewById<TextView>(R.id.size_value) }
+    private val bsTitle by lazy { sideSheetView.findViewById<TextView>(R.id.customization_title) }
+    private val bsSizeSeekBar by lazy { sideSheetView.findViewById<Slider>(R.id.size_seekbar) }
+    private val bsSizeValue by lazy { sideSheetView.findViewById<TextView>(R.id.size_value) }
 
-    private val bsMaxWidthContainer by lazy { bottomSheetView.findViewById<LinearLayout>(R.id.max_width_container) }
-    private val bsMaxWidthSeekBar by lazy { bottomSheetView.findViewById<Slider>(R.id.max_width_seekbar) }
-    private val bsMaxWidthValue by lazy { bottomSheetView.findViewById<TextView>(R.id.max_width_value) }
+    private val bsMaxWidthContainer by lazy { sideSheetView.findViewById<LinearLayout>(R.id.max_width_container) }
+    private val bsMaxWidthSeekBar by lazy { sideSheetView.findViewById<Slider>(R.id.max_width_seekbar) }
+    private val bsMaxWidthValue by lazy { sideSheetView.findViewById<TextView>(R.id.max_width_value) }
 
-    private val bsTransparencySeekBar by lazy { bottomSheetView.findViewById<Slider>(R.id.transparency_seekbar) }
-    private val bsTransparencyPreview by lazy { bottomSheetView.findViewById<View>(R.id.transparency_preview) }
+    private val bsTransparencySeekBar by lazy { sideSheetView.findViewById<Slider>(R.id.transparency_seekbar) }
+    private val bsTransparencyPreview by lazy { sideSheetView.findViewById<View>(R.id.transparency_preview) }
 
-    private val bsFontRecyclerView by lazy { bottomSheetView.findViewById<RecyclerView>(R.id.font_recycler_view) }
-    private val bsColorRecyclerView by lazy { bottomSheetView.findViewById<RecyclerView>(R.id.color_recycler_view) }
+    private val bsFontRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.font_recycler_view) }
+    private val bsColorRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.color_recycler_view) }
 
-    private val bsApplyButton by lazy { bottomSheetView.findViewById<Button>(R.id.apply_button) }
-    private val bsCancelButton by lazy { bottomSheetView.findViewById<Button>(R.id.cancel_button) }
+    private val bsApplyButton by lazy { sideSheetView.findViewById<Button>(R.id.apply_button) }
+    private val bsCancelButton by lazy { sideSheetView.findViewById<Button>(R.id.cancel_button) }
 
-    private val bsNightShiftSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.night_shift_switch) }
-    private val bsEditBackgroundSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.edit_background_switch) }
-    private val bsFreeModeSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.free_mode_switch) }
-    private val bsGridSnapSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.grid_snap_switch) }
-    private val bsIgnoreCollisionSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.ignore_collision_switch) }
+    private val bsNightShiftSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.night_shift_switch) }
+    private val bsEditBackgroundSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.edit_background_switch) }
+    private val bsFreeModeSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.free_mode_switch) }
+    private val bsGridSnapSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.grid_snap_switch) }
+    private val bsIgnoreCollisionSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.ignore_collision_switch) }
 
-    private val bsTimeFormatGroup by lazy { bottomSheetView.findViewById<RadioGroup>(R.id.time_format_radio_group) }
-    private val bsShowAMPMSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.show_am_pm_switch) }
-    private val bsDateFormatGroup by lazy { bottomSheetView.findViewById<RadioGroup>(R.id.date_format_radio_group) }
+    private val bsTimeFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.time_format_radio_group) }
+    private val bsShowAMPMSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_am_pm_switch) }
+    private val bsDateFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.date_format_radio_group) }
 
-    private val bsTimeFormatLabel by lazy { bottomSheetView.findViewById<TextView>(R.id.time_format_label) }
-    private val bsDateFormatLabel by lazy { bottomSheetView.findViewById<TextView>(R.id.date_format_label) }
-    private val bsTextGravityTitle by lazy { bottomSheetView.findViewById<TextView>(R.id.gravity_label) }
-    private val bsAlignmentLabel by lazy { bottomSheetView.findViewById<TextView>(R.id.alignment_label) }
-    private val bsVerticalAlignmentLabel by lazy { bottomSheetView.findViewById<TextView>(R.id.vertical_alignment_label) }
-    private val bsWidgetOrderLabel by lazy { bottomSheetView.findViewById<TextView>(R.id.widget_order_label) }
+    private val bsTimeFormatLabel by lazy { sideSheetView.findViewById<TextView>(R.id.time_format_label) }
+    private val bsDateFormatLabel by lazy { sideSheetView.findViewById<TextView>(R.id.date_format_label) }
+    private val bsTextGravityTitle by lazy { sideSheetView.findViewById<TextView>(R.id.gravity_label) }
+    private val bsAlignmentLabel by lazy { sideSheetView.findViewById<TextView>(R.id.alignment_label) }
+    private val bsVerticalAlignmentLabel by lazy { sideSheetView.findViewById<TextView>(R.id.vertical_alignment_label) }
+    private val bsWidgetOrderLabel by lazy { sideSheetView.findViewById<TextView>(R.id.widget_order_label) }
 
-    private val bsTextGravityGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.text_gravity_toggle_group) }
-    private val bsHorizontalAlignGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.alignment_toggle_group) }
-    private val bsVerticalAlignGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.vertical_alignment_group) }
+    private val bsTextGravityGroup by lazy { sideSheetView.findViewById<MaterialButtonToggleGroup>(R.id.text_gravity_toggle_group) }
+    private val bsHorizontalAlignGroup by lazy { sideSheetView.findViewById<MaterialButtonToggleGroup>(R.id.alignment_toggle_group) }
+    private val bsVerticalAlignGroup by lazy { sideSheetView.findViewById<MaterialButtonToggleGroup>(R.id.vertical_alignment_group) }
 
-    private val bsMoveUpBtn by lazy { bottomSheetView.findViewById<Button>(R.id.move_up_button) }
-    private val bsMoveDownBtn by lazy { bottomSheetView.findViewById<Button>(R.id.move_down_button) }
+    private val bsMoveUpBtn by lazy { sideSheetView.findViewById<Button>(R.id.move_up_button) }
+    private val bsMoveDownBtn by lazy { sideSheetView.findViewById<Button>(R.id.move_down_button) }
 
-    private val bsVarTitle by lazy { bottomSheetView.findViewById<TextView>(R.id.variable_properties_title) }
+    private val bsVarTitle by lazy { sideSheetView.findViewById<TextView>(R.id.variable_properties_title) }
 
     private val dynamicAxesContainer: LinearLayout by lazy {
-        val container = LinearLayout(bottomSheetView.context).apply {
+        val container = LinearLayout(sideSheetView.context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -99,9 +100,9 @@ class CustomizationSheetManager(
         parent.addView(container, index + 1)
 
         try {
-            bottomSheetView.findViewById<View>(R.id.var_weight_container)?.visibility = View.GONE
-            bottomSheetView.findViewById<View>(R.id.var_width_container)?.visibility = View.GONE
-            bottomSheetView.findViewById<View>(R.id.var_roundness_container)?.visibility = View.GONE
+            sideSheetView.findViewById<View>(R.id.var_weight_container)?.visibility = View.GONE
+            sideSheetView.findViewById<View>(R.id.var_width_container)?.visibility = View.GONE
+            sideSheetView.findViewById<View>(R.id.var_roundness_container)?.visibility = View.GONE
         } catch (e: Exception) {}
 
         container
@@ -113,14 +114,11 @@ class CustomizationSheetManager(
     }
 
     private fun setupBehavior() {
-        behavior.state = BottomSheetBehavior.STATE_HIDDEN
-        behavior.peekHeight = 0
-        behavior.isHideable = true
-        behavior.isDraggable = true
+        behavior.state = SideSheetBehavior.STATE_HIDDEN
 
-        behavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+        behavior.addCallback(object : SideSheetCallback() {
+            override fun onStateChanged(sheet: View, newState: Int) {
+                if (newState == SideSheetBehavior.STATE_HIDDEN) {
                     onSheetStateChanged(true)
                     restoreMainLayoutState()
                     highlightFocusedView(false)
@@ -129,14 +127,14 @@ class CustomizationSheetManager(
                     onSheetStateChanged(false)
                 }
             }
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+            override fun onSlide(sheet: View, slideOffset: Float) {}
         })
     }
 
     private fun initControls() {
-        bsFontRecyclerView.layoutManager = LinearLayoutManager(bottomSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsFontRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
         bsFontRecyclerView.isNestedScrollingEnabled = false
-        bsColorRecyclerView.layoutManager = LinearLayoutManager(bottomSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsColorRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
 
         setupSizeAndTransparency()
         setupSwitchesAndToggles()
@@ -155,15 +153,15 @@ class CustomizationSheetManager(
         configureVisibilityForView(viewToCustomize)
         loadSettingsForView(viewToCustomize)
 
-        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        behavior.state = SideSheetBehavior.STATE_EXPANDED
     }
 
     fun hide() {
-        behavior.state = BottomSheetBehavior.STATE_HIDDEN
+        behavior.state = SideSheetBehavior.STATE_HIDDEN
     }
 
     val isShowing: Boolean
-        get() = behavior.state != BottomSheetBehavior.STATE_HIDDEN && behavior.state != BottomSheetBehavior.STATE_COLLAPSED
+        get() = behavior.state != SideSheetBehavior.STATE_HIDDEN
 
     fun onFontAdded(newIndex: Int) {
         if (newIndex > 0) {
@@ -200,7 +198,7 @@ class CustomizationSheetManager(
     }
 
     private fun createDynamicSlider(axis: FontAxis, initialValue: Float): View {
-        val context = bottomSheetView.context
+        val context = sideSheetView.context
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -224,7 +222,6 @@ class CustomizationSheetManager(
         val slider = Slider(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f)
 
-            // Material Slider works perfectly with floats, no more 0-1000 scaling hacks needed
             val min = axis.minValue
             val max = axis.maxValue
             if (max > min) {
@@ -268,11 +265,11 @@ class CustomizationSheetManager(
     }
 
     private fun scaleDownMainLayout() {
-        val metrics = bottomSheetView.resources.displayMetrics
+        val metrics = sideSheetView.resources.displayMetrics
         val screenW = metrics.widthPixels.toFloat()
-        val bottomSheetPx = 380f * metrics.density
+        val sideSheetPx = 380f * metrics.density
         val targetScale = 0.60f
-        val translationX = (screenW * (1f - targetScale) / 2f) - bottomSheetPx
+        val translationX = (screenW * (1f - targetScale) / 2f) - sideSheetPx
 
         mainLayout.animate()
             .scaleX(targetScale)
@@ -320,7 +317,7 @@ class CustomizationSheetManager(
         val isLastFm = view.id == R.id.lastfm_layout
         val isSmartChip = view.id == R.id.smart_chip_container
 
-        bsTitle.text = bottomSheetView.context.getString(
+        bsTitle.text = sideSheetView.context.getString(
             when {
                 isTime -> R.string.customize_time
                 isDate -> R.string.customize_date
@@ -369,7 +366,7 @@ class CustomizationSheetManager(
 
     private fun loadSettingsForView(view: View) {
         val settings = fontManager.getSettings(view) ?: return
-        val metrics = bottomSheetView.resources.displayMetrics
+        val metrics = sideSheetView.resources.displayMetrics
 
         val sizeOffset = 8
         val maxvalue = (metrics.widthPixels / metrics.density * 0.3f)
@@ -380,7 +377,7 @@ class CustomizationSheetManager(
             valueTo = safeMax
             value = (settings.size - sizeOffset).coerceIn(0f, safeMax)
         }
-        bsSizeValue.text = bottomSheetView.context.getString(R.string.size_value_format, settings.size.toInt())
+        bsSizeValue.text = sideSheetView.context.getString(R.string.size_value_format, settings.size.toInt())
 
         bsMaxWidthSeekBar.apply {
             valueFrom = 0f
@@ -452,7 +449,7 @@ class CustomizationSheetManager(
         bsSizeSeekBar.addOnChangeListener { _, value, fromUser ->
             if (!fromUser || focusedView == null) return@addOnChangeListener
             val size = (value + 8f)
-            bsSizeValue.text = bottomSheetView.context.getString(R.string.size_value_format, size.toInt())
+            bsSizeValue.text = sideSheetView.context.getString(R.string.size_value_format, size.toInt())
             fontManager.setFontSize(focusedView!!, size)
         }
 
@@ -564,7 +561,7 @@ class CustomizationSheetManager(
             },
             onAddFontClicked = { onAddFontRequested() },
             onFontLongClick = { fontIndex ->
-                val context = bottomSheetView.context
+                val context = sideSheetView.context
                 MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_font_title))
                     .setMessage(context.getString(R.string.delete_font_msg))

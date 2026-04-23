@@ -37,7 +37,6 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -56,10 +55,11 @@ import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
-import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.sidesheet.SideSheetBehavior
+import com.google.android.material.sidesheet.SideSheetCallback
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
@@ -111,9 +111,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundCustomizationTab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var editModeBlurLayer: ImageView
-    private lateinit var bottomSheet: LinearLayout
-    private lateinit var backgroundBottomSheet: LinearLayout
-    private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
+
+    // UI Elements
+    private lateinit var sideSheet: LinearLayout
+    private lateinit var sideSheetBehavior: SideSheetBehavior<LinearLayout>
+    private lateinit var backgroundBottomSheet: View // Changed to View to prevent ClassCastException
+
     private lateinit var tutorialLayout: ConstraintLayout
     private lateinit var tutorialFinger: ImageView
     private lateinit var tutorialText: TextView
@@ -122,25 +125,41 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var customizationSheetManager: CustomizationSheetManager
     private lateinit var backgroundSheetManager: BackgroundSheetManager
     private lateinit var tutorialManager: TutorialManager
-    // Flag to prevent UI updates from triggering listener logic
-    private var isUpdatingBackgroundUi = false
+
+    // Core Managers
     private lateinit var clockManager: ClockManager
     private lateinit var gradientManager: GradientManager
     private lateinit var fontManager: FontManager
     private lateinit var locationManager: LocationManager
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
-    private var musicManager: MusicPluginManager? = null
-    private var currentMusicState: PluginState = PluginState.Idle
+    private lateinit var backgroundManager: BackgroundManager
+    private lateinit var smartChipManager: SmartChipManager
+    private lateinit var chipContainer: ConstraintLayout
     private lateinit var widgetMover: WidgetMover
     private lateinit var burnInProtectionManager: BurnInProtectionManager
-    private var isAdvancedGraphicsEnabled = false
+    private lateinit var powerStateManager: PowerStateManager
+    private lateinit var sensorManager: SensorManager
+
+    // State Variables
+    private var musicManager: MusicPluginManager? = null
+    private var currentMusicState: PluginState = PluginState.Idle
     private var lastTrackInfo: String? = null
     private var wasMusicBackgroundApplied = false
+    private var isUpdatingBackgroundUi = false
     private var isEditMode = false
     private var isDemoMode = false
     private var isTutorialRunning = false
     private var isNightShiftEnabled = false
+    private var isPowerSavingMode = false
+    private var isAutoPowerSavingActive = false
+    private var isBottomSheetInitializing = false
+    private var hasCustomImageBackground = false
+    private var previewBackgroundUri: String? = null
+    private var backgroundsAdapter: BackgroundsAdapter? = null
+    private var isAdvancedGraphicsEnabled = false
+    private var enableAdditionalLogging = false
+
     private var focusedView: View? = null
     private val editModeTimeout = 10000L // 10 seconds
     private val animationDuration = 300L // 300ms
@@ -148,18 +167,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
     private val PICK_FONT_REQUEST = 400
-    private var enableAdditionalLogging = false
-    private lateinit var powerStateManager: PowerStateManager
-    private var isPowerSavingMode = false
-    private var isAutoPowerSavingActive = false // Tracks if auto-mode did it
-    private lateinit var sensorManager: SensorManager
-    private var lightSensor: Sensor? = null
     private val minPowerSaveBrightness = 0.01f
-    private lateinit var smartChipManager: SmartChipManager
-    private lateinit var chipContainer: ConstraintLayout
+
+    private var lightSensor: Sensor? = null
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var pendingRestoreRunnable: Runnable? = null
-    private lateinit var backgroundFrame: FrameLayout
 
     private lateinit var entranceAnimationManager: EntranceAnimationManager
     private var isWidgetLayoutComplete = false
@@ -173,22 +185,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         checkAndPlayEntranceAnimation(force = true)
     }
 
-    private fun checkAndPlayEntranceAnimation(force: Boolean = false) {
-        if (entranceAnimationPlayed) return
-        if (force || (isWidgetLayoutComplete && isBackgroundReady)) {
-            entranceAnimationPlayed = true
-            handler.removeCallbacks(entranceAnimationRunnable)
+    private val editModeTimeoutRunnable = Runnable {
+        if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN ||
+            (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing)
+        ) {
+            return@Runnable
+        }
 
-            val timePassed = System.currentTimeMillis() - activityStartTime
-            val delay = if (force) 0L else maxOf(0L, MIN_LOADER_DURATION - timePassed)
-
-            mainLayout.postDelayed({
-                entranceAnimationManager.play()
-                handler.postDelayed({ setupMusicSystem()
-                                    widgetMover.restoreOrderAndPositions()
-                                    }, 850)
-            }, delay)
-
+        if (isEditMode && !isDemoMode) {
+            exitEditMode()
         }
     }
 
@@ -219,23 +224,24 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
 
-    private val editModeTimeoutRunnable = Runnable {
-        if (bottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN ||
-            backgroundBottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN
-        ) {
-            return@Runnable
-        }
+    private fun checkAndPlayEntranceAnimation(force: Boolean = false) {
+        if (entranceAnimationPlayed) return
+        if (force || (isWidgetLayoutComplete && isBackgroundReady)) {
+            entranceAnimationPlayed = true
+            handler.removeCallbacks(entranceAnimationRunnable)
 
-        if (isEditMode && !isDemoMode) {
-            exitEditMode()
+            val timePassed = System.currentTimeMillis() - activityStartTime
+            val delay = if (force) 0L else maxOf(0L, MIN_LOADER_DURATION - timePassed)
+
+            mainLayout.postDelayed({
+                entranceAnimationManager.play()
+                handler.postDelayed({
+                    setupMusicSystem()
+                    widgetMover.restoreOrderAndPositions()
+                }, 850)
+            }, delay)
         }
     }
-    private var isBottomSheetInitializing = false
-    private var hasCustomImageBackground = false
-    private lateinit var backgroundBottomSheetBehavior: BottomSheetBehavior<LinearLayout>
-    private var previewBackgroundUri: String? = null
-    private var backgroundsAdapter: BackgroundsAdapter? = null
-    private lateinit var backgroundManager: BackgroundManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         activityStartTime = System.currentTimeMillis()
@@ -243,17 +249,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         super.onCreate(savedInstanceState)
 
         setupWindowFlags()
-
         setContentView(R.layout.activity_main)
 
         initViews()
 
-        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet).apply {
-            state = BottomSheetBehavior.STATE_HIDDEN
-        }
-
-        backgroundBottomSheetBehavior = BottomSheetBehavior.from(backgroundBottomSheet).apply {
-            state = BottomSheetBehavior.STATE_HIDDEN
+        sideSheetBehavior = SideSheetBehavior.from(sideSheet).apply {
+            state = SideSheetBehavior.STATE_HIDDEN
         }
 
         handler.postDelayed(entranceAnimationRunnable, ENTRANCE_ANIMATION_TIMEOUT)
@@ -263,15 +264,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         setupListeners()
 
         loadSavedBackground()
-
         checkForFirstLaunchAnimation()
-
-        setupBottomSheet()
-
+        setupSideSheet()
         restoreSavedWeatherState()
         startUpdates()
     }
-
 
     private fun setupWindowFlags() {
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -301,7 +298,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundButton = findViewById(R.id.background_button)
         backgroundCustomizationTab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
-        bottomSheet = findViewById(R.id.bottom_sheet)
+        sideSheet = findViewById(R.id.side_sheet)
         backgroundBottomSheet = findViewById(R.id.background_bottom_sheet)
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
@@ -333,6 +330,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         Logger.isLoggingEnabled = enableAdditionalLogging
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+
         Thread {
             val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
             val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
@@ -343,6 +341,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 }
             }
         }.start()
+
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
@@ -396,8 +395,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         )
         lifecycle.addObserver(smartChipManager)
 
-        //musicManager = MusicPluginManager(this, prefs) { state -> runOnUiThread { handleMusicStateUpdate(state) } }
-
         clockManager = ClockManager(
             timeText,
             dateText,
@@ -431,8 +428,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             enableAdditionalLogging
         )
 
-        burnInProtectionManager =
-            BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
+        burnInProtectionManager = BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
 
         widgetMover = WidgetMover(this, listOf(lastfmLayout, dateText, timeText), mainLayout)
 
@@ -461,7 +457,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         // 1. Customization Sheet
         customizationSheetManager = CustomizationSheetManager(
-            bottomSheetView = bottomSheet,
+            sideSheetView = sideSheet,
             mainLayout = mainLayout,
             backgroundCustomizationTab = backgroundCustomizationTab,
             fontManager = fontManager,
@@ -492,7 +488,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         // 2. Background Sheet
         backgroundSheetManager = BackgroundSheetManager(
-            bottomSheetView = backgroundBottomSheet,
+            floatingMenuView = backgroundBottomSheet,
             mainLayout = mainLayout,
             backgroundCustomizationTab = backgroundCustomizationTab,
             backgroundManager = backgroundManager,
@@ -611,7 +607,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             onTutorialFinished = { checkLocationPermissionsAndLoadData() }
         )
 
-        bottomSheet.bringToFront()
+        sideSheet.bringToFront()
         backgroundBottomSheet.bringToFront()
     }
 
@@ -687,12 +683,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
-                    backgroundSheetManager.hide()
+                    backgroundSheetManager.cancelAndHide()
                     return
                 }
 
-                if (bottomSheetBehavior.state != BottomSheetBehavior.STATE_HIDDEN &&
-                    bottomSheetBehavior.state != BottomSheetBehavior.STATE_COLLAPSED) {
+                if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) {
                     fontManager.loadFont()
                     widgetMover.restoreOrderAndPositions()
                     customizationSheetManager.hide()
@@ -882,9 +877,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private fun handleBackgroundUpdate(track: MusicTrack) {
         val blurIntensity = backgroundManager.getBlurIntensity()
-        var isMusicBgAppliedThisTrack = false
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val musicBgEnabled = prefs.getBoolean("lastfm_albumart_background", true)
+
         if (!musicBgEnabled) {
             if (wasMusicBackgroundApplied) {
                 restoreUserBackground(backgroundManager.getSavedBackgroundUri())
@@ -895,16 +890,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (track.artworkBitmap != null) {
             Logger.d("MainActivity"){"Applying bitmap album art background"}
             applyBitmapBackground(track.artworkBitmap, blurIntensity)
-
             wasMusicBackgroundApplied = true
-            isMusicBgAppliedThisTrack = true
         }
         else if (!track.artworkUrl.isNullOrEmpty()) {
             Logger.d("MainActivity"){"Applying URL album art background: ${track.artworkUrl}"}
             applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
-
             wasMusicBackgroundApplied = true
-            isMusicBgAppliedThisTrack = true
         }
         else {
             val savedUri = backgroundManager.getSavedBackgroundUri()
@@ -1455,78 +1446,24 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-    private fun setupBottomSheet() {
-        val fontRecyclerView = bottomSheet.findViewById<RecyclerView>(R.id.font_recycler_view)
+    private fun setupSideSheet() {
+        val fontRecyclerView = sideSheet.findViewById<RecyclerView>(R.id.font_recycler_view)
         fontRecyclerView.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         fontRecyclerView.isNestedScrollingEnabled = false
-        bottomSheetBehavior.peekHeight = 0
-        bottomSheetBehavior.isHideable = true
-        bottomSheetBehavior.isDraggable = true
-        bottomSheetBehavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
-                    when (newState) {
-                        BottomSheetBehavior.STATE_DRAGGING,
-                        BottomSheetBehavior.STATE_SETTLING,
-                        BottomSheetBehavior.STATE_EXPANDED,
-                        BottomSheetBehavior.STATE_HALF_EXPANDED -> {
-                            stopHideUiTimer()
-                        }
-
-                        BottomSheetBehavior.STATE_COLLAPSED,
-                        BottomSheetBehavior.STATE_HIDDEN -> {
-                            resetEditModeTimeout()
-                            customizationSheetManager.hide()
-                        }
-                    }
+        sideSheetBehavior.addCallback(object : SideSheetCallback() {
+            override fun onStateChanged(sheet: View, newState: Int) {
+                if (newState == SideSheetBehavior.STATE_HIDDEN) {
+                    resetEditModeTimeout()
+                    customizationSheetManager.hide()
+                } else {
+                    stopHideUiTimer()
                 }
             }
 
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+            override fun onSlide(sheet: View, slideOffset: Float) {}
         })
-        backgroundBottomSheetBehavior.peekHeight = 0
-        backgroundBottomSheetBehavior.isHideable = true
-        backgroundBottomSheetBehavior.isDraggable = true
-        backgroundBottomSheetBehavior.addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                when (newState) {
-                    BottomSheetBehavior.STATE_DRAGGING,
-                    BottomSheetBehavior.STATE_SETTLING,
-                    BottomSheetBehavior.STATE_EXPANDED,
-                    BottomSheetBehavior.STATE_HALF_EXPANDED -> {
-                        stopHideUiTimer()
-                    }
-
-                    BottomSheetBehavior.STATE_COLLAPSED,
-                    BottomSheetBehavior.STATE_HIDDEN -> {
-                        mainLayout.animate()
-                            .scaleX(0.90f)
-                            .scaleY(0.90f)
-                            .translationX(0f)
-                            .setDuration(animationDuration)
-                            .setInterpolator(OvershootInterpolator())
-                            .start()
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                            backgroundCustomizationTab.visibility = View.VISIBLE
-                            backgroundCustomizationTab.animate()
-                                .alpha(1f)
-                                .setDuration(200)
-                                .start()
-                        } else {
-                            backgroundCustomizationTab.visibility = View.VISIBLE
-                        }
-
-                        resetEditModeTimeout()
-                    }
-                }
-            }
-
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
-        })
-        bottomSheet.bringToFront()
-        backgroundBottomSheet.bringToFront()
+        sideSheet.bringToFront()
     }
 
     private fun showDeleteConfirmationDialog(title: String, message: String, onConfirm: () -> Unit) {

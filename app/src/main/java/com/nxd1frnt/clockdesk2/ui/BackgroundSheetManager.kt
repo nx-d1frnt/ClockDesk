@@ -2,13 +2,14 @@ package com.nxd1frnt.clockdesk2.ui.settings
 
 import android.net.Uri
 import android.os.Build
+import android.transition.AutoTransition
+import android.transition.TransitionManager
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
-import android.widget.LinearLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -23,7 +24,7 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
 class BackgroundSheetManager(
-    private val bottomSheetView: LinearLayout,
+    private val floatingMenuView: View, // Изменен тип на View
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
     private val backgroundManager: BackgroundManager,
@@ -41,15 +42,12 @@ class BackgroundSheetManager(
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit
 ) {
 
-    private val behavior: BottomSheetBehavior<LinearLayout> = BottomSheetBehavior.from(bottomSheetView)
-    private var bottomSheetCallback: BottomSheetBehavior.BottomSheetCallback? = null
-
     // Внутреннее состояние
     var previewBackgroundUri: String? = null
         private set
     private var isUpdatingBackgroundUi = false
     private var isApplying = false
-    private val animationDuration = 300L
+    private val animationDuration = 350L
     private var backgroundsAdapter: BackgroundsAdapter? = null
 
     // Задачи для предотвращения OOM и спама (Debounce)
@@ -57,66 +55,38 @@ class BackgroundSheetManager(
     private var filterTask: Runnable? = null
 
     // Ленивая инициализация UI
-    private val bgRecycler by lazy { bottomSheetView.findViewById<RecyclerView>(R.id.background_recycler_view) }
-    private val bgBlurSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.background_blur_switch) }
-    private val bgBlurSeek by lazy { bottomSheetView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
-    private val bgDimToggleGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
-    private val bgDimSeek by lazy { bottomSheetView.findViewById<Slider>(R.id.dimming_intensity_seekbar) }
-    private val bgNightShiftSwitch: MaterialSwitch? by lazy { bottomSheetView.findViewById(R.id.background_night_shift_switch) }
+    private val bgRecycler by lazy { floatingMenuView.findViewById<RecyclerView>(R.id.background_recycler_view) }
+    private val bgBlurSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
+    private val bgDimToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
+    private val bgDimSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.dimming_intensity_seekbar) }
+    private val bgNightShiftSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.background_night_shift_switch) }
+    private val bgZoomSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.background_zoom_switch) }
 
-    private val bgClearBtn by lazy { bottomSheetView.findViewById<Button>(R.id.clear_background_button_bs) }
-    private val bgApplyBtn by lazy { bottomSheetView.findViewById<Button>(R.id.apply_background_button) }
-    private val bgWeatherSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.weather_effect_switch) }
-    private val bgManualWeatherSwitch by lazy { bottomSheetView.findViewById<MaterialSwitch>(R.id.manual_weather_switch) }
-    private val bgManualWeatherScroll by lazy { bottomSheetView.findViewById<View>(R.id.manual_weather_scroll) }
-    private val bgWeatherToggleGroup by lazy { bottomSheetView.findViewById<MaterialButtonToggleGroup>(R.id.weather_type_toggle_group) }
-    private val bgIntensityContainer by lazy { bottomSheetView.findViewById<View>(R.id.weather_intensity_container) }
-    private val bgIntensitySeek by lazy { bottomSheetView.findViewById<Slider>(R.id.weather_intensity_seekbar) }
+    // Новые кнопки управления сверху
+    private val bgApplyBtn: Button? by lazy { floatingMenuView.findViewById(R.id.apply_background_button) }
+    private val bgCancelBtn: Button? by lazy { floatingMenuView.findViewById(R.id.cancel_background_button) }
+
+    private val bgWeatherSwitch by lazy { floatingMenuView.findViewById<MaterialSwitch>(R.id.weather_effect_switch) }
+    private val bgManualWeatherSwitch by lazy { floatingMenuView.findViewById<MaterialSwitch>(R.id.manual_weather_switch) }
+    private val bgManualWeatherScroll by lazy { floatingMenuView.findViewById<View>(R.id.manual_weather_scroll) }
+    private val bgWeatherToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.weather_type_toggle_group) }
+    private val bgIntensitySeek by lazy { floatingMenuView.findViewById<Slider>(R.id.weather_intensity_seekbar) }
+
+    // Контейнеры навигации
+    private val contentContainer by lazy { floatingMenuView.findViewById<ViewGroup>(R.id.settings_content_container) }
+    private val tabStyle by lazy { floatingMenuView.findViewById<View>(R.id.tab_style_content) }
+    private val tabWeather by lazy { floatingMenuView.findViewById<View>(R.id.tab_weather_content) }
+    private val tabEffects by lazy { floatingMenuView.findViewById<View>(R.id.tab_effects_content) }
+    private val bottomNavGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.bottom_nav_group) }
 
     init {
-        setupBehavior()
+        floatingMenuView.visibility = View.GONE
         initControls()
-    }
-
-    private fun setupBehavior() {
-        behavior.state = BottomSheetBehavior.STATE_HIDDEN
-        behavior.peekHeight = 0
-        behavior.isHideable = true
-        behavior.isDraggable = true
-
-        bottomSheetCallback = object : BottomSheetBehavior.BottomSheetCallback() {
-            override fun onStateChanged(bottomSheet: View, newState: Int) {
-                when (newState) {
-                    BottomSheetBehavior.STATE_DRAGGING,
-                    BottomSheetBehavior.STATE_SETTLING,
-                    BottomSheetBehavior.STATE_EXPANDED,
-                    BottomSheetBehavior.STATE_HALF_EXPANDED -> {
-                        onSheetStateChanged(false)
-                    }
-                    BottomSheetBehavior.STATE_HIDDEN,
-                    BottomSheetBehavior.STATE_COLLAPSED -> {
-                        // Отмена (смахивание) - восстанавливаем сохраненный фон, если не нажали Apply
-                        if (previewBackgroundUri != null && !isApplying) {
-                            if (!isMusicBackgroundApplied()) {
-                                onRestoreSavedBackground()
-                            }
-                        }
-                        previewBackgroundUri = null
-                        isApplying = false
-
-                        restoreMainLayoutState()
-                        onSheetStateChanged(true)
-                    }
-                }
-            }
-            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
-        }
-
-        behavior.addBottomSheetCallback(bottomSheetCallback!!)
+        setupNavigation()
     }
 
     private fun initControls() {
-        bgRecycler.layoutManager = LinearLayoutManager(bottomSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bgRecycler.layoutManager = LinearLayoutManager(floatingMenuView.context, LinearLayoutManager.HORIZONTAL, false)
         bgRecycler.isNestedScrollingEnabled = false
 
         setupAdapter()
@@ -125,7 +95,7 @@ class BackgroundSheetManager(
 
     private fun setupAdapter() {
         backgroundsAdapter = BackgroundsAdapter(
-            bottomSheetView.context,
+            floatingMenuView.context,
             mutableListOf(),
             onClick = { id ->
                 if (id == "__ADD__") {
@@ -138,11 +108,10 @@ class BackgroundSheetManager(
 
                 when (id) {
                     "__DEFAULT_GRADIENT__" -> {
-                        previewTask?.let { bottomSheetView.removeCallbacks(it) }
+                        previewTask?.let { floatingMenuView.removeCallbacks(it) }
                         onRestoreGradient()
                     }
                     else -> {
-                        // Debounce (250ms) предотвращает OOM при быстром "прокликивании" тяжелых фонов пользователем
                         debouncePreview {
                             try {
                                 val uri = Uri.parse(id)
@@ -156,14 +125,17 @@ class BackgroundSheetManager(
                 }
             },
             onLongClick = { id ->
-                val context = bottomSheetView.context
+                val context = floatingMenuView.context
                 MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_background_title))
                     .setMessage(context.getString(R.string.delete_background_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
                         backgroundManager.removeSavedUri(id)
                         if (previewBackgroundUri == id || backgroundManager.getSavedBackgroundUri() == id) {
-                            bgClearBtn.performClick()
+                            isApplying = true
+                            previewBackgroundUri = null
+                            onClearBackground()
+                            hide()
                         }
                         updateAdapterItems()
                         dialog.dismiss()
@@ -176,20 +148,9 @@ class BackgroundSheetManager(
     }
 
     private fun setupListeners() {
-        bgBlurSwitch.setOnCheckedChangeListener { _, isChecked ->
-            if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            if (!isChecked) bgBlurSeek.value = 0f
-            else if (bgBlurSeek.value == 0f) bgBlurSeek.value = 25f
-        }
-
-        bgBlurSeek.addOnChangeListener { _, value, fromUser ->
-            if (fromUser) bgBlurSwitch.isChecked = value > 0f
-        }
-
         bgBlurSeek.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
-                // Применяем актуальное размытие к текущему превью при отпускании ползунка
                 previewBackgroundUri?.let { id ->
                     if (id != "__DEFAULT_GRADIENT__" && !isMusicBackgroundApplied()) {
                         debouncePreview {
@@ -205,7 +166,12 @@ class BackgroundSheetManager(
                 if (group.checkedButtonId == View.NO_ID && !isUpdatingBackgroundUi) group.check(checkedId)
                 return@addOnButtonCheckedListener
             }
-            if (checkedId == R.id.off_button) bgDimSeek.value = 0f
+            if (bgDimToggleGroup.checkedButtonId == R.id.off_button) {
+                bgDimSeek.value = 0f
+                bgDimSeek.isEnabled = false
+            } else {
+                bgDimSeek.isEnabled = true
+            }
             debounceFilterUpdate { onUpdateFilters() }
         }
 
@@ -213,7 +179,6 @@ class BackgroundSheetManager(
             if (fromUser) debounceFilterUpdate { onUpdateFilters() }
         }
 
-        // Night Shift Listener
         bgNightShiftSwitch?.setOnCheckedChangeListener { _, _ ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
             val wasEnabledBefore = backgroundManager.isNightShiftEnabled()
@@ -237,7 +202,7 @@ class BackgroundSheetManager(
             bgManualWeatherSwitch.isEnabled = isChecked
             bgManualWeatherScroll.visibility = if (isChecked && bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
             weatherView.visibility = if (isChecked) View.VISIBLE else View.GONE
-            bgIntensityContainer.visibility = if (isChecked) View.VISIBLE else View.GONE
+            bgIntensitySeek.visibility = if (isChecked && bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
 
             if (!isChecked) {
                 weatherView.updateFromOpenMeteoSmart(0, 0.0, !dayTimeGetter.isDay(), null, null, null)
@@ -250,44 +215,121 @@ class BackgroundSheetManager(
         bgManualWeatherSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
             bgManualWeatherScroll.visibility = if (isChecked) View.VISIBLE else View.GONE
+            bgIntensitySeek.visibility = if (isChecked) View.VISIBLE else View.GONE
             applyWeatherPreview()
         }
 
-        bgClearBtn.setOnClickListener {
-            isApplying = true // Предотвращаем срабатывание логики отмены при закрытии
-            previewBackgroundUri = null
-            onClearBackground()
-            hide()
-        }
-
-        bgApplyBtn.setOnClickListener {
+        // Логика кнопки Применить
+        bgApplyBtn?.setOnClickListener {
             isApplying = true
             applyBackgroundSettings()
         }
+
+        // Логика кнопки Отмена (крестик)
+        bgCancelBtn?.setOnClickListener {
+            cancelAndHide()
+        }
     }
 
+    private fun setupNavigation() {
+        bottomNavGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+
+            val transition = AutoTransition().apply {
+                duration = 250L
+                interpolator = OvershootInterpolator(0.8f)
+            }
+            TransitionManager.beginDelayedTransition(contentContainer, transition)
+
+            tabStyle.visibility = if (checkedId == R.id.nav_style) View.VISIBLE else View.GONE
+            tabWeather.visibility = if (checkedId == R.id.nav_weather) View.VISIBLE else View.GONE
+            tabEffects.visibility = if (checkedId == R.id.nav_effects) View.VISIBLE else View.GONE
+        }
+    }
 
     private fun debouncePreview(action: () -> Unit) {
-        previewTask?.let { bottomSheetView.removeCallbacks(it) }
+        previewTask?.let { floatingMenuView.removeCallbacks(it) }
         previewTask = Runnable { action() }
-        bottomSheetView.postDelayed(previewTask, 250)
+        floatingMenuView.postDelayed(previewTask, 250)
     }
 
     private fun debounceFilterUpdate(action: () -> Unit) {
-        filterTask?.let { bottomSheetView.removeCallbacks(it) }
+        filterTask?.let { floatingMenuView.removeCallbacks(it) }
         filterTask = Runnable { action() }
-        bottomSheetView.postDelayed(filterTask, 32)
+        floatingMenuView.postDelayed(filterTask, 32)
     }
 
     fun show() {
+        isApplying = false
+        loadCurrentSettings()
         scaleDownMainLayout()
         hideBackgroundTab()
-        loadCurrentSettings()
-        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+
+        floatingMenuView.visibility = View.VISIBLE
+        floatingMenuView.alpha = 1f // Убеждаемся, что корневой слой прозрачен, анимируем сами карточки
+
+        val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
+        val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
+
+        val interpolator = OvershootInterpolator(0.8f)
+
+        // Устанавливаем начальные позиции элементов (сдвинуты, уменьшены и прозрачны)
+        bgApplyBtn?.apply { alpha = 0f; translationY = -50f }
+        bgCancelBtn?.apply { alpha = 0f; translationY = -50f }
+        settingsCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
+        navCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
+
+        // Анимируем плавный спуск кнопок сверху
+        bgApplyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
+        bgCancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
+
+        // Каскадная анимация 1: основная карточка выплывает первой
+        settingsCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
+            ?.setDuration(animationDuration)?.setStartDelay(50)?.setInterpolator(interpolator)?.start()
+
+        // Каскадная анимация 2: нижняя панель навигации появляется с задержкой (тянется за карточкой)
+        navCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
+            ?.setDuration(animationDuration)?.setStartDelay(100)?.setInterpolator(interpolator)?.start()
+
+        onSheetStateChanged(false)
     }
 
     fun hide() {
-        behavior.state = BottomSheetBehavior.STATE_HIDDEN
+        val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
+        val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
+
+        // Использование Anticipate дает легкий отскок перед скрытием (естественная физика)
+        val interpolator = android.view.animation.AnticipateInterpolator(0.8f)
+
+        bgApplyBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
+        bgCancelBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
+
+        settingsCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
+            ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
+
+        navCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
+            ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.withEndAction {
+                floatingMenuView.visibility = View.GONE
+
+                // Сбрасываем задержки, чтобы предотвратить баги при повторном открытии
+                settingsCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
+                navCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
+            }?.start()
+
+        restoreMainLayoutState()
+        onSheetStateChanged(true)
+    }
+
+    // Вызывается при нажатии на крестик или системную кнопку "Назад"
+    fun cancelAndHide() {
+        if (previewBackgroundUri != null && !isApplying) {
+            if (!isMusicBackgroundApplied()) {
+                onRestoreSavedBackground()
+            }
+        }
+        previewBackgroundUri = null
+        isApplying = false
+        hide()
     }
 
     fun onImageAdded(uriStr: String) {
@@ -299,7 +341,7 @@ class BackgroundSheetManager(
     }
 
     val isShowing: Boolean
-        get() = behavior.state != BottomSheetBehavior.STATE_HIDDEN && behavior.state != BottomSheetBehavior.STATE_COLLAPSED
+        get() = floatingMenuView.visibility == View.VISIBLE
 
     private fun loadCurrentSettings() {
         isUpdatingBackgroundUi = true
@@ -311,7 +353,6 @@ class BackgroundSheetManager(
 
         val blurInt = backgroundManager.getBlurIntensity()
         bgBlurSeek.value = blurInt.toFloat()
-        bgBlurSwitch.isChecked = blurInt > 0
 
         bgDimToggleGroup.check(when (backgroundManager.getDimMode()) {
             BackgroundManager.DIM_MODE_OFF -> R.id.off_button
@@ -320,6 +361,7 @@ class BackgroundSheetManager(
             else -> R.id.off_button
         })
         bgDimSeek.value = backgroundManager.getDimIntensity().toFloat()
+
 
         bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
 
@@ -331,7 +373,7 @@ class BackgroundSheetManager(
         bgManualWeatherSwitch.isEnabled = isWeatherEnabled
 
         bgManualWeatherScroll.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
-        bgIntensityContainer.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
+        bgIntensitySeek.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
         bgIntensitySeek.value = backgroundManager.getManualWeatherIntensity().toFloat()
 
         bgWeatherToggleGroup.check(when (backgroundManager.getManualWeatherType()) {
@@ -356,7 +398,6 @@ class BackgroundSheetManager(
             R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
             else -> BackgroundManager.DIM_MODE_OFF
         })
-        backgroundManager.setDimIntensity(bgDimSeek.value.toInt())
 
         bgNightShiftSwitch?.let {
             backgroundManager.setNightShiftEnabled(it.isChecked)
@@ -365,7 +406,7 @@ class BackgroundSheetManager(
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherIntensity(bgIntensitySeek.value.toInt())
-
+        backgroundManager.setDimIntensity(bgDimSeek.value.toInt())
         backgroundManager.setManualWeatherType(when (bgWeatherToggleGroup.checkedButtonId) {
             R.id.btn_weather_clear -> WeatherView.WeatherType.CLEAR.ordinal
             R.id.btn_weather_cloudy -> WeatherView.WeatherType.CLOUDY.ordinal
@@ -418,15 +459,15 @@ class BackgroundSheetManager(
     }
 
     private fun scaleDownMainLayout() {
-        val metrics = bottomSheetView.resources.displayMetrics
-        val bottomSheetPx = 380f * metrics.density
-        val targetScale = 0.60f
-        val translationX = (metrics.widthPixels * (1f - targetScale) / 2f) - bottomSheetPx
+        val metrics = floatingMenuView.resources.displayMetrics
+        val targetScale = 0.77f // Немного отдаляем экран для обзора
+        val translationY = -(metrics.heightPixels * 0.17f) // Смещаем вверх на 12% от высоты экрана
 
         mainLayout.animate()
             .scaleX(targetScale)
             .scaleY(targetScale)
-            .translationX(translationX)
+            .translationY(translationY)
+            .translationX(0f) // Обнуляем X (ранее он смещался вбок)
             .setDuration(animationDuration)
             .setInterpolator(OvershootInterpolator())
             .start()
@@ -434,8 +475,9 @@ class BackgroundSheetManager(
 
     private fun restoreMainLayoutState() {
         mainLayout.animate()
-            .scaleX(0.90f)
+            .scaleX(0.90f) // Возвращаем в исходный масштаб (или 0.90f, если это стандартный зум вашего приложения)
             .scaleY(0.90f)
+            .translationY(0f)
             .translationX(0f)
             .setDuration(animationDuration)
             .setInterpolator(OvershootInterpolator())
@@ -453,12 +495,12 @@ class BackgroundSheetManager(
         backgroundCustomizationTab.animate().alpha(0f).setDuration(200).withEndAction {
             backgroundCustomizationTab.visibility = View.GONE
         }.start()
+
     }
 
     fun onDestroy() {
-        bottomSheetCallback?.let { behavior.removeBottomSheetCallback(it) }
-        previewTask?.let { bottomSheetView.removeCallbacks(it) }
-        filterTask?.let { bottomSheetView.removeCallbacks(it) }
+        previewTask?.let { floatingMenuView.removeCallbacks(it) }
+        filterTask?.let { floatingMenuView.removeCallbacks(it) }
 
         bgRecycler.adapter = null
         backgroundsAdapter = null

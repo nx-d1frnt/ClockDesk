@@ -7,16 +7,7 @@
     android:orientation="vertical"
     android:background="@drawable/main_activity_bg"
     android:clickable="true"
-    app:behavior_hideable="true"
-    app:maxWidth="480dp"
-    android:layout_gravity="center_horizontal"
-    style="@style/Widget.Material3.BottomSheet.Modal"
     android:focusable="true">
-
-    <com.google.android.material.bottomsheet.BottomSheetDragHandleView
-        android:id="@+id/drag_handle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -25,6 +16,7 @@
         android:fillViewport="true"
         android:focusableInTouchMode="true"
         android:clipToPadding="false"
+        android:paddingTop="18dp"
         android:paddingBottom="24dp">
 
         <LinearLayout

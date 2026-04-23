@@ -199,4 +199,5 @@
     <string name="import_failed">Не вдалося імпортувати налаштування</string>
     <string name="confirm_restore_title">Відновити налаштування?</string>
     <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування та не може бути скасована. Ви впевнені, що хочете продовжити?</string>
+    <string name="nav_effects">Ефекти</string>
 </resources>
