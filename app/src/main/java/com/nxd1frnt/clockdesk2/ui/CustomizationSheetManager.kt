@@ -3,6 +3,7 @@ package com.nxd1frnt.clockdesk2.ui
 import android.os.Build
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
@@ -108,6 +109,38 @@ class CustomizationSheetManager(
         container
     }
 
+    private fun preventSheetDragForSlider(slider: Slider) {
+        slider.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            false
+        }
+    }
+
+    private fun preventSheetDragForRecyclerView(recyclerView: RecyclerView) {
+        recyclerView.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
+            override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                when (e.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                        rv.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        rv.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                }
+                return false
+            }
+            override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {}
+            override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {}
+        })
+    }
+
     init {
         setupBehavior()
         initControls()
@@ -120,21 +153,58 @@ class CustomizationSheetManager(
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
                     onSheetStateChanged(true)
-                    restoreMainLayoutState()
+                    //restoreMainLayoutState()
+                    mainLayout.scaleX = 0.90f
+                    mainLayout.scaleY = 0.90f
+                    mainLayout.translationX = 0f
+                    backgroundCustomizationTab.alpha = 1f
+                    backgroundCustomizationTab.visibility = View.VISIBLE
                     highlightFocusedView(false)
                     focusedView = null
                 } else {
                     onSheetStateChanged(false)
                 }
             }
-            override fun onSlide(sheet: View, slideOffset: Float) {}
+            override fun onSlide(sheet: View, slideOffset: Float) {
+                val safeOffset = slideOffset.coerceIn(0f, 1f)
+                val baseScale = 0.90f
+                sheet.alpha = safeOffset
+                val sheetScale = 0.95f + (0.05f * safeOffset)
+                sheet.scaleX = sheetScale
+                sheet.scaleY = sheetScale
+
+                val targetScale = 0.60f
+                val currentScale = baseScale - ((baseScale - targetScale) * safeOffset)
+                mainLayout.scaleX = currentScale
+                mainLayout.scaleY = currentScale
+
+                val metrics = sheet.resources.displayMetrics
+                val screenW = metrics.widthPixels.toFloat()
+                val sideSheetPx = 380f * metrics.density
+                val maxTranslationX = (screenW * (1f - targetScale) / 2f) - sideSheetPx
+
+                mainLayout.translationX = maxTranslationX * safeOffset
+                backgroundCustomizationTab.alpha = 1f - safeOffset
+                if (safeOffset < 1f && backgroundCustomizationTab.visibility == View.GONE) {
+                    backgroundCustomizationTab.visibility = View.VISIBLE
+                } else if (safeOffset == 1f && backgroundCustomizationTab.visibility == View.VISIBLE) {
+                    backgroundCustomizationTab.visibility = View.GONE
+                }
+            }
         })
     }
 
     private fun initControls() {
         bsFontRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
         bsFontRecyclerView.isNestedScrollingEnabled = false
+        preventSheetDragForRecyclerView(bsFontRecyclerView)
+
         bsColorRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        preventSheetDragForRecyclerView(bsColorRecyclerView)
+
+        preventSheetDragForSlider(bsSizeSeekBar)
+        preventSheetDragForSlider(bsMaxWidthSeekBar)
+        preventSheetDragForSlider(bsTransparencySeekBar)
 
         setupSizeAndTransparency()
         setupSwitchesAndToggles()
@@ -146,9 +216,9 @@ class CustomizationSheetManager(
         focusedView = viewToCustomize
         isEditingBackground = false
 
-        scaleDownMainLayout()
+        //scaleDownMainLayout()
         highlightFocusedView(true)
-        hideBackgroundTab()
+        //hideBackgroundTab()
 
         configureVisibilityForView(viewToCustomize)
         loadSettingsForView(viewToCustomize)
@@ -242,6 +312,8 @@ class CustomizationSheetManager(
                 }
             }
         }
+
+        preventSheetDragForSlider(slider)
 
         container.addView(nameText)
         container.addView(slider)
