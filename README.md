@@ -46,7 +46,7 @@ ClockDesk transforms your idle smartphone or tablet into a beautiful bedside or 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Android Version:** API 22 *(Android 5.1 Lollipop)* (Recommended) or higher. Minimum supported: API 14 *(Android 4.0 Ice Cream Sandwich)* — experimental; use at your own risk, many features may be broken. 
+- **Android Version:** API 23 *(Android 6 Marshmallow)* or higher. 
 - **Recommended:** Keep the device connected to a power source for continuous use.
 
 ### Installation
