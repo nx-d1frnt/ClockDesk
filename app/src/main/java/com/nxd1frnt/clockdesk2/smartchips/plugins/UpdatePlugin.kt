@@ -68,7 +68,7 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
         ?.replace(Regex("###|##|#|\\*\\*|__"), "")
         ?.trim()
 
-        val materialDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+        val materialDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
         .setTitle(context.getString(R.string.new_version_title))
         .setMessage(cleanNotes ?: context.getString(R.string.update_description_default))
         .setPositiveButton(context.getString(R.string.install_action)) { _, _ ->

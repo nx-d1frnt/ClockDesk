@@ -121,7 +121,7 @@
     <string name="enable_advanced_graphics">Включить продвинутую графику</string>
     <string name="enable_advanced_graphics_summary">Включить продвинутые графические функции (может влиять на производительность на некоторых устройствах)</string>
     <string name="weather_background">Динамический погодный фон</string>
-    <string name="weather_effects_title">Погодные эффекты</string>
+    <string name="weather_effects_title">Погода</string>
     <string name="enable_weather_effects">Включить динамические погодные эффекты</string>
     <string name="manual_weather_control">Ручное управление погодой</string>
     <string name="weather_intensity">Интенсивность погоды</string>

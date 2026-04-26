@@ -1363,6 +1363,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun calculateZoom(effectiveIntensity: Int): Float {
+        if (!backgroundManager.getZoomEnabled()) {
+            return 1.0f
+        }
         return 1.0f + (effectiveIntensity.coerceIn(0, 50) / 50f) * 0.2f
     }
 

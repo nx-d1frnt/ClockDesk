@@ -121,7 +121,7 @@
     <string name="enable_advanced_graphics">Enable Advanced Graphics</string>
     <string name="enable_advanced_graphics_summary">Enable advanced graphics features (may impact performance on some devices)</string>
     <string name="weather_background">Dynamic weather background</string>
-    <string name="weather_effects_title">Weather effects</string>
+    <string name="weather_effects_title">Weather</string>
     <string name="enable_weather_effects">Enable dynamic weather effects</string>
     <string name="manual_weather_control">Manual weather control</string>
     <string name="weather_intensity">Weather intensity</string>

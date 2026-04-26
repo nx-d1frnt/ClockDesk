@@ -189,6 +189,16 @@ class BackgroundSheetManager(
             }
         }
 
+        bgZoomSwitch?.setOnCheckedChangeListener { _, _ ->
+            if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
+            val wasEnabledBefore = backgroundManager.getZoomEnabled()
+            backgroundManager.setZoomEnabled(bgZoomSwitch?.isChecked == true)
+            debounceFilterUpdate {
+                onUpdateFilters()
+                backgroundManager.setZoomEnabled(wasEnabledBefore)
+            }
+        }
+
         bgIntensitySeek.addOnChangeListener { _, _, fromUser ->
             if (fromUser) debounceFilterUpdate { applyWeatherPreview() }
         }
@@ -240,7 +250,6 @@ class BackgroundSheetManager(
                 interpolator = OvershootInterpolator(0.8f)
             }
             TransitionManager.beginDelayedTransition(contentContainer, transition)
-
             tabStyle.visibility = if (checkedId == R.id.nav_style) View.VISIBLE else View.GONE
             tabWeather.visibility = if (checkedId == R.id.nav_weather) View.VISIBLE else View.GONE
             tabEffects.visibility = if (checkedId == R.id.nav_effects) View.VISIBLE else View.GONE
@@ -266,7 +275,7 @@ class BackgroundSheetManager(
         hideBackgroundTab()
 
         floatingMenuView.visibility = View.VISIBLE
-        floatingMenuView.alpha = 1f // Убеждаемся, что корневой слой прозрачен, анимируем сами карточки
+        floatingMenuView.alpha = 1f
 
         val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
         val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
@@ -362,8 +371,8 @@ class BackgroundSheetManager(
         })
         bgDimSeek.value = backgroundManager.getDimIntensity().toFloat()
 
-
         bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
+        bgZoomSwitch?.isChecked = backgroundManager.getZoomEnabled()
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isManual = backgroundManager.isManualWeatherEnabled()
@@ -401,6 +410,10 @@ class BackgroundSheetManager(
 
         bgNightShiftSwitch?.let {
             backgroundManager.setNightShiftEnabled(it.isChecked)
+        }
+
+        bgZoomSwitch?.let {
+            backgroundManager.setZoomEnabled(it.isChecked)
         }
 
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)

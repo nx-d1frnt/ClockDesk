@@ -1,20 +1,12 @@
 package com.nxd1frnt.clockdesk2.utils
 
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
-import android.os.Environment
-import android.util.Log
-import androidx.core.content.FileProvider
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONException
-import com.nxd1frnt.clockdesk2.utils.Logger
-import java.io.File
 
 object UpdateManager {
 
@@ -148,45 +140,5 @@ object UpdateManager {
         } catch (e: Exception) {
         Logger.e("UpdateManager") { "Could not open browser: ${e.message}" }
         }
-        // val fileName = "ClockDesk_Update.apk"
-
-        // val destinationFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
-
-        // if (destinationFile.exists()) destinationFile.delete()
-
-        // val request = DownloadManager.Request(Uri.parse(url))
-        //     .setTitle("ClockDesk $latestVersion")
-        //     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-        //     .setMimeType("application/vnd.android.package-archive")
-        //     .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
-
-        // val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        // val downloadId = manager.enqueue(request)
-
-        // val onComplete = object : BroadcastReceiver() {
-        //     override fun onReceive(ctxt: Context, intent: Intent) {
-        //         val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-        //         if (downloadId == id) {
-        //             installApk(ctxt, destinationFile)
-        //             ctxt.unregisterReceiver(this)
-        //         }
-        //     }
-        // }
-        // context.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
-    }
-
-    private fun installApk(context: Context, file: File) {
-        if (!file.exists()) {
-            Logger.e("UpdateManager"){"File not found: ${file.absolutePath}"}
-            return
-        }
-
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-        }
-        context.startActivity(intent)
     }
 }

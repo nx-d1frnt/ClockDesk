@@ -121,7 +121,7 @@
     <string name="enable_advanced_graphics">Увімкнути розширену графіку</string>
     <string name="enable_advanced_graphics_summary">Увімкнути розширені графічні функції (може впливати на продуктивність на деяких пристроях)</string>
     <string name="weather_background">Динамічний погодний фон</string>
-    <string name="weather_effects_title">Погодні ефекти</string>
+    <string name="weather_effects_title">Погода</string>
     <string name="enable_weather_effects">Увімкнути динамічні погодні ефекти</string>
     <string name="manual_weather_control">Ручне керування погодою</string>
     <string name="weather_intensity">Інтенсивність погоди</string>
