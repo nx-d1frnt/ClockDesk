@@ -24,7 +24,7 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
 class BackgroundSheetManager(
-    private val floatingMenuView: View, // Изменен тип на View
+    private val floatingMenuView: View,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
     private val backgroundManager: BackgroundManager,
@@ -39,10 +39,10 @@ class BackgroundSheetManager(
     private val onUpdateFilters: () -> Unit,
     private val onApplyCompleted: (previewUri: String?) -> Unit,
     private val onClearBackground: () -> Unit,
-    private val onSheetStateChanged: (isHidden: Boolean) -> Unit
+    private val onSheetStateChanged: (isHidden: Boolean) -> Unit,
+    private val onCropRequested: () -> Unit,
 ) {
 
-    // Внутреннее состояние
     var previewBackgroundUri: String? = null
         private set
     private var isUpdatingBackgroundUi = false
@@ -50,11 +50,9 @@ class BackgroundSheetManager(
     private val animationDuration = 350L
     private var backgroundsAdapter: BackgroundsAdapter? = null
 
-    // Задачи для предотвращения OOM и спама (Debounce)
     private var previewTask: Runnable? = null
     private var filterTask: Runnable? = null
 
-    // Ленивая инициализация UI
     private val bgRecycler by lazy { floatingMenuView.findViewById<RecyclerView>(R.id.background_recycler_view) }
     private val bgBlurSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
     private val bgDimToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
@@ -62,9 +60,9 @@ class BackgroundSheetManager(
     private val bgNightShiftSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.background_night_shift_switch) }
     private val bgZoomSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.background_zoom_switch) }
 
-    // Новые кнопки управления сверху
     private val bgApplyBtn: Button? by lazy { floatingMenuView.findViewById(R.id.apply_background_button) }
     private val bgCancelBtn: Button? by lazy { floatingMenuView.findViewById(R.id.cancel_background_button) }
+    private val bgCropBtn: Button? by lazy { floatingMenuView.findViewById(R.id.crop_position_button) }
 
     private val bgWeatherSwitch by lazy { floatingMenuView.findViewById<MaterialSwitch>(R.id.weather_effect_switch) }
     private val bgManualWeatherSwitch by lazy { floatingMenuView.findViewById<MaterialSwitch>(R.id.manual_weather_switch) }
@@ -72,7 +70,6 @@ class BackgroundSheetManager(
     private val bgWeatherToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.weather_type_toggle_group) }
     private val bgIntensitySeek by lazy { floatingMenuView.findViewById<Slider>(R.id.weather_intensity_seekbar) }
 
-    // Контейнеры навигации
     private val contentContainer by lazy { floatingMenuView.findViewById<ViewGroup>(R.id.settings_content_container) }
     private val tabStyle by lazy { floatingMenuView.findViewById<View>(R.id.tab_style_content) }
     private val tabWeather by lazy { floatingMenuView.findViewById<View>(R.id.tab_weather_content) }
@@ -88,7 +85,6 @@ class BackgroundSheetManager(
     private fun initControls() {
         bgRecycler.layoutManager = LinearLayoutManager(floatingMenuView.context, LinearLayoutManager.HORIZONTAL, false)
         bgRecycler.isNestedScrollingEnabled = false
-
         setupAdapter()
         setupListeners()
     }
@@ -229,13 +225,23 @@ class BackgroundSheetManager(
             applyWeatherPreview()
         }
 
-        // Логика кнопки Применить
+        bgCropBtn?.setOnClickListener {
+            val uri = previewBackgroundUri
+            if (uri != null && uri != "__DEFAULT_GRADIENT__") {
+                // Фикс: Если мы пытаемся кропнуть новую (еще не примененную) картинку,
+                // нужно сбросить старый сдвиг, чтобы не переносить его на новое изображение.
+                if (uri != backgroundManager.getSavedBackgroundUri()) {
+                    backgroundManager.resetBgTransform()
+                }
+                onCropRequested()
+            }
+        }
+
         bgApplyBtn?.setOnClickListener {
             isApplying = true
             applyBackgroundSettings()
         }
 
-        // Логика кнопки Отмена (крестик)
         bgCancelBtn?.setOnClickListener {
             cancelAndHide()
         }
@@ -282,21 +288,20 @@ class BackgroundSheetManager(
 
         val interpolator = OvershootInterpolator(0.8f)
 
-        // Устанавливаем начальные позиции элементов (сдвинуты, уменьшены и прозрачны)
         bgApplyBtn?.apply { alpha = 0f; translationY = -50f }
         bgCancelBtn?.apply { alpha = 0f; translationY = -50f }
         settingsCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
         navCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
+        bgCropBtn?.apply { alpha = 0f; translationY = -50f }
 
-        // Анимируем плавный спуск кнопок сверху
         bgApplyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
         bgCancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
 
-        // Каскадная анимация 1: основная карточка выплывает первой
         settingsCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
             ?.setDuration(animationDuration)?.setStartDelay(50)?.setInterpolator(interpolator)?.start()
 
-        // Каскадная анимация 2: нижняя панель навигации появляется с задержкой (тянется за карточкой)
+        bgCropBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setStartDelay(150)?.setInterpolator(interpolator)?.start()
+
         navCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
             ?.setDuration(animationDuration)?.setStartDelay(100)?.setInterpolator(interpolator)?.start()
 
@@ -307,7 +312,6 @@ class BackgroundSheetManager(
         val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
         val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
 
-        // Использование Anticipate дает легкий отскок перед скрытием (естественная физика)
         val interpolator = android.view.animation.AnticipateInterpolator(0.8f)
 
         bgApplyBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
@@ -319,17 +323,15 @@ class BackgroundSheetManager(
         navCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
             ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.withEndAction {
                 floatingMenuView.visibility = View.GONE
-
-                // Сбрасываем задержки, чтобы предотвратить баги при повторном открытии
                 settingsCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
                 navCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
             }?.start()
+        bgCropBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
 
         restoreMainLayoutState()
         onSheetStateChanged(true)
     }
 
-    // Вызывается при нажатии на крестик или системную кнопку "Назад"
     fun cancelAndHide() {
         if (previewBackgroundUri != null && !isApplying) {
             if (!isMusicBackgroundApplied()) {
@@ -357,6 +359,11 @@ class BackgroundSheetManager(
         updateAdapterItems()
 
         val savedUri = backgroundManager.getSavedBackgroundUri()
+
+        // Фикс: Обновляем previewBackgroundUri при загрузке UI,
+        // чтобы кнопка кропа понимала, что изображение уже выбрано
+        previewBackgroundUri = savedUri
+
         backgroundsAdapter?.selectedId = savedUri ?: "__DEFAULT_GRADIENT__"
         bgRecycler.scrollToPosition(0)
 
@@ -408,13 +415,8 @@ class BackgroundSheetManager(
             else -> BackgroundManager.DIM_MODE_OFF
         })
 
-        bgNightShiftSwitch?.let {
-            backgroundManager.setNightShiftEnabled(it.isChecked)
-        }
-
-        bgZoomSwitch?.let {
-            backgroundManager.setZoomEnabled(it.isChecked)
-        }
+        bgNightShiftSwitch?.let { backgroundManager.setNightShiftEnabled(it.isChecked) }
+        bgZoomSwitch?.let { backgroundManager.setZoomEnabled(it.isChecked) }
 
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
@@ -471,16 +473,20 @@ class BackgroundSheetManager(
         backgroundsAdapter?.updateItems(items)
     }
 
+    fun updateCropButtonVisibility(hasCustomBackground: Boolean) {
+        bgCropBtn?.visibility = if (hasCustomBackground) View.VISIBLE else View.GONE
+    }
+
     private fun scaleDownMainLayout() {
         val metrics = floatingMenuView.resources.displayMetrics
-        val targetScale = 0.77f // Немного отдаляем экран для обзора
-        val translationY = -(metrics.heightPixels * 0.17f) // Смещаем вверх на 12% от высоты экрана
+        val targetScale = 0.77f
+        val translationY = -(metrics.heightPixels * 0.17f)
 
         mainLayout.animate()
             .scaleX(targetScale)
             .scaleY(targetScale)
             .translationY(translationY)
-            .translationX(0f) // Обнуляем X (ранее он смещался вбок)
+            .translationX(0f)
             .setDuration(animationDuration)
             .setInterpolator(OvershootInterpolator())
             .start()
@@ -488,7 +494,7 @@ class BackgroundSheetManager(
 
     private fun restoreMainLayoutState() {
         mainLayout.animate()
-            .scaleX(0.90f) // Возвращаем в исходный масштаб (или 0.90f, если это стандартный зум вашего приложения)
+            .scaleX(0.90f)
             .scaleY(0.90f)
             .translationY(0f)
             .translationX(0f)

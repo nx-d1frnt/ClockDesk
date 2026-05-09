@@ -24,6 +24,10 @@ class BackgroundManager(private val context: Context) {
         private const val KEY_ZOOM_ENABLED = "background_zoom_enabled"
         private const val KEY_NIGHT_SHIFT_ENABLED = "background_night_shift_enabled"
 
+        private const val KEY_BG_OFFSET_X = "background_offset_x"
+        private const val KEY_BG_OFFSET_Y = "background_offset_y"
+        private const val KEY_BG_SCALE    = "background_scale"
+
         const val DIM_MODE_OFF = 0
         const val DIM_MODE_CONTINUOUS = 1
         const val DIM_MODE_DYNAMIC = 2
@@ -58,6 +62,19 @@ class BackgroundManager(private val context: Context) {
     fun getDimMode(): Int = prefs.getInt(KEY_DIM_MODE, DIM_MODE_OFF)
     fun setDimMode(mode: Int) { prefs.edit().putInt(KEY_DIM_MODE, mode).apply() }
 
+    fun getBgOffsetX(): Float = prefs.getFloat(KEY_BG_OFFSET_X, 0f)
+    fun getBgOffsetY(): Float = prefs.getFloat(KEY_BG_OFFSET_Y, 0f)
+    fun getBgScale():   Float = prefs.getFloat(KEY_BG_SCALE, 1f)
+
+    fun setBgTransform(offsetX: Float, offsetY: Float, scale: Float) {
+        prefs.edit()
+            .putFloat(KEY_BG_OFFSET_X, offsetX)
+            .putFloat(KEY_BG_OFFSET_Y, offsetY)
+            .putFloat(KEY_BG_SCALE, scale)
+            .apply()
+    }
+
+    fun resetBgTransform() = setBgTransform(0f, 0f, 1f)
     fun getZoomEnabled(): Boolean = prefs.getBoolean(KEY_ZOOM_ENABLED, false)
     fun setZoomEnabled(enabled: Boolean) { prefs.edit().putBoolean(KEY_ZOOM_ENABLED, enabled).apply() }
 

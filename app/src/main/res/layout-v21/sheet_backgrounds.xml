@@ -30,6 +30,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/crop_position_button"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="@string/crop_button"
+        app:icon="@drawable/crop"
+        app:iconGravity="textStart"
+        app:layout_constraintBottom_toTopOf="@+id/settings_main_card"
+        app:layout_constraintEnd_toEndOf="@+id/settings_main_card" />
+
     <!-- Нижняя навигация (Pill) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/bottom_nav_card"
@@ -48,7 +60,9 @@
             android:id="@+id/bottom_nav_group"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="6dp"
+            android:padding="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             app:selectionRequired="true"
             app:singleSelection="true">
 

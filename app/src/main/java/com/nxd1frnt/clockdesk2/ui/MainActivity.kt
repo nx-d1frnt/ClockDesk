@@ -61,6 +61,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.sidesheet.SideSheetBehavior
 import com.google.android.material.sidesheet.SideSheetCallback
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.background.BackgroundCropController
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.background.BlurTransformation
@@ -134,6 +135,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
     private lateinit var backgroundManager: BackgroundManager
+    private lateinit var cropController: BackgroundCropController
+
     private lateinit var smartChipManager: SmartChipManager
     private lateinit var chipContainer: ConstraintLayout
     private lateinit var widgetMover: WidgetMover
@@ -148,6 +151,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var wasMusicBackgroundApplied = false
     private var isUpdatingBackgroundUi = false
     private var isEditMode = false
+    private var isCropModeActive = false
     private var isDemoMode = false
     private var isTutorialRunning = false
     private var isNightShiftEnabled = false
@@ -156,7 +160,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var isBottomSheetInitializing = false
     private var hasCustomImageBackground = false
     private var previewBackgroundUri: String? = null
-    private var backgroundsAdapter: BackgroundsAdapter? = null
+    //private var backgroundsAdapter: BackgroundsAdapter? = null
     private var isAdvancedGraphicsEnabled = false
     private var enableAdditionalLogging = false
 
@@ -545,7 +549,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 when (previewUri) {
                     "__DEFAULT_GRADIENT__" -> {
                         backgroundManager.setSavedBackgroundUri(null)
-                        hasCustomImageBackground = false
+                        setCustomBackground(false)
                         fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
                         backgroundImageView.visibility = View.GONE
                         backgroundManager.clearDim()
@@ -555,7 +559,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         backgroundManager.getSavedBackgroundUri()?.let {
                             try {
                                 applyImageBackground(Uri.parse(it), intensity)
-                                hasCustomImageBackground = true
+                                setCustomBackground(true)
                                 updateBackgroundFilters()
                             } catch (e: Exception) {
                                 Logger.w("MainActivity") { "Failed to re-apply existing background" }
@@ -566,7 +570,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         backgroundManager.setSavedBackgroundUri(previewUri)
                         try {
                             applyImageBackground(Uri.parse(previewUri), intensity)
-                            hasCustomImageBackground = true
+                            setCustomBackground(true)
                             updateBackgroundFilters()
                         } catch (e: Exception) {
                             Logger.w("MainActivity") { "Failed to apply new background" }
@@ -576,7 +580,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             },
             onClearBackground = {
                 backgroundManager.setSavedBackgroundUri(null)
-                hasCustomImageBackground = false
+                setCustomBackground(false)
                 backgroundImageView.setImageDrawable(null)
                 fontManager.clearDynamicColors()
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
@@ -590,10 +594,35 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             },
             onSheetStateChanged = { isHidden ->
                 if (isHidden) resetEditModeTimeout() else stopHideUiTimer()
+            },
+            onCropRequested = {
+                // Скрываем sheet, запускаем crop
+                isCropModeActive = true
+                backgroundSheetManager.hide()
+                cropController.enter()
+                stopHideUiTimer()
             }
         )
 
-        // 3. Tutorial Manager
+        val overlayView = findViewById<View>(R.id.crop_overlay)
+        cropController = BackgroundCropController(
+            imageView = findViewById(R.id.background_image_view),
+            overlayRoot = overlayView,
+            backgroundManager = backgroundManager,
+            onApply = {
+                isCropModeActive = false
+                if (backgroundImageView.visibility == View.VISIBLE) {
+                    updateBackgroundFilters()
+                }
+                resetEditModeTimeout()
+            },
+            onCancel = {
+                isCropModeActive = false
+                resetEditModeTimeout()
+            }
+        )
+
+    // 3. Tutorial Manager
         tutorialManager = TutorialManager(
             tutorialLayout = tutorialLayout,
             tutorialFinger = tutorialFinger,
@@ -739,6 +768,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             smartPixelManager.onUserInteraction()
         }
         return super.dispatchTouchEvent(ev)
+    }
+
+
+    private fun setCustomBackground(hasCustom: Boolean) {
+        hasCustomImageBackground = hasCustom
+        backgroundSheetManager.updateCropButtonVisibility(hasCustom)
     }
 
     override fun onDestroy() {
@@ -1007,27 +1042,27 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-    private fun restoreMainLayoutState() {
-        if (isEditMode) {
-            mainLayout.animate()
-                .scaleX(0.90f)
-                .scaleY(0.90f)
-                .translationX(0f)
-                .setDuration(animationDuration)
-                .setInterpolator(OvershootInterpolator())
-                .start()
-
-            resetEditModeTimeout()
-        } else {
-            mainLayout.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .translationX(0f)
-                .setDuration(animationDuration)
-                .setInterpolator(OvershootInterpolator())
-                .start()
-        }
-    }
+//    private fun restoreMainLayoutState() {
+//        if (isEditMode) {
+//            mainLayout.animate()
+//                .scaleX(0.90f)
+//                .scaleY(0.90f)
+//                .translationX(0f)
+//                .setDuration(animationDuration)
+//                .setInterpolator(OvershootInterpolator())
+//                .start()
+//
+//            resetEditModeTimeout()
+//        } else {
+//            mainLayout.animate()
+//                .scaleX(1f)
+//                .scaleY(1f)
+//                .translationX(0f)
+//                .setDuration(animationDuration)
+//                .setInterpolator(OvershootInterpolator())
+//                .start()
+//        }
+//    }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -1075,12 +1110,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     isBackgroundReady = true
                     checkAndPlayEntranceAnimation()
                 }
-                hasCustomImageBackground = true
+                setCustomBackground(true)
                 Logger.d("MainActivity") {"Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"}
                 updateBackgroundFilters()
             } catch (e: Exception) {
                 backgroundManager.setSavedBackgroundUri(null)
-                hasCustomImageBackground = false
+                setCustomBackground(false)
                 Logger.w("MainActivity") {"Failed to load saved background: ${e.message}"}
 
                 isBackgroundReady = true
@@ -1088,7 +1123,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         } else {
             backgroundImageView.visibility = View.GONE
-            hasCustomImageBackground = false
+            setCustomBackground(false)
             gradientManager.startUpdates()
             updateBackgroundFilters()
 
@@ -1201,6 +1236,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                     }
 
                                     backgroundImageView.setImageDrawable(resource)
+
+                                    val bgOffsetX = backgroundManager.getBgOffsetX()
+                                    val bgOffsetY = backgroundManager.getBgOffsetY()
+                                    val bgScale   = backgroundManager.getBgScale()
+
+                                    if (bgScale != 1f || bgOffsetX != 0f || bgOffsetY != 0f) {
+                                        backgroundImageView.scaleType = ImageView.ScaleType.MATRIX
+                                        backgroundImageView.post {
+                                            cropController.applyStoredTransform(bgOffsetX, bgOffsetY, bgScale)
+                                        }
+                                    } else {
+                                        backgroundImageView.scaleType = ImageView.ScaleType.CENTER_CROP
+                                    }
 
                                     if (usePlatformBlur) {
                                         try {
@@ -1483,30 +1531,30 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             .show()
     }
 
-    private fun highlightFocusedView(isHighlighted: Boolean) {
-        focusedView?.let { view ->
-            val scale = if (isHighlighted) 1.05f else 1.0f
-
-            view.animate()
-                .scaleX(scale)
-                .scaleY(scale)
-                .setDuration(animationDuration)
-                .start()
-
-            if (isHighlighted) {
-                view.setBackgroundResource(R.drawable.editable_border)
-            } else {
-                if (!isEditMode) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                        view.background = null
-                    } else {
-                        @Suppress("DEPRECATION")
-                        view.setBackgroundDrawable(null)
-                    }
-                }
-            }
-        }
-    }
+//    private fun highlightFocusedView(isHighlighted: Boolean) {
+//        focusedView?.let { view ->
+//            val scale = if (isHighlighted) 1.05f else 1.0f
+//
+//            view.animate()
+//                .scaleX(scale)
+//                .scaleY(scale)
+//                .setDuration(animationDuration)
+//                .start()
+//
+//            if (isHighlighted) {
+//                view.setBackgroundResource(R.drawable.editable_border)
+//            } else {
+//                if (!isEditMode) {
+//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+//                        view.background = null
+//                    } else {
+//                        @Suppress("DEPRECATION")
+//                        view.setBackgroundDrawable(null)
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     private fun startUpdates() {
         clockManager.startUpdates()
@@ -1603,7 +1651,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun resetEditModeTimeout() {
-        if (!isDemoMode) {
+        if (!isDemoMode && !isCropModeActive) {
             handler.removeCallbacks(editModeTimeoutRunnable)
             handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
         }
@@ -1753,8 +1801,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             try {
                 val uri = Uri.parse(savedUriStr)
                 val blur = backgroundManager.getBlurIntensity()
-                applyImageBackground(uri, blur)
-                hasCustomImageBackground = true
+                applyImageBackground(uri, blur) {
+                    setCustomBackground(true)
+                }
+                backgroundSheetManager.updateCropButtonVisibility(true)
             } catch (e: Exception) {
                 Logger.e("MainActivity"){"Failed to restore user background"}
                 restoreGradientBackground()

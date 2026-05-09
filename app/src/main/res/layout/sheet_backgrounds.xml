@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:paddingHorizontal="16dp"
@@ -30,6 +31,19 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Кроп и позиция -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/crop_position_button"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="@string/crop_button"
+        app:icon="@drawable/crop"
+        app:iconGravity="textStart"
+        app:layout_constraintBottom_toTopOf="@+id/settings_main_card"
+        app:layout_constraintEnd_toEndOf="@+id/settings_main_card" />
+
     <!-- Нижняя навигация (Pill) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/bottom_nav_card"
@@ -48,7 +62,9 @@
             android:id="@+id/bottom_nav_group"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="6dp"
+            android:padding="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             app:selectionRequired="true"
             app:singleSelection="true">
 
@@ -89,19 +105,19 @@
         app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
         app:cardElevation="0dp"
         app:layout_constrainedHeight="true"
-        app:layout_constraintWidth_max="400dp"
-        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.ExtraLarge"
         app:layout_constraintBottom_toTopOf="@id/bottom_nav_card"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/cancel_background_button"
-        app:layout_constraintVertical_bias="1.0">
+        app:layout_constraintVertical_bias="1.0"
+        app:layout_constraintWidth_max="400dp"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.ExtraLarge">
 
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:fillViewport="true"
             android:clipToPadding="false"
+            android:fillViewport="true"
             android:scrollbarStyle="outsideOverlay">
 
             <FrameLayout
@@ -188,12 +204,47 @@
                             app:selectionRequired="true"
                             app:singleSelection="true">
 
-                            <Button android:id="@+id/btn_weather_clear" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_clear" />
-                            <Button android:id="@+id/btn_weather_cloudy" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_cloudy" />
-                            <Button android:id="@+id/btn_weather_rain" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_rain" />
-                            <Button android:id="@+id/btn_weather_snow" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_snow" />
-                            <Button android:id="@+id/btn_weather_fog" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_fog" />
-                            <Button android:id="@+id/btn_weather_thunder" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/weather_storm" />
+                            <Button
+                                android:id="@+id/btn_weather_clear"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/weather_clear" />
+
+                            <Button
+                                android:id="@+id/btn_weather_cloudy"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/weather_cloudy" />
+
+                            <Button
+                                android:id="@+id/btn_weather_rain"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/weather_rain" />
+
+                            <Button
+                                android:id="@+id/btn_weather_snow"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/weather_snow" />
+
+                            <Button
+                                android:id="@+id/btn_weather_fog"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/weather_fog" />
+
+                            <Button
+                                android:id="@+id/btn_weather_thunder"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/weather_storm" />
                         </com.google.android.material.button.MaterialButtonToggleGroup>
                     </HorizontalScrollView>
 
@@ -246,6 +297,7 @@
                             android:layout_weight="1"
                             android:text="@string/dimming_dynamic" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
