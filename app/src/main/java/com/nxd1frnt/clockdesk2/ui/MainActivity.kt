@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     // UI Elements
     private lateinit var sideSheet: LinearLayout
     private lateinit var sideSheetBehavior: SideSheetBehavior<LinearLayout>
-    private lateinit var backgroundBottomSheet: View // Changed to View to prevent ClassCastException
+    private lateinit var backgroundBottomSheet: View
 
     private lateinit var tutorialLayout: ConstraintLayout
     private lateinit var tutorialFinger: ImageView
@@ -160,7 +160,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var isBottomSheetInitializing = false
     private var hasCustomImageBackground = false
     private var previewBackgroundUri: String? = null
-    //private var backgroundsAdapter: BackgroundsAdapter? = null
     private var isAdvancedGraphicsEnabled = false
     private var enableAdditionalLogging = false
 
@@ -596,7 +595,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (isHidden) resetEditModeTimeout() else stopHideUiTimer()
             },
             onCropRequested = {
-                // Скрываем sheet, запускаем crop
                 isCropModeActive = true
                 backgroundSheetManager.hide()
                 cropController.enter()
@@ -795,6 +793,88 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
+
+    private fun updateSourceIcon(track: MusicTrack) {
+        val duration = 300L
+        lastfmIcon.animate()
+            .alpha(0f)
+            .setDuration(duration)
+            .withEndAction {
+                if (isDestroyed || isFinishing) return@withEndAction
+
+                var iconApplied = false
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    lastfmIcon.clipToOutline = false
+                }
+
+                if (track.sourceIconBitmap != null) {
+                    lastfmIcon.setImageBitmap(track.sourceIconBitmap)
+
+                    val tintColor = nowPlayingTextView.currentTextColor
+                    lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        lastfmIcon.imageAlpha = 255
+                    }
+                    iconApplied = true
+                } else if (!track.sourcePackageName.isNullOrEmpty()) {
+                    try {
+                        val icon = packageManager.getApplicationIcon(track.sourcePackageName)
+                        var monochromeDrawable: Drawable? = null
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && icon is android.graphics.drawable.AdaptiveIconDrawable) {
+                            monochromeDrawable = icon.monochrome
+                        }
+
+                        if (monochromeDrawable != null) {
+                            lastfmIcon.setImageDrawable(monochromeDrawable)
+
+                            val tintColor = nowPlayingTextView.currentTextColor
+                            lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                                lastfmIcon.imageAlpha = 255
+                            }
+                        } else {
+                            lastfmIcon.setImageDrawable(icon)
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                lastfmIcon.outlineProvider = object : ViewOutlineProvider() {
+                                    override fun getOutline(view: View, outline: Outline) {
+                                        outline.setOval(0, 0, view.width, view.height)
+                                    }
+                                }
+                                lastfmIcon.clipToOutline = true
+                            }
+
+                            val matrix = ColorMatrix().apply { setSaturation(0f) }
+                            lastfmIcon.colorFilter = ColorMatrixColorFilter(matrix)
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                                lastfmIcon.imageAlpha = 200
+                            }
+                        }
+                        iconApplied = true
+                    } catch (e: PackageManager.NameNotFoundException) {
+                        Logger.w("MainActivity") { "Couldnt find icon for package: ${track.sourcePackageName}" }
+                    }
+                }
+
+                if (!iconApplied) {
+                    lastfmIcon.clearColorFilter()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        lastfmIcon.imageAlpha = 255
+                    }
+                }
+
+                lastfmIcon.animate()
+                    .alpha(1f)
+                    .setDuration(duration)
+                    .start()
+            }.start()
+    }
+
     private fun handleMusicStateUpdate(state: PluginState) {
         currentMusicState = state
         if (isEditMode) {
@@ -808,6 +888,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
                 if (isTextDifferent || hasNewArt) {
                     handleBackgroundUpdate(track)
+                }
+                if (isTextDifferent) {
+                    updateSourceIcon(track)
                 }
             } else {
                 nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
@@ -834,6 +917,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     lastTrackInfo = trackInfoText
 
                     lastfmLayout.animate().cancel()
+                    updateSourceIcon(track)
 
                     if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
                         lastfmLayout.visibility = View.VISIBLE
@@ -1041,28 +1125,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             weatherGetter.startUpdates(lat, lon)
         }
     }
-
-//    private fun restoreMainLayoutState() {
-//        if (isEditMode) {
-//            mainLayout.animate()
-//                .scaleX(0.90f)
-//                .scaleY(0.90f)
-//                .translationX(0f)
-//                .setDuration(animationDuration)
-//                .setInterpolator(OvershootInterpolator())
-//                .start()
-//
-//            resetEditModeTimeout()
-//        } else {
-//            mainLayout.animate()
-//                .scaleX(1f)
-//                .scaleY(1f)
-//                .translationX(0f)
-//                .setDuration(animationDuration)
-//                .setInterpolator(OvershootInterpolator())
-//                .start()
-//        }
-//    }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -1530,31 +1592,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
             .show()
     }
-
-//    private fun highlightFocusedView(isHighlighted: Boolean) {
-//        focusedView?.let { view ->
-//            val scale = if (isHighlighted) 1.05f else 1.0f
-//
-//            view.animate()
-//                .scaleX(scale)
-//                .scaleY(scale)
-//                .setDuration(animationDuration)
-//                .start()
-//
-//            if (isHighlighted) {
-//                view.setBackgroundResource(R.drawable.editable_border)
-//            } else {
-//                if (!isEditMode) {
-//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-//                        view.background = null
-//                    } else {
-//                        @Suppress("DEPRECATION")
-//                        view.setBackgroundDrawable(null)
-//                    }
-//                }
-//            }
-//        }
-//    }
 
     private fun startUpdates() {
         clockManager.startUpdates()

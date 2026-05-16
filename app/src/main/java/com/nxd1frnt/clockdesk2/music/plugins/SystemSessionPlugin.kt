@@ -72,48 +72,57 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
     }
 
     private fun processControllers(controllers: List<MediaController>?) {
-        if (controllers.isNullOrEmpty()) {
-            callback?.invoke(PluginState.Idle)
-            return
+        val currentControllers = controllers ?: emptyList()
+
+        val toRemove = callbackMap.keys - currentControllers.toSet()
+        toRemove.forEach {
+            try { it.unregisterCallback(callbackMap[it]!!) } catch (e: Exception) {}
+            callbackMap.remove(it)
         }
 
-        val activeController = controllers.firstOrNull {
-            val state = it.playbackState?.state ?: PlaybackState.STATE_NONE
-            state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
-        } ?: controllers.firstOrNull()
-
-        if (activeController != null) {
-            registerCallback(activeController)
-            updateStateFromController(activeController)
-        } else {
-            callback?.invoke(PluginState.Idle)
+        currentControllers.forEach { controller ->
+            if (!callbackMap.containsKey(controller)) {
+                val cb = object : MediaController.Callback() {
+                    override fun onPlaybackStateChanged(state: PlaybackState?) {
+                        evaluateOverallState()
+                    }
+                    override fun onMetadataChanged(metadata: MediaMetadata?) {
+                        evaluateOverallState()
+                    }
+                    override fun onSessionDestroyed() {
+                        try {
+                            val updatedControllers = mediaSessionManager.getActiveSessions(componentName)
+                            processControllers(updatedControllers)
+                        } catch (e: Exception) {
+                            evaluateOverallState()
+                        }
+                    }
+                }
+                controller.registerCallback(cb)
+                callbackMap[controller] = cb
+            }
         }
+
+        evaluateOverallState()
     }
 
-    private fun registerCallback(controller: MediaController) {
-        callbackMap.keys.forEach {
-            try { it.unregisterCallback(callbackMap[it]!!) } catch (e: Exception) {}
-        }
-        callbackMap.clear()
+    private fun evaluateOverallState() {
+        try {
+            val controllers = mediaSessionManager.getActiveSessions(componentName)
 
-        val cb = object : MediaController.Callback() {
-            override fun onPlaybackStateChanged(state: PlaybackState?) {
-                updateStateFromController(controller)
+            val playingController = controllers.firstOrNull {
+                val state = it.playbackState?.state ?: PlaybackState.STATE_NONE
+                state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
             }
-            override fun onMetadataChanged(metadata: MediaMetadata?) {
-                updateStateFromController(controller)
+
+            if (playingController != null) {
+                updateStateFromController(playingController)
+            } else {
+                callback?.invoke(PluginState.Idle)
             }
-            override fun onSessionDestroyed() {
-                try {
-                    val controllers = mediaSessionManager.getActiveSessions(componentName)
-                    processControllers(controllers)
-                } catch (e: Exception) {
-                    callback?.invoke(PluginState.Idle)
-                }
-            }
+        } catch (e: Exception) {
+            callback?.invoke(PluginState.Idle)
         }
-        controller.registerCallback(cb)
-        callbackMap[controller] = cb
     }
 
     private fun updateStateFromController(controller: MediaController) {
@@ -130,6 +139,9 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
             val artUri = meta?.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: meta?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
 
+            val displayIcon = ClockDeskMediaService.getMediaIconBitmap(controller.packageName, context)
+                ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+
             Logger.d("SystemMediaPlugin"){"Update: ${controller.packageName}, hasBitmap=${bitmap != null}, uri=$artUri"}
 
             val track = MusicTrack(
@@ -138,7 +150,8 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
                 album = meta?.getString(MediaMetadata.METADATA_KEY_ALBUM),
                 artworkBitmap = bitmap,
                 artworkUrl = artUri,
-                sourcePackageName = controller.packageName
+                sourcePackageName = controller.packageName,
+                sourceIconBitmap = displayIcon
             )
             callback?.invoke(PluginState.Playing(track))
         } else {

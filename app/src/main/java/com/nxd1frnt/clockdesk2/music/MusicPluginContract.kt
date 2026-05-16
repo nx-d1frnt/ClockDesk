@@ -8,7 +8,9 @@ data class MusicTrack(
     val album: String? = null,
     val artworkUrl: String? = null,
     val artworkBitmap: Bitmap? = null,
-    val sourcePackageName: String? = null
+    val sourcePackageName: String? = null,
+    val sourceIconBitmap: Bitmap? = null,
+    val sourceIconUri: String? = null
 )
 
 sealed class PluginState {
