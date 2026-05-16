@@ -1668,6 +1668,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         mainLayout.animate()
             .scaleX(1f)
             .scaleY(1f)
+            .translationX(0f)
+            .translationY(0f)
             .setDuration(animationDuration)
             .setInterpolator(OvershootInterpolator())
             .start()
