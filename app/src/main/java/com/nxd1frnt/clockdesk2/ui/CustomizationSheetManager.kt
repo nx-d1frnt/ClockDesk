@@ -5,7 +5,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.OvershootInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioGroup
@@ -43,7 +43,10 @@ class CustomizationSheetManager(
 
     private var focusedView: View? = null
     private var isEditingBackground = false
-    private val animationDuration = 300L
+    private val animationDuration = 350L
+
+    private var calculatedTargetTx = 0f
+    private var dynamicTargetScale = 0.65f
 
     private val bsTitle by lazy { sideSheetView.findViewById<TextView>(R.id.customization_title) }
     private val bsSizeSeekBar by lazy { sideSheetView.findViewById<Slider>(R.id.size_seekbar) }
@@ -112,12 +115,8 @@ class CustomizationSheetManager(
     private fun preventSheetDragForSlider(slider: Slider) {
         slider.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                }
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> v.parent?.requestDisallowInterceptTouchEvent(true)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.parent?.requestDisallowInterceptTouchEvent(false)
             }
             false
         }
@@ -127,12 +126,8 @@ class CustomizationSheetManager(
         recyclerView.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
             override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
                 when (e.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                        rv.parent?.requestDisallowInterceptTouchEvent(true)
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        rv.parent?.requestDisallowInterceptTouchEvent(false)
-                    }
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> rv.parent?.requestDisallowInterceptTouchEvent(true)
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> rv.parent?.requestDisallowInterceptTouchEvent(false)
                 }
                 return false
             }
@@ -146,6 +141,57 @@ class CustomizationSheetManager(
         initControls()
     }
 
+    private fun calculateHorizontalFocus(view: View) {
+        val metrics = sideSheetView.resources.displayMetrics
+        val screenW = metrics.widthPixels.toFloat()
+        val isTablet = sideSheetView.resources.configuration.smallestScreenWidthDp >= 600
+
+        dynamicTargetScale = if (isTablet) 0.85f else 0.65f
+
+        val sheetW = if (sideSheetView.width > 0) sideSheetView.width.toFloat() else (380f * metrics.density)
+
+        var cx = view.width / 2f
+        var currentView = view
+        while (currentView !== mainLayout && currentView.parent is View) {
+            cx += currentView.x
+            currentView = currentView.parent as View
+        }
+
+        val pivotX = screenW / 2f
+        val scaledCx = pivotX + (cx - pivotX) * dynamicTargetScale
+
+        val visibleAreaCenter = (screenW - sheetW) / 2f
+        val targetTx = visibleAreaCenter - scaledCx
+
+        calculatedTargetTx = targetTx.coerceIn(-screenW, screenW)
+    }
+
+    private val focusUpdateRunnable = Runnable {
+        focusedView?.let { view ->
+            executeFocusShift(view)
+        }
+    }
+
+    private fun executeFocusShift(view: View) {
+        if (behavior.state == SideSheetBehavior.STATE_EXPANDED) {
+            calculateHorizontalFocus(view)
+            mainLayout.animate()
+                .translationX(calculatedTargetTx)
+                .setDuration(350)
+                .setInterpolator(DecelerateInterpolator(1.5f))
+                .start()
+        }
+    }
+
+    private fun applyRealTimeFocusUpdate(isStructuralChange: Boolean = false) {
+        if (focusedView == null) return
+
+        sideSheetView.removeCallbacks(focusUpdateRunnable)
+
+        val delay = if (isStructuralChange) 150L else 30L
+        sideSheetView.postDelayed(focusUpdateRunnable, delay)
+    }
+
     private fun setupBehavior() {
         behavior.state = SideSheetBehavior.STATE_HIDDEN
 
@@ -153,10 +199,11 @@ class CustomizationSheetManager(
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
                     onSheetStateChanged(true)
-                    //restoreMainLayoutState()
+                    sideSheetView.removeCallbacks(focusUpdateRunnable)
                     mainLayout.scaleX = 0.90f
                     mainLayout.scaleY = 0.90f
                     mainLayout.translationX = 0f
+                    mainLayout.translationY = 0f
                     backgroundCustomizationTab.alpha = 1f
                     backgroundCustomizationTab.visibility = View.VISIBLE
                     highlightFocusedView(false)
@@ -165,25 +212,22 @@ class CustomizationSheetManager(
                     onSheetStateChanged(false)
                 }
             }
+
             override fun onSlide(sheet: View, slideOffset: Float) {
                 val safeOffset = slideOffset.coerceIn(0f, 1f)
                 val baseScale = 0.90f
+
                 sheet.alpha = safeOffset
                 val sheetScale = 0.95f + (0.05f * safeOffset)
                 sheet.scaleX = sheetScale
                 sheet.scaleY = sheetScale
 
-                val targetScale = 0.60f
-                val currentScale = baseScale - ((baseScale - targetScale) * safeOffset)
+                val currentScale = baseScale - ((baseScale - dynamicTargetScale) * safeOffset)
                 mainLayout.scaleX = currentScale
                 mainLayout.scaleY = currentScale
 
-                val metrics = sheet.resources.displayMetrics
-                val screenW = metrics.widthPixels.toFloat()
-                val sideSheetPx = 380f * metrics.density
-                val maxTranslationX = (screenW * (1f - targetScale) / 2f) - sideSheetPx
+                mainLayout.translationX = calculatedTargetTx * safeOffset
 
-                mainLayout.translationX = maxTranslationX * safeOffset
                 backgroundCustomizationTab.alpha = 1f - safeOffset
                 if (safeOffset < 1f && backgroundCustomizationTab.visibility == View.GONE) {
                     backgroundCustomizationTab.visibility = View.VISIBLE
@@ -216,12 +260,22 @@ class CustomizationSheetManager(
         focusedView = viewToCustomize
         isEditingBackground = false
 
-        //scaleDownMainLayout()
         highlightFocusedView(true)
-        //hideBackgroundTab()
-
         configureVisibilityForView(viewToCustomize)
         loadSettingsForView(viewToCustomize)
+
+        calculateHorizontalFocus(viewToCustomize)
+
+        if (behavior.state == SideSheetBehavior.STATE_EXPANDED) {
+            mainLayout.animate()
+                .scaleX(dynamicTargetScale)
+                .scaleY(dynamicTargetScale)
+                .translationX(calculatedTargetTx)
+                .translationY(0f)
+                .setDuration(250)
+                .setInterpolator(DecelerateInterpolator(1.2f))
+                .start()
+        }
 
         behavior.state = SideSheetBehavior.STATE_EXPANDED
     }
@@ -237,25 +291,22 @@ class CustomizationSheetManager(
         if (newIndex > 0) {
             bsFontRecyclerView.adapter?.notifyDataSetChanged()
             (bsFontRecyclerView.adapter as? FontAdapter)?.selectedPosition = newIndex
-
             focusedView?.let { view ->
                 fontManager.setFontIndex(view, newIndex)
                 updateVariationVisibility()
+                applyRealTimeFocusUpdate(true)
             }
         }
     }
 
     private fun updateVariationVisibility() {
         if (focusedView == null) return
-
         dynamicAxesContainer.removeAllViews()
-
         val axes = try { fontManager.getFontAxesDetails(focusedView!!) } catch (e: Exception) { emptyList<FontAxis>() }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && axes.isNotEmpty()) {
             bsVarTitle.visibility = View.VISIBLE
             dynamicAxesContainer.visibility = View.VISIBLE
-
             axes.forEach { axis ->
                 val currentValue = try { fontManager.getCurrentAxisValue(focusedView!!, axis.tag) } catch (e: Exception) { axis.defaultValue }
                 val sliderView = createDynamicSlider(axis, currentValue ?: axis.defaultValue)
@@ -291,7 +342,6 @@ class CustomizationSheetManager(
 
         val slider = Slider(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f)
-
             val min = axis.minValue
             val max = axis.maxValue
             if (max > min) {
@@ -299,73 +349,28 @@ class CustomizationSheetManager(
                 valueTo = max
                 value = initialValue.coerceIn(min, max)
             } else {
-                valueFrom = 0f
-                valueTo = 1f
-                value = 0f
-                isEnabled = false
+                valueFrom = 0f; valueTo = 1f; value = 0f; isEnabled = false
             }
 
             addOnChangeListener { _, sliderValue, fromUser ->
                 if (fromUser && focusedView != null) {
                     valueText.text = String.format("%.1f", sliderValue)
                     fontManager.setVariationAxis(focusedView!!, axis.tag, sliderValue)
+                    applyRealTimeFocusUpdate(false)
                 }
             }
         }
 
         preventSheetDragForSlider(slider)
-
-        container.addView(nameText)
-        container.addView(slider)
-        container.addView(valueText)
+        container.addView(nameText); container.addView(slider); container.addView(valueText)
         return container
     }
 
     private fun getAxisDisplayName(tag: String): String {
         return when (tag) {
-            "wght" -> "Weight"
-            "wdth" -> "Width"
-            "slnt" -> "Slant"
-            "ital" -> "Italic"
-            "opsz" -> "Optical Size"
-            "ROND" -> "Roundness"
-            "GRAD" -> "Grade"
-            "CASL" -> "Casual"
-            "MONO" -> "Monospace"
-            else -> tag
-        }
-    }
-
-    private fun scaleDownMainLayout() {
-        val metrics = sideSheetView.resources.displayMetrics
-        val screenW = metrics.widthPixels.toFloat()
-        val sideSheetPx = 380f * metrics.density
-        val targetScale = 0.60f
-        val translationX = (screenW * (1f - targetScale) / 2f) - sideSheetPx
-
-        mainLayout.animate()
-            .scaleX(targetScale)
-            .scaleY(targetScale)
-            .translationX(translationX)
-            .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
-            .start()
-    }
-
-    private fun restoreMainLayoutState() {
-        mainLayout.animate()
-            .scaleX(0.90f)
-            .scaleY(0.90f)
-            .translationX(0f)
-            .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
-            .start()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            backgroundCustomizationTab.visibility = View.VISIBLE
-            backgroundCustomizationTab.animate().alpha(1f).setDuration(200).start()
-        } else {
-            backgroundCustomizationTab.visibility = View.VISIBLE
+            "wght" -> "Weight"; "wdth" -> "Width"; "slnt" -> "Slant"; "ital" -> "Italic"
+            "opsz" -> "Optical Size"; "ROND" -> "Roundness"; "GRAD" -> "Grade"
+            "CASL" -> "Casual"; "MONO" -> "Monospace"; else -> tag
         }
     }
 
@@ -439,28 +444,24 @@ class CustomizationSheetManager(
     private fun loadSettingsForView(view: View) {
         val settings = fontManager.getSettings(view) ?: return
         val metrics = sideSheetView.resources.displayMetrics
-
         val sizeOffset = 8
         val maxvalue = (metrics.widthPixels / metrics.density * 0.3f)
         val safeMax = (maxvalue - sizeOffset).coerceAtLeast(1f)
 
         bsSizeSeekBar.apply {
-            valueFrom = 0f
-            valueTo = safeMax
+            valueFrom = 0f; valueTo = safeMax
             value = (settings.size - sizeOffset).coerceIn(0f, safeMax)
         }
         bsSizeValue.text = sideSheetView.context.getString(R.string.size_value_format, settings.size.toInt())
 
         bsMaxWidthSeekBar.apply {
-            valueFrom = 0f
-            valueTo = 100f
+            valueFrom = 0f; valueTo = 100f
             value = settings.maxWidthPercent.toFloat().coerceIn(0f, 100f)
         }
         bsMaxWidthValue.text = "${settings.maxWidthPercent}%"
 
         bsTransparencySeekBar.apply {
-            valueFrom = 0f
-            valueTo = 100f
+            valueFrom = 0f; valueTo = 100f
             value = (settings.alpha * 100).coerceIn(0f, 100f)
         }
         bsTransparencyPreview.alpha = settings.alpha
@@ -474,7 +475,6 @@ class CustomizationSheetManager(
         }
 
         updateVariationVisibility()
-
         bsColorRecyclerView.adapter = createColorAdapter(view)
 
         bsNightShiftSwitch.setOnCheckedChangeListener(null)
@@ -523,6 +523,7 @@ class CustomizationSheetManager(
             val size = (value + 8f)
             bsSizeValue.text = sideSheetView.context.getString(R.string.size_value_format, size.toInt())
             fontManager.setFontSize(focusedView!!, size)
+            applyRealTimeFocusUpdate(false)
         }
 
         bsMaxWidthSeekBar.addOnChangeListener { _, value, fromUser ->
@@ -531,6 +532,7 @@ class CustomizationSheetManager(
             bsMaxWidthValue.text = "$progress%"
             if (focusedView!!.id == R.id.lastfm_layout) {
                 fontManager.setMaxWidthPercent(focusedView!!, progress)
+                applyRealTimeFocusUpdate(false)
             }
         }
 
@@ -551,15 +553,6 @@ class CustomizationSheetManager(
         bsGridSnapSwitch.setOnCheckedChangeListener { _, isChecked -> widgetMover.setGridSnapEnabled(isChecked) }
         bsIgnoreCollisionSwitch.setOnCheckedChangeListener { _, isChecked -> widgetMover.setCollisionCheckEnabled(isChecked) }
 
-        bsTextGravityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
-            widgetMover.setTextGravity(focusedView!!, when (checkedId) {
-                R.id.gravity_left_button -> widgetMover.GRAVITY_START
-                R.id.gravity_right_button -> widgetMover.GRAVITY_END
-                else -> widgetMover.GRAVITY_CENTER
-            })
-        }
-
         bsHorizontalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
             widgetMover.alignViewHorizontal(focusedView!!, when (checkedId) {
@@ -567,6 +560,7 @@ class CustomizationSheetManager(
                 R.id.right_button -> 2
                 else -> 1
             })
+            applyRealTimeFocusUpdate(true)
         }
 
         bsVerticalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -578,12 +572,23 @@ class CustomizationSheetManager(
             })
         }
 
+        bsTextGravityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            widgetMover.setTextGravity(focusedView!!, when (checkedId) {
+                R.id.gravity_left_button -> widgetMover.GRAVITY_START
+                R.id.gravity_right_button -> widgetMover.GRAVITY_END
+                else -> widgetMover.GRAVITY_CENTER
+            })
+            applyRealTimeFocusUpdate(true)
+        }
+
         bsTimeFormatGroup.setOnCheckedChangeListener { _, checkedId ->
             if (focusedView?.id == R.id.time_text) {
                 val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else if (bsShowAMPMSwitch.isChecked) "hh:mm a" else "hh:mm"
                 bsShowAMPMSwitch.isEnabled = (checkedId != R.id.time_24_radio)
                 fontManager.setTimeFormatPattern(pattern)
                 clockManager.updateTimeText()
+                applyRealTimeFocusUpdate(true)
             }
         }
 
@@ -591,35 +596,28 @@ class CustomizationSheetManager(
             if (focusedView?.id == R.id.time_text) {
                 fontManager.setTimeFormatPattern(if (isChecked) "hh:mm a" else "hh:mm")
                 clockManager.updateTimeText()
+                applyRealTimeFocusUpdate(true)
             }
         }
 
         bsDateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
             if (focusedView?.id == R.id.date_text) {
                 fontManager.setDateFormatPattern(when (checkedId) {
-                    R.id.date_format_1 -> "MMM dd"
-                    R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"
+                    R.id.date_format_1 -> "MMM dd"; R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"
                     else -> "EEE, MMM dd"
                 })
                 clockManager.updateDateText()
+                applyRealTimeFocusUpdate(true)
             }
         }
     }
 
     private fun setupButtons() {
-        bsMoveUpBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, true) } }
-        bsMoveDownBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, false) } }
+        bsMoveUpBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, true); applyRealTimeFocusUpdate(true) } }
+        bsMoveDownBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, false); applyRealTimeFocusUpdate(true) } }
 
-        bsApplyButton.setOnClickListener {
-            fontManager.saveSettings()
-            hide()
-        }
-
-        bsCancelButton.setOnClickListener {
-            fontManager.loadFont()
-            widgetMover.restoreOrderAndPositions()
-            hide()
-        }
+        bsApplyButton.setOnClickListener { fontManager.saveSettings(); hide() }
+        bsCancelButton.setOnClickListener { fontManager.loadFont(); widgetMover.restoreOrderAndPositions(); hide() }
     }
 
     private fun setupFontAdapter() {
@@ -629,6 +627,7 @@ class CustomizationSheetManager(
                 focusedView?.let {
                     fontManager.setFontIndex(it, fontIndex)
                     updateVariationVisibility()
+                    applyRealTimeFocusUpdate(true)
                 }
             },
             onAddFontClicked = { onAddFontRequested() },
@@ -640,9 +639,7 @@ class CustomizationSheetManager(
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
                         if (fontManager.deleteCustomFont(fontIndex)) {
                             bsFontRecyclerView.adapter?.notifyDataSetChanged()
-                            focusedView?.let { view ->
-                                (bsFontRecyclerView.adapter as? FontAdapter)?.selectedPosition = fontManager.getSettings(view)?.fontIndex ?: 1
-                            }
+                            focusedView?.let { view -> (bsFontRecyclerView.adapter as? FontAdapter)?.selectedPosition = fontManager.getSettings(view)?.fontIndex ?: 1 }
                         }
                         dialog.dismiss()
                     }
@@ -655,7 +652,6 @@ class CustomizationSheetManager(
 
     private fun createColorAdapter(view: View): ColorAdapter {
         val settings = fontManager.getSettings(view) ?: return ColorAdapter(emptyList(), 0, false, null) {}
-
         val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
         val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
         val currentRole = if (isEditingBackground) settings.dynamicBackgroundColorRole else settings.dynamicColorRole
@@ -679,9 +675,7 @@ class CustomizationSheetManager(
                         else -> {}
                     }
                 }
-
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
-
                 val updSettings = fontManager.getSettings(view)
                 if (updSettings != null) {
                     val nextColor = if (isEditingBackground) updSettings.backgroundColor else updSettings.color
