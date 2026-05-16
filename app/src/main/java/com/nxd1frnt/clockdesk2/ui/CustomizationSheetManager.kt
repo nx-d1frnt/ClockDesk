@@ -10,6 +10,8 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.TextView
+import android.text.Editable
+import android.text.TextWatcher
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -18,6 +20,8 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.sidesheet.SideSheetBehavior
 import com.google.android.material.sidesheet.SideSheetCallback
 import com.google.android.material.slider.Slider
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
@@ -26,6 +30,8 @@ import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class CustomizationSheetManager(
     private val sideSheetView: LinearLayout,
@@ -73,7 +79,12 @@ class CustomizationSheetManager(
 
     private val bsTimeFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.time_format_radio_group) }
     private val bsShowAMPMSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_am_pm_switch) }
+    private val bsTimeCustomInputLayout by lazy { sideSheetView.findViewById<TextInputLayout>(R.id.time_custom_input_layout) }
+    private val bsTimeCustomEditText by lazy { sideSheetView.findViewById<TextInputEditText>(R.id.time_custom_edit_text) }
+
     private val bsDateFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.date_format_radio_group) }
+    private val bsDateCustomInputLayout by lazy { sideSheetView.findViewById<TextInputLayout>(R.id.date_custom_input_layout) }
+    private val bsDateCustomEditText by lazy { sideSheetView.findViewById<TextInputEditText>(R.id.date_custom_edit_text) }
 
     private val bsTimeFormatLabel by lazy { sideSheetView.findViewById<TextView>(R.id.time_format_label) }
     private val bsDateFormatLabel by lazy { sideSheetView.findViewById<TextView>(R.id.date_format_label) }
@@ -406,22 +417,12 @@ class CustomizationSheetManager(
 
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatLabel.visibility = if (isTime) View.VISIBLE else View.GONE
-        bsShowAMPMSwitch.visibility = if (isTime) View.VISIBLE else View.GONE
-        if (isTime) {
-            bsShowAMPMSwitch.isEnabled = !bsTimeFormatGroup.checkedRadioButtonId.equals(R.id.time_24_radio)
-            bsTimeFormatGroup.check(if (fontManager.getTimeFormatPattern().contains("H")) R.id.time_24_radio else R.id.time_12_radio)
-        }
+        bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
+        bsShowAMPMSwitch.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId != R.id.time_custom_radio) View.VISIBLE else View.GONE
 
         bsDateFormatGroup.visibility = if (isDate) View.VISIBLE else View.GONE
         bsDateFormatLabel.visibility = if (isDate) View.VISIBLE else View.GONE
-        if (isDate) {
-            val pattern = fontManager.getDateFormatPattern()
-            bsDateFormatGroup.check(when (pattern) {
-                "MMM dd" -> R.id.date_format_1
-                "EEEE, MMMM dd, yyyy" -> R.id.date_format_3
-                else -> R.id.date_format_2
-            })
-        }
+        bsDateCustomInputLayout.visibility = if (isDate && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
 
         val showLayoutControls = isTime || isDate || isLastFm
         bsTextGravityGroup.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
@@ -476,6 +477,43 @@ class CustomizationSheetManager(
 
         updateVariationVisibility()
         bsColorRecyclerView.adapter = createColorAdapter(view)
+
+        // Загрузка формата времени
+        if (view.id == R.id.time_text) {
+            val timePattern = fontManager.getTimeFormatPattern()
+            bsTimeFormatGroup.setOnCheckedChangeListener(null)
+            when (timePattern) {
+                "HH:mm" -> {
+                    bsTimeFormatGroup.check(R.id.time_24_radio)
+                    bsShowAMPMSwitch.isChecked = false
+                }
+                "hh:mm a", "hh:mm" -> {
+                    bsTimeFormatGroup.check(R.id.time_12_radio)
+                    bsShowAMPMSwitch.isChecked = timePattern.contains("a")
+                }
+                else -> {
+                    bsTimeFormatGroup.check(R.id.time_custom_radio)
+                    bsTimeCustomEditText.setText(timePattern)
+                }
+            }
+            setupSwitchesAndToggles() // Перепривязываем листенеры
+        }
+
+        // Загрузка формата даты
+        if (view.id == R.id.date_text) {
+            val datePattern = fontManager.getDateFormatPattern()
+            bsDateFormatGroup.setOnCheckedChangeListener(null)
+            when (datePattern) {
+                "MMM dd" -> bsDateFormatGroup.check(R.id.date_format_1)
+                "EEE, MMM dd" -> bsDateFormatGroup.check(R.id.date_format_2)
+                "EEEE, MMMM dd, yyyy" -> bsDateFormatGroup.check(R.id.date_format_3)
+                else -> {
+                    bsDateFormatGroup.check(R.id.date_custom_radio)
+                    bsDateCustomEditText.setText(datePattern)
+                }
+            }
+            setupSwitchesAndToggles() // Перепривязываем листенеры
+        }
 
         bsNightShiftSwitch.setOnCheckedChangeListener(null)
         bsNightShiftSwitch.isChecked = fontManager.isNightShiftEnabledForView(view)
@@ -584,32 +622,87 @@ class CustomizationSheetManager(
 
         bsTimeFormatGroup.setOnCheckedChangeListener { _, checkedId ->
             if (focusedView?.id == R.id.time_text) {
-                val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else if (bsShowAMPMSwitch.isChecked) "hh:mm a" else "hh:mm"
-                bsShowAMPMSwitch.isEnabled = (checkedId != R.id.time_24_radio)
-                fontManager.setTimeFormatPattern(pattern)
+                if (checkedId == R.id.time_custom_radio) {
+                    bsTimeCustomInputLayout.visibility = View.VISIBLE
+                    bsShowAMPMSwitch.visibility = View.GONE
+                    val pattern = bsTimeCustomEditText.text?.toString()?.takeIf { it.isNotBlank() } ?: "HH:mm"
+                    fontManager.setTimeFormatPattern(pattern)
+                } else {
+                    bsTimeCustomInputLayout.visibility = View.GONE
+                    bsShowAMPMSwitch.visibility = View.VISIBLE
+                    val pattern = if (checkedId == R.id.time_24_radio) "HH:mm" else if (bsShowAMPMSwitch.isChecked) "hh:mm a" else "hh:mm"
+                    bsShowAMPMSwitch.isEnabled = (checkedId != R.id.time_24_radio)
+                    fontManager.setTimeFormatPattern(pattern)
+                }
                 clockManager.updateTimeText()
                 applyRealTimeFocusUpdate(true)
             }
         }
 
         bsShowAMPMSwitch.setOnCheckedChangeListener { _, isChecked ->
-            if (focusedView?.id == R.id.time_text) {
+            if (focusedView?.id == R.id.time_text && bsTimeFormatGroup.checkedRadioButtonId != R.id.time_custom_radio) {
                 fontManager.setTimeFormatPattern(if (isChecked) "hh:mm a" else "hh:mm")
                 clockManager.updateTimeText()
                 applyRealTimeFocusUpdate(true)
             }
         }
 
+        bsTimeCustomEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (focusedView?.id == R.id.time_text && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) {
+                    val pattern = s?.toString()?.takeIf { it.isNotBlank() } ?: "HH:mm"
+                    try {
+                        SimpleDateFormat(pattern, Locale.getDefault()) // Валидация
+                        bsTimeCustomInputLayout.error = null
+                        fontManager.setTimeFormatPattern(pattern)
+                        clockManager.updateTimeText()
+                        applyRealTimeFocusUpdate(false)
+                    } catch (e: Exception) {
+                        bsTimeCustomInputLayout.error = "Invalid format"
+                    }
+                }
+            }
+        })
+
         bsDateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
             if (focusedView?.id == R.id.date_text) {
-                fontManager.setDateFormatPattern(when (checkedId) {
-                    R.id.date_format_1 -> "MMM dd"; R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"
-                    else -> "EEE, MMM dd"
-                })
+                if (checkedId == R.id.date_custom_radio) {
+                    bsDateCustomInputLayout.visibility = View.VISIBLE
+                    val pattern = bsDateCustomEditText.text?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
+                    fontManager.setDateFormatPattern(pattern)
+                } else {
+                    bsDateCustomInputLayout.visibility = View.GONE
+                    fontManager.setDateFormatPattern(when (checkedId) {
+                        R.id.date_format_1 -> "MMM dd"
+                        R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"
+                        else -> "EEE, MMM dd"
+                    })
+                }
                 clockManager.updateDateText()
                 applyRealTimeFocusUpdate(true)
             }
         }
+
+        bsDateCustomEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (focusedView?.id == R.id.date_text && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) {
+                    val pattern = s?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
+                    try {
+                        SimpleDateFormat(pattern, Locale.getDefault()) // Валидация
+                        bsDateCustomInputLayout.error = null
+                        fontManager.setDateFormatPattern(pattern)
+                        clockManager.updateDateText()
+                        applyRealTimeFocusUpdate(false)
+                    } catch (e: Exception) {
+                        bsDateCustomInputLayout.error = "Invalid format"
+                    }
+                }
+            }
+        })
     }
 
     private fun setupButtons() {

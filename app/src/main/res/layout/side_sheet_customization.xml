@@ -567,7 +567,29 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/time_12" />
+                <RadioButton
+                    android:id="@+id/time_custom_radio"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/date_time_format_custom" />
             </RadioGroup>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/time_custom_input_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                android:hint="@string/time_format_pattern_hint">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/time_custom_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textNoSuggestions" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/show_am_pm_switch"
@@ -615,8 +637,31 @@
                     style="@style/Widget.Material3.CompoundButton.RadioButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
                     android:text="@string/date_format_long" />
+                <RadioButton
+                    android:id="@+id/date_custom_radio"
+                    style="@style/Widget.Material3.CompoundButton.RadioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/date_time_format_custom" />
             </RadioGroup>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/date_custom_input_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone"
+                tools:visibility="visible"
+                android:hint="@string/date_format_pattern_hint">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/date_custom_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textNoSuggestions" />
+            </com.google.android.material.textfield.TextInputLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
