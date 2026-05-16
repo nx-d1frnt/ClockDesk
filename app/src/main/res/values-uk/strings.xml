@@ -108,7 +108,7 @@
     <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї додатку</string>
     <string name="battery_low">Низький заряд</string>
     <string name="battery_saver_on">Економія ввімк</string>
-    <string name="snap_to_grid">Прив\'язка до сітки\n</string>
+    <string name="snap_to_grid">Прив\'язка до сітки</string>
     <string name="vertical_alignment">Вертикальне вирівнювання</string>
     <string name="horizontal_alignment">Горизонтальне вирівнювання</string>
     <string name="layer_order">Порядок шарів</string>
@@ -200,4 +200,14 @@
     <string name="confirm_restore_title">Відновити налаштування?</string>
     <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування та не може бути скасована. Ви впевнені, що хочете продовжити?</string>
     <string name="nav_effects">Ефекти</string>
+    <string name="appearance">Оформлення</string>
+    <string name="font">Шрифт</string>
+    <string name="color">Колір</string>
+    <string name="positioning">Позиціювання</string>
+    <string name="formats">Формати</string>
+    <string name="free_mode_description">Вільне переміщення віджетів</string>
+    <string name="snap_to_grid_description">Прив\'язка до невидимої сітки</string>
+    <string name="ignore_collision_description">Дозволити накладання віджетів</string>
+    <string name="show_media_icon_description">Відображати логотип плеєра</string>
+    <string name="additional_settings">Додаткові налаштування</string>
 </resources>

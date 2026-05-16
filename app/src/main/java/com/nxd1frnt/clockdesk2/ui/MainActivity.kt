@@ -63,7 +63,6 @@ import com.google.android.material.sidesheet.SideSheetCallback
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundCropController
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
-import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.background.BlurTransformation
 import com.nxd1frnt.clockdesk2.background.GradientManager
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
@@ -183,6 +182,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private val ENTRANCE_ANIMATION_TIMEOUT = 2500L
     private val MIN_LOADER_DURATION = 800L
     private var activityStartTime = 0L
+    private var showMediaIcon = false
 
     private val entranceAnimationRunnable = Runnable {
         checkAndPlayEntranceAnimation(force = true)
@@ -332,6 +332,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         Logger.isLoggingEnabled = enableAdditionalLogging
+        showMediaIcon = prefs.getBoolean("show_media_icon", false)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
 
         Thread {
@@ -756,6 +757,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     Logger.isLoggingEnabled = enableAdditionalLogging
                 }
                 "lastfm_albumart_background" -> runOnUiThread { handleMusicStateUpdate(currentMusicState) }
+                "show_media_icon" -> runOnUiThread {
+                    showMediaIcon = prefs.getBoolean("show_media_icon", false)
+                    handleMusicStateUpdate(currentMusicState)
+                }
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
@@ -795,6 +800,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
 
     private fun updateSourceIcon(track: MusicTrack) {
+        if (!showMediaIcon) {
+            lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
+            lastfmIcon.visibility = View.VISIBLE
+            return
+        }
+
         val duration = 300L
         lastfmIcon.animate()
             .alpha(0f)
@@ -857,12 +868,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         }
                         iconApplied = true
                     } catch (e: PackageManager.NameNotFoundException) {
-                        Logger.w("MainActivity") { "Couldnt find icon for package: ${track.sourcePackageName}" }
+                        Logger.w("MainActivity") { "Couldn't find icon for package: ${track.sourcePackageName}" }
                     }
                 }
 
                 if (!iconApplied) {
                     lastfmIcon.clearColorFilter()
+                    lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                         lastfmIcon.imageAlpha = 255
                     }

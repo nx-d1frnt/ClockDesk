@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Аналог topShape -->
+    <style name="ShapeAppearance.ClockDesk.Top" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">24dp</item>
+        <item name="cornerSizeTopRight">24dp</item>
+        <item name="cornerSizeBottomLeft">4dp</item>
+        <item name="cornerSizeBottomRight">4dp</item>
+    </style>
+
+    <!-- Аналог middleShape -->
+    <style name="ShapeAppearance.ClockDesk.Middle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">4dp</item>
+    </style>
+
+    <!-- Аналог bottomShape -->
+    <style name="ShapeAppearance.ClockDesk.Bottom" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">4dp</item>
+        <item name="cornerSizeTopRight">4dp</item>
+        <item name="cornerSizeBottomLeft">24dp</item>
+        <item name="cornerSizeBottomRight">24dp</item>
+    </style>
+
+    <!-- Аналог singleShape -->
+    <style name="ShapeAppearance.ClockDesk.Single" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+</resources>

@@ -108,7 +108,7 @@
     <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
     <string name="battery_low">Battery Low</string>
     <string name="battery_saver_on">Saver On</string>
-    <string name="snap_to_grid">Snap to grid\n</string>
+    <string name="snap_to_grid">Snap to grid</string>
     <string name="vertical_alignment">Vertical alignment</string>
     <string name="horizontal_alignment">Horizontal alignment</string>
     <string name="layer_order">Layer order</string>
@@ -206,4 +206,23 @@
     <string name="crop_hint">Pinch to zoom · Drag to move</string>
     <string name="crop_reset">Reset</string>
     <string name="crop_button">Crop</string>
+    <string name="date_time_format_custom">Custom</string>
+    <string name="time_format_pattern_hint">Pattern (e.g. HH:mm:ss)</string>
+    <string name="date_format_pattern_hint">Pattern (e.g. yyyy-MM-dd)</string>
+    <string name="show_media_icon">Show media player icon</string>
+    <string name="show_media_icon_summary">Display an icon of the current media player</string>
+    <string name="appearance">Appearance</string>
+    <string name="font">Font</string>
+    <string name="color">Color</string>
+    <string name="positioning">Positioning</string>
+    <string name="formats">Formats</string>
+    <string name="free_mode_description">Free movement of widgets</string>
+    <string name="snap_to_grid_description">Snap to an invisible grid</string>
+    <string name="ignore_collision_description">Allow widgets to overlap</string>
+    <string name="show_media_icon_description">Display the player logo</string>
+    <string name="percent_100">100%</string>
+    <string name="weight_default">400</string>
+    <string name="width_default">100</string>
+    <string name="roundness_default">0</string>
+    <string name="additional_settings">Additional settings</string>
 </resources>

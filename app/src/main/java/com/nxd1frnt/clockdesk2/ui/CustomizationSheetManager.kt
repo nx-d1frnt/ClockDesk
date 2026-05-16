@@ -1,6 +1,8 @@
 package com.nxd1frnt.clockdesk2.ui
 
 import android.os.Build
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -10,8 +12,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.TextView
-import android.text.Editable
-import android.text.TextWatcher
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -76,6 +76,7 @@ class CustomizationSheetManager(
     private val bsFreeModeSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.free_mode_switch) }
     private val bsGridSnapSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.grid_snap_switch) }
     private val bsIgnoreCollisionSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.ignore_collision_switch) }
+    private val bsShowMediaIconSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_media_icon) }
 
     private val bsTimeFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.time_format_radio_group) }
     private val bsShowAMPMSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_am_pm_switch) }
@@ -86,6 +87,9 @@ class CustomizationSheetManager(
     private val bsDateCustomInputLayout by lazy { sideSheetView.findViewById<TextInputLayout>(R.id.date_custom_input_layout) }
     private val bsDateCustomEditText by lazy { sideSheetView.findViewById<TextInputEditText>(R.id.date_custom_edit_text) }
 
+    private val bsBlockFormatsTitle by lazy { sideSheetView.findViewById<TextView>(R.id.block_formats_title) }
+    private val bsDateFormatCard by lazy { sideSheetView.findViewById<View>(R.id.card_date_format) }
+    private val bsTimeFormatCard by lazy { sideSheetView.findViewById<View>(R.id.card_time_format) }
     private val bsTimeFormatLabel by lazy { sideSheetView.findViewById<TextView>(R.id.time_format_label) }
     private val bsDateFormatLabel by lazy { sideSheetView.findViewById<TextView>(R.id.date_format_label) }
     private val bsTextGravityTitle by lazy { sideSheetView.findViewById<TextView>(R.id.gravity_label) }
@@ -404,6 +408,7 @@ class CustomizationSheetManager(
         val isDate = view.id == R.id.date_text
         val isLastFm = view.id == R.id.lastfm_layout
         val isSmartChip = view.id == R.id.smart_chip_container
+        val showLayoutControls = isTime || isDate || isLastFm
 
         bsTitle.text = sideSheetView.context.getString(
             when {
@@ -422,23 +427,26 @@ class CustomizationSheetManager(
 
         bsDateFormatGroup.visibility = if (isDate) View.VISIBLE else View.GONE
         bsDateFormatLabel.visibility = if (isDate) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (isDate) View.VISIBLE else View.GONE
         bsDateCustomInputLayout.visibility = if (isDate && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
 
-        val showLayoutControls = isTime || isDate || isLastFm
-        bsTextGravityGroup.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsHorizontalAlignGroup.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsVerticalAlignGroup.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsMoveUpBtn.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsMoveDownBtn.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsFreeModeSwitch.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsGridSnapSwitch.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsIgnoreCollisionSwitch.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsAlignmentLabel.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsVerticalAlignmentLabel.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsWidgetOrderLabel.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        bsTextGravityTitle.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.block_positioning_title)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_alignment)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_vertical_alignment)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_gravity)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_widget_order)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
 
+        sideSheetView.findViewById<View>(R.id.block_additional_title)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_free_mode)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_grid_snap)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_ignore_collision)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+
+        // Last.fm Specific
+        sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (isLastFm) View.VISIBLE else View.GONE
         bsMaxWidthContainer.visibility = if (isLastFm) View.VISIBLE else View.GONE
+        bsBlockFormatsTitle.visibility = if (isTime || isDate) View.VISIBLE else View.GONE
+        bsDateFormatCard.visibility = if (isDate) View.VISIBLE else View.GONE
+        bsTimeFormatCard.visibility = if (isTime) View.VISIBLE else View.GONE
         bsEditBackgroundSwitch.visibility = if (isSmartChip) View.VISIBLE else View.GONE
     }
 
@@ -523,13 +531,43 @@ class CustomizationSheetManager(
         }
 
         bsFreeModeSwitch.setOnCheckedChangeListener(null)
-        bsFreeModeSwitch.isChecked = widgetMover.isFreeMovementEnabled(view)
+        val isFreeMode = widgetMover.isFreeMovementEnabled(view)
+        bsFreeModeSwitch.isChecked = isFreeMode
+
+        val updateAdditionalCardsVisibility = { isEnabled: Boolean ->
+            val showLayoutControls = view.id == R.id.time_text || view.id == R.id.date_text || view.id == R.id.lastfm_layout
+            if (showLayoutControls) {
+                sideSheetView.findViewById<View>(R.id.card_grid_snap)?.visibility = if (isEnabled) View.VISIBLE else View.GONE
+                sideSheetView.findViewById<View>(R.id.card_ignore_collision)?.visibility = if (isEnabled) View.VISIBLE else View.GONE
+
+                val freeModeCard = sideSheetView.findViewById<com.google.android.material.card.MaterialCardView>(R.id.card_free_mode)
+                freeModeCard?.let { card ->
+                    val radiusBottom = if (isEnabled) 4f else 24f
+                    val pxBottom = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, radiusBottom, sideSheetView.resources.displayMetrics)
+                    card.shapeAppearanceModel = card.shapeAppearanceModel.toBuilder()
+                        .setBottomLeftCornerSize(pxBottom)
+                        .setBottomRightCornerSize(pxBottom)
+                        .build()
+                }
+            }
+        }
+
+        updateAdditionalCardsVisibility(isFreeMode)
+
         bsFreeModeSwitch.setOnCheckedChangeListener { _, isChecked ->
             widgetMover.setFreeMovementEnabled(view, isChecked)
+            updateAdditionalCardsVisibility(isChecked)
         }
 
         bsGridSnapSwitch.isChecked = widgetMover.isGridSnapEnabled()
         bsIgnoreCollisionSwitch.isChecked = widgetMover.isCollisionCheckEnabled()
+
+        val prefs = sideSheetView.context.getSharedPreferences("ClockDeskPrefs", android.content.Context.MODE_PRIVATE)
+        bsShowMediaIconSwitch.setOnCheckedChangeListener(null)
+        bsShowMediaIconSwitch.isChecked = prefs.getBoolean("show_media_icon", true)
+        bsShowMediaIconSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("show_media_icon", isChecked).apply()
+        }
 
         val savedGravity = widgetMover.getInternalGravity(view)
         bsTextGravityGroup.check(when (savedGravity) {
@@ -670,10 +708,12 @@ class CustomizationSheetManager(
             if (focusedView?.id == R.id.date_text) {
                 if (checkedId == R.id.date_custom_radio) {
                     bsDateCustomInputLayout.visibility = View.VISIBLE
+                    bsDateCustomInputLayout.requestFocus()
                     val pattern = bsDateCustomEditText.text?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
                     fontManager.setDateFormatPattern(pattern)
                 } else {
                     bsDateCustomInputLayout.visibility = View.GONE
+                    bsDateCustomInputLayout.error = null
                     fontManager.setDateFormatPattern(when (checkedId) {
                         R.id.date_format_1 -> "MMM dd"
                         R.id.date_format_3 -> "EEEE, MMMM dd, yyyy"

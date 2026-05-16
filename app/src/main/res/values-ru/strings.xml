@@ -108,7 +108,7 @@
     <string name="show_battery_alert_chip_summary">Показывает чип, когда батарея разряжена или включена экономия батареи приложения</string>
     <string name="battery_low">Низкий заряд</string>
     <string name="battery_saver_on">Экономия вкл</string>
-    <string name="snap_to_grid">Привязка к сетке\n</string>
+    <string name="snap_to_grid">Привязка к сетке</string>
     <string name="vertical_alignment">Вертикальное выравнивание</string>
     <string name="horizontal_alignment">Горизонтальное выравнивание</string>
     <string name="layer_order">Порядок слоев</string>
@@ -200,4 +200,14 @@
     <string name="confirm_restore_title">Импортировать настройки?</string>
     <string name="confirm_restore_message">Это действие перезапишет ваши текущие настройки и перезапустит приложение. Вы уверены, что хотите продолжить?</string>
     <string name="nav_effects">Эффекты</string>
+    <string name="appearance">Оформление</string>
+    <string name="font">Шрифт</string>
+    <string name="color">Цвет</string>
+    <string name="positioning">Позиционирование</string>
+    <string name="formats">Форматы</string>
+    <string name="free_mode_description">Свободное перемещение виджетов</string>
+    <string name="snap_to_grid_description">Привязка к невидимой сетке</string>
+    <string name="ignore_collision_description">Разрешить наложение виджетов</string>
+    <string name="show_media_icon_description">Отображать логотип плеера</string>
+    <string name="additional_settings">Дополнительные настройки</string>
 </resources>
