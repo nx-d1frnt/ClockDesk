@@ -1,8 +1,10 @@
 package com.nxd1frnt.clockdesk2.music
 
 import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
@@ -21,27 +23,57 @@ class ClockDeskMediaService : NotificationListenerService() {
 
         fun getMediaIconBitmap(packageName: String, context: Context): Bitmap? {
             val service = instance ?: return null
-            try {
+
+            return runCatching {
                 val notifications = service.activeNotifications
                 val sbn = notifications?.firstOrNull { it.packageName == packageName }
-                val notification = sbn?.notification ?: return null
+                val notification = sbn?.notification ?: return@runCatching null
+
+                val pkgContext = context.createPackageContext(packageName, 0)
 
                 val drawable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    notification.smallIcon?.loadDrawable(context)
+                    notification.smallIcon?.loadDrawable(pkgContext)
                 } else {
                     @Suppress("DEPRECATION")
                     val resId = notification.icon
                     if (resId != 0) {
-                        val pkgContext = context.createPackageContext(packageName, 0)
-                        pkgContext.resources.getDrawable(resId)
+                        pkgContext.resources.getDrawable(resId, context.theme)
                     } else null
                 }
 
-                return drawable?.let { drawableToBitmap(it) }
-            } catch (e: Exception) {
-                Logger.e("ClockDeskMediaService") { "Failed to extract icon for $packageName: ${e.message}" }
-                return null
+                drawable?.let { drawableToBitmap(it) }
+            }.onFailure { e ->
+                if (e is PackageManager.NameNotFoundException) {
+                    Logger.d("ClockDeskMediaService") { "Package visibility restriction for: $packageName" }
+                } else if (e is SecurityException && e.message?.contains("unknown notification listener", ignoreCase = true) == true) {
+                    Logger.w("ClockDeskMediaService") { "Listener proxy is dead (Android 11 quirk). Performing hard reset." }
+                    instance = null
+                    performHardReset(context)
+                } else {
+                    Logger.e("ClockDeskMediaService") { "Failed to extract icon for $packageName: ${e.message}" }
+                }
+            }.getOrNull() ?: getApplicationIconFallback(packageName, context) // Визуальный обход: если вернулся null или ошибка, берем иконку приложения
+        }
+
+        private fun performHardReset(context: Context) {
+            runCatching {
+                val componentName = ComponentName(context, ClockDeskMediaService::class.java)
+                val pm = context.packageManager
+
+                pm.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+                pm.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    NotificationListenerService.requestRebind(componentName)
+                }
             }
+        }
+
+        private fun getApplicationIconFallback(packageName: String, context: Context): Bitmap? {
+            return runCatching {
+                val iconDrawable = context.packageManager.getApplicationIcon(packageName)
+                drawableToBitmap(iconDrawable)
+            }.getOrNull()
         }
 
         private fun drawableToBitmap(drawable: Drawable): Bitmap {
