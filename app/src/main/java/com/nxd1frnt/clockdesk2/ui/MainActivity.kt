@@ -1896,6 +1896,44 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        if (isPowerSavingMode == isEnabled) return
         isPowerSavingMode = isEnabled
+
+        Logger.d("MainActivity") { "Power Save Mode toggled: $isEnabled. Adapting UI." }
+
+        if (isEnabled) {
+            if (::weatherView.isInitialized && weatherView.visibility == View.VISIBLE) {
+                weatherView.onPause()
+                weatherView.visibility = View.GONE
+            }
+
+            if (::weatherGetter.isInitialized) {
+                weatherGetter.stopUpdates()
+            }
+
+            lightSensor?.let { sensorManager.unregisterListener(sensorEventListener, it) }
+            val layoutParams = window.attributes
+            layoutParams.screenBrightness = minPowerSaveBrightness
+            window.attributes = layoutParams
+
+        } else {
+            if (::weatherView.isInitialized && backgroundManager.isWeatherEffectsEnabled()) {
+                weatherView.onResume()
+                weatherView.visibility = View.VISIBLE
+            }
+
+            locationManager.loadCoordinates { lat, lon ->
+                weatherGetter.startUpdates(lat, lon)
+            }
+
+            lightSensor?.let {
+                sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+
+            val layoutParams = window.attributes
+            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            window.attributes = layoutParams
+
+        }
     }
 }
