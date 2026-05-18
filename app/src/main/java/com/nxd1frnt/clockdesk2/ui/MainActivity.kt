@@ -174,7 +174,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var lightSensor: Sensor? = null
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var pendingRestoreRunnable: Runnable? = null
-
     private lateinit var entranceAnimationManager: EntranceAnimationManager
     private var isWidgetLayoutComplete = false
     private var isBackgroundReady = false
@@ -759,6 +758,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 "lastfm_albumart_background" -> runOnUiThread { handleMusicStateUpdate(currentMusicState) }
                 "show_media_icon" -> runOnUiThread {
                     showMediaIcon = prefs.getBoolean("show_media_icon", false)
+                    if (!showMediaIcon) {
+                        lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
+                    } else {
+                        updateSourceIcon(MusicTrack(
+                            title = "",
+                            artist = "",
+                            album = "",
+                            sourcePackageName = (currentMusicState as? PluginState.Playing)?.track?.sourcePackageName,
+                            sourceIconBitmap = (currentMusicState as? PluginState.Playing)?.track?.sourceIconBitmap
+                        ))
+                    }
                     handleMusicStateUpdate(currentMusicState)
                 }
             }
