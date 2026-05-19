@@ -150,6 +150,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var wasMusicBackgroundApplied = false
     private var isUpdatingBackgroundUi = false
     private var isEditMode = false
+    private var isPendingMediaPicker = false
+
     private var isCropModeActive = false
     private var isDemoMode = false
     private var isTutorialRunning = false
@@ -468,6 +470,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             clockManager = clockManager,
             dayTimeGetter = dayTimeGetter,
             onAddFontRequested = {
+                isPendingMediaPicker = true
                 val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
@@ -478,7 +481,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
                 }
                 try { startActivityForResult(intent, PICK_FONT_REQUEST) }
-                catch (e: ActivityNotFoundException) { /* Handle error */ }
+                catch (e: ActivityNotFoundException) { isPendingMediaPicker = false }
             },
             onSheetStateChanged = { isHidden ->
                 if (isHidden) {
@@ -500,6 +503,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             weatherView = weatherView,
             isMusicBackgroundApplied = { wasMusicBackgroundApplied },
             onAddBackgroundRequested = {
+                isPendingMediaPicker = true
                 val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
@@ -514,6 +518,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 try {
                     startActivityForResult(intent, PICK_BG_REQUEST)
                 } catch (e: ActivityNotFoundException) {
+                    isPendingMediaPicker = false
                     Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
                 }
             },
@@ -1817,7 +1822,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (backgroundImageView.visibility == View.VISIBLE) updateBackgroundFilters()
             }
         }
-        if (isEditMode) exitEditMode()
+        if (isEditMode && !isPendingMediaPicker) exitEditMode()
+        isPendingMediaPicker = false
         if (isDemoMode) {
             isDemoMode = false
             clockManager.toggleDebugMode(false)
