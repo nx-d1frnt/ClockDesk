@@ -1910,7 +1910,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (isEnabled) {
             if (::weatherView.isInitialized && weatherView.visibility == View.VISIBLE) {
                 weatherView.onPause()
-                weatherView.visibility = View.GONE
+                weatherView.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .withEndAction { weatherView.visibility = View.GONE }
+                    .start()
             }
 
             if (::weatherGetter.isInitialized) {
@@ -1925,7 +1929,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         } else {
             if (::weatherView.isInitialized && backgroundManager.isWeatherEffectsEnabled()) {
                 weatherView.onResume()
+                weatherView.alpha = 0f
                 weatherView.visibility = View.VISIBLE
+                weatherView.animate()
+                    .alpha(1f)
+                    .setDuration(300)
+                    .start()
             }
 
             locationManager.loadCoordinates { lat, lon ->

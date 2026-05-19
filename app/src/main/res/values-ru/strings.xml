@@ -32,9 +32,9 @@
     <string name="time_24">24-часовой</string>
     <string name="time_12">12-часовой</string>
     <string name="date_format">Формат даты</string>
-    <string name="date_format_short">МММ дд</string>
-    <string name="date_format_medium">ЕЕЕ, МММ дд</string>
-    <string name="date_format_long">ЕЕЕЕ, ММММ дд, гггг</string>
+    <string name="date_format_short">MMM dd</string>
+    <string name="date_format_medium">EEE, MMM dd</string>
+    <string name="date_format_long">EEEE, MMMM dd, yyyy</string>
 
     <!-- New strings for background selection -->
     <string name="choose_background">Выбрать фон</string>
@@ -104,8 +104,8 @@
     <string name="battery_saver_trigger_summary">Установите уровень заряда батареи (%), при котором активируется режим экономии</string>
     <string name="battery_saver_settings_title">Настройки экономии батареи</string>
     <string name="smart_chips_settings_title">Настройки умных чипов</string>
-    <string name="show_battery_alert_chip">Показывать чип оповещения о батарее</string>
-    <string name="show_battery_alert_chip_summary">Показывает чип, когда батарея разряжена или включена экономия батареи приложения</string>
+    <string name="show_battery_alert_chip">Чип оповещения о батарее</string>
+    <string name="show_battery_alert_chip_summary">Показывать чип, когда батарея разряжена или включена экономия батареи</string>
     <string name="battery_low">Низкий заряд</string>
     <string name="battery_saver_on">Экономия вкл</string>
     <string name="snap_to_grid">Привязка к сетке</string>
@@ -158,6 +158,11 @@
     <string name="variable_properties_roundness">Скругления</string>
     <string name="show_am_pm">Показывать индикатор AM/PM</string>
     <string name="update_available_text">Доступно обновление</string>
+    <string name="new_version_title">Доступно обновление</string>
+    <string name="update_description_default">Доступна новая версия приложения. Рекомендуем обновиться для стабильной работы и новых возможностей.</string>
+    <string name="install_action">Установить</string>
+    <string name="later_action">Позже</string>
+    <string name="checking_updates">Поиск обновлений…</string>
     <string name="show_updates_chip">Показывать обновления приложения</string>
     <string name="show_updates_chip_summary">Показывать уведомления об обновлениях приложения</string>
     <string name="customize_smart_chips">Настроить умные чипы</string>
@@ -166,7 +171,7 @@
     <string name="music_sources_title">Источники музыки</string>
     <string name="music_sources_summary">Сортировать источники музыки и настраивать провайдеров</string>
     <string name="smart_pixels_title">Умные пиксели</string>
-    <string name="smart_pixels_summary">Затемняет пиксели в шахматном порядке после бездействия для экономии заряда батареи и экрана</string>
+    <string name="smart_pixels_summary">Затемняет пиксели в шахматном порядке после бездействия для экономии заряда батареи и экрана (Экран может казаться тусклее)</string>
     <string name="max_width">Максимальная ширина</string>
     <string name="show_background_progress_chip">Индикатор загрузки фона</string>
     <string name="show_background_progress_chip_summary">Отображать чип со статусом загрузки или обработки фонового изображения</string>
@@ -179,17 +184,13 @@
     <string name="delete_background_title">Удалить фон?</string>
     <string name="delete_background_msg">Это фоновое изображение будет безвозвратно удалено.</string>
     <string name="delete">Удалить</string>
-    <string name="new_version_title">Доступно обновление</string>
-    <string name="update_description_default">Доступна новая версия приложения. Рекомендуем обновиться для стабильной работы и новых возможностей.</string>
-    <string name="install_action">Установить</string>
-    <string name="later_action">Позже</string>
-    <string name="checking_updates">Поиск обновлений…</string>
     <string name="feature_not_supported">Функция не поддерживается вашей версией Android</string>
     <string name="manage_smart_chips">Управление умными чипами</string>
     <string name="manage_smart_chips_summary">Сортировка и настройка умных чипов</string>
     <string name="external_plugin_desc">Внешний плагин</string>
     <string name="error_opening_settings">Ошибка открытия настроек</string>
 
+    <!-- Backup & Restore Strings -->
     <string name="backup_restore_title">Бекап и восстановление</string>
     <string name="export_settings">Бекап настроек</string>
     <string name="import_settings">Импорт настроек</string>
@@ -198,8 +199,18 @@
     <string name="import_success">Настройки импортированы, перезапуск...</string>
     <string name="import_failed">Не удалось импортировать настройки</string>
     <string name="confirm_restore_title">Импортировать настройки?</string>
-    <string name="confirm_restore_message">Это действие перезапишет ваши текущие настройки и перезапустит приложение. Вы уверены, что хотите продолжить?</string>
+    <string name="confirm_restore_message">Это действие перезапишет ваши текущие настройки. Приложение будет перезапущено.</string>
+    <string name="smart_chips_plugins_title">Управление умными чипами</string>
     <string name="nav_effects">Эффекты</string>
+
+    <string name="crop_hint">Сожмите для масштаба · Перетащите для сдвига</string>
+    <string name="crop_reset">Сбросить</string>
+    <string name="crop_button">Кадрировать</string>
+    <string name="date_time_format_custom">Свой</string>
+    <string name="time_format_pattern_hint">Шаблон (напр. HH:mm:ss)</string>
+    <string name="date_format_pattern_hint">Шаблон (напр. yyyy-MM-dd)</string>
+    <string name="show_media_icon">Показывать иконку плеера</string>
+    <string name="show_media_icon_summary">Отображать иконку текущего музыкального плеера</string>
     <string name="appearance">Оформление</string>
     <string name="font">Шрифт</string>
     <string name="color">Цвет</string>
@@ -209,5 +220,9 @@
     <string name="snap_to_grid_description">Привязка к невидимой сетке</string>
     <string name="ignore_collision_description">Разрешить наложение виджетов</string>
     <string name="show_media_icon_description">Отображать логотип плеера</string>
+    <string name="percent_100">100%</string>
+    <string name="weight_default">400</string>
+    <string name="width_default">100</string>
+    <string name="roundness_default">0</string>
     <string name="additional_settings">Дополнительные настройки</string>
 </resources>

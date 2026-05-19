@@ -203,7 +203,7 @@ class CustomizationSheetManager(
 
         sideSheetView.removeCallbacks(focusUpdateRunnable)
 
-        val delay = if (isStructuralChange) 150L else 30L
+        val delay = if (isStructuralChange) 350L else 30L
         sideSheetView.postDelayed(focusUpdateRunnable, delay)
     }
 

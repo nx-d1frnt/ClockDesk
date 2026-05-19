@@ -32,9 +32,9 @@
     <string name="time_24">24-годинний</string>
     <string name="time_12">12-годинний</string>
     <string name="date_format">Формат дати</string>
-    <string name="date_format_short">МММ дд</string>
-    <string name="date_format_medium">ЕЕЕ, МММ дд</string>
-    <string name="date_format_long">ЕЕЕЕ, ММММ дд, рррр</string>
+    <string name="date_format_short">MMM dd</string>
+    <string name="date_format_medium">EEE, MMM dd</string>
+    <string name="date_format_long">EEEE, MMMM dd, yyyy</string>
 
     <!-- New strings for background selection -->
     <string name="choose_background">Обрати фон</string>
@@ -104,8 +104,8 @@
     <string name="battery_saver_trigger_summary">Встановіть рівень заряду батареї (%), при якому активується режим економії</string>
     <string name="battery_saver_settings_title">Налаштування економії батареї</string>
     <string name="smart_chips_settings_title">Налаштування розумних чіпів</string>
-    <string name="show_battery_alert_chip">Показувати чіп сповіщення про батарею</string>
-    <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї додатку</string>
+    <string name="show_battery_alert_chip">Чіп сповіщення про батарею</string>
+    <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї</string>
     <string name="battery_low">Низький заряд</string>
     <string name="battery_saver_on">Економія ввімк</string>
     <string name="snap_to_grid">Прив\'язка до сітки</string>
@@ -140,7 +140,7 @@
     <string name="send_backward">Відправити назад</string>
     <string name="bring_forward">Вивести вперед</string>
     <string name="display_settings_title">Налаштування відображення</string>
-    <string name="burn_in_protection_title">Захист від вигорання</string>
+    <string name="burn_in_protection_title">Защита від вигорання</string>
     <string name="burn_in_protection_summary">Запобігти вигоранню на екранах OLED, періодично переміщуючи елементи інтерфейсу</string>
     <string name="system_media_plugin_name">Системні медіа</string>
     <string name="lastfm_plugin_name">Last.fm</string>
@@ -158,6 +158,11 @@
     <string name="variable_properties_roundness">Скруглення</string>
     <string name="show_am_pm">Показувати індикатор AM/PM</string>
     <string name="update_available_text">Доступне оновлення</string>
+    <string name="new_version_title">Доступне оновлення</string>
+    <string name="update_description_default">Доступна нова версія додатка. Оновіться, щоб отримати покращений досвід та стабільну роботу.</string>
+    <string name="install_action">Встановити</string>
+    <string name="later_action">Пізніше</string>
+    <string name="checking_updates">Пошук оновлень…</string>
     <string name="show_updates_chip">Показувати оновлення додатку</string>
     <string name="show_updates_chip_summary">Показувати сповіщення про оновлення додатку</string>
     <string name="customize_smart_chips">Налаштувати розумні чіпи</string>
@@ -166,7 +171,7 @@
     <string name="music_sources_title">Джерела музики</string>
     <string name="music_sources_summary">Сортувати джерела музики та налаштовувати провайдерів</string>
     <string name="smart_pixels_title">Розумні пікселі</string>
-    <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану</string>
+    <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану (Екран може здаватися тьмянішим)</string>
     <string name="max_width">Максимальна ширина</string>
     <string name="show_background_progress_chip">Індикатор завантаження фону</string>
     <string name="show_background_progress_chip_summary">Показувати чип зі статусом завантаження або обробки фонового зображення</string>
@@ -179,17 +184,13 @@
     <string name="delete_background_title">Видалити фон?</string>
     <string name="delete_background_msg">Це фонове зображення буде видалено назавжди.</string>
     <string name="delete">Видалити</string>
-    <string name="new_version_title">Доступне оновлення</string>
-    <string name="update_description_default">Доступна нова версія додатка. Оновіться, щоб отримати покращений досвід та стабільну роботу.</string>
-    <string name="install_action">Встановити</string>
-    <string name="later_action">Пізніше</string>
-    <string name="checking_updates">Пошук оновлень…</string>
     <string name="feature_not_supported">Функція не підтримується вашою версією Android</string>
     <string name="manage_smart_chips">Управління розумними чипами</string>
     <string name="manage_smart_chips_summary">Сортування та налаштування розумних чипів</string>
     <string name="external_plugin_desc">Сторонній плагін</string>
     <string name="error_opening_settings">Не вдалося відкрити налаштування</string>
 
+    <!-- Backup & Restore Strings -->
     <string name="backup_restore_title">Бекап та відновлення</string>
     <string name="export_settings">Бекап налаштувань</string>
     <string name="import_settings">Імпорт налаштувань</string>
@@ -198,8 +199,18 @@
     <string name="import_success">Налаштування успішно імпортовано, перезапуск...</string>
     <string name="import_failed">Не вдалося імпортувати налаштування</string>
     <string name="confirm_restore_title">Відновити налаштування?</string>
-    <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування та не може бути скасована. Ви впевнені, що хочете продовжити?</string>
+    <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування. Додаток буде перезапущено.</string>
+    <string name="smart_chips_plugins_title">Управління розумними чипами</string>
     <string name="nav_effects">Ефекти</string>
+
+    <string name="crop_hint">Стисніть для масштабу · Перетягніть для зсуву</string>
+    <string name="crop_reset">Скинути</string>
+    <string name="crop_button">Кадрувати</string>
+    <string name="date_time_format_custom">Власний</string>
+    <string name="time_format_pattern_hint">Шаблон (напр. HH:mm:ss)</string>
+    <string name="date_format_pattern_hint">Шаблон (напр. yyyy-MM-dd)</string>
+    <string name="show_media_icon">Показувати іконку плеєра</string>
+    <string name="show_media_icon_summary">Відображати іконку поточного музичного плеєра</string>
     <string name="appearance">Оформлення</string>
     <string name="font">Шрифт</string>
     <string name="color">Колір</string>
@@ -209,5 +220,9 @@
     <string name="snap_to_grid_description">Прив\'язка до невидимої сітки</string>
     <string name="ignore_collision_description">Дозволити накладання віджетів</string>
     <string name="show_media_icon_description">Відображати логотип плеєра</string>
+    <string name="percent_100">100%</string>
+    <string name="weight_default">400</string>
+    <string name="width_default">100</string>
+    <string name="roundness_default">0</string>
     <string name="additional_settings">Додаткові налаштування</string>
 </resources>
