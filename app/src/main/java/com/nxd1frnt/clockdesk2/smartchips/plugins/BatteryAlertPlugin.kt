@@ -20,11 +20,9 @@ class BatteryAlertPlugin(private val context: Context) : ISmartChip {
     private var stateChangeListener: (() -> Unit)? = null
     private var isListening = false
 
-    // Реактивный слушатель: срабатывает только при реальном изменении заряда
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Intent.ACTION_BATTERY_CHANGED) {
-                // Уведомляем SmartChipManager, что пора обновить UI
                 stateChangeListener?.invoke()
             }
         }
