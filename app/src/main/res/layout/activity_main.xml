@@ -44,6 +44,11 @@
                     android:scaleType="centerCrop"
                     android:visibility="gone" />
 
+                <com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+                    android:id="@+id/dynamic_background_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
                 <com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
                     android:id="@+id/turbulence_overlay"
                     android:layout_width="match_parent"
