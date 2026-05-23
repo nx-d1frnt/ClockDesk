@@ -778,7 +778,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 }
             }
         }
-        prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
@@ -1836,6 +1835,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (prefs.getBoolean("smart_pixels_enabled", false)) smartPixelManager.start() else smartPixelManager.stop()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
+        if (::weatherView.isInitialized && !isPowerSavingMode && backgroundManager.isWeatherEffectsEnabled()) {
+            weatherView.onResume()
+        }
         smartChipManager.updateAllChips()
         startUpdates()
     }
@@ -1883,6 +1885,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     override fun onPause() {
         super.onPause()
+        if (::weatherView.isInitialized) {
+            weatherView.onPause()
+        }
+        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         burnInProtectionManager.stop()
         smartPixelManager.stop()
         stopUpdates()

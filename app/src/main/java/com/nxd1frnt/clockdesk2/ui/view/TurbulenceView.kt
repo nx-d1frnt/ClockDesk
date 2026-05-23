@@ -166,8 +166,17 @@ class TurbulenceView @JvmOverloads constructor(
         private var opacity = 0f
 
         // Background thread for noise generation so the main thread is never blocked.
-        private val noiseThread = HandlerThread("LegacyNoiseGen").also { it.start() }
-        private val noiseHandler = Handler(noiseThread.looper)
+        private var noiseThread: HandlerThread? = null
+        private var noiseHandler: Handler? = null
+
+        private fun ensureThreadRunning() {
+            if (noiseThread == null || !noiseThread!!.isAlive) {
+                noiseThread = HandlerThread("LegacyNoiseGen").also {
+                    it.start()
+                    noiseHandler = Handler(it.looper)
+                }
+            }
+        }
 
         // Guards against queuing multiple generation tasks when the bg thread can't keep up.
         // Frames are dropped rather than queued – this eliminates the blink/stutter caused
@@ -287,8 +296,10 @@ class TurbulenceView @JvmOverloads constructor(
 
         fun cleanUp() {
             animator?.cancel()
-            noiseHandler.removeCallbacksAndMessages(null)
-            noiseThread.quitSafely()
+            noiseHandler?.removeCallbacksAndMessages(null)
+            noiseThread?.quitSafely()
+            noiseThread = null
+            noiseHandler = null
             isGenerating = false
             frontBitmap?.recycle(); frontBitmap = null
             backBitmap?.recycle();  backBitmap  = null
@@ -318,6 +329,9 @@ class TurbulenceView @JvmOverloads constructor(
             // Capture backBitmap reference on the main thread before posting.
             val back = backBitmap ?: return
 
+            ensureThreadRunning()
+            val handler = noiseHandler ?: return
+
             // Each animation phase sets noiseBase* at its start and passes elapsedSec
             // from its own animator, so offset = base + time * speed is always relative
             // to the beginning of that phase. No cross-phase accumulation occurs.
@@ -326,7 +340,7 @@ class TurbulenceView @JvmOverloads constructor(
             val oz = noiseBaseZ + elapsedSec * cfg.noiseMoveSpeedZ
 
             isGenerating = true
-            noiseHandler.post {
+            handler.post {
                 generateNoiseTo(back, cfg, ox, oy, oz)
                 // Swap on the main thread, then clear the flag so the next frame
                 // only begins after the freshly written bitmap is safely in front.

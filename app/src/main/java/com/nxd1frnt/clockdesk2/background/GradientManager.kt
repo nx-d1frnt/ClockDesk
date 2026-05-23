@@ -296,11 +296,12 @@ class GradientManager(
         val g2 = Color.green(color2)
         val b2 = Color.blue(color2)
         val a2 = Color.alpha(color2)
-        return Color.argb(
-            (a1 + (a2 - a1) * clampedFactor).toInt(),
-            (r1 + (r2 - r1) * clampedFactor).toInt(),
-            (g1 + (g2 - g1) * clampedFactor).toInt(),
-            (b1 + (b2 - b1) * clampedFactor).toInt()
-        )
+        
+        val a = (a1 + (a2 - a1) * clampedFactor).toInt()
+        val r = Math.sqrt((r1 * r1 * (1 - clampedFactor) + r2 * r2 * clampedFactor).toDouble()).toInt()
+        val g = Math.sqrt((g1 * g1 * (1 - clampedFactor) + g2 * g2 * clampedFactor).toDouble()).toInt()
+        val b = Math.sqrt((b1 * b1 * (1 - clampedFactor) + b2 * b2 * clampedFactor).toDouble()).toInt()
+        
+        return Color.argb(a, r, g, b)
     }
 }

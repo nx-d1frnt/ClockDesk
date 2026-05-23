@@ -9,10 +9,9 @@ import org.json.JSONObject
 object SettingsBackupManager {
 
     private val PREF_FILES = listOf(
-        BackgroundManager.PREFS_NAME,
+        "ClockDeskPrefs",
         "WidgetPositions",
-        "update_prefs",
-        "ClockDeskPrefs"
+        "update_prefs"
     )
 
     fun exportSettings(context: Context, uri: Uri): Boolean {

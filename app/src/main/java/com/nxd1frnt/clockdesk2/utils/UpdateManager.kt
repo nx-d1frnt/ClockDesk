@@ -82,9 +82,9 @@ object UpdateManager {
     }
 
    private fun isNewer(server: String, current: String): Boolean {
-    // 1. Убираем "v" в начале, если есть
-    val sClean = server.removePrefix("v")
-    val cClean = current.removePrefix("v")
+    // 1. Убираем "v" в начале, если есть, и приводим к нижнему регистру
+    val sClean = server.removePrefix("v").lowercase()
+    val cClean = current.removePrefix("v").lowercase()
     
     // Если строки идентичны — обновления нет
     if (sClean == cClean) return false
