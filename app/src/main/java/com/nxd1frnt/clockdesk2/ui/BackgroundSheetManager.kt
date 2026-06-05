@@ -18,7 +18,7 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
-import com.nxd1frnt.clockdesk2.ui.view.WeatherGLView
+import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import com.nxd1frnt.clockdesk2.ui.view.WeatherView
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
@@ -30,7 +30,7 @@ class BackgroundSheetManager(
     private val backgroundManager: BackgroundManager,
     private val dayTimeGetter: DayTimeGetter,
     private val weatherGetter: WeatherGetter,
-    private val weatherView: WeatherGLView,
+    private val weatherView: DynamicBackgroundView,
     private val isMusicBackgroundApplied: () -> Boolean,
     private val onAddBackgroundRequested: () -> Unit,
     private val onPreviewImage: (Uri, blur: Int) -> Unit,
@@ -106,6 +106,7 @@ class BackgroundSheetManager(
                     "__DEFAULT_GRADIENT__" -> {
                         previewTask?.let { floatingMenuView.removeCallbacks(it) }
                         onRestoreGradient()
+                        updateCropButtonVisibility(false)
                     }
                     else -> {
                         debouncePreview {
@@ -113,6 +114,7 @@ class BackgroundSheetManager(
                                 val uri = Uri.parse(id)
                                 val intensity = bgBlurSeek.value.toInt()
                                 onPreviewImage(uri, intensity)
+                                updateCropButtonVisibility(true)
                             } catch (e: Exception) {
                                 Logger.e("BackgroundSheetManager") { "Error selecting background: $id - ${e.message}" }
                             }
@@ -207,11 +209,10 @@ class BackgroundSheetManager(
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
             bgManualWeatherSwitch.isEnabled = isChecked
             bgManualWeatherScroll.visibility = if (isChecked && bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
-            weatherView.visibility = if (isChecked) View.VISIBLE else View.GONE
             bgIntensitySeek.visibility = if (isChecked && bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
 
             if (!isChecked) {
-                weatherView.updateFromOpenMeteoSmart(0, 0.0, !dayTimeGetter.isDay(), null, null, null)
+                weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, !dayTimeGetter.isDay())
                 onUpdateFilters()
             } else {
                 applyWeatherPreview()
@@ -333,9 +334,14 @@ class BackgroundSheetManager(
     }
 
     fun cancelAndHide() {
-        if (previewBackgroundUri != null && !isApplying) {
+        if (!isApplying) {
             if (!isMusicBackgroundApplied()) {
-                onRestoreSavedBackground()
+                val savedUri = backgroundManager.getSavedBackgroundUri()
+                if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
+                    onRestoreSavedBackground()
+                } else {
+                    onRestoreGradient()
+                }
             }
         }
         previewBackgroundUri = null
@@ -366,6 +372,9 @@ class BackgroundSheetManager(
 
         backgroundsAdapter?.selectedId = savedUri ?: "__DEFAULT_GRADIENT__"
         bgRecycler.scrollToPosition(0)
+
+        val hasCustom = savedUri != null && savedUri != "__DEFAULT_GRADIENT__"
+        updateCropButtonVisibility(hasCustom)
 
         val blurInt = backgroundManager.getBlurIntensity()
         bgBlurSeek.value = blurInt.toFloat()
@@ -448,7 +457,7 @@ class BackgroundSheetManager(
                 R.id.btn_weather_thunder -> WeatherView.WeatherType.THUNDERSTORM.ordinal
                 else -> backgroundManager.getManualWeatherType()
             }
-            val type = WeatherGLView.WeatherType.values().getOrElse(typeOrdinal) { WeatherGLView.WeatherType.CLEAR }
+            val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val floatIntensity = bgIntensitySeek.value / 100f
             weatherView.forceWeather(type, floatIntensity, 5.0f, isNight)
         } else {

@@ -17,13 +17,15 @@ import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
+import com.nxd1frnt.clockdesk2.background.BlurTransformation
 import com.nxd1frnt.clockdesk2.background.GradientManager
 import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
 import com.nxd1frnt.clockdesk2.music.MusicPluginManager
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
-import com.nxd1frnt.clockdesk2.ui.view.WeatherView
+import android.graphics.Bitmap
+import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
@@ -44,7 +46,7 @@ class ClockDeskDreamService : DreamService() {
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
     private lateinit var turbulenceOverlay: TurbulenceView
-    private lateinit var weatherView: WeatherView
+    private lateinit var dynamicBackgroundView: DynamicBackgroundView
     private lateinit var smartChipContainer: ConstraintLayout
     // endregion
 
@@ -140,6 +142,10 @@ class ClockDeskDreamService : DreamService() {
             onMusicStateChanged(state)
         }
 
+        if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.onResume()
+        }
+
         // Restore user background (photo or gradient)
         restoreBackground()
         // Restore weather overlay state
@@ -148,6 +154,10 @@ class ClockDeskDreamService : DreamService() {
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+
+        if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.onPause()
+        }
 
         if (::clockManager.isInitialized) clockManager.stopUpdates()
         if (::gradientManager.isInitialized) gradientManager.stopUpdates()
@@ -175,7 +185,7 @@ class ClockDeskDreamService : DreamService() {
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
-        weatherView = findViewById(R.id.weatherView)
+        dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
         smartChipContainer = findViewById(R.id.smart_chip_container)
     }
 
@@ -214,7 +224,7 @@ class ClockDeskDreamService : DreamService() {
             if (backgroundManager.isWeatherEffectsEnabled() &&
                 !backgroundManager.isManualWeatherEnabled()
             ) {
-                weatherView.updateFromOpenMeteoSmart(
+                dynamicBackgroundView.updateFromOpenMeteoSmart(
                     wmoCode = code,
                     windSpeedKmh = wind,
                     night = isNight,
@@ -230,7 +240,13 @@ class ClockDeskDreamService : DreamService() {
         }
 
         // Gradient
-        gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
+        gradientManager = GradientManager(
+            dynamicBackgroundView,
+            dayTimeGetter,
+            locationManager,
+            handler,
+            isCustomBackgroundActive = { hasCustomImageBackground }
+        )
 
         // Font — identical argument list to MainActivity
         fontManager = FontManager(
@@ -280,6 +296,7 @@ class ClockDeskDreamService : DreamService() {
         // No user photo → gradient path
         hasCustomImageBackground = false
         backgroundImageView.visibility = View.GONE
+        dynamicBackgroundView.visibility = View.VISIBLE
     }
 
     /**
@@ -287,45 +304,50 @@ class ClockDeskDreamService : DreamService() {
      * no LoadingAnimationView, but does apply blur via RenderEffect on API 31+).
      */
     private fun applyImageBackground(uri: Uri, blurIntensity: Int) {
-        // Use Glide the same way MainActivity does (reuse GlideApp if available,
-        // otherwise fall back to standard Glide). Only the loading part is simplified —
-        // no cross-fade animation needed while the screen is static.
         try {
-            com.nxd1frnt.clockdesk2.network.GlideApp.with(this)
-                .load(uri)
-                .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
-                    override fun onResourceReady(
-                        resource: android.graphics.drawable.Drawable,
-                        transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
-                    ) {
-                        backgroundImageView.setImageDrawable(resource)
-                        backgroundImageView.visibility = View.VISIBLE
+            val metrics = resources.displayMetrics
+            val maxDim = 1080
+            val blurScaleFactor = if (blurIntensity <= 0) 1.0f else {
+                val normalized = blurIntensity.coerceIn(0, 100) / 100f
+                1.0f - (normalized * 0.75f)
+            }
+            val targetW = (minOf(metrics.widthPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
+            val targetH = (minOf(metrics.heightPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
 
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                            && blurIntensity > 0
-                        ) {
-                            val radius = blurIntensity.toFloat().coerceIn(1f, 25f)
-                            backgroundImageView.setRenderEffect(
-                                android.graphics.RenderEffect.createBlurEffect(
-                                    radius, radius,
-                                    android.graphics.Shader.TileMode.CLAMP
-                                )
-                            )
-                        } else {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                backgroundImageView.setRenderEffect(null)
-                            }
-                        }
+            var req = com.bumptech.glide.request.RequestOptions()
+                .override(targetW, targetH)
+                .downsample(com.bumptech.glide.load.resource.bitmap.DownsampleStrategy.CENTER_INSIDE)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+
+            if (blurIntensity > 0) {
+                req = req.transform(
+                    BlurTransformation(this, blurIntensity, 1)
+                )
+            }
+
+            com.nxd1frnt.clockdesk2.network.GlideApp.with(this)
+                .asBitmap()
+                .load(uri)
+                .apply(req)
+                .into(object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+                    override fun onResourceReady(
+                        resource: Bitmap,
+                        transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?
+                    ) {
+                        val bgOffsetX = backgroundManager.getBgOffsetX()
+                        val bgOffsetY = backgroundManager.getBgOffsetY()
+                        val bgScale   = backgroundManager.getBgScale()
+                        dynamicBackgroundView.transitionTo(resource, 0L, bgScale, bgOffsetX, bgOffsetY)
+                        dynamicBackgroundView.visibility = View.VISIBLE
                     }
 
                     override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
-                        backgroundImageView.visibility = View.GONE
                     }
                 })
         } catch (e: Exception) {
             Log.e("ClockDeskDream", "Failed to load background image", e)
             hasCustomImageBackground = false
-            backgroundImageView.visibility = View.GONE
+            dynamicBackgroundView.visibility = View.VISIBLE
         }
     }
 
@@ -339,21 +361,29 @@ class ClockDeskDreamService : DreamService() {
      */
     private fun restoreWeatherView() {
         val isEnabled = backgroundManager.isWeatherEffectsEnabled()
+        val isNight = !dayTimeGetter.isDay()
+
         if (!isEnabled) {
-            weatherView.visibility = View.GONE
+            dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight)
             return
         }
-        weatherView.visibility = View.VISIBLE
-        val isNight = !dayTimeGetter.isDay()
 
         if (backgroundManager.isManualWeatherEnabled()) {
             val typeOrdinal = backgroundManager.getManualWeatherType()
-            val type = WeatherView.WeatherType.values()
-                .getOrElse(typeOrdinal) { WeatherView.WeatherType.CLEAR }
+            val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
-            weatherView.forceWeather(type, intensity, 5.0f, isNight)
+            dynamicBackgroundView.forceWeather(type, intensity, 5.0f, isNight)
+        } else {
+            val code = weatherGetter.weatherCode ?: 0
+            val wind = weatherGetter.windSpeed ?: 0.0
+            val precip = weatherGetter.precipitation
+            val clouds = weatherGetter.cloudCover
+            val vis = weatherGetter.visibility
+            dynamicBackgroundView.updateFromOpenMeteoSmart(
+                code, wind, isNight,
+                precip, clouds, vis
+            )
         }
-        // Automatic weather will be set once the first weatherGetter callback fires.
     }
 
     // endregion

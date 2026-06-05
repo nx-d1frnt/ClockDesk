@@ -2,20 +2,20 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-        <ImageView
-            android:id="@+id/edit_mode_blur_layer"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:alpha="0"
-            android:visibility="gone"
-            android:importantForAccessibility="no"
-            android:contentDescription="@null"
-            app:tint="#C5000000"
-            app:tintMode="src_over"/>
+    <ImageView
+        android:id="@+id/edit_mode_blur_layer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no"
+        android:contentDescription="@null"
+        app:tint="#C5000000"
+        app:tintMode="src_over"/>
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/main_layout"
@@ -55,10 +55,7 @@
                     android:layout_height="match_parent"
                     android:elevation="10dp" />
 
-                <com.nxd1frnt.clockdesk2.ui.view.WeatherGLView
-                    android:id="@+id/weatherView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+
 
                 <!-- Progress overlay shown while blur is being applied -->
 
@@ -253,7 +250,7 @@
         </LinearLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
-        <include layout="@layout/tutorial_layout" />
+    <include layout="@layout/tutorial_layout" />
     <!-- Backgrounds bottom sheet (separate) -->
     <FrameLayout
         android:id="@+id/background_bottom_sheet"
@@ -275,15 +272,15 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-        <View
-            android:id="@+id/smart_pixel_overlay"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone"
-            android:alpha="0"
+    <View
+        android:id="@+id/smart_pixel_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:alpha="0"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-            tools:visibility="visible" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
+        tools:visibility="visible" />
+</androidx.constraintlayout.widget.ConstraintLayout>
