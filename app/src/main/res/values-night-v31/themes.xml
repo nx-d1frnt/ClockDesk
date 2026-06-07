@@ -12,6 +12,9 @@
         <item name="colorOnSecondaryContainer">@color/material_dynamic_secondary10</item>
         <item name="colorSurface">@color/material_dynamic_neutral10</item>
         <item name="colorOnSurface">@color/material_dynamic_neutral90</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item> 
     </style>
 
     <style name="ClockDesk.Dialog.Theme" parent="Theme.Material3.DayNight.Dialog">

@@ -143,8 +143,8 @@ fun getWeatherMatrix(wmoCode: Int, isNight: Boolean, intensity: Float): ColorMat
     if (intensity <= 0.05f) return matrix
 
     when (wmoCode) {
-        //clear sky, cloudy, fog
-        1, 2, 3, 45, 48 -> {
+        // overcast + fog → desaturate
+        3, 45, 48 -> {
             val sat = scale(0.2f, intensity)
             val saturation = ColorMatrix()
             saturation.setSaturation(sat)

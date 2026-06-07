@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -12,7 +13,50 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.SettingsBackupManager
 
-class SettingsFragment : PreferenceFragmentCompat() {
+class GeneralSettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_general, rootKey)
+    }
+}
+
+class MusicSettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_music, rootKey)
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            val albumArtBackgroundPref =
+                findPreference<SwitchPreferenceCompat>("lastfm_albumart_background")
+            albumArtBackgroundPref?.isEnabled = false
+            albumArtBackgroundPref?.isChecked = false
+            albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
+        }
+    }
+}
+
+class DisplaySettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_display, rootKey)
+    }
+}
+
+class BatterySettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_battery, rootKey)
+    }
+}
+
+class PerformanceSettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_performance, rootKey)
+    }
+}
+
+class BackupSettingsFragment : PreferenceFragmentCompat() {
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let {
@@ -32,18 +76,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        val preferenceManager = preferenceManager
         preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
-        setPreferencesFromResource(R.xml.preferences, rootKey)
-        
-        // disable album art background option if android version < 4.4
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-            val albumArtBackgroundPref =
-                findPreference<SwitchPreferenceCompat>("lastfm_albumart_background")
-            albumArtBackgroundPref?.isEnabled = false
-            albumArtBackgroundPref?.isChecked = false
-            albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
-        }
+        setPreferencesFromResource(R.xml.pref_backup, rootKey)
 
         findPreference<Preference>("export_settings")?.setOnPreferenceClickListener {
             exportLauncher.launch("clockdesk_settings.json")

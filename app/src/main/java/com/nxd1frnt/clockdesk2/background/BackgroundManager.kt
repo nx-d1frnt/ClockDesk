@@ -20,6 +20,8 @@ class BackgroundManager(private val context: Context) {
         private const val KEY_DIM_MODE = "background_dim_mode" // 0=off,1=continuous,2=dynamic
         private const val KEY_DIM_ENABLED = "background_dim_enabled" // legacy (0/1) kept for compatibility
         private const val KEY_DIM_INTENSITY = "background_dim_intensity"
+        private const val KEY_DIM_MIN_INTENSITY = "background_dim_min_intensity"
+        private const val KEY_DIM_MAX_INTENSITY = "background_dim_max_intensity"
 
         private const val KEY_ZOOM_ENABLED = "background_zoom_enabled"
         private const val KEY_NIGHT_SHIFT_ENABLED = "background_night_shift_enabled"
@@ -85,6 +87,12 @@ class BackgroundManager(private val context: Context) {
     fun getDimIntensity(): Int = prefs.getInt(KEY_DIM_INTENSITY, 0)
     fun setDimIntensity(i: Int) { prefs.edit().putInt(KEY_DIM_INTENSITY, i).apply() }
 
+    fun getDimMinIntensity(): Int = prefs.getInt(KEY_DIM_MIN_INTENSITY, 0)
+    fun setDimMinIntensity(i: Int) { prefs.edit().putInt(KEY_DIM_MIN_INTENSITY, i).apply() }
+
+    fun getDimMaxIntensity(): Int = prefs.getInt(KEY_DIM_MAX_INTENSITY, prefs.getInt(KEY_DIM_INTENSITY, 50))
+    fun setDimMaxIntensity(i: Int) { prefs.edit().putInt(KEY_DIM_MAX_INTENSITY, i).apply() }
+
     fun isWeatherEffectsEnabled(): Boolean = prefs.getBoolean(KEY_WEATHER_ENABLED, true)
     fun setWeatherEffectsEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_WEATHER_ENABLED, enabled).apply()
@@ -143,35 +151,52 @@ class BackgroundManager(private val context: Context) {
     /**
      * Compute the effective dim intensity for the provided time using sun times.
      */
-    fun computeEffectiveDimIntensity(currentTime: Date, sunTimeApi: DayTimeGetter): Int {
-        val mode = getDimMode()
-        val userIntensity = getDimIntensity().coerceIn(0, 50)
-        if (mode == DIM_MODE_OFF || userIntensity <= 0) return 0
-        if (mode == DIM_MODE_CONTINUOUS) return userIntensity
-
-        // DYNAMIC mode: mirror night transitions but produce an intensity factor 0..1
-        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
-        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
-
-        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
-        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
-        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
-
-        val factor = when {
-            currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
-            currentTime.before(sunrise) -> {
-                val f = (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time)
-                (1.0f - f).coerceIn(0f, 1f) // transition to day: decrease dim
-            }
-            currentTime.before(postSunset) -> 0.0f // Daytime: no dim
-            currentTime.before(fullNight) -> {
-                val f = (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
-                f.coerceIn(0f, 1f) // transition to full night: increase dim
-            }
-            else -> 1.0f // Full night after fullNight
+    fun computeEffectiveDimIntensity(
+        currentTime: Date,
+        sunTimeApi: DayTimeGetter,
+        overrideMode: Int? = null,
+        overrideMin: Int? = null,
+        overrideMax: Int? = null,
+        overrideFactor: Float? = null
+    ): Int {
+        val mode = overrideMode ?: getDimMode()
+        if (mode == DIM_MODE_OFF) return 0
+        if (mode == DIM_MODE_CONTINUOUS) {
+            val userIntensity = (overrideMax ?: getDimIntensity()).coerceIn(0, 50)
+            if (userIntensity <= 0) return 0
+            return userIntensity
         }
 
-        val result = (userIntensity * factor).toInt().coerceIn(0, userIntensity)
+        // DYNAMIC mode: mirror night transitions but produce an intensity factor 0..1
+        val minDim = (overrideMin ?: getDimMinIntensity()).coerceIn(0, 50)
+        val maxDim = (overrideMax ?: getDimMaxIntensity()).coerceIn(0, 50)
+
+        val factor = if (overrideFactor != null) {
+            overrideFactor.coerceIn(0f, 1f)
+        } else {
+            val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
+            val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+
+            val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
+            val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
+            val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
+
+            when {
+                currentTime.before(preSunrise) -> 1.0f // Full night before pre-sunrise
+                currentTime.before(sunrise) -> {
+                    val f = (currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time)
+                    (1.0f - f).coerceIn(0f, 1f) // transition to day: decrease dim
+                }
+                currentTime.before(postSunset) -> 0.0f // Daytime: no dim
+                currentTime.before(fullNight) -> {
+                    val f = (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+                    f.coerceIn(0f, 1f) // transition to full night: increase dim
+                }
+                else -> 1.0f // Full night after fullNight
+            }
+        }
+
+        val result = (minDim + (maxDim - minDim) * factor).toInt().coerceIn(0, 50)
         return result
     }
 

@@ -42,8 +42,12 @@ class BackgroundCropController(
                 val newScale = (curScale * detector.scaleFactor).coerceIn(MIN_SCALE, MAX_SCALE)
                 val focusX = detector.focusX
                 val focusY = detector.focusY
-                curOffsetX = focusX - (focusX - curOffsetX) * (newScale / curScale)
-                curOffsetY = focusY - (focusY - curOffsetY) * (newScale / curScale)
+                val vw = dynamicBackgroundView.width.toFloat()
+                val vh = dynamicBackgroundView.height.toFloat()
+                val centerX = vw / 2f
+                val centerY = vh / 2f
+                curOffsetX = (focusX - centerX) * (1f - newScale / curScale) + curOffsetX * (newScale / curScale)
+                curOffsetY = (focusY - centerY) * (1f - newScale / curScale) + curOffsetY * (newScale / curScale)
                 curScale = newScale
                 clampOffset()
                 applyMatrix()
@@ -142,6 +146,7 @@ class BackgroundCropController(
         val vh = dynamicBackgroundView.height.toFloat()
         if (vw == 0f || vh == 0f || dw == 0f || dh == 0f) return
 
+        clampOffset()
         dynamicBackgroundView.setCropTransform(curScale, curOffsetX, curOffsetY)
     }
 

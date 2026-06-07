@@ -103,6 +103,31 @@
     <string name="battery_saver_trigger_title">Battery Saver Trigger Level</string>
     <string name="battery_saver_trigger_summary">Set the battery level (%) at which battery saver mode activates</string>
     <string name="battery_saver_settings_title">Battery saving settings</string>
+    <string name="power_saver_manual_title">Manual Battery Saver</string>
+    <string name="power_saver_rules_title">Battery Saver Actions</string>
+    <string name="power_saver_manual_summary">Force battery saver mode on manually to reduce resource usage</string>
+    <string name="power_saver_disable_animations_title">Disable animations</string>
+    <string name="power_saver_disable_animations_summary">Pause dynamic background effects to reduce GPU usage</string>
+    <string name="power_saver_limit_fps_title">Limit framerate</string>
+    <string name="power_saver_limit_fps_summary">Cap background animation framerate when battery saver is active</string>
+    <string name="power_saver_fps_limit_value_title">Framerate limit</string>
+    <string name="power_saver_fps_limit_value_summary">Target frames per second for OpenGL animations (lower uses less battery)</string>
+    <string name="power_saver_disable_weather_title">Disable weather updates</string>
+    <string name="power_saver_disable_weather_summary">Stop fetching weather updates in the background</string>
+    <string name="power_saver_lock_brightness_title">Force low brightness</string>
+    <string name="power_saver_lock_brightness_summary">Lock screen brightness to a very low level</string>
+    <string name="power_saver_limit_clock_title">Reduce clock updates</string>
+    <string name="power_saver_limit_clock_summary">Update time once per minute (hides seconds)</string>
+    <string name="power_saver_disable_light_sensor_title">Disable light sensor</string>
+    <string name="power_saver_disable_light_sensor_summary">Stop ambient light sensor polling</string>
+    <string name="power_saver_enable_smart_pixels_title">Enable Smart Pixels</string>
+    <string name="power_saver_enable_smart_pixels_summary">Activate screen pixel dimming checkerboard pattern</string>
+    <string name="power_saver_dim_background_title">Dim background view</string>
+    <string name="power_saver_dim_background_summary">Heavily dim the background image/gradients to save OLED power</string>
+    <string name="power_saver_dim_level_title">Background dimming level</string>
+    <string name="power_saver_dim_level_summary">Adjust background dim percentage during battery saver</string>
+    <string name="power_saver_brightness_level_title">Screen brightness level</string>
+    <string name="power_saver_brightness_level_summary">Adjust screen brightness level when locked in battery saver</string>
     <string name="smart_chips_settings_title">Smart Chips Settings</string>
     <string name="show_battery_alert_chip">Battery Alert Chip</string>
     <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
@@ -120,6 +145,20 @@
     <string name="free_mode_switch">Free movement (BETA)</string>
     <string name="enable_advanced_graphics">Enable Advanced Graphics</string>
     <string name="enable_advanced_graphics_summary">Enable advanced graphics features (may impact performance on some devices)</string>
+    <string name="graphics_enable_transitions_title">Smooth Transitions</string>
+    <string name="graphics_enable_transitions_summary">Animate zoom and fade transitions when updating background images</string>
+    <string name="graphics_enable_turbulence_title">Turbulence Noise Effect</string>
+    <string name="graphics_enable_turbulence_summary">Animate liquid chromatic turbulence distortion during theme changes</string>
+    <string name="graphics_turbulence_grid_title">Turbulence grid scale</string>
+    <string name="graphics_turbulence_grid_summary">Adjust the scale of the chromatic turbulence liquid distortion noise</string>
+    <string name="graphics_turbulence_speed_title">Turbulence animation speed</string>
+    <string name="graphics_turbulence_speed_summary">Adjust the movement speed of the chromatic turbulence transitions</string>
+    <string name="graphics_enable_edit_blur_title">Edit Mode Blur</string>
+    <string name="graphics_enable_edit_blur_summary">Apply high-quality blur effect to the background when editing widgets</string>
+    <string name="graphics_render_scale_title">Render resolution scale</string>
+    <string name="graphics_render_scale_summary">Scale the rendering resolution of the entire background (lower values improve performance/battery)</string>
+    <string name="graphics_weather_scale_title">Weather effects resolution</string>
+    <string name="graphics_weather_scale_summary">Scale the resolution of weather effects like rain/snow (lower values run faster on slow GPUs)</string>
     <string name="weather_background">Dynamic weather background</string>
     <string name="weather_effects_title">Weather</string>
     <string name="enable_weather_effects">Enable dynamic weather effects</string>
@@ -132,6 +171,9 @@
     <string name="weather_storm">Storm</string>
     <string name="weather_clear">Clear</string>
     <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_auto_current">Current weather (auto)</string>
+    <string name="weather_auto_loading">Waiting for data…</string>
+    <string name="weather_auto_no_data">No weather data yet</string>
     <string name="now_playing_placeholder">Now Playing: Not connected</string>
     <string name="widget_order">Widget order</string>
     <string name="text_gravity">Text Gravity</string>
@@ -225,4 +267,38 @@
     <string name="width_default">100</string>
     <string name="roundness_default">0</string>
     <string name="additional_settings">Additional settings</string>
+
+    <!-- About screen strings -->
+    <string name="about_title">About</string>
+    <string name="about_subtitle">App info &amp; open source</string>
+    <string name="about_version_format">Version %1$s</string>
+    <string name="about_version_code_format">%1$s (build %2$d)</string>
+    <string name="about_developer_label">Developer</string>
+    <string name="about_developer_value">nx-d1frnt</string>
+    <string name="about_version_label">Version</string>
+    <string name="about_license_label">License</string>
+    <string name="about_license_value">MIT License</string>
+    <string name="about_source_label">Source code</string>
+    <string name="about_source_value">github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_license">License</string>
+    <string name="about_github_url">https://github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_license_url">https://github.com/nx-d1frnt/ClockDesk/blob/master/LICENSE</string>
+    <string name="about_footer">ClockDesk %1$s · Open Source</string>
+
+    <!-- Location & Weather Settings -->
+    <string name="location_weather_settings_title">Location &amp; Weather</string>
+    <string name="location_weather_settings_subtitle">Coordinates, solar times and weather refresh</string>
+    <string name="weather_settings_category_title">Weather Settings</string>
+    <string name="weather_refresh_interval_title">Weather refresh interval</string>
+    <string name="weather_refresh_interval_summary">How often to fetch current weather data</string>
+
+    <!-- Settings Categories Subtitles and Titles -->
+    <string name="music_settings_subtitle">Music sources and album art background</string>
+    <string name="display_settings_subtitle">Burn-in protection and smart pixels</string>
+    <string name="battery_saver_settings_subtitle">Trigger level and saver actions</string>
+    <string name="performance_settings_title">Performance &amp; Graphics</string>
+    <string name="performance_settings_subtitle">Logging, transitions and graphics scale</string>
+    <string name="smart_chips_settings_subtitle">Manage active chips and widgets</string>
+    <string name="backup_restore_subtitle">Export and restore settings backup</string>
 </resources>

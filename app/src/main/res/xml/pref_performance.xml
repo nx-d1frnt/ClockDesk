@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:key="performance_category"
+        app:title="@string/performance_settings">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="additional_logging"
+            app:title="@string/enable_additional_logging"
+            app:summary="@string/enable_additional_logging_summary" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="advanced_graphics"
+            app:title="@string/enable_advanced_graphics"
+            app:summary="@string/enable_advanced_graphics_summary" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="graphics_enable_transitions"
+            app:title="@string/graphics_enable_transitions_title"
+            app:summary="@string/graphics_enable_transitions_summary"
+            android:defaultValue="true"
+            app:dependency="advanced_graphics" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="graphics_enable_turbulence"
+            app:title="@string/graphics_enable_turbulence_title"
+            app:summary="@string/graphics_enable_turbulence_summary"
+            android:defaultValue="true"
+            app:dependency="advanced_graphics" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="graphics_turbulence_grid"
+            app:title="@string/graphics_turbulence_grid_title"
+            app:summary="@string/graphics_turbulence_grid_summary"
+            android:min="5"
+            android:max="50"
+            android:defaultValue="10"
+            app:showSeekBarValue="true"
+            app:dependency="graphics_enable_turbulence" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="graphics_turbulence_speed"
+            app:title="@string/graphics_turbulence_speed_title"
+            app:summary="@string/graphics_turbulence_speed_summary"
+            android:min="1"
+            android:max="30"
+            android:defaultValue="10"
+            app:showSeekBarValue="true"
+            app:dependency="graphics_enable_turbulence" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="graphics_enable_edit_blur"
+            app:title="@string/graphics_enable_edit_blur_title"
+            app:summary="@string/graphics_enable_edit_blur_summary"
+            android:defaultValue="true"
+            app:dependency="advanced_graphics" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="graphics_render_scale"
+            app:title="@string/graphics_render_scale_title"
+            app:summary="@string/graphics_render_scale_summary"
+            android:min="10"
+            android:max="100"
+            android:defaultValue="100"
+            app:showSeekBarValue="true"
+            app:dependency="advanced_graphics" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="graphics_weather_scale"
+            app:title="@string/graphics_weather_scale_title"
+            app:summary="@string/graphics_weather_scale_summary"
+            android:min="10"
+            android:max="100"
+            android:defaultValue="40"
+            app:showSeekBarValue="true"
+            app:dependency="advanced_graphics" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

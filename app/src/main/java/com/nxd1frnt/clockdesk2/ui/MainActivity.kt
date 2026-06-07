@@ -152,6 +152,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var isEditMode = false
     private var isCropModeActive = false
     private var isScaleAnimating = false
+    private var isLaunchingFilePicker = false
     private var isDemoMode = false
     private var isTutorialRunning = false
     private var isNightShiftEnabled = false
@@ -163,6 +164,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var lastBackgroundSource: Any? = null
     private var lastBlurIntensity: Int? = null
     private var isAdvancedGraphicsEnabled = false
+    private var isGraphicsTransitionsEnabled = true
+    private var isGraphicsTurbulenceEnabled = true
+    private var isGraphicsEditBlurEnabled = true
+    private var graphicsRenderScale = 100
+    private var graphicsWeatherScale = 40
     private var enableAdditionalLogging = false
 
     private var focusedView: View? = null
@@ -337,6 +343,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         Logger.isLoggingEnabled = enableAdditionalLogging
         showMediaIcon = prefs.getBoolean("show_media_icon", false)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
+        isGraphicsTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
+        isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
+        graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
+        graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
 
         Thread {
             val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
@@ -344,7 +355,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             handler.post {
                 if (!isDestroyed && !isFinishing) {
                     dynamicBackgroundView.setFogTextures(fogBitmap, cloudsBitmap)
-                    dynamicBackgroundView.setRenderScale(0.5f)
+                    val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+                    dynamicBackgroundView.setRenderScale(targetScale)
+                    val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+                    dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
                 }
             }
         }.start()
@@ -385,9 +399,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             locationManager,
             handler,
             isCustomBackgroundActive = {
-                hasCustomImageBackground || (::backgroundSheetManager.isInitialized &&
-                        backgroundSheetManager.isShowing &&
-                        backgroundSheetManager.previewBackgroundUri != null &&
+                hasCustomImageBackground || (::backgroundSheetManager.isInitialized && 
+                        backgroundSheetManager.isShowing && 
+                        backgroundSheetManager.previewBackgroundUri != null && 
                         backgroundSheetManager.previewBackgroundUri != "__DEFAULT_GRADIENT__")
             }
         )
@@ -443,6 +457,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     Logger.w("MainActivity") { "Failed to update dynamic dimming: ${e.message}" }
                 }
             },
+            prefs,
             enableAdditionalLogging
         )
 
@@ -492,8 +507,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 } else {
                     Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
                 }
-                try { startActivityForResult(intent, PICK_FONT_REQUEST) }
-                catch (e: ActivityNotFoundException) { /* Handle error */ }
+                try {
+                    isLaunchingFilePicker = true
+                    startActivityForResult(intent, PICK_FONT_REQUEST)
+                } catch (e: ActivityNotFoundException) { /* Handle error */ }
             },
             onSheetStateChanged = { isHidden ->
                 if (isHidden) {
@@ -527,6 +544,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
                 try {
+                    isLaunchingFilePicker = true
                     startActivityForResult(intent, PICK_BG_REQUEST)
                 } catch (e: ActivityNotFoundException) {
                     Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
@@ -543,8 +561,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 restoreUserBackground(backgroundManager.getSavedBackgroundUri())
                 restoreSavedWeatherState()
             },
-            onUpdateFilters = {
-                if (dynamicBackgroundView.visibility == View.VISIBLE) updateBackgroundFilters()
+            onUpdateFilters = { previewMode, previewIntensity, previewMin, previewMax ->
+                if (dynamicBackgroundView.visibility == View.VISIBLE) {
+                    updateBackgroundFilters(previewMode, previewIntensity, previewMin, previewMax)
+                }
             },
             onApplyCompleted = { previewUri ->
                 if (wasMusicBackgroundApplied) {
@@ -644,7 +664,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         )
 
-        // 3. Tutorial Manager
+    // 3. Tutorial Manager
         tutorialManager = TutorialManager(
             tutorialLayout = tutorialLayout,
             tutorialFinger = tutorialFinger,
@@ -779,6 +799,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging
                 }
+                "graphics_render_scale" -> runOnUiThread {
+                    graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
+                    if (::dynamicBackgroundView.isInitialized) {
+                        val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+                        dynamicBackgroundView.setRenderScale(targetScale)
+                    }
+                }
+                "graphics_weather_scale" -> runOnUiThread {
+                    graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
+                    if (::dynamicBackgroundView.isInitialized) {
+                        val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+                        dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+                    }
+                }
                 "lastfm_albumart_background" -> runOnUiThread { handleMusicStateUpdate(currentMusicState) }
                 "show_media_icon" -> runOnUiThread {
                     showMediaIcon = prefs.getBoolean("show_media_icon", false)
@@ -851,35 +885,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 //            .alpha(0f)
 //            .setDuration(duration)
 //            .withEndAction {
-        // if (isDestroyed || isFinishing) return@withEndAction
+               // if (isDestroyed || isFinishing) return@withEndAction
 
-        var iconApplied = false
+                var iconApplied = false
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            lastfmIcon.clipToOutline = false
-        }
-
-        if (track.sourceIconBitmap != null) {
-            lastfmIcon.setImageBitmap(track.sourceIconBitmap)
-
-            val tintColor = nowPlayingTextView.currentTextColor
-            lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                lastfmIcon.imageAlpha = 255
-            }
-            iconApplied = true
-        } else if (!track.sourcePackageName.isNullOrEmpty()) {
-            try {
-                val icon = packageManager.getApplicationIcon(track.sourcePackageName)
-                var monochromeDrawable: Drawable? = null
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && icon is android.graphics.drawable.AdaptiveIconDrawable) {
-                    monochromeDrawable = icon.monochrome
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    lastfmIcon.clipToOutline = false
                 }
 
-                if (monochromeDrawable != null) {
-                    lastfmIcon.setImageDrawable(monochromeDrawable)
+                if (track.sourceIconBitmap != null) {
+                    lastfmIcon.setImageBitmap(track.sourceIconBitmap)
 
                     val tintColor = nowPlayingTextView.currentTextColor
                     lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
@@ -887,44 +902,63 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                         lastfmIcon.imageAlpha = 255
                     }
-                } else {
-                    lastfmIcon.setImageDrawable(icon)
+                    iconApplied = true
+                } else if (!track.sourcePackageName.isNullOrEmpty()) {
+                    try {
+                        val icon = packageManager.getApplicationIcon(track.sourcePackageName)
+                        var monochromeDrawable: Drawable? = null
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        lastfmIcon.outlineProvider = object : ViewOutlineProvider() {
-                            override fun getOutline(view: View, outline: Outline) {
-                                outline.setOval(0, 0, view.width, view.height)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && icon is android.graphics.drawable.AdaptiveIconDrawable) {
+                            monochromeDrawable = icon.monochrome
+                        }
+
+                        if (monochromeDrawable != null) {
+                            lastfmIcon.setImageDrawable(monochromeDrawable)
+
+                            val tintColor = nowPlayingTextView.currentTextColor
+                            lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                                lastfmIcon.imageAlpha = 255
+                            }
+                        } else {
+                            lastfmIcon.setImageDrawable(icon)
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                lastfmIcon.outlineProvider = object : ViewOutlineProvider() {
+                                    override fun getOutline(view: View, outline: Outline) {
+                                        outline.setOval(0, 0, view.width, view.height)
+                                    }
+                                }
+                                lastfmIcon.clipToOutline = true
+                            }
+
+                            val matrix = ColorMatrix().apply { setSaturation(0f) }
+                            lastfmIcon.colorFilter = ColorMatrixColorFilter(matrix)
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                                lastfmIcon.imageAlpha = 200
                             }
                         }
-                        lastfmIcon.clipToOutline = true
-                    }
-
-                    val matrix = ColorMatrix().apply { setSaturation(0f) }
-                    lastfmIcon.colorFilter = ColorMatrixColorFilter(matrix)
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                        lastfmIcon.imageAlpha = 200
+                        iconApplied = true
+                    } catch (e: PackageManager.NameNotFoundException) {
+                        Logger.w("MainActivity") { "Couldn't find icon for package: ${track.sourcePackageName}" }
                     }
                 }
-                iconApplied = true
-            } catch (e: PackageManager.NameNotFoundException) {
-                Logger.w("MainActivity") { "Couldn't find icon for package: ${track.sourcePackageName}" }
-            }
-        }
 
-        if (!iconApplied) {
-            lastfmIcon.clearColorFilter()
-            lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                lastfmIcon.imageAlpha = 255
-            }
-        }
+                if (!iconApplied) {
+                    lastfmIcon.clearColorFilter()
+                    lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        lastfmIcon.imageAlpha = 255
+                    }
+                }
 
 //                lastfmIcon.animate()
 //                    .alpha(1f)
 //                    .setDuration(duration)
 //                    .start()
-        //}.start()
+            //}.start()
     }
 
     private fun handleMusicStateUpdate(state: PluginState) {
@@ -1080,17 +1114,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
 
-    private fun applyHeavyBlurToLayer(view: ImageView) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val blurRadius = 45f
-            view.setRenderEffect(
-                RenderEffect.createBlurEffect(
-                    blurRadius, blurRadius, Shader.TileMode.CLAMP
-                )
-            )
-        }
-        view.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
-    }
+
 
     private fun checkForFirstLaunchAnimation() {
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
@@ -1265,17 +1289,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun loadBackgroundInternal(model: Any, blurIntensity: Int, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
         if (isFinishing) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
-
+        
         if (lastBackgroundSource == model && lastBlurIntensity == blurIntensity) {
             onComplete?.invoke()
             return
         }
-
+        
         val isSourceChanged = lastBackgroundSource != model
-
+        
         lastBackgroundSource = model
         lastBlurIntensity = blurIntensity
-
+        
         try {
             val targetMode = backgroundManager.getDimMode()
             val targetIntensity = backgroundManager.getDimIntensity()
@@ -1296,7 +1320,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 backgroundLayout.setBackgroundDrawable(gradientDrawable)
             }
 
-            if (isSourceChanged && !skipAnimation) {
+            val animAllowed = isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && isSourceChanged && !skipAnimation
+            if (animAllowed) {
                 isScaleAnimating = true
                 dynamicBackgroundView.animate()
                     .scaleX(targetZoom + 0.2f)
@@ -1362,7 +1387,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                     noiseColor = fontManager.getDynamicScheme()!!.primary
                                 }
 
-                                if (isAdvancedGraphicsEnabled && isSourceChanged && !skipAnimation) {
+                                if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
                                     turbulenceOverlay.playAnimation(noiseColor) {}
                                 }
 
@@ -1371,7 +1396,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 val bgScale   = backgroundManager.getBgScale()
 
                                 // 1. Запускаем кинематографичный GLSL-переход (Crossfade)
-                                val duration = if (skipAnimation) 0L else if (isSourceChanged) 2000L else 300L
+                                val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else if (isSourceChanged) 2000L else 300L
                                 dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
 
                                 val currentTargetMode = backgroundManager.getDimMode()
@@ -1389,19 +1414,26 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                                 updateBackgroundFilters()
 
-                                isScaleAnimating = true
-                                dynamicBackgroundView.animate()
-                                    .scaleX(finalZoom)
-                                    .scaleY(finalZoom)
-                                    .setDuration(1200)
-                                    .setListener(object : AnimatorListenerAdapter() {
-                                        override fun onAnimationEnd(animation: Animator) {
-                                            isScaleAnimating = false
-                                            handler.postDelayed({
-                                                updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-                                            }, 500)
-                                        }
-                                    }).start()
+                                if (isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && !skipAnimation) {
+                                    isScaleAnimating = true
+                                    dynamicBackgroundView.animate()
+                                        .scaleX(finalZoom)
+                                        .scaleY(finalZoom)
+                                        .setDuration(1200)
+                                        .setListener(object : AnimatorListenerAdapter() {
+                                            override fun onAnimationEnd(animation: Animator) {
+                                                isScaleAnimating = false
+                                                handler.postDelayed({
+                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                                                }, 500)
+                                            }
+                                        }).start()
+                                } else {
+                                    dynamicBackgroundView.scaleX = finalZoom
+                                    dynamicBackgroundView.scaleY = finalZoom
+                                    isScaleAnimating = false
+                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                                }
                             }
                         }
                     }.start()
@@ -1461,7 +1493,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-    //    private fun loadBackgroundInternal(model: Any, blurIntensity: Int, onComplete: (() -> Unit)? = null) {
+//    private fun loadBackgroundInternal(model: Any, blurIntensity: Int, onComplete: (() -> Unit)? = null) {
 //        if (isFinishing) return
 //        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
 //        try {
@@ -1681,15 +1713,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun applyEditModeBlurLayer(model: Any) {
         editModeBlurLayer.visibility = View.VISIBLE
         val ambientReq = RequestOptions()
-            .transform(FitCenter())
+            .transform(FitCenter(), BlurTransformation(this, 25, 3))
             .override(200, 400)
             .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
-
-        val finalAmbientReq = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            ambientReq.transform(FitCenter(), BlurTransformation(this, 35))
-        } else {
-            ambientReq
-        }
 
         val editTarget = object : CustomTarget<Drawable>() {
             override fun onResourceReady(
@@ -1697,11 +1723,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 transition: Transition<in Drawable>?
             ) {
                 editModeBlurLayer.setImageDrawable(resource)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    applyHeavyBlurToLayer(editModeBlurLayer)
-                } else {
-                    editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
-                }
+                editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
             }
             override fun onLoadCleared(placeholder: Drawable?) {
                 editModeBlurLayer.setImageDrawable(null)
@@ -1710,22 +1732,32 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         GlideApp.with(this)
             .load(model)
-            .apply(finalAmbientReq)
+            .apply(ambientReq)
             .into(editTarget)
     }
 
-    private fun getEffectiveDimIntensity(mode: Int, userIntensity: Int): Int {
-        val intensity = if (mode == BackgroundManager.Companion.DIM_MODE_DYNAMIC) {
-            try {
-                backgroundManager.computeEffectiveDimIntensity(
-                    clockManager.getCurrentTime(),
-                    dayTimeGetter
-                )
-            } catch (e: Exception) {
-                userIntensity.coerceIn(0, 50)
+    private fun getEffectiveDimIntensity(
+        mode: Int,
+        userIntensity: Int,
+        previewDimMin: Int? = null,
+        previewDimMax: Int? = null
+    ): Int {
+        val intensity = when (mode) {
+            BackgroundManager.Companion.DIM_MODE_OFF -> 0
+            BackgroundManager.Companion.DIM_MODE_DYNAMIC -> {
+                try {
+                    backgroundManager.computeEffectiveDimIntensity(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter,
+                        overrideMode = mode,
+                        overrideMin = previewDimMin,
+                        overrideMax = previewDimMax
+                    )
+                } catch (e: Exception) {
+                    (previewDimMax ?: backgroundManager.getDimMaxIntensity()).coerceIn(0, 50)
+                }
             }
-        } else {
-            userIntensity.coerceIn(0, 50)
+            else -> userIntensity.coerceIn(0, 50) // CONTINUOUS
         }
         return intensity.coerceIn(0, 50)
     }
@@ -1737,16 +1769,43 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         return 1.0f + (effectiveIntensity.coerceIn(0, 50) / 50f) * 0.2f
     }
 
-    private fun updateBackgroundFilters() {
+    private fun updateBackgroundFilters(
+        previewDimMode: Int? = null,
+        previewDimIntensity: Int? = null,
+        previewDimMinIntensity: Int? = null,
+        previewDimMaxIntensity: Int? = null
+    ) {
         if (dynamicBackgroundView.visibility != View.VISIBLE) return
 
-        val dimMode = backgroundManager.getDimMode()
-        val dimIntensity = backgroundManager.getDimIntensity()
-        val effectiveDim = getEffectiveDimIntensity(dimMode, dimIntensity)
+        val dimMode = previewDimMode ?: backgroundManager.getDimMode()
+        // For continuous mode preview, use the single-slider value (previewDimIntensity).
+        // For dynamic mode preview, use max (previewDimMaxIntensity) so the helper can
+        // interpolate between min and max correctly.
+        // Fall back to saved prefs when no preview overrides are given.
+        val dimIntensity = when {
+            previewDimMode == BackgroundManager.Companion.DIM_MODE_CONTINUOUS && previewDimIntensity != null -> previewDimIntensity
+            previewDimMode == BackgroundManager.Companion.DIM_MODE_DYNAMIC && previewDimMaxIntensity != null -> previewDimMaxIntensity
+            else -> backgroundManager.getDimIntensity()
+        }
+        val effectiveDim = getEffectiveDimIntensity(
+            dimMode,
+            dimIntensity,
+            previewDimMinIntensity,
+            previewDimMaxIntensity
+        )
 
         val maxDarkness = 0.8f
         val dimFactor = (effectiveDim / 50f) * maxDarkness
-        val brightness = 1.0f - dimFactor
+
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val dimBackground = prefs.getBoolean("power_saver_dim_background", true)
+        val finalDimFactor = if (isPowerSavingMode && dimBackground) {
+            val dimLevel = prefs.getInt("power_saver_dim_level", 85) / 100f
+            dimLevel
+        } else {
+            dimFactor
+        }
+        val brightness = 1.0f - finalDimFactor
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isNight = !dayTimeGetter.isDay()
@@ -1908,7 +1967,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .setInterpolator(OvershootInterpolator())
                 .start()
             animateCornerRadius(mainLayout, 0f, targetRadius)
-            if (isAdvancedGraphicsEnabled && hasCustomImageBackground) {
+            if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
                 editModeBlurLayer.visibility = View.VISIBLE
                 editModeBlurLayer.alpha = 1.0f
             }
@@ -2047,8 +2106,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     override fun onResume() {
         super.onResume()
-        if (::dynamicBackgroundView.isInitialized && !isPowerSavingMode) {
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
+        if (::dynamicBackgroundView.isInitialized) {
             dynamicBackgroundView.onResume()
+            dynamicBackgroundView.areAnimationsPaused = isPowerSavingMode && disableAnimations
         }
         setupWindowFlags()
         locationManager.loadCoordinates { lat, lon ->
@@ -2058,17 +2120,31 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (dynamicBackgroundView.visibility == View.VISIBLE) updateBackgroundFilters()
             }
         }
-        if (isEditMode) exitEditMode()
+        if (isEditMode && !isLaunchingFilePicker) exitEditMode()
+        isLaunchingFilePicker = false
         if (isDemoMode) {
             isDemoMode = false
             clockManager.toggleDebugMode(false)
             gradientManager.toggleDebugMode(false)
         }
 
-        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
-        if (prefs.getBoolean("smart_pixels_enabled", false)) smartPixelManager.start() else smartPixelManager.stop()
+        isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
+        isGraphicsTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
+        isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
+        graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
+        graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
+        if (::dynamicBackgroundView.isInitialized) {
+            val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+            dynamicBackgroundView.setRenderScale(targetScale)
+            val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+            dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+        }
+
+        val enableSmartPixels = prefs.getBoolean("power_saver_enable_smart_pixels", true)
+        val shouldStartSmartPixels = prefs.getBoolean("smart_pixels_enabled", false) || (isPowerSavingMode && enableSmartPixels)
+        if (shouldStartSmartPixels) smartPixelManager.start() else smartPixelManager.stop()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
         smartChipManager.updateAllChips()
@@ -2143,59 +2219,111 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
-        if (isPowerSavingMode == isEnabled) return
+        val modeChanged = isPowerSavingMode != isEnabled
         isPowerSavingMode = isEnabled
 
-        Logger.d("MainActivity") { "Power Save Mode toggled: $isEnabled. Adapting UI." }
+        Logger.d("MainActivity") { "Power Save Mode changed to: $isEnabled. Adapting UI." }
+
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
+        val disableWeather = prefs.getBoolean("power_saver_disable_weather", true)
+        val lockBrightness = prefs.getBoolean("power_saver_lock_brightness", true)
+        val disableLightSensor = prefs.getBoolean("power_saver_disable_light_sensor", true)
+        val enableSmartPixels = prefs.getBoolean("power_saver_enable_smart_pixels", true)
+        val limitFps = prefs.getBoolean("power_saver_limit_fps", true)
+        val fpsLimitValue = prefs.getInt("power_saver_fps_limit_value", 30)
 
         if (isEnabled) {
+            // Apply granular battery saving rules
+
+            // 1. OpenGL Animations & Framerate
             if (::dynamicBackgroundView.isInitialized) {
-                dynamicBackgroundView.onPause()
-            }
-            if (::weatherGetter.isInitialized) {
-                weatherGetter.stopUpdates()
+                dynamicBackgroundView.areAnimationsPaused = disableAnimations
+                dynamicBackgroundView.maxFps = if (limitFps) fpsLimitValue else 0
             }
 
-            // 3. Отключаем сенсор освещенности (фиксируем яркость)
-            lightSensor?.let { sensorManager.unregisterListener(sensorEventListener, it) }
-            val layoutParams = window.attributes
-            layoutParams.screenBrightness = minPowerSaveBrightness
-            window.attributes = layoutParams
+            // 2. Weather Updates
+            if (disableWeather) {
+                if (::weatherGetter.isInitialized) {
+                    weatherGetter.stopUpdates()
+                }
+            } else {
+                locationManager.loadCoordinates { lat, lon ->
+                    if (::weatherGetter.isInitialized) {
+                        weatherGetter.startUpdates(lat, lon)
+                    }
+                }
+            }
 
-//            // 4. Облегчаем визуал (глушим фон для OLED)
-//            backgroundImageView.animate()
-//                .alpha(0.3f) // Сильное затемнение фона
-//                .setDuration(1000L)
-//                .start()
+            // 3. Ambient Light Sensor
+            if (disableLightSensor) {
+                lightSensor?.let { sensorManager.unregisterListener(sensorEventListener, it) }
+            } else {
+                lightSensor?.let {
+                    sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+                }
+            }
+
+            // 4. Brightness Override
+            if (lockBrightness) {
+                val brightnessPct = prefs.getInt("power_saver_brightness_level", 1) / 100f
+                val layoutParams = window.attributes
+                layoutParams.screenBrightness = brightnessPct.coerceIn(0.01f, 1.0f)
+                window.attributes = layoutParams
+            } else {
+                val layoutParams = window.attributes
+                val savedBrightness = prefs.getInt("power_saver_brightness_level", 1) / 100f
+                if (layoutParams.screenBrightness == savedBrightness.coerceIn(0.01f, 1.0f) || layoutParams.screenBrightness == minPowerSaveBrightness) {
+                    layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    window.attributes = layoutParams
+                }
+            }
+
+            // 5. Smart Pixels
+            if (enableSmartPixels) {
+                smartPixelManager.start()
+            } else {
+                if (!prefs.getBoolean("smart_pixels_enabled", false)) {
+                    smartPixelManager.stop()
+                }
+            }
 
         } else {
-            // ВОССТАНОВЛЕНИЕ РЕЖИМА (Обычная работа)
+            // Restore normal mode
+            if (modeChanged) {
+                // 1. Graphics animations & framerate
+                if (::dynamicBackgroundView.isInitialized) {
+                    dynamicBackgroundView.areAnimationsPaused = false
+                    dynamicBackgroundView.maxFps = 0
+                }
 
-            // 1. Возобновляем графику
-            if (::dynamicBackgroundView.isInitialized) {
-                dynamicBackgroundView.onResume()
+                // 2. Weather
+                locationManager.loadCoordinates { lat, lon ->
+                    if (::weatherGetter.isInitialized) {
+                        weatherGetter.startUpdates(lat, lon)
+                    }
+                }
+
+                // 3. Sensors & brightness
+                lightSensor?.let {
+                    sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+                }
+                val layoutParams = window.attributes
+                layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                window.attributes = layoutParams
+
+                // 4. Smart pixels (restore state matching user preference)
+                if (prefs.getBoolean("smart_pixels_enabled", false)) {
+                    smartPixelManager.start()
+                } else {
+                    smartPixelManager.stop()
+                }
             }
-//            if (::turbulenceOverlay.isInitialized && isAdvancedGraphicsEnabled) {
-//                turbulenceOverlay.resumeAnimation()
-//            }
-//            if (::gradientManager.isInitialized && !hasCustomImageBackground) {
-//                gradientManager.startUpdates()
-//            }
+        }
 
-            // 2. Возобновляем сеть
-            locationManager.loadCoordinates { lat, lon ->
-                weatherGetter.startUpdates(lat, lon)
-            }
-
-            // 3. Возобновляем сенсоры
-            lightSensor?.let {
-                sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
-            }
-
-            val layoutParams = window.attributes
-            layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-            window.attributes = layoutParams
-
+        // Always update background filters (handles dimming changes)
+        if (::dynamicBackgroundView.isInitialized && dynamicBackgroundView.visibility == View.VISIBLE) {
+            updateBackgroundFilters()
         }
     }
 }

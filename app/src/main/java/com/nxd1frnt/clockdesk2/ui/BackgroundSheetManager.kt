@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.RangeSlider
 import com.google.android.material.slider.Slider
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
@@ -36,7 +37,7 @@ class BackgroundSheetManager(
     private val onPreviewImage: (Uri, blur: Int) -> Unit,
     private val onRestoreGradient: () -> Unit,
     private val onRestoreSavedBackground: () -> Unit,
-    private val onUpdateFilters: () -> Unit,
+    private val onUpdateFilters: (Int?, Int?, Int?, Int?) -> Unit,
     private val onApplyCompleted: (previewUri: String?) -> Unit,
     private val onClearBackground: () -> Unit,
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit,
@@ -57,6 +58,7 @@ class BackgroundSheetManager(
     private val bgBlurSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
     private val bgDimToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
     private val bgDimSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.dimming_intensity_seekbar) }
+    private val bgDimRangeSeek by lazy { floatingMenuView.findViewById<RangeSlider>(R.id.dimming_intensity_range_slider) }
     private val bgNightShiftSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.background_night_shift_switch) }
     private val bgZoomSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.background_zoom_switch) }
 
@@ -69,6 +71,10 @@ class BackgroundSheetManager(
     private val bgManualWeatherScroll by lazy { floatingMenuView.findViewById<View>(R.id.manual_weather_scroll) }
     private val bgWeatherToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.weather_type_toggle_group) }
     private val bgIntensitySeek by lazy { floatingMenuView.findViewById<Slider>(R.id.weather_intensity_seekbar) }
+    private val bgAutoWeatherCard by lazy { floatingMenuView.findViewById<View>(R.id.current_weather_card) }
+    private val bgAutoWeatherIcon by lazy { floatingMenuView.findViewById<android.widget.TextView>(R.id.weather_auto_icon) }
+    private val bgAutoWeatherDetail by lazy { floatingMenuView.findViewById<android.widget.TextView>(R.id.weather_auto_detail) }
+    private val bgAutoWeatherTemp by lazy { floatingMenuView.findViewById<android.widget.TextView>(R.id.weather_auto_temp) }
 
     private val contentContainer by lazy { floatingMenuView.findViewById<ViewGroup>(R.id.settings_content_container) }
     private val tabStyle by lazy { floatingMenuView.findViewById<View>(R.id.tab_style_content) }
@@ -164,17 +170,24 @@ class BackgroundSheetManager(
                 if (group.checkedButtonId == View.NO_ID && !isUpdatingBackgroundUi) group.check(checkedId)
                 return@addOnButtonCheckedListener
             }
-            if (bgDimToggleGroup.checkedButtonId == R.id.off_button) {
-                bgDimSeek.value = 0f
-                bgDimSeek.isEnabled = false
+            val mode = getPreviewDimMode()
+            if (mode == BackgroundManager.DIM_MODE_DYNAMIC) {
+                bgDimSeek.visibility = View.GONE
+                bgDimRangeSeek.visibility = View.VISIBLE
             } else {
-                bgDimSeek.isEnabled = true
+                bgDimSeek.visibility = View.VISIBLE
+                bgDimRangeSeek.visibility = View.GONE
+                bgDimSeek.isEnabled = (mode != BackgroundManager.DIM_MODE_OFF)
             }
-            debounceFilterUpdate { onUpdateFilters() }
+            debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
         }
 
         bgDimSeek.addOnChangeListener { _, _, fromUser ->
-            if (fromUser) debounceFilterUpdate { onUpdateFilters() }
+            if (fromUser) debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+        }
+
+        bgDimRangeSeek.addOnChangeListener { _, _, fromUser ->
+            if (fromUser) debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
         }
 
         bgNightShiftSwitch?.setOnCheckedChangeListener { _, _ ->
@@ -182,7 +195,7 @@ class BackgroundSheetManager(
             val wasEnabledBefore = backgroundManager.isNightShiftEnabled()
             backgroundManager.setNightShiftEnabled(bgNightShiftSwitch?.isChecked == true)
             debounceFilterUpdate {
-                onUpdateFilters()
+                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
                 backgroundManager.setNightShiftEnabled(wasEnabledBefore)
             }
         }
@@ -192,7 +205,7 @@ class BackgroundSheetManager(
             val wasEnabledBefore = backgroundManager.getZoomEnabled()
             backgroundManager.setZoomEnabled(bgZoomSwitch?.isChecked == true)
             debounceFilterUpdate {
-                onUpdateFilters()
+                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
                 backgroundManager.setZoomEnabled(wasEnabledBefore)
             }
         }
@@ -210,10 +223,11 @@ class BackgroundSheetManager(
             bgManualWeatherSwitch.isEnabled = isChecked
             bgManualWeatherScroll.visibility = if (isChecked && bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
             bgIntensitySeek.visibility = if (isChecked && bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
+            bgAutoWeatherCard.visibility = if (isChecked && !bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
 
             if (!isChecked) {
                 weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, !dayTimeGetter.isDay())
-                onUpdateFilters()
+                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
             } else {
                 applyWeatherPreview()
             }
@@ -223,6 +237,8 @@ class BackgroundSheetManager(
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
             bgManualWeatherScroll.visibility = if (isChecked) View.VISIBLE else View.GONE
             bgIntensitySeek.visibility = if (isChecked) View.VISIBLE else View.GONE
+            bgAutoWeatherCard.visibility = if (!isChecked && bgWeatherSwitch.isChecked) View.VISIBLE else View.GONE
+            updateAutoWeatherCard()
             applyWeatherPreview()
         }
 
@@ -379,13 +395,27 @@ class BackgroundSheetManager(
         val blurInt = backgroundManager.getBlurIntensity()
         bgBlurSeek.value = blurInt.toFloat()
 
-        bgDimToggleGroup.check(when (backgroundManager.getDimMode()) {
+        val dimMode = backgroundManager.getDimMode()
+        bgDimToggleGroup.check(when (dimMode) {
             BackgroundManager.DIM_MODE_OFF -> R.id.off_button
             BackgroundManager.DIM_MODE_CONTINUOUS -> R.id.continuous_button
             BackgroundManager.DIM_MODE_DYNAMIC -> R.id.dynamic_button
             else -> R.id.off_button
         })
         bgDimSeek.value = backgroundManager.getDimIntensity().toFloat()
+
+        val minDim = backgroundManager.getDimMinIntensity()
+        val maxDim = backgroundManager.getDimMaxIntensity()
+        bgDimRangeSeek.values = listOf(minDim.toFloat(), maxDim.toFloat())
+
+        if (dimMode == BackgroundManager.DIM_MODE_DYNAMIC) {
+            bgDimSeek.visibility = View.GONE
+            bgDimRangeSeek.visibility = View.VISIBLE
+        } else {
+            bgDimSeek.visibility = View.VISIBLE
+            bgDimRangeSeek.visibility = View.GONE
+            bgDimSeek.isEnabled = (dimMode != BackgroundManager.DIM_MODE_OFF)
+        }
 
         bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
         bgZoomSwitch?.isChecked = backgroundManager.getZoomEnabled()
@@ -399,6 +429,8 @@ class BackgroundSheetManager(
 
         bgManualWeatherScroll.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
         bgIntensitySeek.visibility = if (isManual && isWeatherEnabled) View.VISIBLE else View.GONE
+        bgAutoWeatherCard.visibility = if (!isManual && isWeatherEnabled) View.VISIBLE else View.GONE
+        updateAutoWeatherCard()
         bgIntensitySeek.value = backgroundManager.getManualWeatherIntensity().toFloat()
 
         bgWeatherToggleGroup.check(when (backgroundManager.getManualWeatherType()) {
@@ -417,12 +449,13 @@ class BackgroundSheetManager(
     private fun applyBackgroundSettings() {
         backgroundManager.setBlurIntensity(bgBlurSeek.value.toInt())
 
-        backgroundManager.setDimMode(when (bgDimToggleGroup.checkedButtonId) {
+        val dimMode = when (bgDimToggleGroup.checkedButtonId) {
             R.id.off_button -> BackgroundManager.DIM_MODE_OFF
             R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
             R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
             else -> BackgroundManager.DIM_MODE_OFF
-        })
+        }
+        backgroundManager.setDimMode(dimMode)
 
         bgNightShiftSwitch?.let { backgroundManager.setNightShiftEnabled(it.isChecked) }
         bgZoomSwitch?.let { backgroundManager.setZoomEnabled(it.isChecked) }
@@ -431,6 +464,9 @@ class BackgroundSheetManager(
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherIntensity(bgIntensitySeek.value.toInt())
         backgroundManager.setDimIntensity(bgDimSeek.value.toInt())
+
+        backgroundManager.setDimMinIntensity(bgDimRangeSeek.values[0].toInt())
+        backgroundManager.setDimMaxIntensity(bgDimRangeSeek.values[1].toInt())
         backgroundManager.setManualWeatherType(when (bgWeatherToggleGroup.checkedButtonId) {
             R.id.btn_weather_clear -> WeatherView.WeatherType.CLEAR.ordinal
             R.id.btn_weather_cloudy -> WeatherView.WeatherType.CLOUDY.ordinal
@@ -443,6 +479,35 @@ class BackgroundSheetManager(
 
         onApplyCompleted(previewBackgroundUri)
         hide()
+    }
+
+    private fun getPreviewDimMode(): Int {
+        return when (bgDimToggleGroup.checkedButtonId) {
+            R.id.off_button -> BackgroundManager.DIM_MODE_OFF
+            R.id.continuous_button -> BackgroundManager.DIM_MODE_CONTINUOUS
+            R.id.dynamic_button -> BackgroundManager.DIM_MODE_DYNAMIC
+            else -> BackgroundManager.DIM_MODE_OFF
+        }
+    }
+
+    private fun getPreviewDimIntensity(): Int {
+        return bgDimSeek.value.toInt()
+    }
+
+    private fun getPreviewDimMin(): Int {
+        return if (getPreviewDimMode() == BackgroundManager.DIM_MODE_DYNAMIC) {
+            bgDimRangeSeek.values[0].toInt()
+        } else {
+            0
+        }
+    }
+
+    private fun getPreviewDimMax(): Int {
+        return if (getPreviewDimMode() == BackgroundManager.DIM_MODE_DYNAMIC) {
+            bgDimRangeSeek.values[1].toInt()
+        } else {
+            bgDimSeek.value.toInt()
+        }
     }
 
     private fun applyWeatherPreview() {
@@ -470,7 +535,36 @@ class BackgroundSheetManager(
                 weatherGetter.visibility
             )
         }
-        onUpdateFilters()
+        onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+    }
+
+    private fun updateAutoWeatherCard() {
+        val code = weatherGetter.weatherCode
+        val temp = weatherGetter.temperature
+
+        if (code == null) {
+            bgAutoWeatherIcon.text = "🌡️"
+            bgAutoWeatherDetail.text = floatingMenuView.context.getString(R.string.weather_auto_no_data)
+            bgAutoWeatherTemp.text = ""
+            return
+        }
+
+        val (emoji, label) = when (code) {
+            0    -> "☀️"  to floatingMenuView.context.getString(R.string.weather_clear)
+            1    -> "🌤️" to floatingMenuView.context.getString(R.string.weather_clear)
+            2    -> "⛅"  to floatingMenuView.context.getString(R.string.weather_cloudy)
+            3    -> "☁️"  to floatingMenuView.context.getString(R.string.weather_cloudy)
+            45, 48 -> "🌫️" to floatingMenuView.context.getString(R.string.weather_fog)
+            51, 53, 55, 56, 57 -> "🌦️" to floatingMenuView.context.getString(R.string.weather_rain)
+            61, 63, 65, 80, 81, 82 -> "🌧️" to floatingMenuView.context.getString(R.string.weather_rain)
+            71, 73, 75, 77, 85, 86 -> "❄️" to floatingMenuView.context.getString(R.string.weather_snow)
+            95, 96, 99 -> "⛈️" to floatingMenuView.context.getString(R.string.weather_storm)
+            else -> "🌡️" to "WMO $code"
+        }
+
+        bgAutoWeatherIcon.text = emoji
+        bgAutoWeatherDetail.text = label
+        bgAutoWeatherTemp.text = if (temp != null) "%.0f°C".format(temp) else ""
     }
 
     private fun updateAdapterItems() {

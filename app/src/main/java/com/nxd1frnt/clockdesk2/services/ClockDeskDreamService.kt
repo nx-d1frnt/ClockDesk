@@ -30,9 +30,11 @@ import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.utils.LocationManager
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
+import com.nxd1frnt.clockdesk2.utils.PowerStateManager
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 
-class ClockDeskDreamService : DreamService() {
+class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
     // region Views
     private lateinit var timeText: TextView
@@ -60,6 +62,7 @@ class ClockDeskDreamService : DreamService() {
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var locationManager: LocationManager
     private lateinit var dayTimeGetter: SunriseAPI
+    private lateinit var powerStateManager: PowerStateManager
     private var musicManager: MusicPluginManager? = null
     // endregion
 
@@ -150,10 +153,19 @@ class ClockDeskDreamService : DreamService() {
         restoreBackground()
         // Restore weather overlay state
         restoreWeatherView()
+
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.registerObserver(this)
+        }
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.unregisterObserver(this)
+            powerStateManager.destroy()
+        }
 
         if (::dynamicBackgroundView.isInitialized) {
             dynamicBackgroundView.onPause()
@@ -261,6 +273,7 @@ class ClockDeskDreamService : DreamService() {
             timeText, dateText, handler, fontManager, dayTimeGetter, locationManager,
             { _, _, _ -> }, // sun-times callback — no-op in dream
             { _ -> gradientManager.updateSimulatedTime(clockManager.getCurrentTime()) },
+            prefs,
             enableLogging
         )
 
@@ -271,6 +284,18 @@ class ClockDeskDreamService : DreamService() {
         burnInProtectionManager = BurnInProtectionManager(
             listOf(timeText, dateText, lastfmLayout, smartChipContainer)
         )
+
+        val isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        val graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
+        val graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
+        val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+        dynamicBackgroundView.setRenderScale(targetScale)
+        val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+        dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+
+        powerStateManager = PowerStateManager(themedContext)
+        powerStateManager.registerObserver(clockManager)
+        powerStateManager.registerObserver(weatherGetter)
     }
 
     // endregion
@@ -404,4 +429,21 @@ class ClockDeskDreamService : DreamService() {
     }
 
     // endregion
+
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
+        val limitFps = prefs.getBoolean("power_saver_limit_fps", true)
+        val fpsLimitValue = prefs.getInt("power_saver_fps_limit_value", 30)
+
+        if (::dynamicBackgroundView.isInitialized) {
+            if (isEnabled) {
+                dynamicBackgroundView.areAnimationsPaused = disableAnimations
+                dynamicBackgroundView.maxFps = if (limitFps) fpsLimitValue else 0
+            } else {
+                dynamicBackgroundView.areAnimationsPaused = false
+                dynamicBackgroundView.maxFps = 0
+            }
+        }
+    }
 }

@@ -103,6 +103,31 @@
     <string name="battery_saver_trigger_title">Уровень активации экономии батареи</string>
     <string name="battery_saver_trigger_summary">Установите уровень заряда батареи (%), при котором активируется режим экономии</string>
     <string name="battery_saver_settings_title">Настройки экономии батареи</string>
+    <string name="power_saver_manual_title">Ручной режим экономии</string>
+    <string name="power_saver_rules_title">Действия при экономии заряда</string>
+    <string name="power_saver_manual_summary">Принудительно включить режим экономии батареи для снижения потребления ресурсов</string>
+    <string name="power_saver_disable_animations_title">Отключить анимацию</string>
+    <string name="power_saver_disable_animations_summary">Приостановить динамический фон для снижения нагрузки на GPU</string>
+    <string name="power_saver_limit_fps_title">Ограничить кадровую частоту</string>
+    <string name="power_saver_limit_fps_summary">Ограничить частоту кадров фоновой анимации при экономии заряда</string>
+    <string name="power_saver_fps_limit_value_title">Лимит частоты кадров</string>
+    <string name="power_saver_fps_limit_value_summary">Целевое количество кадров в секунду для анимаций OpenGL (меньше - экономичнее)</string>
+    <string name="power_saver_disable_weather_title">Отключить обновление погоды</string>
+    <string name="power_saver_disable_weather_summary">Остановить фоновое получение данных о погоде</string>
+    <string name="power_saver_lock_brightness_title">Минимальная яркость</string>
+    <string name="power_saver_lock_brightness_summary">Зафиксировать яркость экрана на минимальном уровне</string>
+    <string name="power_saver_limit_clock_title">Редкое обновление часов</string>
+    <string name="power_saver_limit_clock_summary">Обновлять время раз в минуту (скрывает секунды)</string>
+    <string name="power_saver_disable_light_sensor_title">Отключить датчик освещенности</string>
+    <string name="power_saver_disable_light_sensor_summary">Прекратить опрос датчика освещенности в помещении</string>
+    <string name="power_saver_enable_smart_pixels_title">Включить Умные пиксели</string>
+    <string name="power_saver_enable_smart_pixels_summary">Активировать шахматное затемнение пикселей экрана</string>
+    <string name="power_saver_dim_background_title">Затемнить фон</string>
+    <string name="power_saver_dim_background_summary">Сильно затемнять фоновое изображение/градиенты для экономии OLED</string>
+    <string name="power_saver_dim_level_title">Уровень затемнения фона</string>
+    <string name="power_saver_dim_level_summary">Настройте процент затемнения фона при экономии батареи</string>
+    <string name="power_saver_brightness_level_title">Яркость экрана</string>
+    <string name="power_saver_brightness_level_summary">Настройте уровень яркости экрана в режиме экономии батареи</string>
     <string name="smart_chips_settings_title">Настройки умных чипов</string>
     <string name="show_battery_alert_chip">Показывать чип оповещения о батарее</string>
     <string name="show_battery_alert_chip_summary">Показывает чип, когда батарея разряжена или включена экономия батареи приложения</string>
@@ -120,6 +145,20 @@
     <string name="free_mode_switch">Свободное перемещение (БЕТА)</string>
     <string name="enable_advanced_graphics">Включить продвинутую графику</string>
     <string name="enable_advanced_graphics_summary">Включить продвинутые графические функции (может влиять на производительность на некоторых устройствах)</string>
+    <string name="graphics_enable_transitions_title">Плавные переходы</string>
+    <string name="graphics_enable_transitions_summary">Анимировать масштабирование и затухание при смене фонового изображения</string>
+    <string name="graphics_enable_turbulence_title">Эффект турбулентного шума</string>
+    <string name="graphics_enable_turbulence_summary">Анимировать эффект искажения жидкого хроматического шума при смене темы</string>
+    <string name="graphics_turbulence_grid_title">Масштаб сетки турбулентности</string>
+    <string name="graphics_turbulence_grid_summary">Настройка масштаба шума искажения жидкой хроматической турбулентности</string>
+    <string name="graphics_turbulence_speed_title">Скорость анимации турбулентности</string>
+    <string name="graphics_turbulence_speed_summary">Настройка скорости движения переходов хроматической турбулентности</string>
+    <string name="graphics_enable_edit_blur_title">Размытие в режиме редактирования</string>
+    <string name="graphics_enable_edit_blur_summary">Размывать фоновое изображение при редактировании виджетов</string>
+    <string name="graphics_render_scale_title">Масштаб разрешения рендеринга</string>
+    <string name="graphics_render_scale_summary">Масштабирование разрешения всего фона (снижение улучшает производительность/батарею)</string>
+    <string name="graphics_weather_scale_title">Разрешение эффектов погоды</string>
+    <string name="graphics_weather_scale_summary">Масштабирование разрешения эффектов дождя/снега (снижение ускоряет работу на слабых GPU)</string>
     <string name="weather_background">Динамический погодный фон</string>
     <string name="weather_effects_title">Погода</string>
     <string name="enable_weather_effects">Включить динамические погодные эффекты</string>
@@ -210,4 +249,38 @@
     <string name="ignore_collision_description">Разрешить наложение виджетов</string>
     <string name="show_media_icon_description">Отображать логотип плеера</string>
     <string name="additional_settings">Дополнительные настройки</string>
+
+    <!-- Location & Weather Settings -->
+    <string name="location_weather_settings_title">Местоположение и погода</string>
+    <string name="location_weather_settings_subtitle">Координаты, время солнца и обновление погоды</string>
+    <string name="weather_settings_category_title">Настройки погоды</string>
+    <string name="weather_refresh_interval_title">Интервал обновления погоды</string>
+    <string name="weather_refresh_interval_summary">Как часто загружать текущие данные о погоде</string>
+
+    <!-- Settings Categories Subtitles and Titles -->
+    <string name="music_settings_subtitle">Источники музыки и обложки альбомов</string>
+    <string name="display_settings_subtitle">Защита от выгорания и умные пиксели</string>
+    <string name="battery_saver_settings_subtitle">Уровень активации и действия режима экономии</string>
+    <string name="performance_settings_title">Производительность и графика</string>
+    <string name="performance_settings_subtitle">Логирование, переходы и масштаб графики</string>
+    <string name="smart_chips_settings_subtitle">Управление активными чипами и виджетами</string>
+    <string name="backup_restore_subtitle">Резервное копирование и импорт настроек</string>
+
+    <!-- About screen strings -->
+    <string name="about_title">О приложении</string>
+    <string name="about_subtitle">Информация и открытый исходный код</string>
+    <string name="about_version_format">Версия %1$s</string>
+    <string name="about_version_code_format">%1$s (сборка %2$d)</string>
+    <string name="about_developer_label">Разработчик</string>
+    <string name="about_developer_value">nx-d1frnt</string>
+    <string name="about_version_label">Версия</string>
+    <string name="about_license_label">Лицензия</string>
+    <string name="about_license_value">MIT License</string>
+    <string name="about_source_label">Исходный код</string>
+    <string name="about_source_value">github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_license">Лицензия</string>
+    <string name="about_github_url">https://github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_license_url">https://github.com/nx-d1frnt/ClockDesk/blob/master/LICENSE</string>
+    <string name="about_footer">ClockDesk %1$s · Open Source</string>
 </resources>

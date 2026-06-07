@@ -1,6 +1,7 @@
 package com.nxd1frnt.clockdesk2.weathergetter
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import com.nxd1frnt.clockdesk2.utils.LocationManager
@@ -12,18 +13,39 @@ open class WeatherGetter(
     private val context: Context,
     private val locationManager: LocationManager,
     private val callback: () -> Unit
-) : PowerSaveObserver {
+) : PowerSaveObserver, SharedPreferences.OnSharedPreferenceChangeListener {
+    private var isPowerSaveActive = false
     private var interval = 30 * 60 * 1000L
+    private val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
-        if (isEnabled) {
-            interval = 60*60*1000L
-            Logger.d("WeatherGetter"){"Power saving mode enabled. Setting interval to 3600000 ms"}
-        } else {
-            interval = 30*60*1000L
-            Logger.d("WeatherGetter"){"Power saving mode disabled. Setting interval to 1800000 ms"}
+        isPowerSaveActive = isEnabled
+        updateInterval()
+    }
+
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        if (key == "weather_refresh_interval") {
+            updateInterval()
+            if (lastLatitude != null && lastLongitude != null) {
+                Logger.d("WeatherGetter") { "Weather refresh rate preference changed. Rescheduling updates." }
+                startUpdates(lastLatitude!!, lastLongitude!!)
+            }
         }
     }
+
+    private fun updateInterval() {
+        val baseMinutesStr = prefs.getString("weather_refresh_interval", "30") ?: "30"
+        val baseMinutes = baseMinutesStr.toLongOrNull() ?: 30L
+        val baseIntervalMs = baseMinutes * 60 * 1000L
+        
+        interval = if (isPowerSaveActive) {
+            baseIntervalMs * 2
+        } else {
+            baseIntervalMs
+        }
+        Logger.d("WeatherGetter") { "Weather interval updated: $interval ms (powerSave=$isPowerSaveActive)" }
+    }
+
     val requestQueue = NetworkManager.getRequestQueue(context)
 
     var temperature: Double? = null
@@ -53,10 +75,13 @@ open class WeatherGetter(
         lastLongitude = longitude
 
         stopUpdates()
+        prefs.registerOnSharedPreferenceChangeListener(this)
+        updateInterval()
         handler.post(updateRunnable)
     }
 
     fun stopUpdates() {
+        prefs.unregisterOnSharedPreferenceChangeListener(this)
         handler.removeCallbacks(updateRunnable)
     }
 

@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.drawable.GradientDrawable
 import android.opengl.GLES20
@@ -22,6 +23,11 @@ import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
 
+/**
+ * Высокопроизводительный фоновый контейнер на базе OpenGL ES 2.0.
+ * Объединяет кинематографичный переход (Liquid Chromatic Transition)
+ * и систему симуляции погоды (WeatherGLView) в единый рендер-конвейер.
+ */
 class DynamicBackgroundView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -40,6 +46,31 @@ class DynamicBackgroundView @JvmOverloads constructor(
     @Volatile private var cloudsBitmap: Bitmap? = null
 
     var weatherResolutionScale: Float = 0.4f
+        set(value) {
+            if (field != value) {
+                field = value
+                requestRender()
+            }
+        }
+
+    @Volatile var maxFps: Int = 0
+        set(value) {
+            if (field != value) {
+                field = value
+                requestRender()
+            }
+        }
+
+    var areAnimationsPaused: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                queueEvent {
+                    renderer.areAnimationsPaused = value
+                    requestRender()
+                }
+            }
+        }
 
     val imageWidth: Int
         get() = renderer.getImageWidth()
@@ -48,6 +79,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         get() = renderer.getImageHeight()
 
     init {
+        // Настройка EGL для поддержки полупрозрачности и аппаратного сглаживания
         setEGLContextClientVersion(2)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
@@ -58,6 +90,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         renderMode = RENDERMODE_WHEN_DIRTY
     }
 
+    /**
+     * Запускает высокохудожественный переход к новому фоновому изображению.
+     */
     fun transitionTo(
         bitmap: Bitmap,
         durationMs: Long = 1800L,
@@ -114,6 +149,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Генерация градиента в Bitmap и плавный переход к нему на GPU.
+     */
     fun transitionToGradient(topColor: Int, bottomColor: Int, durationMs: Long = 1800L) {
         if (lastTopColor == topColor && lastBottomColor == bottomColor) {
             return
@@ -136,6 +174,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         return bitmap
     }
 
+    /**
+     * Плавная регулировка яркости и прозрачности на уровне фрагментного шейдера.
+     */
     fun setGlobalAlpha(alpha: Float, durationMs: Long = 0L) {
         if (durationMs <= 0) {
             queueEvent {
@@ -160,7 +201,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
-
+    /**
+     * Передача матрицы фильтров (Night Shift, диммирование, погода).
+     */
     fun setColorFilter(matrix: ColorMatrix) {
         queueEvent {
             renderer.updateColorMatrix(matrix)
@@ -168,7 +211,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
-
+    /**
+     * Синхронизация сдвигов кропа.
+     */
     fun setCropTransform(scale: Float, offsetX: Float, offsetY: Float) {
         queueEvent {
             renderer.setCropTransform(scale, offsetX, offsetY)
@@ -176,14 +221,18 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
-
+    /**
+     * Установка параметров погоды.
+     */
     fun forceWeather(type: WeatherType, intensity: Float, wind: Float, isNight: Boolean) {
         queueEvent {
             renderer.updateWeatherConfig(type, intensity, wind, isNight)
         }
     }
 
-
+    /**
+     * Установка погоды на основе метеоданных.
+     */
     fun updateFromOpenMeteoSmart(
         wmoCode: Int, windSpeedKmh: Double, night: Boolean,
         precipitation: Double?, cloudCover: Int?, visibility: Double?
@@ -194,8 +243,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         )
 
         val type = when (wmoCode) {
-            0 -> WeatherType.CLEAR
-            1, 2, 3 -> WeatherType.CLOUDY
+            0, 1 -> WeatherType.CLEAR   // clear sky, mainly clear
+            2    -> WeatherType.CLEAR   // partly cloudy (gentle clouds, still feels clear)
+            3    -> WeatherType.CLOUDY  // overcast
             45, 48 -> WeatherType.FOG
             51, 53, 55, 56, 57 -> WeatherType.RAIN
             61, 63, 65, 80, 81, 82 -> WeatherType.RAIN
@@ -209,7 +259,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
-
+    /**
+     * Загрузка текстур облаков/тумана.
+     */
     fun setFogTextures(fog: Bitmap?, clouds: Bitmap?) {
         fogBitmap = fog
         cloudsBitmap = clouds
@@ -218,7 +270,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
-
+    /**
+     * Установка коэффициента масштабирования рендеринга (оптимизация).
+     */
     fun setRenderScale(scale: Float) {
         val safeScale = scale.coerceIn(0.1f, 1.0f)
         post {
@@ -336,6 +390,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var screenTextureHandle = 0
         private var screenAlphaHandle = 0
 
+        @Volatile var areAnimationsPaused: Boolean = false
+
         @Volatile private var textureCurrent = 0
         @Volatile var texCurrentW = 0
         @Volatile var texCurrentH = 0
@@ -368,9 +424,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
         private val vertexData = floatArrayOf(
             -1f, -1f, 0f, 0f, 1f,
-            1f, -1f, 0f, 1f, 1f,
+             1f, -1f, 0f, 1f, 1f,
             -1f,  1f, 0f, 0f, 0f,
-            1f,  1f, 0f, 1f, 0f
+             1f,  1f, 0f, 1f, 0f
         )
         private lateinit var vertexBuffer: FloatBuffer
 
@@ -380,7 +436,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         inner class WeatherState {
             var type = WeatherType.NONE
             var intensity = 1.0f
+            var targetIntensity = 1.0f
             var windFactor = 0f
+            var targetWindFactor = 0f
             var isNight = false
             var particles = Array(maxParticles) { Particle() }
         }
@@ -391,6 +449,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var isTransitioning = false
         private var transitionStartTime = 0L
         private val TRANSITION_DURATION_MS = 1500L
+        private var lastFrameTime = 0L
 
         private val projectionMatrix = FloatArray(16)
 
@@ -700,7 +759,14 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             // Reload current background texture from cache if present
             currentBitmap?.let { bitmap ->
-                setNextTexture(bitmap)
+                setNextTexture(
+                    bitmap,
+                    instant = true,
+                    isGradient = isCurrentGradient,
+                    scale = cropScaleCurrent,
+                    offsetX = cropOffsetXCurrent,
+                    offsetY = cropOffsetYCurrent
+                )
             }
 
             // Reload fog/clouds textures from cache if present
@@ -718,6 +784,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
 
         private fun drawBackgroundQuad() {
+            GLES20.glDisable(GLES20.GL_BLEND)
             GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
@@ -768,6 +835,39 @@ class DynamicBackgroundView @JvmOverloads constructor(
         override fun onDrawFrame(gl: GL10?) {
             if (program == 0) return
 
+            val limit = maxFps
+            if (limit > 0) {
+                val elapsed = System.currentTimeMillis() - lastFrameTime
+                val targetFrameTime = 1000L / limit
+                if (elapsed < targetFrameTime) {
+                    try {
+                        Thread.sleep(targetFrameTime - elapsed)
+                    } catch (e: InterruptedException) {
+                        // ignore
+                    }
+                }
+            }
+
+            val now = System.currentTimeMillis()
+            val dt = if (lastFrameTime == 0L) 0f else (now - lastFrameTime) / 1000f
+            lastFrameTime = now
+
+            var needsContinuousRender = false
+            if (currentState.type != WeatherType.NONE) {
+                val diffIntens = currentState.targetIntensity - currentState.intensity
+                val diffWind = currentState.targetWindFactor - currentState.windFactor
+
+                if (Math.abs(diffIntens) > 0.005f || Math.abs(diffWind) > 0.005f) {
+                    val lerpAlpha = (1.0f - Math.exp(-dt / 0.5)).toFloat()
+                    currentState.intensity += diffIntens * lerpAlpha
+                    currentState.windFactor += diffWind * lerpAlpha
+                    needsContinuousRender = true
+                } else {
+                    currentState.intensity = currentState.targetIntensity
+                    currentState.windFactor = currentState.targetWindFactor
+                }
+            }
+
             val hasWeather = currentState.type != WeatherType.NONE || isTransitioning
 
             val targetFboWidth = (viewWidth * weatherResolutionScale).toInt().coerceAtLeast(64)
@@ -799,9 +899,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 renderWeather(fboTexId, targetFboWidth, targetFboHeight)
 
                 // Determine transition alpha for the FBO screen composition pass
-                val isTransitioningToOrFromNone = isTransitioning &&
+                val isTransitioningToOrFromNone = isTransitioning && 
                         (previousState.type == WeatherType.NONE || currentState.type == WeatherType.NONE)
-
+                
                 var screenAlpha = 1.0f
                 if (isTransitioningToOrFromNone) {
                     val elapsed = System.currentTimeMillis() - transitionStartTime
@@ -838,7 +938,24 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 GLES20.glUniform1i(screenTextureHandle, 0)
                 GLES20.glUniform1f(screenAlphaHandle, screenAlpha)
 
+                // Enable blending and set correct blend mode for premultiplied FBO upscale pass
+                GLES20.glEnable(GLES20.GL_BLEND)
+                GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
                 GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            }
+
+            // Update renderMode based on active simulation, transition, or interpolation
+            if (areAnimationsPaused) {
+                renderMode = RENDERMODE_WHEN_DIRTY
+            } else if (hasWeather) {
+                if (needsContinuousRender || isTransitioning || currentState.type != WeatherType.NONE) {
+                    renderMode = RENDERMODE_CONTINUOUSLY
+                } else {
+                    renderMode = RENDERMODE_WHEN_DIRTY
+                }
+            } else {
+                renderMode = RENDERMODE_WHEN_DIRTY
             }
         }
 
@@ -1144,7 +1261,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
         private fun packPointData(p: Particle, state: WeatherState, alpha: Float) {
             pointDataBuffer.put(p.x).put(p.y).put(p.size * p.scaleX * weatherResolutionScale)
-            var finalAlpha = p.alpha
+            var finalAlpha = p.alpha * alpha
             if (state.type == WeatherType.FOG || state.type == WeatherType.CLOUDY || (!state.isNight && state.type == WeatherType.CLEAR)) {
                 finalAlpha *= (0.3f + state.intensity * 0.7f).coerceIn(0f, 1f)
             }
@@ -1156,18 +1273,18 @@ class DynamicBackgroundView @JvmOverloads constructor(
             val tailY = p.y - scaledSize
             val horizontalOffset = if (p.speedY != 0f) (state.windFactor / p.speedY) * scaledSize * 0.8f else state.windFactor * 2f * weatherResolutionScale
             val tailX = p.x - horizontalOffset
-            lineDataBuffer.put(p.x).put(p.y).put(p.r).put(p.g).put(p.b).put(p.alpha)
+            lineDataBuffer.put(p.x).put(p.y).put(p.r).put(p.g).put(p.b).put(p.alpha * alpha)
             lineDataBuffer.put(tailX).put(tailY).put(p.r).put(p.g).put(p.b).put(0f)
         }
 
         private fun renderPoints(count: Int, globalAlpha: Float, w: Int, h: Int) {
             GLES20.glUseProgram(pointProgram)
             pointDataBuffer.position(0)
-
+            
             // Build dynamic ortho matrix for current FBO dimensions
             val weatherProj = FloatArray(16)
             Matrix.orthoM(weatherProj, 0, 0f, w.toFloat(), h.toFloat(), 0f, -1f, 1f)
-
+            
             val uMatrixLoc = GLES20.glGetUniformLocation(pointProgram, "u_Matrix")
             GLES20.glUniformMatrix4fv(uMatrixLoc, 1, false, weatherProj, 0)
             GLES20.glUniform1f(uPointGlobalAlphaLoc, globalAlpha)
@@ -1198,11 +1315,11 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private fun renderLines(count: Int, globalAlpha: Float, w: Int, h: Int) {
             GLES20.glUseProgram(lineProgram)
             lineDataBuffer.position(0)
-
+            
             // Build dynamic ortho matrix for current FBO dimensions
             val weatherProj = FloatArray(16)
             Matrix.orthoM(weatherProj, 0, 0f, w.toFloat(), h.toFloat(), 0f, -1f, 1f)
-
+            
             val uMatrixLoc = GLES20.glGetUniformLocation(lineProgram, "u_Matrix")
             GLES20.glUniformMatrix4fv(uMatrixLoc, 1, false, weatherProj, 0)
             GLES20.glUniform1f(uLineGlobalAlphaLoc, globalAlpha)
@@ -1333,16 +1450,18 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
         fun updateWeatherConfig(type: WeatherType, intens: Float, wind: Float, night: Boolean) {
             if (currentState.type == type && currentState.isNight == night) {
-                currentState.intensity = intens
-                currentState.windFactor = wind
-                renderMode = if (type == WeatherType.NONE) RENDERMODE_WHEN_DIRTY else RENDERMODE_CONTINUOUSLY
+                currentState.targetIntensity = intens
+                currentState.targetWindFactor = wind
+                renderMode = RENDERMODE_CONTINUOUSLY
                 requestRender()
                 return
             }
 
             previousState.type = currentState.type
             previousState.intensity = currentState.intensity
+            previousState.targetIntensity = currentState.intensity
             previousState.windFactor = currentState.windFactor
+            previousState.targetWindFactor = currentState.windFactor
             previousState.isNight = currentState.isNight
 
             val tempParticles = previousState.particles
@@ -1351,7 +1470,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             currentState.type = type
             currentState.intensity = intens
+            currentState.targetIntensity = intens
             currentState.windFactor = wind
+            currentState.targetWindFactor = wind
             currentState.isNight = night
 
             currentState.particles.forEach { it.active = false }
@@ -1532,10 +1653,13 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 dy = (1f - scaleY) / 2f
             }
 
+            val unscaledVw = this@DynamicBackgroundView.width.toFloat().let { if (it > 0f) it else vw.toFloat() }
+            val unscaledVh = this@DynamicBackgroundView.height.toFloat().let { if (it > 0f) it else vh.toFloat() }
+
             val finalScaleX = scaleX / scale
             val finalScaleY = scaleY / scale
-            val finalDx = dx - (offsetX / vw.toFloat()) * scaleX
-            val finalDy = dy - (offsetY / vh.toFloat()) * scaleY
+            val finalDx = (dx - 0.5f) / scale + 0.5f - (offsetX / unscaledVw) * (scaleX / scale)
+            val finalDy = (dy - 0.5f) / scale + 0.5f - (offsetY / unscaledVh) * (scaleY / scale)
 
             return floatArrayOf(finalScaleX, finalScaleY, finalDx, finalDy)
         }

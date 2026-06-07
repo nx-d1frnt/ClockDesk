@@ -2,13 +2,13 @@ package com.nxd1frnt.clockdesk2.background
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Handler
 import android.util.Log
+import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
-import com.nxd1frnt.clockdesk2.utils.LocationManager
-import java.util.Calendar
-import java.util.Date
+import java.util.*
 
 class GradientManager(
     private val dynamicBackgroundView: DynamicBackgroundView,

@@ -82,13 +82,17 @@ class TurbulenceView @JvmOverloads constructor(
             visibility = View.VISIBLE
             bringToFront()
 
+            val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+            val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
+            val speedScale = prefs.getInt("graphics_turbulence_speed", 10) / 10f
+
             val config = TurbulenceNoiseAnimationConfig(
                 width = width.toFloat(),
                 height = height.toFloat(),
                 color = color,
                 pixelDensity = resources.displayMetrics.density,
-                gridCount = 1.0f,
-                noiseMoveSpeedZ = 0.45f,
+                gridCount = 1.0f * gridScale,
+                noiseMoveSpeedZ = 0.45f * speedScale,
                 luminosityMultiplier = 0.6f
             )
 
@@ -114,10 +118,14 @@ class TurbulenceView @JvmOverloads constructor(
             bringToFront()
             turbulence.visibility = View.VISIBLE
 
+            val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+            val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
+            val speedScale = prefs.getInt("graphics_turbulence_speed", 10) / 10f
+
             val config = LegacySimplexNoiseView.NoiseConfig(
                 color = color,
-                gridCount = 1.0f,
-                noiseMoveSpeedZ = 0.45f,
+                gridCount = 1.0f * gridScale,
+                noiseMoveSpeedZ = 0.45f * speedScale,
                 luminosityMultiplier = 1.0f,
                 octaves = 1
             )

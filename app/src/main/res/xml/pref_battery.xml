@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:key="battery_saver_category"
+        app:title="@string/battery_saver_settings_title">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_manual"
+            app:title="@string/power_saver_manual_title"
+            app:summary="@string/power_saver_manual_summary" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="automatic_battery_saver_mode"
+            app:title="@string/automatic_battery_saver_mode_title"
+            app:summary="@string/automatic_battery_saver_mode_summary" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="battery_saver_trigger"
+            app:title="@string/battery_saver_trigger_title"
+            app:summary="@string/battery_saver_trigger_summary"
+            android:min="5"
+            android:max="90"
+            android:defaultValue="15"
+            app:showSeekBarValue="true"
+            app:dependency="automatic_battery_saver_mode" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="power_saver_rules_category"
+        app:title="@string/power_saver_rules_title">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_disable_animations"
+            app:title="@string/power_saver_disable_animations_title"
+            app:summary="@string/power_saver_disable_animations_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_limit_fps"
+            app:title="@string/power_saver_limit_fps_title"
+            app:summary="@string/power_saver_limit_fps_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="power_saver_fps_limit_value"
+            app:title="@string/power_saver_fps_limit_value_title"
+            app:summary="@string/power_saver_fps_limit_value_summary"
+            android:min="15"
+            android:max="60"
+            android:defaultValue="30"
+            app:showSeekBarValue="true"
+            app:dependency="power_saver_limit_fps" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_disable_weather"
+            app:title="@string/power_saver_disable_weather_title"
+            app:summary="@string/power_saver_disable_weather_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_lock_brightness"
+            app:title="@string/power_saver_lock_brightness_title"
+            app:summary="@string/power_saver_lock_brightness_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="power_saver_brightness_level"
+            app:title="@string/power_saver_brightness_level_title"
+            app:summary="@string/power_saver_brightness_level_summary"
+            android:min="1"
+            android:max="100"
+            android:defaultValue="1"
+            app:showSeekBarValue="true"
+            app:dependency="power_saver_lock_brightness" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_limit_clock"
+            app:title="@string/power_saver_limit_clock_title"
+            app:summary="@string/power_saver_limit_clock_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_disable_light_sensor"
+            app:title="@string/power_saver_disable_light_sensor_title"
+            app:summary="@string/power_saver_disable_light_sensor_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_enable_smart_pixels"
+            app:title="@string/power_saver_enable_smart_pixels_title"
+            app:summary="@string/power_saver_enable_smart_pixels_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_dim_background"
+            app:title="@string/power_saver_dim_background_title"
+            app:summary="@string/power_saver_dim_background_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="power_saver_dim_level"
+            app:title="@string/power_saver_dim_level_title"
+            app:summary="@string/power_saver_dim_level_summary"
+            android:min="0"
+            android:max="100"
+            android:defaultValue="85"
+            app:showSeekBarValue="true"
+            app:dependency="power_saver_dim_background" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

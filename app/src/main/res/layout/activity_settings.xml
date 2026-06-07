@@ -39,7 +39,7 @@
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/settings_container"
-        android:name="com.nxd1frnt.clockdesk2.ui.settings.SettingsFragment"
+        android:name="com.nxd1frnt.clockdesk2.ui.settings.SettingsCategoryListFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
