@@ -675,6 +675,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             toggleEditModeAction = { toggleEditMode() },
             showCustomizationAction = { view -> customizationSheetManager.showForView(view) },
             hideBottomSheetAction = { customizationSheetManager.hide() },
+            requestLocationPermissionAction = {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                    permissionRequestCode
+                )
+            },
             onTutorialFinished = { checkLocationPermissionsAndLoadData() }
         )
 
@@ -765,14 +772,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     return
                 }
 
-                if (tutorialLayout.visibility == View.VISIBLE) {
-                    tutorialLayout.animate().alpha(0f).setDuration(300)
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator) {
-                                tutorialLayout.visibility = View.GONE
-                                isTutorialRunning = false
-                            }
-                        })
+                if (tutorialManager.handleBackPressed()) {
                     return
                 }
 
@@ -2106,6 +2106,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     override fun onResume() {
         super.onResume()
+        if (::tutorialManager.isInitialized) {
+            tutorialManager.checkAndUpdatePermissionState()
+        }
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
         if (::dynamicBackgroundView.isInitialized) {
@@ -2211,6 +2214,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (::tutorialManager.isInitialized) {
+            tutorialManager.checkAndUpdatePermissionState()
+        }
         locationManager.onRequestPermissionsResult(requestCode, grantResults) { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
