@@ -60,7 +60,7 @@
             </intent-filter>
         </service>
 <!--        <service-->
-<!--            android:name=".ClockDeskDreamService"-->
+<!--            android:name=".services.ClockDeskDreamService"-->
 <!--            android:exported="true"-->
 <!--            android:label="@string/app_name"-->
 <!--            android:permission="android.permission.BIND_DREAM_SERVICE"-->
