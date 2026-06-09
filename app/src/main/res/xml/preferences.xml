@@ -54,6 +54,12 @@
             app:summary="@string/enable_additional_logging_summary" />
 
         <androidx.preference.SwitchPreferenceCompat
+            app:key="show_performance_overlay"
+            app:title="@string/show_performance_overlay_title"
+            app:summary="@string/show_performance_overlay_summary"
+            android:defaultValue="false" />
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="advanced_graphics"
             app:title="@string/enable_advanced_graphics"
             app:summary="@string/enable_advanced_graphics_summary" />

@@ -298,4 +298,7 @@
     <string name="about_github_url">https://github.com/nx-d1frnt/ClockDesk</string>
     <string name="about_license_url">https://github.com/nx-d1frnt/ClockDesk/blob/master/LICENSE</string>
     <string name="about_footer">ClockDesk %1$s · Open Source</string>
+    <string name="show_performance_overlay_title">Показать оверлей производительности</string>
+    <string name="show_performance_overlay_summary">Отображать загрузку процессора (CPU) и графического ядра (GPU), а также кадровую частоту (FPS) в реальном времени</string>
+    <string name="weather_auto_current">Текущая погода</string>
 </resources>

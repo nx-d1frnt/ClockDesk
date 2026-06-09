@@ -316,4 +316,6 @@
     <string name="performance_settings_subtitle">Logging, transitions and graphics scale</string>
     <string name="smart_chips_settings_subtitle">Manage active chips and widgets</string>
     <string name="backup_restore_subtitle">Export and restore settings backup</string>
+    <string name="show_performance_overlay_title">Show performance overlay</string>
+    <string name="show_performance_overlay_summary">Display real-time CPU and GPU render statistics on screen</string>
 </resources>

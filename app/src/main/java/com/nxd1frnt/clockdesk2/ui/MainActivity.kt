@@ -76,6 +76,7 @@ import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.ui.settings.BackgroundSheetManager
 import com.nxd1frnt.clockdesk2.ui.settings.SettingsActivity
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+import com.nxd1frnt.clockdesk2.ui.view.PerformanceOverlayView
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.ClockManager
@@ -105,6 +106,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundImageView: ImageView
     private lateinit var dynamicBackgroundView: DynamicBackgroundView
     private lateinit var turbulenceOverlay: TurbulenceView
+    private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
     private lateinit var backgroundButton: Button
@@ -305,6 +307,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         backgroundImageView = findViewById(R.id.background_image_view)
         dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
+        performanceOverlay = findViewById(R.id.performance_overlay)
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
         backgroundButton = findViewById(R.id.background_button)
@@ -794,6 +797,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             if (chipKeys.contains(key)) smartChipManager.onPreferencesChanged()
 
             when (key) {
+                "show_performance_overlay" -> runOnUiThread {
+                    val showOverlay = prefs.getBoolean("show_performance_overlay", false)
+                    togglePerformanceOverlay(showOverlay)
+                }
                 "automatic_battery_saver_mode", "battery_saver_trigger", "battery_saver_mode" -> smartChipManager.onPreferencesChanged()
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
@@ -2152,6 +2159,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
         smartChipManager.updateAllChips()
         startUpdates()
+        val showPerformance = prefs.getBoolean("show_performance_overlay", false)
+        togglePerformanceOverlay(showPerformance)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -2206,6 +2215,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         burnInProtectionManager.stop()
         smartPixelManager.stop()
         stopUpdates()
+        stopPerformanceUpdates()
     }
 
     override fun onRequestPermissionsResult(
@@ -2330,6 +2340,42 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         // Always update background filters (handles dimming changes)
         if (::dynamicBackgroundView.isInitialized && dynamicBackgroundView.visibility == View.VISIBLE) {
             updateBackgroundFilters()
+        }
+    }
+
+    private var performanceRunnable: Runnable? = null
+    private val performanceUpdateInterval = 1000L // 1 second
+
+    private fun togglePerformanceOverlay(enabled: Boolean) {
+        if (!::performanceOverlay.isInitialized) return
+        dynamicBackgroundView.performanceTracker.isEnabled = enabled
+        if (enabled) {
+            performanceOverlay.visibility = View.VISIBLE
+            startPerformanceUpdates()
+        } else {
+            performanceOverlay.visibility = View.GONE
+            stopPerformanceUpdates()
+        }
+    }
+
+    private fun startPerformanceUpdates() {
+        if (performanceRunnable != null) return
+        performanceRunnable = object : Runnable {
+            override fun run() {
+                if (dynamicBackgroundView.performanceTracker.isEnabled) {
+                    val metrics = dynamicBackgroundView.performanceTracker.updateMetrics()
+                    performanceOverlay.updateMetrics(metrics)
+                    handler.postDelayed(this, performanceUpdateInterval)
+                }
+            }
+        }
+        handler.post(performanceRunnable!!)
+    }
+
+    private fun stopPerformanceUpdates() {
+        performanceRunnable?.let {
+            handler.removeCallbacks(it)
+            performanceRunnable = null
         }
     }
 }

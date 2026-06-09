@@ -13,6 +13,7 @@ import android.opengl.GLUtils
 import android.opengl.Matrix
 import android.util.AttributeSet
 import android.view.animation.AccelerateDecelerateInterpolator
+import com.nxd1frnt.clockdesk2.utils.PerformanceTracker
 import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -34,6 +35,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     enum class WeatherType { NONE, RAIN, SNOW, FOG, THUNDERSTORM, CLOUDY, CLEAR }
+
+    val performanceTracker = PerformanceTracker()
 
     private val renderer: BackgroundRenderer
     private var transitionAnimator: ValueAnimator? = null
@@ -848,6 +851,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 }
             }
 
+            val startTime = if (performanceTracker.isEnabled) System.nanoTime() else 0L
+
             val now = System.currentTimeMillis()
             val dt = if (lastFrameTime == 0L) 0f else (now - lastFrameTime) / 1000f
             lastFrameTime = now
@@ -956,6 +961,12 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 }
             } else {
                 renderMode = RENDERMODE_WHEN_DIRTY
+            }
+
+            if (performanceTracker.isEnabled) {
+                GLES20.glFinish()
+                val endTime = System.nanoTime()
+                performanceTracker.trackFrame(endTime - startTime)
             }
         }
 

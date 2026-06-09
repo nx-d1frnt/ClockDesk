@@ -26,6 +26,7 @@ import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 import android.graphics.Bitmap
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+import com.nxd1frnt.clockdesk2.ui.view.PerformanceOverlayView
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
@@ -49,6 +50,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var backgroundImageView: ImageView
     private lateinit var turbulenceOverlay: TurbulenceView
     private lateinit var dynamicBackgroundView: DynamicBackgroundView
+    private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var smartChipContainer: ConstraintLayout
     // endregion
 
@@ -157,6 +159,9 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         if (::powerStateManager.isInitialized) {
             powerStateManager.registerObserver(this)
         }
+
+        val showPerformance = prefs.getBoolean("show_performance_overlay", false)
+        togglePerformanceOverlay(showPerformance)
     }
 
     override fun onDreamingStopped() {
@@ -177,6 +182,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         if (::burnInProtectionManager.isInitialized) burnInProtectionManager.stop()
         musicManager?.destroy()
         musicManager = null
+        stopPerformanceUpdates()
     }
 
     override fun onDetachedFromWindow() {
@@ -198,6 +204,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         backgroundImageView = findViewById(R.id.background_image_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
         dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
+        performanceOverlay = findViewById(R.id.performance_overlay)
         smartChipContainer = findViewById(R.id.smart_chip_container)
     }
 
@@ -444,6 +451,42 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
                 dynamicBackgroundView.areAnimationsPaused = false
                 dynamicBackgroundView.maxFps = 0
             }
+        }
+    }
+
+    private var performanceRunnable: Runnable? = null
+    private val performanceUpdateInterval = 1000L // 1 second
+
+    private fun togglePerformanceOverlay(enabled: Boolean) {
+        if (!::performanceOverlay.isInitialized) return
+        dynamicBackgroundView.performanceTracker.isEnabled = enabled
+        if (enabled) {
+            performanceOverlay.visibility = View.VISIBLE
+            startPerformanceUpdates()
+        } else {
+            performanceOverlay.visibility = View.GONE
+            stopPerformanceUpdates()
+        }
+    }
+
+    private fun startPerformanceUpdates() {
+        if (performanceRunnable != null) return
+        performanceRunnable = object : Runnable {
+            override fun run() {
+                if (dynamicBackgroundView.performanceTracker.isEnabled) {
+                    val metrics = dynamicBackgroundView.performanceTracker.updateMetrics()
+                    performanceOverlay.updateMetrics(metrics)
+                    handler.postDelayed(this, performanceUpdateInterval)
+                }
+            }
+        }
+        handler.post(performanceRunnable!!)
+    }
+
+    private fun stopPerformanceUpdates() {
+        performanceRunnable?.let {
+            handler.removeCallbacks(it)
+            performanceRunnable = null
         }
     }
 }
