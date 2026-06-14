@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="weather_refresh_entries">
+        <item>15 хвилин</item>
+        <item>30 хвилин</item>
+        <item>1 година</item>
+        <item>2 години</item>
+        <item>6 годин</item>
+        <item>12 годин</item>
+        <item>24 години</item>
+    </string-array>
+</resources>
