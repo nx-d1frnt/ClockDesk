@@ -6,17 +6,26 @@
         app:key="suntimeapi_category"
         app:title="@string/sun_sunrise_api_settings">
 
-        <androidx.preference.SwitchPreferenceCompat
-            app:key="useManualCoordinates"
-            app:title="@string/use_manual_coordinates"
-            app:summary="@string/use_manual_coordinates_summary" />
+        <androidx.preference.ListPreference
+            app:key="location_mode"
+            app:title="@string/location_mode_title"
+            app:summary="@string/location_mode_summary"
+            app:defaultValue="auto"
+            app:entries="@array/location_mode_entries"
+            app:entryValues="@array/location_mode_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <androidx.preference.EditTextPreference
+            app:key="location_city_name"
+            app:title="@string/location_city_name_title"
+            app:dialogTitle="@string/location_city_name_dialog_title"
+            app:useSimpleSummaryProvider="false" />
 
         <androidx.preference.EditTextPreference
             app:key="latitude"
             app:title="@string/latitude_label"
             app:dialogTitle="@string/enter_latitude"
             app:useSimpleSummaryProvider="true"
-            app:dependency="useManualCoordinates"
             android:inputType="numberDecimal|numberSigned" />
 
         <androidx.preference.EditTextPreference
@@ -24,7 +33,6 @@
             app:title="@string/longitude"
             app:dialogTitle="@string/enter_longitude"
             app:useSimpleSummaryProvider="true"
-            app:dependency="useManualCoordinates"
             android:inputType="numberDecimal|numberSigned" />
     </androidx.preference.PreferenceCategory>
 

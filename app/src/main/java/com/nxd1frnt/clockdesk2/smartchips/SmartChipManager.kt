@@ -32,9 +32,12 @@ import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.smartchips.plugins.AlarmChipPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.WeatherAlertPlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.WeatherChipPlugin
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
@@ -71,7 +74,10 @@ class SmartChipManager(
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
         UpdatePlugin(context),
-        BackgroundProgressPlugin(context)
+        BackgroundProgressPlugin(context),
+        AlarmChipPlugin(context),
+        WeatherChipPlugin(context),
+        WeatherAlertPlugin(context)
     )
     var externalPlugins: List<ExternalChipPlugin> = emptyList()
     private val allChips = mutableListOf<ChipInfo>()
@@ -134,6 +140,22 @@ class SmartChipManager(
     fun setEditMode(enabled: Boolean, listener: (View) -> Unit) {
         isEditMode = enabled
         onEditClickListener = listener
+        updateChipsClickability()
+    }
+
+    private fun updateChipsClickability() {
+        for (i in 0 until chipContainer.childCount) {
+            val child = chipContainer.getChildAt(i)
+            if (isEditMode) {
+                child.isClickable = false
+                child.isFocusable = false
+            } else {
+                val chipInfo = allChips.find { it.view == child }
+                val hasClick = chipInfo?.clickActivityClassName != null
+                child.isClickable = hasClick
+                child.isFocusable = hasClick
+            }
+        }
     }
 
     private val dataUpdateReceiver: BroadcastReceiver = object : BroadcastReceiver() {
@@ -523,7 +545,7 @@ fun updateAllChips() {
 
     private fun sortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
-        val orderString = sharedPreferences.getString("smart_chip_order", "show_battery_alert,show_updates,system_bg_progress") ?: ""
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
        // Logger.d("SmartChipManager"){"orderString: $orderString"}
         val orderList = orderString.split(",").map { it.trim() }
 
@@ -606,6 +628,7 @@ fun updateAllChips() {
             }
         }
         constraintSet.applyTo(container)
+        updateChipsClickability()
     }
 
     fun onPreferencesChanged() {

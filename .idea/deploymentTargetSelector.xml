@@ -2,12 +2,12 @@
 <project version="4">
   <component name="deploymentTargetSelector">
     <selectionStates>
-      <SelectionState runConfigName="app">
+      <SelectionState runConfigName="ClockDesk">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-01-31T21:50:33.096869059Z">
+        <DropdownSelection timestamp="2026-06-14T19:25:09.370370616Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=80e4f4e1f5c4" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=b08b37d4" />
             </handle>
           </Target>
         </DropdownSelection>

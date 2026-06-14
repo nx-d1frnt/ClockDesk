@@ -14,6 +14,35 @@ open class WeatherGetter(
     private val locationManager: LocationManager,
     private val callback: () -> Unit
 ) : PowerSaveObserver, SharedPreferences.OnSharedPreferenceChangeListener {
+
+    companion object {
+        var cachedTemperature: Double? = null
+        var cachedWeatherCode: Int? = null
+        var cachedIsDay: Boolean? = null
+        var cachedWindSpeed: Double? = null
+        var cachedHourlyCodes: List<Int> = emptyList()
+
+        private val listeners = mutableSetOf<() -> Unit>()
+
+        fun registerListener(listener: () -> Unit) {
+            listeners.add(listener)
+        }
+
+        fun unregisterListener(listener: () -> Unit) {
+            listeners.remove(listener)
+        }
+
+        fun updateCache(temp: Double?, code: Int?, isDay: Boolean?, wind: Double?, hourlyCodes: List<Int>) {
+            cachedTemperature = temp
+            cachedWeatherCode = code
+            cachedIsDay = isDay
+            cachedWindSpeed = wind
+            cachedHourlyCodes = hourlyCodes
+            listeners.forEach {
+                try { it() } catch (e: Exception) {}
+            }
+        }
+    }
     private var isPowerSaveActive = false
     private var interval = 30 * 60 * 1000L
     private val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)

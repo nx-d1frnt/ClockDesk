@@ -18,4 +18,14 @@
         <item>720</item>
         <item>1440</item>
     </string-array>
+    <string-array name="location_mode_entries">
+        <item>@string/location_mode_auto</item>
+        <item>@string/location_mode_city</item>
+        <item>@string/location_mode_coords</item>
+    </string-array>
+    <string-array name="location_mode_values">
+        <item>auto</item>
+        <item>city</item>
+        <item>coords</item>
+    </string-array>
 </resources>

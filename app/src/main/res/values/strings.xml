@@ -91,6 +91,16 @@
 
     <!-- Preference Strings -->
     <string name="sun_sunrise_api_settings">Sunset/Sunrise API Settings</string>
+    <string name="location_mode_title">Location Mode</string>
+    <string name="location_mode_summary">Select how location is configured for weather and sunset/sunrise</string>
+    <string name="location_mode_auto">Automatic (GPS/Network)</string>
+    <string name="location_mode_city">Manual City Name</string>
+    <string name="location_mode_coords">Manual Coordinates</string>
+    <string name="location_city_name_title">City Name</string>
+    <string name="location_city_name_summary">Enter city name (e.g. London)</string>
+    <string name="location_city_name_dialog_title">Enter City Name</string>
+    <string name="city_resolved_format">Resolved city: %1$s (Lat: %2$.4f, Lon: %3$.4f)</string>
+    <string name="city_resolve_error_format">Failed to resolve city: %1$s</string>
     <string name="use_manual_coordinates_summary">Enable to manually enter latitude and longitude</string>
     <string name="enter_latitude">Enter Latitude</string>
     <string name="longitude">Longitude</string>
@@ -318,4 +328,32 @@
     <string name="backup_restore_subtitle">Export and restore settings backup</string>
     <string name="show_performance_overlay_title">Show performance overlay</string>
     <string name="show_performance_overlay_summary">Display real-time CPU and GPU render statistics on screen</string>
+
+    <!-- Smart Chips -->
+    <string name="show_alarm_chip">Alarm Clock Chip</string>
+    <string name="show_alarm_chip_summary">Show next scheduled alarm</string>
+    <string name="show_weather_chip">Weather Chip</string>
+    <string name="show_weather_chip_summary">Show current temperature and conditions</string>
+    <string name="show_weather_alert_chip">Weather Alert Chip</string>
+    <string name="show_weather_alert_chip_summary">Show weather alerts and upcoming worsening conditions</string>
+    <string name="weather_alert_rain_in_format">Rain in %1$dh</string>
+    <string name="weather_alert_snow_in_format">Snow in %1$dh</string>
+    <string name="weather_alert_storm_in_format">Storm in %1$dh</string>
+    <string name="weather_alert_storm_active">Storm Warning</string>
+    <string name="weather_alert_high_winds">High Winds</string>
+
+    <!-- Weather Alert Settings -->
+    <string name="weather_alert_settings_title">Weather Alert Settings</string>
+    <string name="weather_alert_types_category">Alert Types</string>
+    <string name="weather_alert_enable_storms_title">Storm Warnings</string>
+    <string name="weather_alert_enable_storms_summary">Show alerts for current thunderstorms</string>
+    <string name="weather_alert_enable_wind_title">High Wind Warnings</string>
+    <string name="weather_alert_enable_wind_summary">Show alerts for wind speed exceeding threshold</string>
+    <string name="weather_alert_enable_worsening_title">Worsening Conditions</string>
+    <string name="weather_alert_enable_worsening_summary">Show predictions for upcoming rain, snow, or storms</string>
+    <string name="weather_alert_thresholds_category">Thresholds &amp; Forecast</string>
+    <string name="weather_alert_wind_threshold_title">Wind Speed Threshold</string>
+    <string name="weather_alert_wind_threshold_summary">Wind speed (km/h) to trigger alert</string>
+    <string name="weather_alert_forecast_hours_title">Forecast Window</string>
+    <string name="weather_alert_forecast_hours_summary">Hours ahead to check for worsening weather</string>
 </resources>

@@ -60,7 +60,7 @@ class SmartChipsPluginsFragment : Fragment() {
 
         val savedOrderString = prefs.getString(
             "smart_chip_order",
-            "system_bg_progress,show_battery_alert,show_updates"
+            "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip"
         ) ?: ""
         val savedOrderList = savedOrderString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         Logger.d("SmartChipsFragment") { "Saved order: $savedOrderList" }
@@ -198,6 +198,31 @@ class SmartChipsPluginsFragment : Fragment() {
             desc = getString(R.string.show_background_progress_chip_summary),
             isInternal = true,
             iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.image_refresh)
+        )
+        map["show_alarm_chip"] = ChipDef(
+            id = "show_alarm_chip",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_alarm_chip),
+            desc = getString(R.string.show_alarm_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_alarm)
+        )
+        map["show_weather_chip"] = ChipDef(
+            id = "show_weather_chip",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_weather_chip),
+            desc = getString(R.string.show_weather_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_clear_day)
+        )
+        map["show_weather_alert_chip"] = ChipDef(
+            id = "show_weather_alert_chip",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_weather_alert_chip),
+            desc = getString(R.string.show_weather_alert_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_weather_cloudy_alert),
+            settingsActivityClassName = "com.nxd1frnt.clockdesk2.smartchips.ui.WeatherAlertSettingsActivity"
         )
 
         // External plugin discovery via BroadcastReceivers

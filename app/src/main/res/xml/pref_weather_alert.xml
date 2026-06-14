@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/weather_alert_types_category">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="weather_alert_enable_storms"
+            app:title="@string/weather_alert_enable_storms_title"
+            app:summary="@string/weather_alert_enable_storms_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="weather_alert_enable_wind"
+            app:title="@string/weather_alert_enable_wind_title"
+            app:summary="@string/weather_alert_enable_wind_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="weather_alert_enable_worsening"
+            app:title="@string/weather_alert_enable_worsening_title"
+            app:summary="@string/weather_alert_enable_worsening_summary"
+            android:defaultValue="true" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/weather_alert_thresholds_category">
+
+        <androidx.preference.SeekBarPreference
+            app:key="weather_alert_wind_threshold"
+            app:title="@string/weather_alert_wind_threshold_title"
+            app:summary="@string/weather_alert_wind_threshold_summary"
+            android:min="15"
+            android:max="80"
+            android:defaultValue="35"
+            app:showSeekBarValue="true"
+            app:dependency="weather_alert_enable_wind" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="weather_alert_forecast_hours"
+            app:title="@string/weather_alert_forecast_hours_title"
+            app:summary="@string/weather_alert_forecast_hours_summary"
+            android:min="1"
+            android:max="8"
+            android:defaultValue="3"
+            app:showSeekBarValue="true"
+            app:dependency="weather_alert_enable_worsening" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

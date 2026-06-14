@@ -723,6 +723,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 resetEditModeTimeout()
             }
         }
+        chipContainer.setOnClickListener {
+            if (isEditMode) {
+                customizationSheetManager.showForView(it)
+                resetEditModeTimeout()
+            }
+        }
 
         backgroundCustomizationTab.setOnClickListener {
             backgroundSheetManager.show()

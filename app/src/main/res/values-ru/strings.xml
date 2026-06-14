@@ -91,6 +91,16 @@
 
     <!-- Preference Strings -->
     <string name="sun_sunrise_api_settings">Настройки API заката/восхода</string>
+    <string name="location_mode_title">Режим местоположения</string>
+    <string name="location_mode_summary">Выберите способ определения местоположения для погоды и времени восхода/заката</string>
+    <string name="location_mode_auto">Автоматически (GPS/Сеть)</string>
+    <string name="location_mode_city">Вручную по названию города</string>
+    <string name="location_mode_coords">Вручную по координатам</string>
+    <string name="location_city_name_title">Название города</string>
+    <string name="location_city_name_summary">Введите название города (например, Москва)</string>
+    <string name="location_city_name_dialog_title">Введите название города</string>
+    <string name="city_resolved_format">Город определен: %1$s (Широта: %2$.4f, Долгота: %3$.4f)</string>
+    <string name="city_resolve_error_format">Не удалось определить город: %1$s</string>
     <string name="use_manual_coordinates_summary">Включите для ручного ввода широты и долготы</string>
     <string name="enter_latitude">Введите широту</string>
     <string name="longitude">Долгота</string>
@@ -301,4 +311,32 @@
     <string name="show_performance_overlay_title">Показать оверлей производительности</string>
     <string name="show_performance_overlay_summary">Отображать загрузку процессора (CPU) и графического ядра (GPU), а также кадровую частоту (FPS) в реальном времени</string>
     <string name="weather_auto_current">Текущая погода</string>
+
+    <!-- Smart Chips -->
+    <string name="show_alarm_chip">Чип будильника</string>
+    <string name="show_alarm_chip_summary">Показывать следующий запланированный будильник</string>
+    <string name="show_weather_chip">Чип погоды</string>
+    <string name="show_weather_chip_summary">Показывать текущую температуру и условия погоды</string>
+    <string name="show_weather_alert_chip">Чип предупреждений о погоде</string>
+    <string name="show_weather_alert_chip_summary">Показывать предупреждения о погоде и ухудшении условий</string>
+    <string name="weather_alert_rain_in_format">Дождь через %1$d ч.</string>
+    <string name="weather_alert_snow_in_format">Снег через %1$d ч.</string>
+    <string name="weather_alert_storm_in_format">Гроза через %1$d ч.</string>
+    <string name="weather_alert_storm_active">Грозовое предупреждение</string>
+    <string name="weather_alert_high_winds">Сильный ветер</string>
+
+    <!-- Weather Alert Settings -->
+    <string name="weather_alert_settings_title">Настройки предупреждений о погоде</string>
+    <string name="weather_alert_types_category">Типы предупреждений</string>
+    <string name="weather_alert_enable_storms_title">Предупреждения о грозах</string>
+    <string name="weather_alert_enable_storms_summary">Показывать предупреждения при текущей грозе</string>
+    <string name="weather_alert_enable_wind_title">Предупреждения о сильном ветре</string>
+    <string name="weather_alert_enable_wind_summary">Показывать предупреждения при превышении порога скорости ветра</string>
+    <string name="weather_alert_enable_worsening_title">Ухудшение условий</string>
+    <string name="weather_alert_enable_worsening_summary">Показывать прогнозы предстоящего дождя, снега или грозы</string>
+    <string name="weather_alert_thresholds_category">Пороги и прогноз</string>
+    <string name="weather_alert_wind_threshold_title">Порог скорости ветра</string>
+    <string name="weather_alert_wind_threshold_summary">Скорость ветра (км/ч) для срабатывания предупреждения</string>
+    <string name="weather_alert_forecast_hours_title">Окно прогноза</string>
+    <string name="weather_alert_forecast_hours_summary">На сколько часов вперед проверять ухудшение погоды</string>
 </resources>

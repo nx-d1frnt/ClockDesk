@@ -91,6 +91,16 @@
 
     <!-- Preference Strings -->
     <string name="sun_sunrise_api_settings">Налаштування API заходу/сходу</string>
+    <string name="location_mode_title">Режим місцезнаходження</string>
+    <string name="location_mode_summary">Виберіть спосіб визначення місцезнаходження для погоди та часу сходу/заходу</string>
+    <string name="location_mode_auto">Автоматично (GPS/Мережа)</string>
+    <string name="location_mode_city">Вручную за назвою міста</string>
+    <string name="location_mode_coords">Вручну за координатами</string>
+    <string name="location_city_name_title">Назва міста</string>
+    <string name="location_city_name_summary">Введіть назву міста (наприклад, Київ)</string>
+    <string name="location_city_name_dialog_title">Введіть назву міста</string>
+    <string name="city_resolved_format">Місто визначено: %1$s (Широта: %2$.4f, Довгота: %3$.4f)</string>
+    <string name="city_resolve_error_format">Не вдалося визначити місто: %1$s</string>
     <string name="use_manual_coordinates_summary">Увімкніть для ручного введення широти та довготи</string>
     <string name="enter_latitude">Введіть широту</string>
     <string name="longitude">Довгота</string>
@@ -301,4 +311,32 @@
     <string name="show_performance_overlay_title">Показати оверлей продуктивності</string>
     <string name="show_performance_overlay_summary">Відображати завантаження процесора (CPU) та графічного ядра (GPU), а також кадрову частоту (FPS) в реальному часі</string>
     <string name="weather_auto_current">Поточна погода</string>
+
+    <!-- Smart Chips -->
+    <string name="show_alarm_chip">Чіп будильника</string>
+    <string name="show_alarm_chip_summary">Показувати наступний запланований будильник</string>
+    <string name="show_weather_chip">Чіп погоди</string>
+    <string name="show_weather_chip_summary">Показувати поточну температуру та умови погоди</string>
+    <string name="show_weather_alert_chip">Чіп попереджень про погоду</string>
+    <string name="show_weather_alert_chip_summary">Показувати попередження про погоду та погіршення умов</string>
+    <string name="weather_alert_rain_in_format">Дощ через %1$d год.</string>
+    <string name="weather_alert_snow_in_format">Сніг через %1$d год.</string>
+    <string name="weather_alert_storm_in_format">Гроза через %1$d год.</string>
+    <string name="weather_alert_storm_active">Грозове попередження</string>
+    <string name="weather_alert_high_winds">Сильний вітер</string>
+
+    <!-- Weather Alert Settings -->
+    <string name="weather_alert_settings_title">Налаштування попереджень про погоду</string>
+    <string name="weather_alert_types_category">Типи попереджень</string>
+    <string name="weather_alert_enable_storms_title">Попередження про грози</string>
+    <string name="weather_alert_enable_storms_summary">Показувати попередження при поточній грозі</string>
+    <string name="weather_alert_enable_wind_title">Попередження про сильний вітер</string>
+    <string name="weather_alert_enable_wind_summary">Показувати попередження при перевищенні порогу швидкості вітру</string>
+    <string name="weather_alert_enable_worsening_title">Погіршення умов</string>
+    <string name="weather_alert_enable_worsening_summary">Показувати прогнози майбутнього дощу, снігу або грози</string>
+    <string name="weather_alert_thresholds_category">Пороги та прогноз</string>
+    <string name="weather_alert_wind_threshold_title">Поріг швидкості вітру</string>
+    <string name="weather_alert_wind_threshold_summary">Швидкість вітру (км/год) для спрацьовування попередження</string>
+    <string name="weather_alert_forecast_hours_title">Вікно прогнозу</string>
+    <string name="weather_alert_forecast_hours_summary">На скільки годин вперед перевіряти погіршення погоди</string>
 </resources>

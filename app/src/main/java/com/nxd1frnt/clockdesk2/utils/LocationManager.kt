@@ -9,11 +9,32 @@ import android.location.LocationManager
 class LocationManager(private val context: Context, private val permissionRequestCode: Int) {
     fun loadCoordinates(callback: (Double, Double) -> Unit) {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("useManualCoordinates", false)) {
-            val latitude: Any = prefs.getString("latitude", "40.7128f")?.toDouble() ?: 40.7128f
-            val longitude: Any = prefs.getString("longitude", "-74.0060f")?.toDouble() ?: -74.0060f
-            Logger.d("LocationManager"){"Using manual coordinates: lat=$latitude, lon=$longitude"}
-            callback(latitude as Double, longitude as Double) } else { fetchLocation(callback) }
+        
+        // Auto-migration for legacy preference
+        if (!prefs.contains("location_mode")) {
+            val legacyManual = prefs.getBoolean("useManualCoordinates", false)
+            val mode = if (legacyManual) "coords" else "auto"
+            prefs.edit().putString("location_mode", mode).apply()
+        }
+
+        val mode = prefs.getString("location_mode", "auto") ?: "auto"
+        when (mode) {
+            "coords" -> {
+                val latitude = prefs.getString("latitude", "40.7128")?.replace("f", "")?.toDoubleOrNull() ?: 40.7128
+                val longitude = prefs.getString("longitude", "-74.0060")?.replace("f", "")?.toDoubleOrNull() ?: -74.0060
+                Logger.d("LocationManager") { "Using manual coordinates: lat=$latitude, lon=$longitude" }
+                callback(latitude, longitude)
+            }
+            "city" -> {
+                val latitude = prefs.getString("resolved_latitude", "40.7128")?.replace("f", "")?.toDoubleOrNull() ?: 40.7128
+                val longitude = prefs.getString("resolved_longitude", "-74.0060")?.replace("f", "")?.toDoubleOrNull() ?: -74.0060
+                Logger.d("LocationManager") { "Using resolved city coordinates: lat=$latitude, lon=$longitude" }
+                callback(latitude, longitude)
+            }
+            else -> {
+                fetchLocation(callback)
+            }
+        }
     }
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray, callback: (Double, Double) -> Unit) {
         if (requestCode == permissionRequestCode && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
