@@ -78,6 +78,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private var hasCustomImageBackground = false
     private var isNightShiftEnabled = false
     private var isPowerSavingMode = false
+    private var lastIsNight: Boolean? = null
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -247,7 +248,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
             val code = weatherGetter.weatherCode ?: 0
             val wind = weatherGetter.windSpeed ?: 0.0
-            val isNight = !(weatherGetter.isDay ?: true)
+            val isNight = !dayTimeGetter.isDay()
             val precip = weatherGetter.precipitation
             val clouds = weatherGetter.cloudCover
             val vis = weatherGetter.visibility
@@ -300,6 +301,13 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
                 if (isNightShiftEnabled) {
                     fontManager.applyNightShiftTransition(currentTime, dayTimeGetter, isNightShiftEnabled)
                 }
+
+                val isNight = !dayTimeGetter.isDay()
+                if (lastIsNight == null || lastIsNight != isNight) {
+                    lastIsNight = isNight
+                    restoreWeatherView()
+                }
+
                 val mode = backgroundManager.getDimMode()
                 if (mode == BackgroundManager.DIM_MODE_DYNAMIC || backgroundManager.isNightShiftEnabled()) {
                     updateBackgroundFilters()
@@ -421,6 +429,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private fun restoreWeatherView() {
         val isEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isNight = !dayTimeGetter.isDay()
+        lastIsNight = isNight
 
         if (!isEnabled) {
             dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight)

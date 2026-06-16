@@ -172,6 +172,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var graphicsRenderScale = 100
     private var graphicsWeatherScale = 40
     private var enableAdditionalLogging = false
+    private var lastIsNight: Boolean? = null
 
     private var focusedView: View? = null
     private val editModeTimeout = 10000L // 10 seconds
@@ -378,7 +379,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                 val code = weatherGetter.weatherCode ?: 0
                 val wind = weatherGetter.windSpeed ?: 0.0
-                val isNight = !(weatherGetter.isDay ?: true)
+                val isNight = !dayTimeGetter.isDay()
                 val precip = weatherGetter.precipitation
                 val clouds = weatherGetter.cloudCover
                 val vis = weatherGetter.visibility
@@ -447,6 +448,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     gradientManager.updateSimulatedTime(currentTime)
                 } catch (e: Exception) {
                     Logger.w("MainActivity") { "Failed to update gradient simulated time: ${e.message}" }
+                }
+
+                val isNight = !dayTimeGetter.isDay()
+                if (lastIsNight == null || lastIsNight != isNight) {
+                    lastIsNight = isNight
+                    if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
+                        backgroundSheetManager.applyWeatherPreview()
+                    } else {
+                        restoreSavedWeatherState()
+                    }
                 }
 
                 try {
@@ -1158,6 +1169,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun restoreSavedWeatherState() {
         val isEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isNight = !dayTimeGetter.isDay()
+        lastIsNight = isNight
 
         if (!isEnabled) {
             dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight)

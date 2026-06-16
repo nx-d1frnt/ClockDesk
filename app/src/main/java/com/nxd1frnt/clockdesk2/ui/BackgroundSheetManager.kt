@@ -510,7 +510,7 @@ class BackgroundSheetManager(
         }
     }
 
-    private fun applyWeatherPreview() {
+    fun applyWeatherPreview() {
         val isNight = !dayTimeGetter.isDay()
         if (bgManualWeatherSwitch.isChecked) {
             val typeOrdinal = when (bgWeatherToggleGroup.checkedButtonId) {
