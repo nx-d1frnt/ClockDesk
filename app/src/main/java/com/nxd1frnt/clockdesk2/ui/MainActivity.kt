@@ -1748,7 +1748,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 transition: Transition<in Drawable>?
             ) {
                 editModeBlurLayer.setImageDrawable(resource)
-                editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
+                updateBackgroundFilters()
             }
             override fun onLoadCleared(placeholder: Drawable?) {
                 editModeBlurLayer.setImageDrawable(null)
@@ -1834,7 +1834,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isNight = !dayTimeGetter.isDay()
-        val combinedMatrix = ColorMatrix()
+        val baseWeatherMatrix = ColorMatrix()
 
         if (isWeatherEnabled) {
             val isManual = backgroundManager.isManualWeatherEnabled()
@@ -1867,7 +1867,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
             val visualIntensity = rawIntensity * 0.2f
             val weatherMatrix = getWeatherMatrix(wmoCode, isNight, visualIntensity)
-            combinedMatrix.postConcat(weatherMatrix)
+            baseWeatherMatrix.postConcat(weatherMatrix)
         }
 
         // Night Shift Factor for Background
@@ -1878,14 +1878,27 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val gScale = 1.0f - (0.55f * nightFactor)
             val bScale = 1.0f - (0.80f * nightFactor)
             nightShiftMatrix.setScale(rScale, gScale, bScale, 1f)
-            combinedMatrix.postConcat(nightShiftMatrix)
+            baseWeatherMatrix.postConcat(nightShiftMatrix)
         }
 
+        val combinedMatrix = ColorMatrix(baseWeatherMatrix)
         val dimMatrix = ColorMatrix()
         dimMatrix.setScale(brightness, brightness, brightness, 1f)
         combinedMatrix.postConcat(dimMatrix)
 
         dynamicBackgroundView.setColorFilter(combinedMatrix)
+
+        if (isEditMode && isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
+            val editModeMatrix = ColorMatrix(baseWeatherMatrix)
+            val editModeDim = ColorMatrix()
+            val blendedBrightness = 1.0f - (finalDimFactor * 0.3f)
+            val finalEditScale = 0.35f * blendedBrightness
+            editModeDim.setScale(finalEditScale, finalEditScale, finalEditScale, 1.0f)
+            editModeMatrix.postConcat(editModeDim)
+            editModeBlurLayer.colorFilter = android.graphics.ColorMatrixColorFilter(editModeMatrix)
+        } else {
+            editModeBlurLayer.clearColorFilter()
+        }
 
         if (!isScaleAnimating) {
             val zoom = calculateZoom(effectiveDim)
@@ -1995,6 +2008,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
                 editModeBlurLayer.visibility = View.VISIBLE
                 editModeBlurLayer.alpha = 1.0f
+                updateBackgroundFilters()
             }
             settingsButton.animate()
                 .alpha(1f)
