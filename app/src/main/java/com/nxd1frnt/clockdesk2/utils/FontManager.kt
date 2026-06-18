@@ -824,6 +824,23 @@ class FontManager(
 
             textView?.setTextColor(finalChipColor)
             iconView?.setColorFilter(finalChipColor)
+
+            val cardView = chipView as? MaterialCardView
+            if (cardView != null && chipSettings != null) {
+                val baseBgColor = if (chipSettings.useDynamicBackgroundColor && currentScheme != null) {
+                    getColorFromScheme(currentScheme!!, chipSettings.dynamicBackgroundColorRole)
+                } else {
+                    chipSettings.backgroundColor
+                }
+                val redShiftedBg = Color.argb(
+                    Color.alpha(baseBgColor),
+                    Color.red(baseBgColor),
+                    (Color.green(baseBgColor) * 0.4f).toInt(),
+                    (Color.blue(baseBgColor) * 0.3f).toInt()
+                )
+                val finalBgColor = interpolateColor(baseBgColor, redShiftedBg, chipEffectiveFactor)
+                cardView.setCardBackgroundColor(finalBgColor)
+            }
         }
     }
 
@@ -838,7 +855,10 @@ class FontManager(
 
     private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {
         val clamped = factor.coerceIn(0f, 1f)
-        return Color.rgb(
+        val a1 = Color.alpha(color1)
+        val a2 = Color.alpha(color2)
+        return Color.argb(
+            (a1 + (a2 - a1) * clamped).toInt(),
             Color.red(color1) + ((Color.red(color2) - Color.red(color1)) * clamped).toInt(),
             Color.green(color1) + ((Color.green(color2) - Color.green(color1)) * clamped).toInt(),
             Color.blue(color1) + ((Color.blue(color2) - Color.blue(color1)) * clamped).toInt()
