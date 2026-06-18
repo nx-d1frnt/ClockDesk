@@ -896,10 +896,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-
     private fun updateSourceIcon(track: MusicTrack) {
         if (!showMediaIcon) {
             lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
+            val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
+            lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
             lastfmIcon.visibility = View.VISIBLE
             return
         }
@@ -909,7 +910,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 //            .alpha(0f)
 //            .setDuration(duration)
 //            .withEndAction {
-               // if (isDestroyed || isFinishing) return@withEndAction
+//                // if (isDestroyed || isFinishing) return@withEndAction
 
                 var iconApplied = false
 
@@ -920,7 +921,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (track.sourceIconBitmap != null) {
                     lastfmIcon.setImageBitmap(track.sourceIconBitmap)
 
-                    val tintColor = nowPlayingTextView.currentTextColor
+                    val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
                     lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -939,7 +940,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         if (monochromeDrawable != null) {
                             lastfmIcon.setImageDrawable(monochromeDrawable)
 
-                            val tintColor = nowPlayingTextView.currentTextColor
+                            val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
                             lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
 
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -971,7 +972,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 }
 
                 if (!iconApplied) {
-                    lastfmIcon.clearColorFilter()
+                    val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
+                    lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
                     lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.music_note))
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                         lastfmIcon.imageAlpha = 255

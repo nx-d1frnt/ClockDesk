@@ -106,6 +106,8 @@ class FontManager(
     )
 
     private var isNightShiftEnabled = false
+    private var lastNightFactor = 0f
+    private val nightTint = Color.rgb(255, 104, 104)
     var isDynamicColorEnabled = false
     private var dynamicColor: Int? = null
     private var timeFormatPattern: String = "HH:mm"
@@ -529,32 +531,39 @@ class FontManager(
         applyToView(viewId)
     }
 
-    private fun applyAll() {
-        keyPrefixMap.keys.forEach { applyToView(it) }
+    private fun applyAll(colorOnly: Boolean = false) {
+        keyPrefixMap.keys.forEach { applyToView(it, colorOnly) }
     }
 
-    private fun applyToView(viewId: Int) {
+    private fun applyToView(viewId: Int, colorOnly: Boolean = false) {
         val settings = settingsMap[viewId] ?: return
         val typeface = getTypeface(settings.fontIndex)
 
-        val finalColor = if (settings.useDynamicColor && currentScheme != null) {
+        var finalColor = if (settings.useDynamicColor && currentScheme != null) {
             getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
         } else {
             settings.color
         }
 
+        val effectiveFactor = if (settings.isNightShiftEnabled && lastNightFactor > 0f) lastNightFactor else 0f
+        if (effectiveFactor > 0f) {
+            finalColor = interpolateColor(finalColor, nightTint, effectiveFactor)
+        }
+
         when (viewId) {
-            R.id.time_text -> applyStyleToTextView(timeText, settings, typeface, finalColor)
-            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface, finalColor)
+            R.id.time_text -> applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
+            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface, finalColor, colorOnly)
             R.id.lastfm_layout -> {
-                applyStyleToTextView(lastfmText, settings, typeface, finalColor)
-                lastfmIcon.alpha = settings.alpha
+                applyStyleToTextView(lastfmText, settings, typeface, finalColor, colorOnly)
+                if (!colorOnly) {
+                    lastfmIcon.alpha = settings.alpha
+                }
                 lastfmIcon.setColorFilter(finalColor)
             }
             R.id.smart_chip_container -> {
                 for (i in 0 until smartChipContainer.childCount) {
                     val chipView = smartChipContainer.getChildAt(i)
-                    applyStyleToSmartChip(chipView, settings, typeface, finalColor)
+                    applyStyleToSmartChip(chipView, settings, typeface, finalColor, colorOnly)
                 }
             }
         }
@@ -605,96 +614,125 @@ class FontManager(
         val settings = settingsMap[R.id.smart_chip_container] ?: return
         val typeface = getTypeface(settings.fontIndex)
 
-        val finalColor = if (settings.useDynamicColor && currentScheme != null) {
+        var finalColor = if (settings.useDynamicColor && currentScheme != null) {
             getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
         } else {
             settings.color
         }
 
+        val effectiveFactor = if (settings.isNightShiftEnabled && lastNightFactor > 0f) lastNightFactor else 0f
+        if (effectiveFactor > 0f) {
+            finalColor = interpolateColor(finalColor, nightTint, effectiveFactor)
+        }
+
         applyStyleToSmartChip(view, settings, typeface, finalColor)
     }
 
-    private fun applyStyleToSmartChip(view: View, settings: FontSettings, typeface: Typeface, color: Int) {
+    private fun applyStyleToSmartChip(view: View, settings: FontSettings, typeface: Typeface, color: Int, colorOnly: Boolean = false) {
         val textView = view.findViewById<TextView>(R.id.chip_text)
         val iconView = view.findViewById<ImageView>(R.id.chip_icon)
 
-        view.alpha = settings.alpha
+        if (!colorOnly) {
+            view.alpha = settings.alpha
+        }
 
         val scaleFactor = settings.size / baseChipFontSizeSp
         if (textView != null) {
-            applyStyleToTextView(textView, settings, typeface, color)
-            textView.alpha = 1.0f
+            applyStyleToTextView(textView, settings, typeface, color, colorOnly)
+            if (!colorOnly) {
+                textView.alpha = 1.0f
+            }
         }
 
         if (iconView != null) {
             iconView.setColorFilter(color)
-            iconView.alpha = 1.0f
+            if (!colorOnly) {
+                iconView.alpha = 1.0f
 
-            val baseIconSize = 20 * context.resources.displayMetrics.density
-            val newIconSize = (baseIconSize * scaleFactor).toInt()
+                val baseIconSize = 20 * context.resources.displayMetrics.density
+                val newIconSize = (baseIconSize * scaleFactor).toInt()
 
-            val params = iconView.layoutParams
-            if (params.width != newIconSize) {
-                params.width = newIconSize
-                params.height = newIconSize
-                iconView.layoutParams = params
+                val params = iconView.layoutParams
+                if (params.width != newIconSize) {
+                    params.width = newIconSize
+                    params.height = newIconSize
+                    iconView.layoutParams = params
+                }
             }
         }
 
-        val parentContainer = view.parent as? View
-        val grandParent = parentContainer?.parent as? View
+        if (!colorOnly) {
+            val parentContainer = view.parent as? View
+            val grandParent = parentContainer?.parent as? View
 
-        if (grandParent is ScrollView) {
+            if (grandParent is ScrollView) {
+                val density = context.resources.displayMetrics.density
+                val newSizePx = (baseChipContainerSizeDp * density * scaleFactor).toInt()
+
+                val params = grandParent.layoutParams
+                if (params.width != newSizePx || params.height != newSizePx) {
+                    params.width = newSizePx
+                    params.height = newSizePx
+                    grandParent.layoutParams = params
+                }
+            }
+
             val density = context.resources.displayMetrics.density
-            val newSizePx = (baseChipContainerSizeDp * density * scaleFactor).toInt()
+            val basePadV = (8 * density).toInt()
+            val basePadEnd = (12 * density).toInt()
+            val newPadV = (basePadV * scaleFactor).toInt()
+            val newPadEnd = (basePadEnd * scaleFactor).toInt()
 
-            val params = grandParent.layoutParams
-            if (params.width != newSizePx || params.height != newSizePx) {
-                params.width = newSizePx
-                params.height = newSizePx
-                grandParent.layoutParams = params
-            }
+            val layout = textView?.parent as? View
+            layout?.setPaddingRelative(newPadV, newPadV, newPadEnd, newPadV)
         }
-
-        val density = context.resources.displayMetrics.density
-        val basePadV = (8 * density).toInt()
-        val basePadEnd = (12 * density).toInt()
-        val newPadV = (basePadV * scaleFactor).toInt()
-        val newPadEnd = (basePadEnd * scaleFactor).toInt()
-
-        val layout = textView?.parent as? View
-        layout?.setPaddingRelative(newPadV, newPadV, newPadEnd, newPadV)
 
         val cardView = view as? MaterialCardView
-        val bgColor = if (settings.useDynamicBackgroundColor && currentScheme != null) {
+        val baseBgColor = if (settings.useDynamicBackgroundColor && currentScheme != null) {
             getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
         } else {
             settings.backgroundColor
         }
-        cardView?.setCardBackgroundColor(bgColor)
+        val effectiveFactor = if (settings.isNightShiftEnabled && lastNightFactor > 0f) lastNightFactor else 0f
+        val finalBgColor = if (effectiveFactor > 0f) {
+            val redShiftedBg = Color.argb(
+                Color.alpha(baseBgColor),
+                Color.red(baseBgColor),
+                (Color.green(baseBgColor) * 0.4f).toInt(),
+                (Color.blue(baseBgColor) * 0.3f).toInt()
+            )
+            interpolateColor(baseBgColor, redShiftedBg, effectiveFactor)
+        } else {
+            baseBgColor
+        }
+        cardView?.setCardBackgroundColor(finalBgColor)
     }
 
-    private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int) {
-        textView.typeface = typeface
-        textView.textSize = settings.size
-        textView.alpha = settings.alpha
-        textView.setTextColor(color)
+    private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int, colorOnly: Boolean = false) {
+        if (!colorOnly) {
+            textView.typeface = typeface
+            textView.textSize = settings.size
+            textView.alpha = settings.alpha
 
-        if (settings.maxWidthPercent >= 100) {
-            textView.maxWidth = Int.MAX_VALUE
-        } else {
-            val displayMetrics = context.resources.displayMetrics
-            val screenWidth = displayMetrics.widthPixels
-            val targetWidthPx = (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
-            textView.maxWidth = targetWidthPx
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            textView.fontVariationSettings = null
-            if (settings.variationAxes.isNotEmpty()) {
-                val variationSettings = settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
-                textView.fontVariationSettings = variationSettings
+            if (settings.maxWidthPercent >= 100) {
+                textView.maxWidth = Int.MAX_VALUE
+            } else {
+                val displayMetrics = context.resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels
+                val targetWidthPx = (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
+                textView.maxWidth = targetWidthPx
             }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                textView.fontVariationSettings = null
+                if (settings.variationAxes.isNotEmpty()) {
+                    val variationSettings = settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
+                    textView.fontVariationSettings = variationSettings
+                }
+            }
+        }
+        if (textView.currentTextColor != color) {
+            textView.setTextColor(color)
         }
     }
 
@@ -776,9 +814,25 @@ class FontManager(
         return settings.color
     }
 
+    fun getFinalColorForView(viewId: Int): Int {
+        val settings = settingsMap[viewId] ?: return Color.WHITE
+        var finalColor = if (settings.useDynamicColor && currentScheme != null) {
+            getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
+        } else {
+            settings.color
+        }
+
+        val effectiveFactor = if (settings.isNightShiftEnabled && lastNightFactor > 0f) lastNightFactor else 0f
+        if (effectiveFactor > 0f) {
+            finalColor = interpolateColor(finalColor, nightTint, effectiveFactor)
+        }
+        return finalColor
+    }
+
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
-            applyAll()
+            lastNightFactor = 0f
+            applyAll(colorOnly = true)
             return
         }
 
@@ -801,56 +855,8 @@ class FontManager(
             else -> 1.0f
         }
 
-        val nightTint = Color.rgb(255, 104, 104)
-
-        updateViewColorWithNightShift(timeText, R.id.time_text, nightFactor, nightTint)
-        updateViewColorWithNightShift(dateText, R.id.date_text, nightFactor, nightTint)
-        updateViewColorWithNightShift(lastfmText, R.id.lastfm_layout, nightFactor, nightTint)
-
-        val iconEffectiveFactor = if (settingsMap[R.id.lastfm_layout]?.isNightShiftEnabled != false) nightFactor else 0f
-        val targetIconColor = getTargetColorForView(R.id.lastfm_layout)
-        val finalIconColor = interpolateColor(targetIconColor, nightTint, iconEffectiveFactor)
-        lastfmIcon.setColorFilter(finalIconColor)
-
-        val chipSettings = settingsMap[R.id.smart_chip_container]
-        val chipEffectiveFactor = if (chipSettings?.isNightShiftEnabled != false) nightFactor else 0f
-        val targetColor = getTargetColorForView(R.id.smart_chip_container)
-        val finalChipColor = interpolateColor(targetColor, nightTint, chipEffectiveFactor)
-
-        for (i in 0 until smartChipContainer.childCount) {
-            val chipView = smartChipContainer.getChildAt(i)
-            val textView = chipView.findViewById<TextView>(R.id.chip_text)
-            val iconView = chipView.findViewById<ImageView>(R.id.chip_icon)
-
-            textView?.setTextColor(finalChipColor)
-            iconView?.setColorFilter(finalChipColor)
-
-            val cardView = chipView as? MaterialCardView
-            if (cardView != null && chipSettings != null) {
-                val baseBgColor = if (chipSettings.useDynamicBackgroundColor && currentScheme != null) {
-                    getColorFromScheme(currentScheme!!, chipSettings.dynamicBackgroundColorRole)
-                } else {
-                    chipSettings.backgroundColor
-                }
-                val redShiftedBg = Color.argb(
-                    Color.alpha(baseBgColor),
-                    Color.red(baseBgColor),
-                    (Color.green(baseBgColor) * 0.4f).toInt(),
-                    (Color.blue(baseBgColor) * 0.3f).toInt()
-                )
-                val finalBgColor = interpolateColor(baseBgColor, redShiftedBg, chipEffectiveFactor)
-                cardView.setCardBackgroundColor(finalBgColor)
-            }
-        }
-    }
-
-    private fun updateViewColorWithNightShift(textView: TextView, settingsId: Int, nightFactor: Float, nightTint: Int) {
-        val settings = settingsMap[settingsId]
-        val effectiveFactor = if (settings?.isNightShiftEnabled == true) nightFactor else 0f
-        val targetColor = getTargetColorForView(settingsId)
-        val finalColor = interpolateColor(targetColor, nightTint, effectiveFactor)
-
-        textView.setTextColor(finalColor)
+        lastNightFactor = nightFactor
+        applyAll(colorOnly = true)
     }
 
     private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {
