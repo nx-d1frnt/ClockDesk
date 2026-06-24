@@ -15,7 +15,7 @@ class OpenMeteoAPI(
     override fun fetch(latitude: Double, longitude: Double) {
         val url =
             "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
-                    "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility" +
+                    "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility,uv_index" +
                     "&hourly=weather_code&timezone=auto&forecast_days=2"
 
         val request = JsonObjectRequest(
@@ -51,6 +51,12 @@ class OpenMeteoAPI(
                         null
                     }
 
+                    uvIndex = if (current.has("uv_index")) {
+                        current.getDouble("uv_index")
+                    } else {
+                        null
+                    }
+
                     val hourlyCodesList = mutableListOf<Int>()
                     try {
                         if (response.has("hourly")) {
@@ -68,9 +74,9 @@ class OpenMeteoAPI(
 
                     Logger.d("OpenMeteoApi"){"Weather: Code=$weatherCode, Wind=$windSpeed km/h, " +
                             "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m, " +
-                            "HourlyCodesSize=${hourlyCodesList.size}"}
+                            "UvIndex=$uvIndex, HourlyCodesSize=${hourlyCodesList.size}"}
 
-                    WeatherGetter.updateCache(temperature, weatherCode, isDay, windSpeed, hourlyCodesList)
+                    WeatherGetter.updateCache(temperature, weatherCode, isDay, windSpeed, hourlyCodesList, uvIndex)
 
                     onWeatherUpdated()
 

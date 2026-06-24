@@ -21,6 +21,7 @@ open class WeatherGetter(
         var cachedIsDay: Boolean? = null
         var cachedWindSpeed: Double? = null
         var cachedHourlyCodes: List<Int> = emptyList()
+        var cachedUvIndex: Double? = null
 
         private val listeners = mutableSetOf<() -> Unit>()
 
@@ -32,12 +33,13 @@ open class WeatherGetter(
             listeners.remove(listener)
         }
 
-        fun updateCache(temp: Double?, code: Int?, isDay: Boolean?, wind: Double?, hourlyCodes: List<Int>) {
+        fun updateCache(temp: Double?, code: Int?, isDay: Boolean?, wind: Double?, hourlyCodes: List<Int>, uvIndex: Double? = null) {
             cachedTemperature = temp
             cachedWeatherCode = code
             cachedIsDay = isDay
             cachedWindSpeed = wind
             cachedHourlyCodes = hourlyCodes
+            cachedUvIndex = uvIndex
             listeners.forEach {
                 try { it() } catch (e: Exception) {}
             }
@@ -85,6 +87,7 @@ open class WeatherGetter(
     var precipitation: Double? = null
     var cloudCover: Int? = null
     var visibility: Double? = null
+    var uvIndex: Double? = null
     private val handler = Handler(Looper.getMainLooper())
     private var lastLatitude: Double? = null
     private var lastLongitude: Double? = null

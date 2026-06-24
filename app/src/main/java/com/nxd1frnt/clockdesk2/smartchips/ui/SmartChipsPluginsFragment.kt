@@ -189,7 +189,8 @@ class SmartChipsPluginsFragment : Fragment() {
             name = getString(R.string.show_battery_alert_chip),
             desc = getString(R.string.show_battery_alert_chip_summary),
             isInternal = true,
-            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_battery_alert)
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_battery_alert),
+            settingsActivityClassName = "com.nxd1frnt.clockdesk2.smartchips.ui.BatteryAlertSettingsActivity"
         )
         map["system_bg_progress"] = ChipDef(
             id = "system_bg_progress",

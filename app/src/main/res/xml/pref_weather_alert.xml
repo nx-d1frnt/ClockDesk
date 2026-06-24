@@ -22,6 +22,12 @@
             app:title="@string/weather_alert_enable_worsening_title"
             app:summary="@string/weather_alert_enable_worsening_summary"
             android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="weather_alert_enable_uv"
+            app:title="@string/weather_alert_enable_uv_title"
+            app:summary="@string/weather_alert_enable_uv_summary"
+            android:defaultValue="true" />
     </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
@@ -36,6 +42,16 @@
             android:defaultValue="35"
             app:showSeekBarValue="true"
             app:dependency="weather_alert_enable_wind" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="weather_alert_uv_threshold"
+            app:title="@string/weather_alert_uv_threshold_title"
+            app:summary="@string/weather_alert_uv_threshold_summary"
+            android:min="3"
+            android:max="11"
+            android:defaultValue="6"
+            app:showSeekBarValue="true"
+            app:dependency="weather_alert_enable_uv" />
 
         <androidx.preference.SeekBarPreference
             app:key="weather_alert_forecast_hours"

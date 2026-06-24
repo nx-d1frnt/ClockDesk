@@ -818,7 +818,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     val showOverlay = prefs.getBoolean("show_performance_overlay", false)
                     togglePerformanceOverlay(showOverlay)
                 }
-                "automatic_battery_saver_mode", "battery_saver_trigger", "battery_saver_mode" -> smartChipManager.onPreferencesChanged()
+                "automatic_battery_saver_mode", "battery_saver_trigger", "battery_saver_mode",
+                "battery_alert_show_low", "battery_alert_low_threshold", "battery_alert_show_charging",
+                "battery_alert_show_full", "battery_alert_show_saver",
+                "weather_alert_enable_storms", "weather_alert_enable_wind", "weather_alert_enable_worsening",
+                "weather_alert_enable_uv", "weather_alert_wind_threshold", "weather_alert_uv_threshold",
+                "weather_alert_forecast_hours" -> smartChipManager.onPreferencesChanged()
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging
@@ -1740,7 +1745,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun applyEditModeBlurLayer(model: Any) {
         editModeBlurLayer.visibility = View.VISIBLE
         val ambientReq = RequestOptions()
-            .transform(FitCenter(), BlurTransformation(this, 25, 3))
+            .transform(FitCenter(), BlurTransformation(this, 20, 3))
             .override(200, 400)
             .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
 

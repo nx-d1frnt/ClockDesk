@@ -158,6 +158,18 @@
     <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
     <string name="battery_low">Battery Low</string>
     <string name="battery_saver_on">Saver On</string>
+    <string name="battery_alert_settings_title">Battery Alert Settings</string>
+    <string name="battery_alert_behavior_category">Display Conditions</string>
+    <string name="battery_alert_show_charging_title">Show when charging</string>
+    <string name="battery_alert_show_charging_summary">Show chip when the device is plugged in and charging</string>
+    <string name="battery_alert_show_full_title">Show when fully charged</string>
+    <string name="battery_alert_show_full_summary">Show chip when battery is fully charged (100%)</string>
+    <string name="battery_alert_show_saver_title">Show when app battery saver is active</string>
+    <string name="battery_alert_show_saver_summary">Show chip when manual app battery saver mode is enabled</string>
+    <string name="battery_alert_show_low_title">Show low battery alert</string>
+    <string name="battery_alert_show_low_summary">Show chip when battery level falls below threshold</string>
+    <string name="battery_alert_low_threshold_title">Low battery threshold</string>
+    <string name="battery_alert_low_threshold_summary">Battery percentage to trigger low alert</string>
     <string name="snap_to_grid">Snap to grid</string>
     <string name="vertical_alignment">Vertical alignment</string>
     <string name="horizontal_alignment">Horizontal alignment</string>
@@ -341,6 +353,7 @@
     <string name="weather_alert_storm_in_format">Storm in %1$dh</string>
     <string name="weather_alert_storm_active">Storm Warning</string>
     <string name="weather_alert_high_winds">High Winds</string>
+    <string name="weather_alert_high_uv">High UV: %s</string>
 
     <!-- Weather Alert Settings -->
     <string name="weather_alert_settings_title">Weather Alert Settings</string>
@@ -351,9 +364,13 @@
     <string name="weather_alert_enable_wind_summary">Show alerts for wind speed exceeding threshold</string>
     <string name="weather_alert_enable_worsening_title">Worsening Conditions</string>
     <string name="weather_alert_enable_worsening_summary">Show predictions for upcoming rain, snow, or storms</string>
+    <string name="weather_alert_enable_uv_title">High UV Alerts</string>
+    <string name="weather_alert_enable_uv_summary">Show alerts for UV index exceeding threshold</string>
     <string name="weather_alert_thresholds_category">Thresholds &amp; Forecast</string>
     <string name="weather_alert_wind_threshold_title">Wind Speed Threshold</string>
     <string name="weather_alert_wind_threshold_summary">Wind speed (km/h) to trigger alert</string>
+    <string name="weather_alert_uv_threshold_title">UV Index Threshold</string>
+    <string name="weather_alert_uv_threshold_summary">UV index level to trigger alert</string>
     <string name="weather_alert_forecast_hours_title">Forecast Window</string>
     <string name="weather_alert_forecast_hours_summary">Hours ahead to check for worsening weather</string>
 </resources>

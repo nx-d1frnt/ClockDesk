@@ -49,7 +49,10 @@ class WeatherAlertPlugin(private val context: Context) : ISmartChip {
         val enableStorms = sharedPreferences.getBoolean("weather_alert_enable_storms", true)
         val enableWind = sharedPreferences.getBoolean("weather_alert_enable_wind", true)
         val enableWorsening = sharedPreferences.getBoolean("weather_alert_enable_worsening", true)
+        val enableUv = sharedPreferences.getBoolean("weather_alert_enable_uv", true)
+
         val windThreshold = sharedPreferences.getInt("weather_alert_wind_threshold", 35)
+        val uvThreshold = sharedPreferences.getInt("weather_alert_uv_threshold", 6)
         val forecastHours = sharedPreferences.getInt("weather_alert_forecast_hours", 3)
 
         // 1. Current Storm Alert
@@ -59,7 +62,15 @@ class WeatherAlertPlugin(private val context: Context) : ISmartChip {
             return true
         }
 
-        // 2. High Winds Alert
+        // 2. High UV Alert
+        val uvIndex = WeatherGetter.cachedUvIndex
+        if (enableUv && uvIndex != null && uvIndex >= uvThreshold) {
+            iconView.setImageResource(R.drawable.ic_clear_day)
+            textView.text = context.getString(R.string.weather_alert_high_uv, String.format(java.util.Locale.US, "%.1f", uvIndex))
+            return true
+        }
+
+        // 3. High Winds Alert
         if (enableWind && windSpeed != null && windSpeed > windThreshold) {
             iconView.setImageResource(R.drawable.ic_weather_windy)
             textView.text = context.getString(R.string.weather_alert_high_winds)

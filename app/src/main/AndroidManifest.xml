@@ -56,6 +56,12 @@
             android:theme="@style/Theme.ClockDesk.Settings"
             android:screenOrientation="landscape"
             android:exported="false" />
+        <activity
+            android:name=".smartchips.ui.BatteryAlertSettingsActivity"
+            android:label="@string/battery_alert_settings_title"
+            android:theme="@style/Theme.ClockDesk.Settings"
+            android:screenOrientation="landscape"
+            android:exported="false" />
         <service
             android:name=".music.ClockDeskMediaService"
             android:label="@string/app_name"

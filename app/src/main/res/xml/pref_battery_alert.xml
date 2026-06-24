@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/battery_alert_behavior_category">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="battery_alert_show_charging"
+            app:title="@string/battery_alert_show_charging_title"
+            app:summary="@string/battery_alert_show_charging_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="battery_alert_show_full"
+            app:title="@string/battery_alert_show_full_title"
+            app:summary="@string/battery_alert_show_full_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="battery_alert_show_saver"
+            app:title="@string/battery_alert_show_saver_title"
+            app:summary="@string/battery_alert_show_saver_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="battery_alert_show_low"
+            app:title="@string/battery_alert_show_low_title"
+            app:summary="@string/battery_alert_show_low_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="battery_alert_low_threshold"
+            app:title="@string/battery_alert_low_threshold_title"
+            app:summary="@string/battery_alert_low_threshold_summary"
+            android:min="5"
+            android:max="50"
+            android:defaultValue="20"
+            app:showSeekBarValue="true"
+            app:dependency="battery_alert_show_low" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>
