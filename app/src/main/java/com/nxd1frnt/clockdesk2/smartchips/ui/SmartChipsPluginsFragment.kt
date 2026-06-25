@@ -82,7 +82,7 @@ class SmartChipsPluginsFragment : Fragment() {
 
         val items = finalIdList.mapNotNull { id ->
             val info = availableChips[id] ?: return@mapNotNull null
-            val isEnabled = prefs.getBoolean(id, false)
+            val isEnabled = prefs.getBoolean(id, info.isInternal)
 
             //Detect if plugin is external
             val isExternalPlugin = !info.isInternal
