@@ -32,9 +32,9 @@
     <string name="time_24">24-часовой</string>
     <string name="time_12">12-часовой</string>
     <string name="date_format">Формат даты</string>
-    <string name="date_format_short">MMM dd</string>
-    <string name="date_format_medium">EEE, MMM dd</string>
-    <string name="date_format_long">EEEE, MMMM dd, yyyy</string>
+    <string name="date_format_short">МММ дд</string>
+    <string name="date_format_medium">ЕЕЕ, МММ дд</string>
+    <string name="date_format_long">ЕЕЕЕ, ММММ дд, гггг</string>
 
     <!-- New strings for background selection -->
     <string name="choose_background">Выбрать фон</string>
@@ -61,11 +61,26 @@
     <string name="background_zoom">Масштаб фона</string>
     <string name="customize_now_playing">Настроить виджет \"Сейчас играет\"</string>
     <string name="applying_blur">Применение размытия…\nЭто может занять несколько секунд…</string>
-    <string name="tutorial_text_1">Добро пожаловать в ClockDesk!\nДавайте совершим быструю экскурсию.</string>
+    <string name="onboarding_welcome_title">Добро пожаловать в ClockDesk</string>
+    <string name="onboarding_welcome_desc">Превратите свой неиспользуемый телефон или планшет в стильные и функциональные настольные часы.</string>
+    <string name="onboarding_customization_title">Настройте под себя</string>
+    <string name="onboarding_customization_desc">Удерживайте нажатие в любом месте экрана для входа в Режим редактирования. Выберите шрифт, настройте фон и разместите информационные виджеты.</string>
+    <string name="onboarding_widgets_title">Виджеты и музыка</string>
+    <string name="onboarding_widgets_desc">Отображайте обложку альбома воспроизводимого трека и добавляйте умные виджеты для отображения заряда батареи, обновлений или статуса загрузки.</string>
+    <string name="onboarding_weather_title">Динамический режим</string>
+    <string name="onboarding_weather_desc">Наслаждайтесь плавными градиентами и эффектами дождя, снега или тумана, которые меняются в зависимости от погоды и времени суток.</string>
+    <string name="onboarding_permission_title">Готовы начать?</string>
+    <string name="onboarding_permission_desc">Для автоматического обновления погоды и смены дня и ночи приложению требуется доступ к геопозиции. Вы также можете указать координаты вручную в настройках.</string>
+    <string name="onboarding_grant_btn">Разрешить доступ</string>
+    <string name="onboarding_permission_granted">Доступ разрешен</string>
+    <string name="onboarding_next_btn">Далее</string>
+    <string name="onboarding_back_btn">Назад</string>
+    <string name="onboarding_finish_btn">Начать работу</string>
+    <string name="onboarding_skip_btn">Пропустить</string>
+    <string name="onboarding_try_guide_btn">Показать как</string>
     <string name="tutorial_text_2">Нажмите и удерживайте в любом месте, чтобы войти в режим редактирования…</string>
-    <string name="tutorial_text_3">…затем нажмите на время или дату, чтобы настроить их.</string>
-    <string name="tutorial_text_4">Отлично! Теперь вы знаете основы.\nНажмите в любом месте, чтобы начать.</string>
-    <string name="tutorial_skip">Пропустить</string>
+    <string name="tutorial_text_3">…затем нажмите на любой виджет, чтобы настроить.</string>
+    <string name="tutorial_text_4">Отлично! Теперь вы знаете основы. Нажмите в любом месте, чтобы продолжить.</string>
     <string name="automatic_color">Автоматический цвет текста</string>
     <string name="location_permission_title">Требуется разрешение на местоположение</string>
     <string name="location_permission_message">ClockDesk требуется ваше местоположение для получения данных о погоде и времени восхода/заката (для динамического градиентного фона и функции ночного режима).\nВы можете предоставить следующее разрешение или установить координаты вручную в настройках.</string>
@@ -76,6 +91,16 @@
 
     <!-- Preference Strings -->
     <string name="sun_sunrise_api_settings">Настройки API заката/восхода</string>
+    <string name="location_mode_title">Режим местоположения</string>
+    <string name="location_mode_summary">Выберите способ определения местоположения для погоды и времени восхода/заката</string>
+    <string name="location_mode_auto">Автоматически (GPS/Сеть)</string>
+    <string name="location_mode_city">Вручную по названию города</string>
+    <string name="location_mode_coords">Вручную по координатам</string>
+    <string name="location_city_name_title">Название города</string>
+    <string name="location_city_name_summary">Введите название города (например, Москва)</string>
+    <string name="location_city_name_dialog_title">Введите название города</string>
+    <string name="city_resolved_format">Город определен: %1$s (Широта: %2$.4f, Долгота: %3$.4f)</string>
+    <string name="city_resolve_error_format">Не удалось определить город: %1$s</string>
     <string name="use_manual_coordinates_summary">Включите для ручного ввода широты и долготы</string>
     <string name="enter_latitude">Введите широту</string>
     <string name="longitude">Долгота</string>
@@ -103,11 +128,48 @@
     <string name="battery_saver_trigger_title">Уровень активации экономии батареи</string>
     <string name="battery_saver_trigger_summary">Установите уровень заряда батареи (%), при котором активируется режим экономии</string>
     <string name="battery_saver_settings_title">Настройки экономии батареи</string>
+    <string name="power_saver_manual_title">Ручной режим экономии</string>
+    <string name="power_saver_rules_title">Действия при экономии заряда</string>
+    <string name="power_saver_manual_summary">Принудительно включить режим экономии батареи для снижения потребления ресурсов</string>
+    <string name="power_saver_disable_animations_title">Отключить анимацию</string>
+    <string name="power_saver_disable_animations_summary">Приостановить динамический фон для снижения нагрузки на GPU</string>
+    <string name="power_saver_limit_fps_title">Ограничить кадровую частоту</string>
+    <string name="power_saver_limit_fps_summary">Ограничить частоту кадров фоновой анимации при экономии заряда</string>
+    <string name="power_saver_fps_limit_value_title">Лимит частоты кадров</string>
+    <string name="power_saver_fps_limit_value_summary">Целевое количество кадров в секунду для анимаций OpenGL (меньше - экономичнее)</string>
+    <string name="power_saver_disable_weather_title">Отключить обновление погоды</string>
+    <string name="power_saver_disable_weather_summary">Остановить фоновое получение данных о погоде</string>
+    <string name="power_saver_lock_brightness_title">Минимальная яркость</string>
+    <string name="power_saver_lock_brightness_summary">Зафиксировать яркость экрана на минимальном уровне</string>
+    <string name="power_saver_limit_clock_title">Редкое обновление часов</string>
+    <string name="power_saver_limit_clock_summary">Обновлять время раз в минуту (скрывает секунды)</string>
+    <string name="power_saver_disable_light_sensor_title">Отключить датчик освещенности</string>
+    <string name="power_saver_disable_light_sensor_summary">Прекратить опрос датчика освещенности в помещении</string>
+    <string name="power_saver_enable_smart_pixels_title">Включить Умные пиксели</string>
+    <string name="power_saver_enable_smart_pixels_summary">Активировать шахматное затемнение пикселей экрана</string>
+    <string name="power_saver_dim_background_title">Затемнить фон</string>
+    <string name="power_saver_dim_background_summary">Сильно затемнять фоновое изображение/градиенты для экономии OLED</string>
+    <string name="power_saver_dim_level_title">Уровень затемнения фона</string>
+    <string name="power_saver_dim_level_summary">Настройте процент затемнения фона при экономии батареи</string>
+    <string name="power_saver_brightness_level_title">Яркость экрана</string>
+    <string name="power_saver_brightness_level_summary">Настройте уровень яркости экрана в режиме экономии батареи</string>
     <string name="smart_chips_settings_title">Настройки умных чипов</string>
-    <string name="show_battery_alert_chip">Чип оповещения о батарее</string>
-    <string name="show_battery_alert_chip_summary">Показывать чип, когда батарея разряжена или включена экономия батареи</string>
+    <string name="show_battery_alert_chip">Показывать чип оповещения о батарее</string>
+    <string name="show_battery_alert_chip_summary">Показывает чип, когда батарея разряжена или включена экономия батареи приложения</string>
     <string name="battery_low">Низкий заряд</string>
     <string name="battery_saver_on">Экономия вкл</string>
+    <string name="battery_alert_settings_title">Настройки оповещений о батарее</string>
+    <string name="battery_alert_behavior_category">Условия отображения</string>
+    <string name="battery_alert_show_charging_title">Показывать при зарядке</string>
+    <string name="battery_alert_show_charging_summary">Показывать чип, когда устройство подключено к зарядному устройству</string>
+    <string name="battery_alert_show_full_title">Показывать при полном заряде</string>
+    <string name="battery_alert_show_full_summary">Показывать чип при 100% заряде батареи</string>
+    <string name="battery_alert_show_saver_title">Показывать при экономии батареи приложения</string>
+    <string name="battery_alert_show_saver_summary">Показывать чип при ручном включении режима экономии батареи</string>
+    <string name="battery_alert_show_low_title">Показывать при низком заряде</string>
+    <string name="battery_alert_show_low_summary">Показывать чип, когда уровень заряда опускается ниже порога</string>
+    <string name="battery_alert_low_threshold_title">Порог низкого заряда</string>
+    <string name="battery_alert_low_threshold_summary">Процент заряда для срабатывания оповещения</string>
     <string name="snap_to_grid">Привязка к сетке</string>
     <string name="vertical_alignment">Вертикальное выравнивание</string>
     <string name="horizontal_alignment">Горизонтальное выравнивание</string>
@@ -120,6 +182,20 @@
     <string name="free_mode_switch">Свободное перемещение (БЕТА)</string>
     <string name="enable_advanced_graphics">Включить продвинутую графику</string>
     <string name="enable_advanced_graphics_summary">Включить продвинутые графические функции (может влиять на производительность на некоторых устройствах)</string>
+    <string name="graphics_enable_transitions_title">Плавные переходы</string>
+    <string name="graphics_enable_transitions_summary">Анимировать масштабирование и затухание при смене фонового изображения</string>
+    <string name="graphics_enable_turbulence_title">Эффект турбулентного шума</string>
+    <string name="graphics_enable_turbulence_summary">Анимировать эффект искажения жидкого хроматического шума при смене темы</string>
+    <string name="graphics_turbulence_grid_title">Масштаб сетки турбулентности</string>
+    <string name="graphics_turbulence_grid_summary">Настройка масштаба шума искажения жидкой хроматической турбулентности</string>
+    <string name="graphics_turbulence_speed_title">Скорость анимации турбулентности</string>
+    <string name="graphics_turbulence_speed_summary">Настройка скорости движения переходов хроматической турбулентности</string>
+    <string name="graphics_enable_edit_blur_title">Размытие в режиме редактирования</string>
+    <string name="graphics_enable_edit_blur_summary">Размывать фоновое изображение при редактировании виджетов</string>
+    <string name="graphics_render_scale_title">Масштаб разрешения рендеринга</string>
+    <string name="graphics_render_scale_summary">Масштабирование разрешения всего фона (снижение улучшает производительность/батарею)</string>
+    <string name="graphics_weather_scale_title">Разрешение эффектов погоды</string>
+    <string name="graphics_weather_scale_summary">Масштабирование разрешения эффектов дождя/снега (снижение ускоряет работу на слабых GPU)</string>
     <string name="weather_background">Динамический погодный фон</string>
     <string name="weather_effects_title">Погода</string>
     <string name="enable_weather_effects">Включить динамические погодные эффекты</string>
@@ -158,11 +234,6 @@
     <string name="variable_properties_roundness">Скругления</string>
     <string name="show_am_pm">Показывать индикатор AM/PM</string>
     <string name="update_available_text">Доступно обновление</string>
-    <string name="new_version_title">Доступно обновление</string>
-    <string name="update_description_default">Доступна новая версия приложения. Рекомендуем обновиться для стабильной работы и новых возможностей.</string>
-    <string name="install_action">Установить</string>
-    <string name="later_action">Позже</string>
-    <string name="checking_updates">Поиск обновлений…</string>
     <string name="show_updates_chip">Показывать обновления приложения</string>
     <string name="show_updates_chip_summary">Показывать уведомления об обновлениях приложения</string>
     <string name="customize_smart_chips">Настроить умные чипы</string>
@@ -171,7 +242,7 @@
     <string name="music_sources_title">Источники музыки</string>
     <string name="music_sources_summary">Сортировать источники музыки и настраивать провайдеров</string>
     <string name="smart_pixels_title">Умные пиксели</string>
-    <string name="smart_pixels_summary">Затемняет пиксели в шахматном порядке после бездействия для экономии заряда батареи и экрана (Экран может казаться тусклее)</string>
+    <string name="smart_pixels_summary">Затемняет пиксели в шахматном порядке после бездействия для экономии заряда батареи и экрана</string>
     <string name="max_width">Максимальная ширина</string>
     <string name="show_background_progress_chip">Индикатор загрузки фона</string>
     <string name="show_background_progress_chip_summary">Отображать чип со статусом загрузки или обработки фонового изображения</string>
@@ -184,13 +255,17 @@
     <string name="delete_background_title">Удалить фон?</string>
     <string name="delete_background_msg">Это фоновое изображение будет безвозвратно удалено.</string>
     <string name="delete">Удалить</string>
+    <string name="new_version_title">Доступно обновление</string>
+    <string name="update_description_default">Доступна новая версия приложения. Рекомендуем обновиться для стабильной работы и новых возможностей.</string>
+    <string name="install_action">Установить</string>
+    <string name="later_action">Позже</string>
+    <string name="checking_updates">Поиск обновлений…</string>
     <string name="feature_not_supported">Функция не поддерживается вашей версией Android</string>
     <string name="manage_smart_chips">Управление умными чипами</string>
     <string name="manage_smart_chips_summary">Сортировка и настройка умных чипов</string>
     <string name="external_plugin_desc">Внешний плагин</string>
     <string name="error_opening_settings">Ошибка открытия настроек</string>
 
-    <!-- Backup & Restore Strings -->
     <string name="backup_restore_title">Бекап и восстановление</string>
     <string name="export_settings">Бекап настроек</string>
     <string name="import_settings">Импорт настроек</string>
@@ -199,18 +274,8 @@
     <string name="import_success">Настройки импортированы, перезапуск...</string>
     <string name="import_failed">Не удалось импортировать настройки</string>
     <string name="confirm_restore_title">Импортировать настройки?</string>
-    <string name="confirm_restore_message">Это действие перезапишет ваши текущие настройки. Приложение будет перезапущено.</string>
-    <string name="smart_chips_plugins_title">Управление умными чипами</string>
+    <string name="confirm_restore_message">Это действие перезапишет ваши текущие настройки и перезапустит приложение. Вы уверены, что хотите продолжить?</string>
     <string name="nav_effects">Эффекты</string>
-
-    <string name="crop_hint">Сожмите для масштаба · Перетащите для сдвига</string>
-    <string name="crop_reset">Сбросить</string>
-    <string name="crop_button">Кадрировать</string>
-    <string name="date_time_format_custom">Свой</string>
-    <string name="time_format_pattern_hint">Шаблон (напр. HH:mm:ss)</string>
-    <string name="date_format_pattern_hint">Шаблон (напр. yyyy-MM-dd)</string>
-    <string name="show_media_icon">Показывать иконку плеера</string>
-    <string name="show_media_icon_summary">Отображать иконку текущего музыкального плеера</string>
     <string name="appearance">Оформление</string>
     <string name="font">Шрифт</string>
     <string name="color">Цвет</string>
@@ -220,9 +285,75 @@
     <string name="snap_to_grid_description">Привязка к невидимой сетке</string>
     <string name="ignore_collision_description">Разрешить наложение виджетов</string>
     <string name="show_media_icon_description">Отображать логотип плеера</string>
-    <string name="percent_100">100%</string>
-    <string name="weight_default">400</string>
-    <string name="width_default">100</string>
-    <string name="roundness_default">0</string>
     <string name="additional_settings">Дополнительные настройки</string>
+
+    <!-- Location & Weather Settings -->
+    <string name="location_weather_settings_title">Местоположение и погода</string>
+    <string name="location_weather_settings_subtitle">Координаты, время солнца и обновление погоды</string>
+    <string name="weather_settings_category_title">Настройки погоды</string>
+    <string name="weather_refresh_interval_title">Интервал обновления погоды</string>
+    <string name="weather_refresh_interval_summary">Как часто загружать текущие данные о погоде</string>
+
+    <!-- Settings Categories Subtitles and Titles -->
+    <string name="music_settings_subtitle">Источники музыки и обложки альбомов</string>
+    <string name="display_settings_subtitle">Защита от выгорания и умные пиксели</string>
+    <string name="battery_saver_settings_subtitle">Уровень активации и действия режима экономии</string>
+    <string name="performance_settings_title">Производительность и графика</string>
+    <string name="performance_settings_subtitle">Логирование, переходы и масштаб графики</string>
+    <string name="smart_chips_settings_subtitle">Управление активными чипами и виджетами</string>
+    <string name="backup_restore_subtitle">Резервное копирование и импорт настроек</string>
+
+    <!-- About screen strings -->
+    <string name="about_title">О приложении</string>
+    <string name="about_subtitle">Информация и открытый исходный код</string>
+    <string name="about_version_format">Версия %1$s</string>
+    <string name="about_version_code_format">%1$s (сборка %2$d)</string>
+    <string name="about_developer_label">Разработчик</string>
+    <string name="about_developer_value">nx-d1frnt</string>
+    <string name="about_version_label">Версия</string>
+    <string name="about_license_label">Лицензия</string>
+    <string name="about_license_value">MIT License</string>
+    <string name="about_source_label">Исходный код</string>
+    <string name="about_source_value">github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_license">Лицензия</string>
+    <string name="about_github_url">https://github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_license_url">https://github.com/nx-d1frnt/ClockDesk/blob/master/LICENSE</string>
+    <string name="about_footer">ClockDesk %1$s · Open Source</string>
+    <string name="show_performance_overlay_title">Показать оверлей производительности</string>
+    <string name="show_performance_overlay_summary">Отображать загрузку процессора (CPU) и графического ядра (GPU), а также кадровую частоту (FPS) в реальном времени</string>
+    <string name="weather_auto_current">Текущая погода</string>
+
+    <!-- Smart Chips -->
+    <string name="show_alarm_chip">Чип будильника</string>
+    <string name="show_alarm_chip_summary">Показывать следующий запланированный будильник</string>
+    <string name="show_weather_chip">Чип погоды</string>
+    <string name="show_weather_chip_summary">Показывать текущую температуру и условия погоды</string>
+    <string name="show_weather_alert_chip">Чип предупреждений о погоде</string>
+    <string name="show_weather_alert_chip_summary">Показывать предупреждения о погоде и ухудшении условий</string>
+    <string name="weather_alert_rain_in_format">Дождь через %1$d ч.</string>
+    <string name="weather_alert_snow_in_format">Снег через %1$d ч.</string>
+    <string name="weather_alert_storm_in_format">Гроза через %1$d ч.</string>
+    <string name="weather_alert_storm_active">Грозовое предупреждение</string>
+    <string name="weather_alert_high_winds">Сильный ветер</string>
+    <string name="weather_alert_high_uv">Высокий УФ: %s</string>
+
+    <!-- Weather Alert Settings -->
+    <string name="weather_alert_settings_title">Настройки предупреждений о погоде</string>
+    <string name="weather_alert_types_category">Типы предупреждений</string>
+    <string name="weather_alert_enable_storms_title">Предупреждения о грозах</string>
+    <string name="weather_alert_enable_storms_summary">Показывать предупреждения при текущей грозе</string>
+    <string name="weather_alert_enable_wind_title">Предупреждения о сильном ветре</string>
+    <string name="weather_alert_enable_wind_summary">Показывать предупреждения при превышении порога скорости ветра</string>
+    <string name="weather_alert_enable_worsening_title">Ухудшение условий</string>
+    <string name="weather_alert_enable_worsening_summary">Показывать прогнозы предстоящего дождя, снега или грозы</string>
+    <string name="weather_alert_enable_uv_title">Предупреждения о высоком УФ</string>
+    <string name="weather_alert_enable_uv_summary">Показывать предупреждения при превышении порога УФ-индекса</string>
+    <string name="weather_alert_thresholds_category">Пороги и прогноз</string>
+    <string name="weather_alert_wind_threshold_title">Порог скорости ветра</string>
+    <string name="weather_alert_wind_threshold_summary">Скорость ветра (км/ч) для срабатывания предупреждения</string>
+    <string name="weather_alert_uv_threshold_title">Порог УФ-индекса</string>
+    <string name="weather_alert_uv_threshold_summary">Уровень УФ-индекса для срабатывания предупреждения</string>
+    <string name="weather_alert_forecast_hours_title">Окно прогноза</string>
+    <string name="weather_alert_forecast_hours_summary">На сколько часов вперед проверять ухудшение погоды</string>
 </resources>

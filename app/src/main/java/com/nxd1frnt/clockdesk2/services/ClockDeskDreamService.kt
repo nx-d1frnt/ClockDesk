@@ -3,6 +3,7 @@ package com.nxd1frnt.clockdesk2.services
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.graphics.Color
+import android.graphics.ColorMatrix
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -17,20 +18,27 @@ import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
+import com.nxd1frnt.clockdesk2.background.BlurTransformation
 import com.nxd1frnt.clockdesk2.background.GradientManager
 import com.nxd1frnt.clockdesk2.daytimegetter.SunriseAPI
 import com.nxd1frnt.clockdesk2.music.MusicPluginManager
 import com.nxd1frnt.clockdesk2.music.PluginState
 import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
-import com.nxd1frnt.clockdesk2.ui.view.WeatherView
+import android.graphics.Bitmap
+import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+import com.nxd1frnt.clockdesk2.ui.view.PerformanceOverlayView
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
+import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
+import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.utils.LocationManager
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
+import com.nxd1frnt.clockdesk2.utils.PowerStateManager
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 
-class ClockDeskDreamService : DreamService() {
+class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
     // region Views
     private lateinit var timeText: TextView
@@ -44,7 +52,8 @@ class ClockDeskDreamService : DreamService() {
     private lateinit var backgroundLayout: LinearLayout
     private lateinit var backgroundImageView: ImageView
     private lateinit var turbulenceOverlay: TurbulenceView
-    private lateinit var weatherView: WeatherView
+    private lateinit var dynamicBackgroundView: DynamicBackgroundView
+    private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var smartChipContainer: ConstraintLayout
     // endregion
 
@@ -58,6 +67,7 @@ class ClockDeskDreamService : DreamService() {
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var locationManager: LocationManager
     private lateinit var dayTimeGetter: SunriseAPI
+    private lateinit var powerStateManager: PowerStateManager
     private var musicManager: MusicPluginManager? = null
     // endregion
 
@@ -66,6 +76,9 @@ class ClockDeskDreamService : DreamService() {
 
     /** Mirrors MainActivity.hasCustomImageBackground — controls gradient vs image path */
     private var hasCustomImageBackground = false
+    private var isNightShiftEnabled = false
+    private var isPowerSavingMode = false
+    private var lastIsNight: Boolean? = null
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -116,6 +129,10 @@ class ClockDeskDreamService : DreamService() {
                 if (!hasCustomImageBackground) {
                     gradientManager.updateGradient()
                 }
+                if (isNightShiftEnabled) {
+                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, isNightShiftEnabled)
+                }
+                updateBackgroundFilters()
             }
             // 2. Weather
             if (::weatherGetter.isInitialized) weatherGetter.startUpdates(lat, lon)
@@ -140,14 +157,36 @@ class ClockDeskDreamService : DreamService() {
             onMusicStateChanged(state)
         }
 
+        if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.onResume()
+        }
+
         // Restore user background (photo or gradient)
         restoreBackground()
         // Restore weather overlay state
         restoreWeatherView()
+
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.registerObserver(this)
+        }
+
+        val showPerformance = prefs.getBoolean("show_performance_overlay", false)
+        togglePerformanceOverlay(showPerformance)
+
+        updateBackgroundFilters()
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.unregisterObserver(this)
+            powerStateManager.destroy()
+        }
+
+        if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.onPause()
+        }
 
         if (::clockManager.isInitialized) clockManager.stopUpdates()
         if (::gradientManager.isInitialized) gradientManager.stopUpdates()
@@ -155,6 +194,7 @@ class ClockDeskDreamService : DreamService() {
         if (::burnInProtectionManager.isInitialized) burnInProtectionManager.stop()
         musicManager?.destroy()
         musicManager = null
+        stopPerformanceUpdates()
     }
 
     override fun onDetachedFromWindow() {
@@ -175,7 +215,8 @@ class ClockDeskDreamService : DreamService() {
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
-        weatherView = findViewById(R.id.weatherView)
+        dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
+        performanceOverlay = findViewById(R.id.performance_overlay)
         smartChipContainer = findViewById(R.id.smart_chip_container)
     }
 
@@ -187,6 +228,7 @@ class ClockDeskDreamService : DreamService() {
             R.id.background_customization_fab,
             R.id.tutorial_overlay_root,
             R.id.side_sheet_container,
+            R.id.background_bottom_sheet,
         ).forEach { id -> findViewById<View>(id)?.visibility = View.GONE }
     }
 
@@ -206,7 +248,7 @@ class ClockDeskDreamService : DreamService() {
 
             val code = weatherGetter.weatherCode ?: 0
             val wind = weatherGetter.windSpeed ?: 0.0
-            val isNight = !(weatherGetter.isDay ?: true)
+            val isNight = !dayTimeGetter.isDay()
             val precip = weatherGetter.precipitation
             val clouds = weatherGetter.cloudCover
             val vis = weatherGetter.visibility
@@ -214,7 +256,7 @@ class ClockDeskDreamService : DreamService() {
             if (backgroundManager.isWeatherEffectsEnabled() &&
                 !backgroundManager.isManualWeatherEnabled()
             ) {
-                weatherView.updateFromOpenMeteoSmart(
+                dynamicBackgroundView.updateFromOpenMeteoSmart(
                     wmoCode = code,
                     windSpeedKmh = wind,
                     night = isNight,
@@ -224,13 +266,21 @@ class ClockDeskDreamService : DreamService() {
                 )
             }
 
+            updateBackgroundFilters()
+
             // Show/hide the weather text+icon strip like MainActivity
             weatherLayout.visibility =
                 if (weatherGetter.temperature != null) View.VISIBLE else View.GONE
         }
 
         // Gradient
-        gradientManager = GradientManager(backgroundLayout, dayTimeGetter, locationManager, handler)
+        gradientManager = GradientManager(
+            dynamicBackgroundView,
+            dayTimeGetter,
+            locationManager,
+            handler,
+            isCustomBackgroundActive = { hasCustomImageBackground }
+        )
 
         // Font — identical argument list to MainActivity
         fontManager = FontManager(
@@ -240,11 +290,30 @@ class ClockDeskDreamService : DreamService() {
         )
         fontManager.loadFont()
 
+        isNightShiftEnabled = prefs.getBoolean("night_shift_enabled", false)
+
         // Clock
         clockManager = ClockManager(
             timeText, dateText, handler, fontManager, dayTimeGetter, locationManager,
             { _, _, _ -> }, // sun-times callback — no-op in dream
-            { _ -> gradientManager.updateSimulatedTime(clockManager.getCurrentTime()) },
+            { currentTime ->
+                gradientManager.updateSimulatedTime(currentTime)
+                if (isNightShiftEnabled) {
+                    fontManager.applyNightShiftTransition(currentTime, dayTimeGetter, isNightShiftEnabled)
+                }
+
+                val isNight = !dayTimeGetter.isDay()
+                if (lastIsNight == null || lastIsNight != isNight) {
+                    lastIsNight = isNight
+                    restoreWeatherView()
+                }
+
+                val mode = backgroundManager.getDimMode()
+                if (mode == BackgroundManager.DIM_MODE_DYNAMIC || backgroundManager.isNightShiftEnabled()) {
+                    updateBackgroundFilters()
+                }
+            },
+            prefs,
             enableLogging
         )
 
@@ -255,6 +324,18 @@ class ClockDeskDreamService : DreamService() {
         burnInProtectionManager = BurnInProtectionManager(
             listOf(timeText, dateText, lastfmLayout, smartChipContainer)
         )
+
+        val isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        val graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
+        val graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
+        val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+        dynamicBackgroundView.setRenderScale(targetScale)
+        val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+        dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+
+        powerStateManager = PowerStateManager(themedContext)
+        powerStateManager.registerObserver(clockManager)
+        powerStateManager.registerObserver(weatherGetter)
     }
 
     // endregion
@@ -280,6 +361,8 @@ class ClockDeskDreamService : DreamService() {
         // No user photo → gradient path
         hasCustomImageBackground = false
         backgroundImageView.visibility = View.GONE
+        dynamicBackgroundView.visibility = View.VISIBLE
+        updateBackgroundFilters()
     }
 
     /**
@@ -287,45 +370,51 @@ class ClockDeskDreamService : DreamService() {
      * no LoadingAnimationView, but does apply blur via RenderEffect on API 31+).
      */
     private fun applyImageBackground(uri: Uri, blurIntensity: Int) {
-        // Use Glide the same way MainActivity does (reuse GlideApp if available,
-        // otherwise fall back to standard Glide). Only the loading part is simplified —
-        // no cross-fade animation needed while the screen is static.
         try {
-            com.nxd1frnt.clockdesk2.network.GlideApp.with(this)
-                .load(uri)
-                .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
-                    override fun onResourceReady(
-                        resource: android.graphics.drawable.Drawable,
-                        transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
-                    ) {
-                        backgroundImageView.setImageDrawable(resource)
-                        backgroundImageView.visibility = View.VISIBLE
+            val metrics = resources.displayMetrics
+            val maxDim = 1080
+            val blurScaleFactor = if (blurIntensity <= 0) 1.0f else {
+                val normalized = blurIntensity.coerceIn(0, 100) / 100f
+                1.0f - (normalized * 0.75f)
+            }
+            val targetW = (minOf(metrics.widthPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
+            val targetH = (minOf(metrics.heightPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
 
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                            && blurIntensity > 0
-                        ) {
-                            val radius = blurIntensity.toFloat().coerceIn(1f, 25f)
-                            backgroundImageView.setRenderEffect(
-                                android.graphics.RenderEffect.createBlurEffect(
-                                    radius, radius,
-                                    android.graphics.Shader.TileMode.CLAMP
-                                )
-                            )
-                        } else {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                backgroundImageView.setRenderEffect(null)
-                            }
-                        }
+            var req = com.bumptech.glide.request.RequestOptions()
+                .override(targetW, targetH)
+                .downsample(com.bumptech.glide.load.resource.bitmap.DownsampleStrategy.CENTER_INSIDE)
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+
+            if (blurIntensity > 0) {
+                req = req.transform(
+                    BlurTransformation(this, blurIntensity, 1)
+                )
+            }
+
+            com.nxd1frnt.clockdesk2.network.GlideApp.with(this)
+                .asBitmap()
+                .load(uri)
+                .apply(req)
+                .into(object : com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+                    override fun onResourceReady(
+                        resource: Bitmap,
+                        transition: com.bumptech.glide.request.transition.Transition<in Bitmap>?
+                    ) {
+                        val bgOffsetX = backgroundManager.getBgOffsetX()
+                        val bgOffsetY = backgroundManager.getBgOffsetY()
+                        val bgScale   = backgroundManager.getBgScale()
+                        dynamicBackgroundView.transitionTo(resource, 0L, bgScale, bgOffsetX, bgOffsetY)
+                        dynamicBackgroundView.visibility = View.VISIBLE
+                        updateBackgroundFilters()
                     }
 
                     override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
-                        backgroundImageView.visibility = View.GONE
                     }
                 })
         } catch (e: Exception) {
             Log.e("ClockDeskDream", "Failed to load background image", e)
             hasCustomImageBackground = false
-            backgroundImageView.visibility = View.GONE
+            dynamicBackgroundView.visibility = View.VISIBLE
         }
     }
 
@@ -339,21 +428,32 @@ class ClockDeskDreamService : DreamService() {
      */
     private fun restoreWeatherView() {
         val isEnabled = backgroundManager.isWeatherEffectsEnabled()
+        val isNight = !dayTimeGetter.isDay()
+        lastIsNight = isNight
+
         if (!isEnabled) {
-            weatherView.visibility = View.GONE
+            dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight)
+            updateBackgroundFilters()
             return
         }
-        weatherView.visibility = View.VISIBLE
-        val isNight = !dayTimeGetter.isDay()
 
         if (backgroundManager.isManualWeatherEnabled()) {
             val typeOrdinal = backgroundManager.getManualWeatherType()
-            val type = WeatherView.WeatherType.values()
-                .getOrElse(typeOrdinal) { WeatherView.WeatherType.CLEAR }
+            val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
-            weatherView.forceWeather(type, intensity, 5.0f, isNight)
+            dynamicBackgroundView.forceWeather(type, intensity, 5.0f, isNight)
+        } else {
+            val code = weatherGetter.weatherCode ?: 0
+            val wind = weatherGetter.windSpeed ?: 0.0
+            val precip = weatherGetter.precipitation
+            val clouds = weatherGetter.cloudCover
+            val vis = weatherGetter.visibility
+            dynamicBackgroundView.updateFromOpenMeteoSmart(
+                code, wind, isNight,
+                precip, clouds, vis
+            )
         }
-        // Automatic weather will be set once the first weatherGetter callback fires.
+        updateBackgroundFilters()
     }
 
     // endregion
@@ -374,4 +474,164 @@ class ClockDeskDreamService : DreamService() {
     }
 
     // endregion
+
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        isPowerSavingMode = isEnabled
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
+        val limitFps = prefs.getBoolean("power_saver_limit_fps", true)
+        val fpsLimitValue = prefs.getInt("power_saver_fps_limit_value", 30)
+
+        if (::dynamicBackgroundView.isInitialized) {
+            if (isEnabled) {
+                dynamicBackgroundView.areAnimationsPaused = disableAnimations
+                dynamicBackgroundView.maxFps = if (limitFps) fpsLimitValue else 0
+            } else {
+                dynamicBackgroundView.areAnimationsPaused = false
+                dynamicBackgroundView.maxFps = 0
+            }
+            updateBackgroundFilters()
+        }
+    }
+
+    private var performanceRunnable: Runnable? = null
+    private val performanceUpdateInterval = 1000L // 1 second
+
+    private fun togglePerformanceOverlay(enabled: Boolean) {
+        if (!::performanceOverlay.isInitialized) return
+        dynamicBackgroundView.performanceTracker.isEnabled = enabled
+        if (enabled) {
+            performanceOverlay.visibility = View.VISIBLE
+            startPerformanceUpdates()
+        } else {
+            performanceOverlay.visibility = View.GONE
+            stopPerformanceUpdates()
+        }
+    }
+
+    private fun startPerformanceUpdates() {
+        if (performanceRunnable != null) return
+        performanceRunnable = object : Runnable {
+            override fun run() {
+                if (dynamicBackgroundView.performanceTracker.isEnabled) {
+                    val metrics = dynamicBackgroundView.performanceTracker.updateMetrics()
+                    performanceOverlay.updateMetrics(metrics)
+                    handler.postDelayed(this, performanceUpdateInterval)
+                }
+            }
+        }
+        handler.post(performanceRunnable!!)
+    }
+
+    private fun stopPerformanceUpdates() {
+        performanceRunnable?.let {
+            handler.removeCallbacks(it)
+            performanceRunnable = null
+        }
+    }
+
+    private fun getEffectiveDimIntensity(mode: Int, userIntensity: Int): Int {
+        val intensity = when (mode) {
+            BackgroundManager.Companion.DIM_MODE_OFF -> 0
+            BackgroundManager.Companion.DIM_MODE_DYNAMIC -> {
+                try {
+                    backgroundManager.computeEffectiveDimIntensity(
+                        clockManager.getCurrentTime(),
+                        dayTimeGetter
+                    )
+                } catch (e: Exception) {
+                    backgroundManager.getDimMaxIntensity().coerceIn(0, 50)
+                }
+            }
+            else -> userIntensity.coerceIn(0, 50) // CONTINUOUS
+        }
+        return intensity.coerceIn(0, 50)
+    }
+
+    private fun calculateZoom(effectiveIntensity: Int): Float {
+        if (!backgroundManager.getZoomEnabled()) {
+            return 1.0f
+        }
+        return 1.0f + (effectiveIntensity.coerceIn(0, 50) / 50f) * 0.2f
+    }
+
+    private fun updateBackgroundFilters() {
+        if (!::dynamicBackgroundView.isInitialized || dynamicBackgroundView.visibility != View.VISIBLE) return
+
+        val dimMode = backgroundManager.getDimMode()
+        val dimIntensity = backgroundManager.getDimIntensity()
+        val effectiveDim = getEffectiveDimIntensity(dimMode, dimIntensity)
+
+        val maxDarkness = 0.8f
+        val dimFactor = (effectiveDim / 50f) * maxDarkness
+
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val dimBackground = prefs.getBoolean("power_saver_dim_background", true)
+        val finalDimFactor = if (isPowerSavingMode && dimBackground) {
+            val dimLevel = prefs.getInt("power_saver_dim_level", 85) / 100f
+            dimLevel
+        } else {
+            dimFactor
+        }
+        val brightness = 1.0f - finalDimFactor
+
+        val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
+        val isNight = !dayTimeGetter.isDay()
+        val combinedMatrix = ColorMatrix()
+
+        if (isWeatherEnabled) {
+            val isManual = backgroundManager.isManualWeatherEnabled()
+            var wmoCode = 0
+            var rawIntensity = 0f
+
+            if (isManual) {
+                val typeOrdinal = backgroundManager.getManualWeatherType()
+                val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
+                wmoCode = when (type) {
+                    DynamicBackgroundView.WeatherType.CLEAR -> 0
+                    DynamicBackgroundView.WeatherType.CLOUDY -> 3
+                    DynamicBackgroundView.WeatherType.FOG -> 45
+                    DynamicBackgroundView.WeatherType.RAIN -> 63
+                    DynamicBackgroundView.WeatherType.SNOW -> 73
+                    DynamicBackgroundView.WeatherType.THUNDERSTORM -> 95
+                    else -> 0
+                }
+                rawIntensity = backgroundManager.getManualWeatherIntensity() / 100f
+            } else {
+                wmoCode = weatherGetter.weatherCode ?: 0
+                rawIntensity = calculateWeatherIntensity(
+                    wmoCode,
+                    weatherGetter.windSpeed,
+                    weatherGetter.precipitation,
+                    weatherGetter.cloudCover,
+                    weatherGetter.visibility
+                )
+            }
+
+            val visualIntensity = rawIntensity * 0.2f
+            val weatherMatrix = getWeatherMatrix(wmoCode, isNight, visualIntensity)
+            combinedMatrix.postConcat(weatherMatrix)
+        }
+
+        // Night Shift Factor for Background
+        val nightFactor = backgroundManager.computeNightShiftFactor(clockManager.getCurrentTime(), dayTimeGetter)
+        if (nightFactor > 0f) {
+            val nightShiftMatrix = ColorMatrix()
+            val rScale = 1.0f
+            val gScale = 1.0f - (0.55f * nightFactor)
+            val bScale = 1.0f - (0.80f * nightFactor)
+            nightShiftMatrix.setScale(rScale, gScale, bScale, 1f)
+            combinedMatrix.postConcat(nightShiftMatrix)
+        }
+
+        val dimMatrix = ColorMatrix()
+        dimMatrix.setScale(brightness, brightness, brightness, 1f)
+        combinedMatrix.postConcat(dimMatrix)
+
+        dynamicBackgroundView.setColorFilter(combinedMatrix)
+
+        val zoom = calculateZoom(effectiveDim)
+        dynamicBackgroundView.scaleX = zoom
+        dynamicBackgroundView.scaleY = zoom
+    }
 }

@@ -104,8 +104,9 @@ class WeatherGLView @JvmOverloads constructor(
         )
 
         val type = when (wmoCode) {
-            0 -> WeatherType.CLEAR
-            1, 2, 3 -> WeatherType.CLOUDY
+            0, 1 -> WeatherType.CLEAR   // clear sky, mainly clear
+            2    -> WeatherType.CLEAR   // partly cloudy
+            3    -> WeatherType.CLOUDY  // overcast
             45, 48 -> WeatherType.FOG
             51, 53, 55, 56, 57 -> WeatherType.RAIN
             61, 63, 65, 80, 81, 82 -> WeatherType.RAIN

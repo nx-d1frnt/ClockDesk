@@ -5,16 +5,17 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.util.Log
-import android.widget.LinearLayout
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import java.util.*
 
 class GradientManager(
-    private val backgroundLayout: LinearLayout,
+    private val dynamicBackgroundView: DynamicBackgroundView,
     private val sunTimeApi: DayTimeGetter,
     private val locationManager: LocationManager,
-    private val handler: Handler
+    private val handler: Handler,
+    private val isCustomBackgroundActive: () -> Boolean
 ) {
     private var currentSimulatedTime: Date? = null
     private var isDemoMode = false
@@ -111,6 +112,7 @@ class GradientManager(
     }
 
     fun updateGradient() {
+        if (isCustomBackgroundActive()) return
         val currentTime = when {
             isDemoMode && currentSimulatedTime != null -> currentSimulatedTime!!
             isDemoMode -> {
@@ -131,18 +133,8 @@ class GradientManager(
             }
         }
         val (topColor, bottomColor) = getSkyGradientColors(currentTime)
-        val gradientDrawable = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(topColor, bottomColor)
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            // Use the modern method on API 16+
-            backgroundLayout.background = gradientDrawable
-        } else {
-            // Use the older, deprecated method on API < 16
-            @Suppress("DEPRECATION")
-            backgroundLayout.setBackgroundDrawable(gradientDrawable)
-        }
+        val duration = if (isDemoMode) 0L else 2000L
+        dynamicBackgroundView.transitionToGradient(topColor, bottomColor, duration)
         Log.d("GradientUpdate", "Colors: top=$topColor, bottom=$bottomColor at time=$currentTime")
     }
 

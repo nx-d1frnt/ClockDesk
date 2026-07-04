@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -12,7 +13,117 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.SettingsBackupManager
 
-class SettingsFragment : PreferenceFragmentCompat() {
+class GeneralSettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_general, rootKey)
+
+        val prefs = requireContext().getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
+        // Auto-migration from legacy useManualCoordinates setting
+        if (!prefs.contains("location_mode")) {
+            val legacyManual = prefs.getBoolean("useManualCoordinates", false)
+            val mode = if (legacyManual) "coords" else "auto"
+            prefs.edit().putString("location_mode", mode).apply()
+        }
+
+        val locationModePref = findPreference<androidx.preference.ListPreference>("location_mode")
+        val cityPref = findPreference<androidx.preference.EditTextPreference>("location_city_name")
+        val latPref = findPreference<androidx.preference.Preference>("latitude")
+        val lonPref = findPreference<androidx.preference.Preference>("longitude")
+
+        fun updateVisibility(mode: String?) {
+            cityPref?.isVisible = (mode == "city")
+            latPref?.isVisible = (mode == "coords")
+            lonPref?.isVisible = (mode == "coords")
+        }
+
+        // Initialize visibility
+        updateVisibility(locationModePref?.value)
+
+        // Set summary display for city name based on already resolved details
+        val resolvedName = prefs.getString("resolved_city_display_name", "")
+        val savedCity = prefs.getString("location_city_name", "")
+        if (!resolvedName.isNullOrBlank()) {
+            cityPref?.summary = resolvedName
+        } else if (!savedCity.isNullOrBlank()) {
+            cityPref?.summary = savedCity
+        }
+
+        locationModePref?.setOnPreferenceChangeListener { _, newValue ->
+            val newMode = newValue as? String
+            updateVisibility(newMode)
+            true
+        }
+
+        cityPref?.setOnPreferenceChangeListener { _, newValue ->
+            val newCity = newValue as? String
+            if (!newCity.isNullOrBlank()) {
+                com.nxd1frnt.clockdesk2.utils.GeocodingHelper.geocodeCity(requireContext(), newCity,
+                    onSuccess = { lat, lon, resolvedCity ->
+                        prefs.edit()
+                            .putString("resolved_latitude", lat.toString())
+                            .putString("resolved_longitude", lon.toString())
+                            .putString("resolved_city_display_name", resolvedCity)
+                            .apply()
+                        activity?.runOnUiThread {
+                            cityPref.summary = resolvedCity
+                            toast(getString(R.string.city_resolved_format, resolvedCity, lat, lon))
+                        }
+                    },
+                    onError = { error ->
+                        activity?.runOnUiThread {
+                            toast(getString(R.string.city_resolve_error_format, newCity))
+                        }
+                    }
+                )
+            }
+            true
+        }
+    }
+
+    private fun toast(message: String) {
+        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
+class MusicSettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_music, rootKey)
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            val albumArtBackgroundPref =
+                findPreference<SwitchPreferenceCompat>("lastfm_albumart_background")
+            albumArtBackgroundPref?.isEnabled = false
+            albumArtBackgroundPref?.isChecked = false
+            albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
+        }
+    }
+}
+
+class DisplaySettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_display, rootKey)
+    }
+}
+
+class BatterySettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_battery, rootKey)
+    }
+}
+
+class PerformanceSettingsFragment : PreferenceFragmentCompat() {
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_performance, rootKey)
+    }
+}
+
+class BackupSettingsFragment : PreferenceFragmentCompat() {
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let {
@@ -32,18 +143,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        val preferenceManager = preferenceManager
         preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
-        setPreferencesFromResource(R.xml.preferences, rootKey)
-        
-        // disable album art background option if android version < 4.4
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-            val albumArtBackgroundPref =
-                findPreference<SwitchPreferenceCompat>("lastfm_albumart_background")
-            albumArtBackgroundPref?.isEnabled = false
-            albumArtBackgroundPref?.isChecked = false
-            albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
-        }
+        setPreferencesFromResource(R.xml.pref_backup, rootKey)
 
         findPreference<Preference>("export_settings")?.setOnPreferenceClickListener {
             exportLauncher.launch("clockdesk_settings.json")

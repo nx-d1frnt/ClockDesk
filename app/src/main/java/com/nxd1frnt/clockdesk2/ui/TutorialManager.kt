@@ -4,13 +4,16 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.content.SharedPreferences
 import android.view.View
+import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.google.android.material.button.MaterialButton
 import com.nxd1frnt.clockdesk2.R
 
 /**
- * Управляет логикой и цепочкой анимаций обучающего руководства при первом запуске.
+ * Manages the premium onboarding landing screens and interactive tutorial on first launch.
  */
 class TutorialManager(
     private val tutorialLayout: ConstraintLayout,
@@ -22,57 +25,324 @@ class TutorialManager(
     private val toggleEditModeAction: () -> Unit,
     private val showCustomizationAction: (View) -> Unit,
     private val hideBottomSheetAction: () -> Unit,
+    private val requestLocationPermissionAction: () -> Unit,
     private val onTutorialFinished: () -> Unit
 ) {
     var isTutorialRunning = false
         private set
 
+    private var currentSlide = 0
+    private var isInteractiveGuideRunning = false
+
+    private val cardView: View = tutorialLayout.findViewById(R.id.onboarding_card)
+    private val iconView: ImageView = tutorialLayout.findViewById(R.id.onboarding_icon)
+    private val titleView: TextView = tutorialLayout.findViewById(R.id.onboarding_title)
+    private val descView: TextView = tutorialLayout.findViewById(R.id.onboarding_desc)
+    private val actionBtn: MaterialButton = tutorialLayout.findViewById(R.id.onboarding_btn_action)
+    private val btnLeft: MaterialButton = tutorialLayout.findViewById(R.id.onboarding_btn_left)
+    private val btnRight: MaterialButton = tutorialLayout.findViewById(R.id.onboarding_btn_right)
+    private val indicatorContainer: LinearLayout = tutorialLayout.findViewById(R.id.onboarding_indicator_container)
+
+    private data class OnboardingSlide(
+        val iconResId: Int,
+        val titleResId: Int,
+        val descResId: Int,
+        val hasActionBtn: Boolean = false,
+        val actionBtnTextResId: Int = 0,
+        val actionBtnIconResId: Int = 0
+    )
+
+    private val slides = listOf(
+        OnboardingSlide(
+            iconResId = R.mipmap.ic_launcher,
+            titleResId = R.string.onboarding_welcome_title,
+            descResId = R.string.onboarding_welcome_desc
+        ),
+        OnboardingSlide(
+            iconResId = R.drawable.ic_palette_swatch,
+            titleResId = R.string.onboarding_customization_title,
+            descResId = R.string.onboarding_customization_desc,
+            hasActionBtn = true,
+            actionBtnTextResId = R.string.onboarding_try_guide_btn,
+            actionBtnIconResId = R.drawable.cursor_pointer // placeholder icon
+        ),
+        OnboardingSlide(
+            iconResId = R.drawable.ic_music_icon,
+            titleResId = R.string.onboarding_widgets_title,
+            descResId = R.string.onboarding_widgets_desc
+        ),
+        OnboardingSlide(
+            iconResId = R.drawable.ic_weather_cloudy_clock,
+            titleResId = R.string.onboarding_weather_title,
+            descResId = R.string.onboarding_weather_desc
+        ),
+        OnboardingSlide(
+            iconResId = R.drawable.ic_sun_clock_outline,
+            titleResId = R.string.onboarding_permission_title,
+            descResId = R.string.onboarding_permission_desc,
+            hasActionBtn = true,
+            actionBtnTextResId = R.string.onboarding_grant_btn,
+            actionBtnIconResId = R.drawable.ic_sun_clock_outline
+        )
+    )
+
+    init {
+        // Setup button click listeners
+        btnLeft.setOnClickListener {
+            if (currentSlide == 0) {
+                finishOnboarding()
+            } else {
+                showSlide(currentSlide - 1, -1)
+            }
+        }
+
+        btnRight.setOnClickListener {
+            if (currentSlide == slides.size - 1) {
+                finishOnboarding()
+            } else {
+                showSlide(currentSlide + 1, 1)
+            }
+        }
+
+        actionBtn.setOnClickListener {
+            if (currentSlide == 1) {
+                startInteractiveGuide()
+            } else if (currentSlide == slides.size - 1) {
+                requestLocationPermissionAction()
+            }
+        }
+    }
+
     fun start() {
         isTutorialRunning = true
         tutorialLayout.visibility = View.VISIBLE
-        tutorialFinger.translationX = tutorialLayout.resources.displayMetrics.widthPixels.toFloat()
-        tutorialFinger.translationY = -200f
-        tutorialText.text = tutorialLayout.context.getString(R.string.tutorial_text_1)
+        tutorialLayout.alpha = 0f
 
-        // Шаг 1: Появление
-        tutorialLayout.animate().alpha(1f).setDuration(500).setListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                step2ShowTextAndHide()
-            }
-        }).start()
+        cardView.scaleX = 0.8f
+        cardView.scaleY = 0.8f
+        cardView.alpha = 0f
+
+        // Reset overlays
+        tutorialFinger.visibility = View.GONE
+        tutorialText.visibility = View.GONE
+
+        tutorialLayout.animate()
+            .alpha(1f)
+            .setDuration(300)
+            .start()
+
+        cardView.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .alpha(1f)
+            .setDuration(500)
+            .setInterpolator(OvershootInterpolator(1.1f))
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    showSlide(0, 1)
+                }
+            })
+            .start()
     }
 
     fun handleBackPressed(): Boolean {
         if (tutorialLayout.visibility == View.VISIBLE) {
-            tutorialLayout.animate().alpha(0f).setDuration(300)
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        tutorialLayout.visibility = View.GONE
-                        isTutorialRunning = false
-                    }
-                }).start()
+            if (isInteractiveGuideRunning) {
+                cancelInteractiveGuide()
+            } else if (currentSlide > 0) {
+                showSlide(currentSlide - 1, -1)
+            } else {
+                finishOnboarding()
+            }
             return true
         }
         return false
     }
 
-    private fun step2ShowTextAndHide() {
-        tutorialText.animate().alpha(1f).setDuration(800).setListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                tutorialText.animate().alpha(0f).setDuration(800).setStartDelay(1000)
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator) {
-                            step3ShowFingerAndHold()
+    private fun showSlide(index: Int, direction: Int) {
+        val nextSlide = slides.getOrNull(index) ?: return
+        val context = tutorialLayout.context
+        val density = context.resources.displayMetrics.density
+
+        // Clean slide transition animation: Fade out current, slide in next
+        val contentContainer = tutorialLayout.findViewById<View>(R.id.onboarding_content_container)
+
+        contentContainer.animate()
+            .alpha(0f)
+            .translationX(-direction * 40f * density)
+            .setDuration(180)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    // Update views with new slide content
+                    iconView.setImageResource(nextSlide.iconResId)
+                    titleView.setText(nextSlide.titleResId)
+                    descView.setText(nextSlide.descResId)
+
+                    if (nextSlide.hasActionBtn) {
+                        actionBtn.visibility = View.VISIBLE
+                        actionBtn.setText(nextSlide.actionBtnTextResId)
+                        if (index == 1) {
+                            actionBtn.setIconResource(R.drawable.cursor_pointer)
+                        } else {
+                            actionBtn.setIconResource(nextSlide.actionBtnIconResId)
                         }
-                    }).start()
+                        checkAndUpdatePermissionState()
+                    } else {
+                        actionBtn.visibility = View.GONE
+                    }
+
+                    // Update navigation buttons text
+                    btnLeft.text = if (index == 0) context.getString(R.string.onboarding_skip_btn) else context.getString(R.string.onboarding_back_btn)
+                    btnRight.text = if (index == slides.size - 1) context.getString(R.string.onboarding_finish_btn) else context.getString(R.string.onboarding_next_btn)
+
+                    updateIndicators(index, slides.size)
+
+                    // Position incoming content for slide-in
+                    contentContainer.translationX = direction * 40f * density
+
+                    // Fade and slide in
+                    contentContainer.animate()
+                        .alpha(1f)
+                        .translationX(0f)
+                        .setDuration(220)
+                        .setListener(null)
+                        .start()
+                }
+            }).start()
+
+        currentSlide = index
+    }
+
+    private fun updateIndicators(currentIndex: Int, totalSlides: Int) {
+        indicatorContainer.removeAllViews()
+        val context = tutorialLayout.context
+        val density = context.resources.displayMetrics.density
+
+        for (i in 0 until totalSlides) {
+            val dot = ImageView(context).apply {
+                val dotWidth = if (i == currentIndex) (14 * density).toInt() else (6 * density).toInt()
+                val dotHeight = (6 * density).toInt()
+                val margin = (5 * density).toInt()
+                layoutParams = LinearLayout.LayoutParams(dotWidth, dotHeight).apply {
+                    setMargins(margin, 0, margin, 0)
+                }
+                setImageResource(
+                    if (i == currentIndex) R.drawable.onboarding_dot_active
+                    else R.drawable.onboarding_dot_inactive
+                )
             }
-        }).start()
+            indicatorContainer.addView(dot)
+        }
+    }
+
+    fun checkAndUpdatePermissionState() {
+        if (currentSlide == slides.size - 1 && !isInteractiveGuideRunning) { // permission slide
+            val context = tutorialLayout.context
+            if (isLocationPermissionGranted()) {
+                actionBtn.isEnabled = false
+                actionBtn.setText(context.getString(R.string.onboarding_permission_granted))
+                actionBtn.setIconResource(R.drawable.ic_check)
+            } else {
+                actionBtn.isEnabled = true
+                actionBtn.setText(context.getString(R.string.onboarding_grant_btn))
+                actionBtn.setIconResource(R.drawable.ic_sun_clock_outline)
+            }
+        }
+    }
+
+    private fun isLocationPermissionGranted(): Boolean {
+        val context = tutorialLayout.context
+        val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        return hasCoarse || hasFine
+    }
+
+    private fun finishOnboarding() {
+        prefs.edit()
+            .putBoolean("isFirstLaunch", false)
+            .putBoolean("location_permission_rationale_shown", true)
+            .apply()
+
+        cardView.animate()
+            .scaleX(0.8f)
+            .scaleY(0.8f)
+            .alpha(0f)
+            .setDuration(250)
+            .start()
+
+        tutorialLayout.animate()
+            .alpha(0f)
+            .setDuration(250)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    tutorialLayout.visibility = View.GONE
+                    isTutorialRunning = false
+                    onTutorialFinished()
+                }
+            })
+            .start()
+    }
+
+    // region Interactive Guide
+
+    private fun startInteractiveGuide() {
+        isInteractiveGuideRunning = true
+
+        cardView.animate()
+            .alpha(0f)
+            .scaleX(0.8f)
+            .scaleY(0.8f)
+            .setDuration(300)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    cardView.visibility = View.GONE
+
+                    tutorialFinger.visibility = View.VISIBLE
+                    tutorialText.visibility = View.VISIBLE
+
+                    tutorialFinger.translationX = tutorialLayout.resources.displayMetrics.widthPixels.toFloat()
+                    tutorialFinger.translationY = -200f
+                    tutorialFinger.alpha = 0f
+                    tutorialText.alpha = 0f
+
+                    step3ShowFingerAndHold()
+                }
+            })
+            .start()
+    }
+
+    private fun cancelInteractiveGuide() {
+        isInteractiveGuideRunning = false
+
+        tutorialFinger.animate().cancel()
+        tutorialFinger.visibility = View.GONE
+        tutorialText.animate().cancel()
+        tutorialText.visibility = View.GONE
+
+        tutorialLayout.setOnClickListener(null)
+
+        cardView.visibility = View.VISIBLE
+        cardView.alpha = 0f
+        cardView.scaleX = 0.8f
+        cardView.scaleY = 0.8f
+        cardView.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(300)
+            .setInterpolator(OvershootInterpolator(1.1f))
+            .setListener(null)
+            .start()
+
+        showSlide(currentSlide, 1)
     }
 
     private fun step3ShowFingerAndHold() {
+        if (!isInteractiveGuideRunning) return
         tutorialText.text = tutorialLayout.context.getString(R.string.tutorial_text_2)
         tutorialText.animate().alpha(1f).setDuration(500).setListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator) {
+                if (!isInteractiveGuideRunning) return
                 tutorialFinger.animate()
                     .alpha(1f)
                     .translationX(mainLayout.width / 2f - tutorialFinger.width / 2f)
@@ -88,17 +358,20 @@ class TutorialManager(
     }
 
     private fun step4TapAnimation() {
+        if (!isInteractiveGuideRunning) return
         tutorialFinger.animate()
             .scaleX(0.8f).scaleY(0.8f)
             .setDuration(200)
             .setStartDelay(300)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (!isInteractiveGuideRunning) return
                     tutorialFinger.animate()
                         .scaleX(0.8f).scaleY(0.8f)
                         .setDuration(800)
                         .setListener(object : AnimatorListenerAdapter() {
                             override fun onAnimationEnd(animation: Animator) {
+                                if (!isInteractiveGuideRunning) return
                                 toggleEditModeAction()
                                 step5MoveToTimeText()
                             }
@@ -108,6 +381,7 @@ class TutorialManager(
     }
 
     private fun step5MoveToTimeText() {
+        if (!isInteractiveGuideRunning) return
         tutorialText.text = tutorialLayout.context.getString(R.string.tutorial_text_3)
         val targetX = timeText.x + (timeText.width / 2f) - (tutorialFinger.width / 2f)
         val targetY = timeText.y + (timeText.height / 2f) - (tutorialFinger.height / 2f)
@@ -125,11 +399,13 @@ class TutorialManager(
     }
 
     private fun step6TapTimeText(targetY: Float) {
+        if (!isInteractiveGuideRunning) return
         tutorialFinger.animate()
             .scaleX(0.8f).scaleY(0.8f)
             .setDuration(150)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (!isInteractiveGuideRunning) return
                     showCustomizationAction(timeText)
                     step7Finish(targetY)
                 }
@@ -137,12 +413,14 @@ class TutorialManager(
     }
 
     private fun step7Finish(targetY: Float) {
+        if (!isInteractiveGuideRunning) return
         tutorialFinger.animate()
             .scaleX(1f).scaleY(1f)
             .setDuration(150)
             .setStartDelay(200)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (!isInteractiveGuideRunning) return
                     tutorialText.text = tutorialLayout.context.getString(R.string.tutorial_text_4)
                     tutorialFinger.animate()
                         .alpha(0f)
@@ -152,17 +430,33 @@ class TutorialManager(
 
                     tutorialLayout.setOnClickListener {
                         hideBottomSheetAction()
-                        tutorialLayout.animate().alpha(0f).setDuration(300)
-                            .setListener(object : AnimatorListenerAdapter() {
-                                override fun onAnimationEnd(animation: Animator) {
-                                    tutorialLayout.visibility = View.GONE
-                                    prefs.edit().putBoolean("isFirstLaunch", false).apply()
-                                    isTutorialRunning = false
-                                    onTutorialFinished()
-                                }
-                            }).start()
+
+                        tutorialFinger.animate().cancel()
+                        tutorialFinger.visibility = View.GONE
+                        tutorialText.animate().cancel()
+                        tutorialText.visibility = View.GONE
+                        tutorialLayout.setOnClickListener(null)
+                        isInteractiveGuideRunning = false
+
+                        // Restore onboarding card and move to the next slide (widgets)
+                        cardView.visibility = View.VISIBLE
+                        cardView.alpha = 0f
+                        cardView.scaleX = 0.8f
+                        cardView.scaleY = 0.8f
+                        cardView.animate()
+                            .alpha(1f)
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(300)
+                            .setInterpolator(OvershootInterpolator(1.1f))
+                            .setListener(null)
+                            .start()
+
+                        showSlide(2, 1) // Advance to the widgets slide (index 2)
                     }
                 }
             }).start()
     }
+
+    // endregion
 }

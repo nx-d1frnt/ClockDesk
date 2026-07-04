@@ -23,12 +23,29 @@ class PowerStateManager(private val context: Context) {
         }
     }
 
+    private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "power_saver_manual" || key == "automatic_battery_saver_mode" || key == "battery_saver_trigger") {
+            checkPowerSaveStatus()
+        } else if (key == "power_saver_disable_animations" || key == "power_saver_disable_weather" ||
+            key == "power_saver_lock_brightness" || key == "power_saver_limit_clock" ||
+            key == "power_saver_disable_light_sensor" || key == "power_saver_enable_smart_pixels" ||
+            key == "power_saver_dim_background" || key == "power_saver_brightness_level" ||
+            key == "power_saver_dim_level" || key == "power_saver_limit_fps" ||
+            key == "power_saver_fps_limit_value"
+        ) {
+            if (isPowerSavingMode) {
+                notifyObservers(true)
+            }
+        }
+    }
+
     init {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         val intent = context.registerReceiver(batteryReceiver, filter)
         if (intent != null) {
             checkBatteryState(intent)
         }
+        prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
     }
 
     fun registerObserver(observer: PowerSaveObserver) {
@@ -84,6 +101,10 @@ class PowerStateManager(private val context: Context) {
         isPowerSavingMode = enabled
         Logger.d("PowerManager"){"Power Save Mode changed to: $enabled"}
 
+        notifyObservers(enabled)
+    }
+
+    private fun notifyObservers(enabled: Boolean) {
         val iterator = observers.iterator()
         while (iterator.hasNext()) {
             val observer = iterator.next().get()
@@ -100,6 +121,11 @@ class PowerStateManager(private val context: Context) {
     fun destroy() {
         try {
             context.unregisterReceiver(batteryReceiver)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        try {
+            prefs.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         } catch (e: Exception) {
             e.printStackTrace()
         }

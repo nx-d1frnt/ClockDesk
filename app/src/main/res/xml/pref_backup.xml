@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:key="backup_restore_category"
+        app:title="@string/backup_restore_title">
+
+        <androidx.preference.Preference
+            app:key="export_settings"
+            app:title="@string/export_settings" />
+
+        <androidx.preference.Preference
+            app:key="import_settings"
+            app:title="@string/import_settings" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

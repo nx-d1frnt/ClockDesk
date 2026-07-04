@@ -29,7 +29,8 @@
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorOutline">@color/md_theme_outline</item>
         
-        <item name="android:statusBarColor">@color/md_theme_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item> 
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
         <item name="materialButtonToggleGroupStyle">@style/Theme.ClockDesk.Button.ToggleGroup</item>

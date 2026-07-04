@@ -15,8 +15,8 @@ class OpenMeteoAPI(
     override fun fetch(latitude: Double, longitude: Double) {
         val url =
             "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
-                    "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility" +
-                    "&forecast_days=1"
+                    "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility,uv_index" +
+                    "&hourly=weather_code&timezone=auto&forecast_days=2"
 
         val request = JsonObjectRequest(
             Request.Method.GET, url, null,
@@ -51,8 +51,32 @@ class OpenMeteoAPI(
                         null
                     }
 
+                    uvIndex = if (current.has("uv_index")) {
+                        current.getDouble("uv_index")
+                    } else {
+                        null
+                    }
+
+                    val hourlyCodesList = mutableListOf<Int>()
+                    try {
+                        if (response.has("hourly")) {
+                            val hourly = response.getJSONObject("hourly")
+                            val hourlyCodesArray = hourly.optJSONArray("weather_code")
+                            if (hourlyCodesArray != null) {
+                                for (i in 0 until hourlyCodesArray.length()) {
+                                    hourlyCodesList.add(hourlyCodesArray.getInt(i))
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("OpenMeteoApi") { "Error parsing hourly forecast: ${e.message}" }
+                    }
+
                     Logger.d("OpenMeteoApi"){"Weather: Code=$weatherCode, Wind=$windSpeed km/h, " +
-                            "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m"}
+                            "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m, " +
+                            "UvIndex=$uvIndex, HourlyCodesSize=${hourlyCodesList.size}"}
+
+                    WeatherGetter.updateCache(temperature, weatherCode, isDay, windSpeed, hourlyCodesList, uvIndex)
 
                     onWeatherUpdated()
 

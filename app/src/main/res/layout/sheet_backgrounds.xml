@@ -190,6 +190,64 @@
                         android:layout_marginTop="8dp"
                         android:text="@string/manual_weather_control" />
 
+                    <!-- Auto weather indicator (shown when manual control is off) -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/current_weather_card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                        app:cardElevation="0dp"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
+                        android:visibility="gone">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="12dp"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/weather_auto_icon"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="28sp"
+                            android:text="🌡️" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="12dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/weather_auto_label"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textAppearance="?attr/textAppearanceTitleSmall"
+                                android:text="@string/weather_auto_current" />
+
+                            <TextView
+                                android:id="@+id/weather_auto_detail"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:text="@string/weather_auto_loading" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/weather_auto_temp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceTitleMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:text="" />
+                    </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
                     <HorizontalScrollView
                         android:id="@+id/manual_weather_scroll"
                         android:layout_width="match_parent"
@@ -320,6 +378,18 @@
                             android:valueTo="50.0"
                             app:thumbElevation="0dp"
                             app:trackHeight="12dp" />
+
+                        <com.google.android.material.slider.RangeSlider
+                            android:id="@+id/dimming_intensity_range_slider"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:valueFrom="0.0"
+                            android:valueTo="50.0"
+                            app:thumbElevation="0dp"
+                            app:trackHeight="12dp"
+                            android:visibility="gone" />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch

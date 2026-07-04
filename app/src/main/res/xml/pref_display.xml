@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:key="display_category"
+        app:title="@string/display_settings_title">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="burn_in_protection"
+            app:title="@string/burn_in_protection_title"
+            app:summary="@string/burn_in_protection_summary" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="smart_pixels_enabled"
+            app:title="@string/smart_pixels_title"
+            app:summary="@string/smart_pixels_summary"
+            app:dependency="burn_in_protection" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

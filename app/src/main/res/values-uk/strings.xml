@@ -32,9 +32,9 @@
     <string name="time_24">24-годинний</string>
     <string name="time_12">12-годинний</string>
     <string name="date_format">Формат дати</string>
-    <string name="date_format_short">MMM dd</string>
-    <string name="date_format_medium">EEE, MMM dd</string>
-    <string name="date_format_long">EEEE, MMMM dd, yyyy</string>
+    <string name="date_format_short">МММ дд</string>
+    <string name="date_format_medium">ЕЕЕ, МММ дд</string>
+    <string name="date_format_long">ЕЕЕЕ, ММММ дд, рррр</string>
 
     <!-- New strings for background selection -->
     <string name="choose_background">Обрати фон</string>
@@ -61,11 +61,26 @@
     <string name="background_zoom">Масштаб фону</string>
     <string name="customize_now_playing">Налаштувати віджет \"Зараз грає\"</string>
     <string name="applying_blur">Застосування розмиття…\nЦе може зайняти кілька секунд…</string>
-    <string name="tutorial_text_1">Ласкаво просимо до ClockDesk!\nДавайте здійснимо швидку екскурсію.</string>
+    <string name="onboarding_welcome_title">Ласкаво просимо до ClockDesk</string>
+    <string name="onboarding_welcome_desc">Перетворіть свій невикористовуваний телефон або планшет на стильний та функціональний настільний годинник.</string>
+    <string name="onboarding_customization_title">Налаштуйте під себе</string>
+    <string name="onboarding_customization_desc">Утримуйте натискання в будь-якому місці екрана для входу в Режим редагування. Змінюйте шрифт, налаштовуйте динамічні фони та розміщуйте модульні інфо-чипи.</string>
+    <string name="onboarding_widgets_title">Віджети та музика</string>
+    <string name="onboarding_widgets_desc">Відображайте обкладинку альбому треку, що зараз грає, та додавайте розумні чипи для показу заряду батареї, оновлень або прогресу у фоні.</string>
+    <string name="onboarding_weather_title">Динамічний режим</string>
+    <string name="onboarding_weather_desc">Насолоджуйтеся анімованими ефектами дощу, снігу або туману та градієнтами кольорів, які природно змінюються відповідно до сходу й заходу сонця.</string>
+    <string name="onboarding_permission_title">Готові почати?</string>
+    <string name="onboarding_permission_desc">Для автоматичного оновлення погоди та розрахунку циклів сходу й заходу сонця ClockDesk потрібен доступ до геопозиції. Ви також можете вказати координати вручну пізніше.</string>
+    <string name="onboarding_grant_btn">Надати дозвіл</string>
+    <string name="onboarding_permission_granted">Дозвіл надано</string>
+    <string name="onboarding_next_btn">Далі</string>
+    <string name="onboarding_back_btn">Назад</string>
+    <string name="onboarding_finish_btn">Почати роботу</string>
+    <string name="onboarding_skip_btn">Пропустити</string>
+    <string name="onboarding_try_guide_btn">Показати як</string>
     <string name="tutorial_text_2">Натисніть і утримуйте в будь-якому місці, щоб увійти в режим редагування…</string>
-    <string name="tutorial_text_3">…потім натисніть на час або дату, щоб налаштувати їх.</string>
-    <string name="tutorial_text_4">Чудово! Тепер ви знаєте основи.\nНатисніть у будь-якому місці, щоб почати.</string>
-    <string name="tutorial_skip">Пропустити</string>
+    <string name="tutorial_text_3">…потім натисніть на будь-який віджет, щоб налаштувати.</string>
+    <string name="tutorial_text_4">Чудово! Тепер ви знаєте основи.\nНатисніть у будь-якому місці, щоб продовжити.</string>
     <string name="automatic_color">Автоматичний колір тексту</string>
     <string name="location_permission_title">Потрібен дозвіл на місцезнаходження</string>
     <string name="location_permission_message">ClockDesk потрібне ваше місцезнаходження для отримання даних про погоду та час сходу/заходу сонця (для динамічного градієнтного фону та функції нічного режиму).\nВи можете надати наступний дозвіл або встановити координати вручну в налаштуваннях.</string>
@@ -76,6 +91,16 @@
 
     <!-- Preference Strings -->
     <string name="sun_sunrise_api_settings">Налаштування API заходу/сходу</string>
+    <string name="location_mode_title">Режим місцезнаходження</string>
+    <string name="location_mode_summary">Виберіть спосіб визначення місцезнаходження для погоди та часу сходу/заходу</string>
+    <string name="location_mode_auto">Автоматично (GPS/Мережа)</string>
+    <string name="location_mode_city">Вручную за назвою міста</string>
+    <string name="location_mode_coords">Вручну за координатами</string>
+    <string name="location_city_name_title">Назва міста</string>
+    <string name="location_city_name_summary">Введіть назву міста (наприклад, Київ)</string>
+    <string name="location_city_name_dialog_title">Введіть назву міста</string>
+    <string name="city_resolved_format">Місто визначено: %1$s (Широта: %2$.4f, Довгота: %3$.4f)</string>
+    <string name="city_resolve_error_format">Не вдалося визначити місто: %1$s</string>
     <string name="use_manual_coordinates_summary">Увімкніть для ручного введення широти та довготи</string>
     <string name="enter_latitude">Введіть широту</string>
     <string name="longitude">Довгота</string>
@@ -103,11 +128,48 @@
     <string name="battery_saver_trigger_title">Рівень активації економії батареї</string>
     <string name="battery_saver_trigger_summary">Встановіть рівень заряду батареї (%), при якому активується режим економії</string>
     <string name="battery_saver_settings_title">Налаштування економії батареї</string>
+    <string name="power_saver_manual_title">Ручний режим економії</string>
+    <string name="power_saver_rules_title">Дії при економії заряду</string>
+    <string name="power_saver_manual_summary">Примусово увімкнути режим економії батареї для зниження споживання ресурсів</string>
+    <string name="power_saver_disable_animations_title">Вимкнути анімацію</string>
+    <string name="power_saver_disable_animations_summary">Призупинити динамічний фон для зниження навантаження на GPU</string>
+    <string name="power_saver_limit_fps_title">Обмежити частоту кадрів</string>
+    <string name="power_saver_limit_fps_summary">Обмежити частоту кадрів фонової анімації при економії заряду</string>
+    <string name="power_saver_fps_limit_value_title">Ліміт частоти кадрів</string>
+    <string name="power_saver_fps_limit_value_summary">Цільова кількість кадрів на секунду для анімацій OpenGL (менше - економніше)</string>
+    <string name="power_saver_disable_weather_title">Вимкнути оновлення погоди</string>
+    <string name="power_saver_disable_weather_summary">Зупинити фонове отримання даних про погоду</string>
+    <string name="power_saver_lock_brightness_title">Мінімальна яскравість</string>
+    <string name="power_saver_lock_brightness_summary">Зафіксувати яскравість екрана на мінімальному рівні</string>
+    <string name="power_saver_limit_clock_title">Рідкісне оновлення годинника</string>
+    <string name="power_saver_limit_clock_summary">Оновлювати час раз на хвилину (приховує секунди)</string>
+    <string name="power_saver_disable_light_sensor_title">Вимкнути датчик освітленості</string>
+    <string name="power_saver_disable_light_sensor_summary">Припинити опитування датчика освітленості в приміщенні</string>
+    <string name="power_saver_enable_smart_pixels_title">Увімкнути Розумні пікселі</string>
+    <string name="power_saver_enable_smart_pixels_summary">Активувати шахове затемнення пікселів екрана</string>
+    <string name="power_saver_dim_background_title">Затемнити фон</string>
+    <string name="power_saver_dim_background_summary">Сильно затемнювати фонове зображення/градієнти для економії OLED</string>
+    <string name="power_saver_dim_level_title">Рівень затемнення фону</string>
+    <string name="power_saver_dim_level_summary">Налаштуйте відсоток затемнення фону при економії батареї</string>
+    <string name="power_saver_brightness_level_title">Яскравість екрана</string>
+    <string name="power_saver_brightness_level_summary">Налаштуйте рівень яскравості екрана в режимі економії батареї</string>
     <string name="smart_chips_settings_title">Налаштування розумних чіпів</string>
-    <string name="show_battery_alert_chip">Чіп сповіщення про батарею</string>
-    <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї</string>
+    <string name="show_battery_alert_chip">Показувати чіп сповіщення про батарею</string>
+    <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї додатку</string>
     <string name="battery_low">Низький заряд</string>
     <string name="battery_saver_on">Економія ввімк</string>
+    <string name="battery_alert_settings_title">Налаштування сповіщень про батарею</string>
+    <string name="battery_alert_behavior_category">Умови відображення</string>
+    <string name="battery_alert_show_charging_title">Показувати при заряджанні</string>
+    <string name="battery_alert_show_charging_summary">Показувати чіп, коли пристрій підключено до зарядного пристрою</string>
+    <string name="battery_alert_show_full_title">Показувати при повному заряді</string>
+    <string name="battery_alert_show_full_summary">Показувати чіп при 100% заряді батареї</string>
+    <string name="battery_alert_show_saver_title">Показувати при економії батареї додатка</string>
+    <string name="battery_alert_show_saver_summary">Показувати чіп при ручному увімкненні режиму економії батареї</string>
+    <string name="battery_alert_show_low_title">Показувати при низькому заряді</string>
+    <string name="battery_alert_show_low_summary">Показувати чіп, коли рівень заряду опускається нижче порогу</string>
+    <string name="battery_alert_low_threshold_title">Поріг низького заряду</string>
+    <string name="battery_alert_low_threshold_summary">Відсоток заряду для спрацьовування сповіщення</string>
     <string name="snap_to_grid">Прив\'язка до сітки</string>
     <string name="vertical_alignment">Вертикальне вирівнювання</string>
     <string name="horizontal_alignment">Горизонтальне вирівнювання</string>
@@ -120,6 +182,20 @@
     <string name="free_mode_switch">Вільне переміщення (БЕТА)</string>
     <string name="enable_advanced_graphics">Увімкнути розширену графіку</string>
     <string name="enable_advanced_graphics_summary">Увімкнути розширені графічні функції (може впливати на продуктивність на деяких пристроях)</string>
+    <string name="graphics_enable_transitions_title">Плавні переходи</string>
+    <string name="graphics_enable_transitions_summary">Анімувати масштабування та згасання при зміні фонового зображення</string>
+    <string name="graphics_enable_turbulence_title">Ефект турбулентного шуму</string>
+    <string name="graphics_enable_turbulence_summary">Анімувати ефект спотворення рідкого хроматичного шуму при зміні теми</string>
+    <string name="graphics_turbulence_grid_title">Масштаб сітки турбулентності</string>
+    <string name="graphics_turbulence_grid_summary">Налаштування масштабу шуму спотворення рідкої хроматичної турбулентності</string>
+    <string name="graphics_turbulence_speed_title">Швидкість анімації турбулентності</string>
+    <string name="graphics_turbulence_speed_summary">Налаштування швидкості руху переходів хроматичної турбулентності</string>
+    <string name="graphics_enable_edit_blur_title">Розмиття в режимі редагування</string>
+    <string name="graphics_enable_edit_blur_summary">Розмивати фонове зображення при редагуванні віджетів</string>
+    <string name="graphics_render_scale_title">Масштаб роздільної здатності рендерингу</string>
+    <string name="graphics_render_scale_summary">Масштабування роздільної здатності всього фону (зниження покращує продуктивність/батарею)</string>
+    <string name="graphics_weather_scale_title">Роздільна здатність ефектів погоди</string>
+    <string name="graphics_weather_scale_summary">Масштабування роздільної здатності ефектів дощу/снігу (зниження прискорює роботу на слабких GPU)</string>
     <string name="weather_background">Динамічний погодний фон</string>
     <string name="weather_effects_title">Погода</string>
     <string name="enable_weather_effects">Увімкнути динамічні погодні ефекти</string>
@@ -140,7 +216,7 @@
     <string name="send_backward">Відправити назад</string>
     <string name="bring_forward">Вивести вперед</string>
     <string name="display_settings_title">Налаштування відображення</string>
-    <string name="burn_in_protection_title">Защита від вигорання</string>
+    <string name="burn_in_protection_title">Захист від вигорання</string>
     <string name="burn_in_protection_summary">Запобігти вигоранню на екранах OLED, періодично переміщуючи елементи інтерфейсу</string>
     <string name="system_media_plugin_name">Системні медіа</string>
     <string name="lastfm_plugin_name">Last.fm</string>
@@ -158,11 +234,6 @@
     <string name="variable_properties_roundness">Скруглення</string>
     <string name="show_am_pm">Показувати індикатор AM/PM</string>
     <string name="update_available_text">Доступне оновлення</string>
-    <string name="new_version_title">Доступне оновлення</string>
-    <string name="update_description_default">Доступна нова версія додатка. Оновіться, щоб отримати покращений досвід та стабільну роботу.</string>
-    <string name="install_action">Встановити</string>
-    <string name="later_action">Пізніше</string>
-    <string name="checking_updates">Пошук оновлень…</string>
     <string name="show_updates_chip">Показувати оновлення додатку</string>
     <string name="show_updates_chip_summary">Показувати сповіщення про оновлення додатку</string>
     <string name="customize_smart_chips">Налаштувати розумні чіпи</string>
@@ -171,7 +242,7 @@
     <string name="music_sources_title">Джерела музики</string>
     <string name="music_sources_summary">Сортувати джерела музики та налаштовувати провайдерів</string>
     <string name="smart_pixels_title">Розумні пікселі</string>
-    <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану (Екран може здаватися тьмянішим)</string>
+    <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану</string>
     <string name="max_width">Максимальна ширина</string>
     <string name="show_background_progress_chip">Індикатор завантаження фону</string>
     <string name="show_background_progress_chip_summary">Показувати чип зі статусом завантаження або обробки фонового зображення</string>
@@ -184,13 +255,17 @@
     <string name="delete_background_title">Видалити фон?</string>
     <string name="delete_background_msg">Це фонове зображення буде видалено назавжди.</string>
     <string name="delete">Видалити</string>
+    <string name="new_version_title">Доступне оновлення</string>
+    <string name="update_description_default">Доступна нова версія додатка. Оновіться, щоб отримати покращений досвід та стабільну роботу.</string>
+    <string name="install_action">Встановити</string>
+    <string name="later_action">Пізніше</string>
+    <string name="checking_updates">Пошук оновлень…</string>
     <string name="feature_not_supported">Функція не підтримується вашою версією Android</string>
     <string name="manage_smart_chips">Управління розумними чипами</string>
     <string name="manage_smart_chips_summary">Сортування та налаштування розумних чипів</string>
     <string name="external_plugin_desc">Сторонній плагін</string>
     <string name="error_opening_settings">Не вдалося відкрити налаштування</string>
 
-    <!-- Backup & Restore Strings -->
     <string name="backup_restore_title">Бекап та відновлення</string>
     <string name="export_settings">Бекап налаштувань</string>
     <string name="import_settings">Імпорт налаштувань</string>
@@ -199,18 +274,8 @@
     <string name="import_success">Налаштування успішно імпортовано, перезапуск...</string>
     <string name="import_failed">Не вдалося імпортувати налаштування</string>
     <string name="confirm_restore_title">Відновити налаштування?</string>
-    <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування. Додаток буде перезапущено.</string>
-    <string name="smart_chips_plugins_title">Управління розумними чипами</string>
+    <string name="confirm_restore_message">Ця дія перезапише ваші поточні налаштування та не може бути скасована. Ви впевнені, що хочете продовжити?</string>
     <string name="nav_effects">Ефекти</string>
-
-    <string name="crop_hint">Стисніть для масштабу · Перетягніть для зсуву</string>
-    <string name="crop_reset">Скинути</string>
-    <string name="crop_button">Кадрувати</string>
-    <string name="date_time_format_custom">Власний</string>
-    <string name="time_format_pattern_hint">Шаблон (напр. HH:mm:ss)</string>
-    <string name="date_format_pattern_hint">Шаблон (напр. yyyy-MM-dd)</string>
-    <string name="show_media_icon">Показувати іконку плеєра</string>
-    <string name="show_media_icon_summary">Відображати іконку поточного музичного плеєра</string>
     <string name="appearance">Оформлення</string>
     <string name="font">Шрифт</string>
     <string name="color">Колір</string>
@@ -220,9 +285,75 @@
     <string name="snap_to_grid_description">Прив\'язка до невидимої сітки</string>
     <string name="ignore_collision_description">Дозволити накладання віджетів</string>
     <string name="show_media_icon_description">Відображати логотип плеєра</string>
-    <string name="percent_100">100%</string>
-    <string name="weight_default">400</string>
-    <string name="width_default">100</string>
-    <string name="roundness_default">0</string>
     <string name="additional_settings">Додаткові налаштування</string>
+
+    <!-- Location & Weather Settings -->
+    <string name="location_weather_settings_title">Місцезнаходження та погода</string>
+    <string name="location_weather_settings_subtitle">Координати, час сонця та оновлення погоди</string>
+    <string name="weather_settings_category_title">Налаштування погоди</string>
+    <string name="weather_refresh_interval_title">Інтервал оновлення погоди</string>
+    <string name="weather_refresh_interval_summary">Як часто завантажувати поточні дані про погоду</string>
+
+    <!-- Settings Categories Subtitles and Titles -->
+    <string name="music_settings_subtitle">Джерела музики та обкладинки альбомів</string>
+    <string name="display_settings_subtitle">Захист від вигорання та розумні пікселі</string>
+    <string name="battery_saver_settings_subtitle">Рівень активації та дії режиму заощадження</string>
+    <string name="performance_settings_title">Продуктивність та графіка</string>
+    <string name="performance_settings_subtitle">Логування, переходи та масштаб графіки</string>
+    <string name="smart_chips_settings_subtitle">Керування активними чипами та віджетами</string>
+    <string name="backup_restore_subtitle">Резервне копіювання та імпорт налаштувань</string>
+
+    <!-- About screen strings -->
+    <string name="about_title">Про додаток</string>
+    <string name="about_subtitle">Інформація та відкритий вихідний код</string>
+    <string name="about_version_format">Версія %1$s</string>
+    <string name="about_version_code_format">%1$s (збірка %2$d)</string>
+    <string name="about_developer_label">Розробник</string>
+    <string name="about_developer_value">nx-d1frnt</string>
+    <string name="about_version_label">Версія</string>
+    <string name="about_license_label">Ліцензія</string>
+    <string name="about_license_value">MIT License</string>
+    <string name="about_source_label">Вихідний код</string>
+    <string name="about_source_value">github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_license">Ліцензія</string>
+    <string name="about_github_url">https://github.com/nx-d1frnt/ClockDesk</string>
+    <string name="about_license_url">https://github.com/nx-d1frnt/ClockDesk/blob/master/LICENSE</string>
+    <string name="about_footer">ClockDesk %1$s · Open Source</string>
+    <string name="show_performance_overlay_title">Показати оверлей продуктивності</string>
+    <string name="show_performance_overlay_summary">Відображати завантаження процесора (CPU) та графічного ядра (GPU), а також кадрову частоту (FPS) в реальному часі</string>
+    <string name="weather_auto_current">Поточна погода</string>
+
+    <!-- Smart Chips -->
+    <string name="show_alarm_chip">Чіп будильника</string>
+    <string name="show_alarm_chip_summary">Показувати наступний запланований будильник</string>
+    <string name="show_weather_chip">Чіп погоди</string>
+    <string name="show_weather_chip_summary">Показувати поточну температуру та умови погоди</string>
+    <string name="show_weather_alert_chip">Чіп попереджень про погоду</string>
+    <string name="show_weather_alert_chip_summary">Показувати попередження про погоду та погіршення умов</string>
+    <string name="weather_alert_rain_in_format">Дощ через %1$d год.</string>
+    <string name="weather_alert_snow_in_format">Сніг через %1$d год.</string>
+    <string name="weather_alert_storm_in_format">Гроза через %1$d год.</string>
+    <string name="weather_alert_storm_active">Грозове попередження</string>
+    <string name="weather_alert_high_winds">Сильний вітер</string>
+    <string name="weather_alert_high_uv">Високий УФ: %s</string>
+
+    <!-- Weather Alert Settings -->
+    <string name="weather_alert_settings_title">Налаштування попереджень про погоду</string>
+    <string name="weather_alert_types_category">Типи попереджень</string>
+    <string name="weather_alert_enable_storms_title">Попередження про грози</string>
+    <string name="weather_alert_enable_storms_summary">Показувати попередження при поточній грозі</string>
+    <string name="weather_alert_enable_wind_title">Попередження про сильний вітер</string>
+    <string name="weather_alert_enable_wind_summary">Показувати попередження при перевищенні порогу швидкості вітру</string>
+    <string name="weather_alert_enable_worsening_title">Погіршення умов</string>
+    <string name="weather_alert_enable_worsening_summary">Показувати прогнози майбутнього дощу, снігу або грози</string>
+    <string name="weather_alert_enable_uv_title">Попередження про високий УФ</string>
+    <string name="weather_alert_enable_uv_summary">Показувати попередження при перевищенні порогу УФ-індексу</string>
+    <string name="weather_alert_thresholds_category">Пороги та прогноз</string>
+    <string name="weather_alert_wind_threshold_title">Поріг швидкості вітру</string>
+    <string name="weather_alert_wind_threshold_summary">Швидкість вітру (км/год) для спрацьовування попередження</string>
+    <string name="weather_alert_uv_threshold_title">Поріг УФ-індексу</string>
+    <string name="weather_alert_uv_threshold_summary">Рівень УФ-індексу для спрацьовування попередження</string>
+    <string name="weather_alert_forecast_hours_title">Вікно прогнозу</string>
+    <string name="weather_alert_forecast_hours_summary">На скільки годин вперед перевіряти погіршення погоди</string>
 </resources>

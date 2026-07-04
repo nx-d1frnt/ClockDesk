@@ -419,8 +419,9 @@ class WeatherView @JvmOverloads constructor(
         )
 
         when (wmoCode) {
-            0 -> configure(WeatherType.CLEAR, calculatedIntensity)
-            1, 2, 3 -> configure(WeatherType.CLOUDY, calculatedIntensity)
+            0, 1 -> configure(WeatherType.CLEAR, calculatedIntensity)  // clear, mainly clear
+            2    -> configure(WeatherType.CLEAR, calculatedIntensity)   // partly cloudy
+            3    -> configure(WeatherType.CLOUDY, calculatedIntensity)  // overcast
             45, 48 -> configure(WeatherType.FOG, calculatedIntensity)
             51, 53, 55, 56, 57 -> configure(WeatherType.RAIN, calculatedIntensity)
             61, 63, 65, 80, 81, 82 -> configure(WeatherType.RAIN, calculatedIntensity)

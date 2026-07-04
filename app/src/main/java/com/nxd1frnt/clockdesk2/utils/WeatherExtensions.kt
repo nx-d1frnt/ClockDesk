@@ -130,11 +130,11 @@ fun getWeatherMatrix(wmoCode: Int, isNight: Boolean, intensity: Float): ColorMat
     val matrix = ColorMatrix()
 
     if (isNight) {
-        matrix.setScale(0.7f, 0.7f, 0.8f, 1f)
+        matrix.setScale(0.88f, 0.88f, 0.92f, 1f)
         val nightTint = ColorMatrix(floatArrayOf(
-            1f, 0f, 0f, 0f, -15f,
-            0f, 1f, 0f, 0f, -10f,
-            0f, 0f, 1f, 0f, 25f,
+            1f, 0f, 0f, 0f, -5f,
+            0f, 1f, 0f, 0f, -3f,
+            0f, 0f, 1f, 0f, 10f,
             0f, 0f, 0f, 1f, 0f
         ))
         matrix.postConcat(nightTint)
@@ -143,62 +143,62 @@ fun getWeatherMatrix(wmoCode: Int, isNight: Boolean, intensity: Float): ColorMat
     if (intensity <= 0.05f) return matrix
 
     when (wmoCode) {
-        //clear sky, cloudy, fog
-        1, 2, 3, 45, 48 -> {
-            val sat = scale(0.2f, intensity)
+        // overcast + fog → desaturate
+        3, 45, 48 -> {
+            val sat = scale(0.55f, intensity)
             val saturation = ColorMatrix()
             saturation.setSaturation(sat)
             matrix.postConcat(saturation)
         }
 
         51, 53, 55, 56, 57, 61, 63, 65, 80, 81, 82 -> {
-            val sat = scale(0.65f, intensity)
+            val sat = scale(0.80f, intensity)
             val saturation = ColorMatrix()
             saturation.setSaturation(sat)
             matrix.postConcat(saturation)
 
-            val rOffset = -8f * intensity.coerceAtMost(1.5f)
-            val gOffset = 8f * intensity.coerceAtMost(1.5f)
-            val bOffset = 15f * intensity.coerceAtMost(1.5f)
+            val rOffset = -3f * intensity.coerceAtMost(1.5f)
+            val gOffset = 2f * intensity.coerceAtMost(1.5f)
+            val bOffset = 5f * intensity.coerceAtMost(1.5f)
 
             val rainTint = ColorMatrix(floatArrayOf(
-                0.95f, 0f, 0f, 0f, rOffset,
-                0f, 0.98f, 0f, 0f, gOffset,
-                0f, 0f, 1.08f, 0f, bOffset,
+                0.98f, 0f, 0f, 0f, rOffset,
+                0f, 0.99f, 0f, 0f, gOffset,
+                0f, 0f, 1.03f, 0f, bOffset,
                 0f, 0f, 0f, 1f, 0f
             ))
             matrix.postConcat(rainTint)
         }
 
         71, 73, 75, 77, 85, 86 -> {
-            val sat = scale(0.85f, intensity)
+            val sat = scale(0.90f, intensity)
             val saturation = ColorMatrix()
             saturation.setSaturation(sat)
             matrix.postConcat(saturation)
 
-            val bOffset = 25f * intensity.coerceAtMost(1.5f)
+            val bOffset = 8f * intensity.coerceAtMost(1.5f)
             val snowTint = ColorMatrix(floatArrayOf(
                 1f, 0f, 0f, 0f, 0f,
                 0f, 1f, 0f, 0f, 0f,
-                0f, 0f, 1.12f, 0f, bOffset,
+                0f, 0f, 1.03f, 0f, bOffset,
                 0f, 0f, 0f, 1f, 0f
             ))
             matrix.postConcat(snowTint)
         }
 
         95, 96, 99 -> {
-            val sat = scale(0.5f, intensity)
+            val sat = scale(0.70f, intensity)
             val saturation = ColorMatrix()
             saturation.setSaturation(sat)
             matrix.postConcat(saturation)
 
-            val rOffset = 8f * intensity.coerceAtMost(1.5f)
-            val bOffset = 15f * intensity.coerceAtMost(1.5f)
+            val rOffset = 3f * intensity.coerceAtMost(1.5f)
+            val bOffset = 6f * intensity.coerceAtMost(1.5f)
 
             val stormTint = ColorMatrix(floatArrayOf(
-                0.85f, 0f, 0f, 0f, rOffset,
-                0f, 0.85f, 0f, 0f, 0f,
-                0f, 0f, 0.95f, 0f, bOffset,
+                0.92f, 0f, 0f, 0f, rOffset,
+                0f, 0.92f, 0f, 0f, 0f,
+                0f, 0f, 0.98f, 0f, bOffset,
                 0f, 0f, 0f, 1f, 0f
             ))
             matrix.postConcat(stormTint)
@@ -206,18 +206,18 @@ fun getWeatherMatrix(wmoCode: Int, isNight: Boolean, intensity: Float): ColorMat
 
         0 -> {
             if (!isNight) {
-                val sat = scale(1.15f, intensity)
+                val sat = scale(1.05f, intensity)
                 val saturation = ColorMatrix()
                 saturation.setSaturation(sat)
                 matrix.postConcat(saturation)
 
-                val rScale = scale(1.08f, intensity)
-                val rOffset = 12f * intensity.coerceAtMost(1.5f)
+                val rScale = scale(1.02f, intensity)
+                val rOffset = 3f * intensity.coerceAtMost(1.5f)
 
                 val sunTint = ColorMatrix(floatArrayOf(
                     rScale, 0f, 0f, 0f, rOffset,
-                    0f, 1.04f, 0f, 0f, 8f * intensity.coerceAtMost(1.5f),
-                    0f, 0f, 0.92f, 0f, -8f * intensity.coerceAtMost(1.5f),
+                    0f, 1.01f, 0f, 0f, 2f * intensity.coerceAtMost(1.5f),
+                    0f, 0f, 0.98f, 0f, -2f * intensity.coerceAtMost(1.5f),
                     0f, 0f, 0f, 1f, 0f
                 ))
                 matrix.postConcat(sunTint)

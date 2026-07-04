@@ -1,17 +1,16 @@
 package com.nxd1frnt.clockdesk2.background
 
 import android.animation.ValueAnimator
-import android.graphics.Matrix
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.animation.AnticipateInterpolator
 import android.view.animation.OvershootInterpolator
-import android.widget.ImageView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 
 class BackgroundCropController(
-    private val imageView: ImageView,
+    private val dynamicBackgroundView: DynamicBackgroundView,
     private val overlayRoot: View,
     private val backgroundManager: BackgroundManager,
     private val onApply: () -> Unit,
@@ -23,8 +22,6 @@ class BackgroundCropController(
     private var savedScale = 1f
     private var savedOffsetX = 0f
     private var savedOffsetY = 0f
-
-    private val matrix = Matrix()
 
     // Ленивые ссылки на дочерние view оверлея
     private val hintCard   by lazy { overlayRoot.findViewById<View>(R.id.crop_hint_card) }
@@ -39,14 +36,18 @@ class BackgroundCropController(
     // --- Gesture detectors ---
 
     private val scaleDetector = ScaleGestureDetector(
-        imageView.context,
+        dynamicBackgroundView.context,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 val newScale = (curScale * detector.scaleFactor).coerceIn(MIN_SCALE, MAX_SCALE)
                 val focusX = detector.focusX
                 val focusY = detector.focusY
-                curOffsetX = focusX - (focusX - curOffsetX) * (newScale / curScale)
-                curOffsetY = focusY - (focusY - curOffsetY) * (newScale / curScale)
+                val vw = dynamicBackgroundView.width.toFloat()
+                val vh = dynamicBackgroundView.height.toFloat()
+                val centerX = vw / 2f
+                val centerY = vh / 2f
+                curOffsetX = (focusX - centerX) * (1f - newScale / curScale) + curOffsetX * (newScale / curScale)
+                curOffsetY = (focusY - centerY) * (1f - newScale / curScale) + curOffsetY * (newScale / curScale)
                 curScale = newScale
                 clampOffset()
                 applyMatrix()
@@ -96,8 +97,7 @@ class BackgroundCropController(
         curOffsetX = savedOffsetX
         curOffsetY = savedOffsetY
 
-        imageView.scaleType = ImageView.ScaleType.MATRIX
-        imageView.post { applyMatrix() }
+        dynamicBackgroundView.post { applyMatrix() }
 
         overlayRoot.visibility = View.VISIBLE
         overlayRoot.alpha = 1f
@@ -134,44 +134,28 @@ class BackgroundCropController(
         curOffsetY = offsetY
         curScale   = scale
 
-        // Гарантируем, что если есть изменения, ImageView останется в режиме MATRIX
-        if (scale != 1f || offsetX != 0f || offsetY != 0f) {
-            imageView.scaleType = ImageView.ScaleType.MATRIX
-            imageView.post { applyMatrix() }
-        } else {
-            imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-        }
+        dynamicBackgroundView.post { applyMatrix() }
     }
 
     // --- Private ---
 
     private fun applyMatrix() {
-        if (imageView.drawable == null) return
-        val dw = imageView.drawable.intrinsicWidth.toFloat()
-        val dh = imageView.drawable.intrinsicHeight.toFloat()
-        val vw = imageView.width.toFloat()
-        val vh = imageView.height.toFloat()
+        val dw = dynamicBackgroundView.imageWidth.toFloat()
+        val dh = dynamicBackgroundView.imageHeight.toFloat()
+        val vw = dynamicBackgroundView.width.toFloat()
+        val vh = dynamicBackgroundView.height.toFloat()
         if (vw == 0f || vh == 0f || dw == 0f || dh == 0f) return
 
-        val baseScale  = maxOf(vw / dw, vh / dh)
-        val totalScale = baseScale * curScale
-
-        matrix.reset()
-        matrix.setScale(totalScale, totalScale)
-        matrix.postTranslate(
-            (vw - dw * totalScale) / 2f + curOffsetX,
-            (vh - dh * totalScale) / 2f + curOffsetY
-        )
-        imageView.imageMatrix = matrix
+        clampOffset()
+        dynamicBackgroundView.setCropTransform(curScale, curOffsetX, curOffsetY)
     }
 
     private fun clampOffset() {
-        val drawable = imageView.drawable ?: return
-        val dw = drawable.intrinsicWidth.toFloat()
-        val dh = drawable.intrinsicHeight.toFloat()
-        val vw = imageView.width.toFloat()
-        val vh = imageView.height.toFloat()
-        if (vw == 0f || vh == 0f) return
+        val dw = dynamicBackgroundView.imageWidth.toFloat()
+        val dh = dynamicBackgroundView.imageHeight.toFloat()
+        val vw = dynamicBackgroundView.width.toFloat()
+        val vh = dynamicBackgroundView.height.toFloat()
+        if (vw == 0f || vh == 0f || dw == 0f || dh == 0f) return
 
         val baseScale = maxOf(vw / dw, vh / dh)
         val scaledW   = dw * baseScale * curScale
@@ -238,13 +222,7 @@ class BackgroundCropController(
                 hintCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
                 navCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
 
-                // Фикс: сохраняем матрицу, если картинка кропнута, иначе возвращаем CENTER_CROP
-                if (curScale == 1f && curOffsetX == 0f && curOffsetY == 0f) {
-                    imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-                } else {
-                    imageView.scaleType = ImageView.ScaleType.MATRIX
-                    applyMatrix()
-                }
+                applyMatrix()
 
                 onDone()
             }?.start()

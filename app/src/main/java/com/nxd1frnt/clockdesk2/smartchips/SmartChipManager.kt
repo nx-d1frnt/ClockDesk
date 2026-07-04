@@ -32,9 +32,12 @@ import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.smartchips.plugins.AlarmChipPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BatteryAlertPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.UpdatePlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.WeatherAlertPlugin
+import com.nxd1frnt.clockdesk2.smartchips.plugins.WeatherChipPlugin
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
@@ -58,6 +61,8 @@ class SmartChipManager(
     private val updateInterval = 5000L
 
     private val pluginTimers = mutableMapOf<String, Runnable>()
+    private val timeoutRunnables = mutableMapOf<String, Runnable>()
+    private val pluginTimeoutCounts = mutableMapOf<String, Int>()
 
 //    private val periodicUpdateRunnable = object : Runnable {
 //        override fun run() {
@@ -69,7 +74,10 @@ class SmartChipManager(
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
         UpdatePlugin(context),
-        BackgroundProgressPlugin(context)
+        BackgroundProgressPlugin(context),
+        AlarmChipPlugin(context),
+        WeatherChipPlugin(context),
+        WeatherAlertPlugin(context)
     )
     var externalPlugins: List<ExternalChipPlugin> = emptyList()
     private val allChips = mutableListOf<ChipInfo>()
@@ -79,9 +87,75 @@ class SmartChipManager(
 
     private var isReceiverRegistered = false
 
+    private fun isReceiverAvailable(packageName: String, className: String): Boolean {
+        return try {
+            val componentName = ComponentName(packageName, className)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getReceiverInfo(componentName, PackageManager.ComponentInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getReceiverInfo(componentName, 0)
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun startTimeoutCheck(packageName: String) {
+        timeoutRunnables[packageName]?.let { handler.removeCallbacks(it) }
+
+        val timeoutRunnable = Runnable {
+            Logger.w("SmartChipManager") { "Plugin $packageName response timed out. Hiding chip." }
+            timeoutRunnables.remove(packageName)
+            val plugin = externalPlugins.find { it.packageName == packageName } ?: return@Runnable
+            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@Runnable
+
+            val count = (pluginTimeoutCounts[packageName] ?: 0) + 1
+            pluginTimeoutCounts[packageName] = count
+            if (count >= 3) {
+                pluginTimers[packageName]?.let { handler.removeCallbacks(it) }
+                pluginTimers.remove(packageName)
+                Logger.w("SmartChipManager") { "Plugin $packageName timed out 3 times consecutively. Stopped timer." }
+            }
+
+            if (chipInfo.isVisible) {
+                chipInfo.isVisible = false
+                chipInfo.clickActivityClassName = null
+                sortAndRedrawChips(contentChanged = true)
+            }
+        }
+        timeoutRunnables[packageName] = timeoutRunnable
+        handler.postDelayed(timeoutRunnable, 6000L)
+    }
+
+    private fun clearPluginTimeout(packageName: String) {
+        timeoutRunnables[packageName]?.let {
+            handler.removeCallbacks(it)
+            timeoutRunnables.remove(packageName)
+        }
+        pluginTimeoutCounts[packageName] = 0
+    }
+
     fun setEditMode(enabled: Boolean, listener: (View) -> Unit) {
         isEditMode = enabled
         onEditClickListener = listener
+        updateChipsClickability()
+    }
+
+    private fun updateChipsClickability() {
+        for (i in 0 until chipContainer.childCount) {
+            val child = chipContainer.getChildAt(i)
+            if (isEditMode) {
+                child.isClickable = false
+                child.isFocusable = false
+            } else {
+                val chipInfo = allChips.find { it.view == child }
+                val hasClick = chipInfo?.clickActivityClassName != null
+                child.isClickable = hasClick
+                child.isFocusable = hasClick
+            }
+        }
     }
 
     private val dataUpdateReceiver: BroadcastReceiver = object : BroadcastReceiver() {
@@ -92,6 +166,8 @@ class SmartChipManager(
             val plugin = externalPlugins.find { it.packageName == packageName } ?: return
 
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return
+
+            clearPluginTimeout(packageName)
 
             val isVisible = intent.getBooleanExtra(ChipPluginContract.KEY_CHIP_VISIBLE, true)
             val updateIntervalSec = intent.getIntExtra("update_interval_seconds", -1)
@@ -159,6 +235,11 @@ class SmartChipManager(
         internalPlugins.forEach { it.stopListening() }
         pluginTimers.values.forEach { handler.removeCallbacks(it) }
         pluginTimers.clear()
+
+        timeoutRunnables.values.forEach { handler.removeCallbacks(it) }
+        timeoutRunnables.clear()
+        pluginTimeoutCounts.clear()
+
         unregisterReceiver()
         Logger.d("SmartChipManager") { "Stopped listening. App is sleeping." }
     }
@@ -215,6 +296,15 @@ class SmartChipManager(
         externalPlugins.forEach { plugin ->
             val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
             if (isEnabled) {
+                if (!isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
+                    val chipInfo = allChips.find { it.id == plugin.preferenceKey }
+                    if (chipInfo?.isVisible == true) {
+                        chipInfo.isVisible = false
+                        isContentChanged = true
+                    }
+                    return@forEach
+                }
+
                 val requestIntent = Intent().apply {
                     action = ChipPluginContract.ACTION_REQUEST_DATA
                     component = ComponentName(plugin.packageName, plugin.receiverClassName)
@@ -222,6 +312,7 @@ class SmartChipManager(
                     addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
                 }
                 context.sendBroadcast(requestIntent)
+                startTimeoutCheck(plugin.packageName)
             } else {
                 val chipInfo = allChips.find { it.id == plugin.preferenceKey }
                 if (chipInfo?.isVisible == true) {
@@ -244,12 +335,26 @@ class SmartChipManager(
             val runnable = object : Runnable {
                 override fun run() {
                     val plugin = externalPlugins.find { it.packageName == packageName } ?: return
+                    if (!isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
+                        Logger.w("SmartChipManager") { "Plugin receiver not available: $packageName. Stopping timer." }
+                        pluginTimers[packageName]?.let { handler.removeCallbacks(it) }
+                        pluginTimers.remove(packageName)
+
+                        val chipInfo = allChips.find { it.id == plugin.preferenceKey }
+                        if (chipInfo?.isVisible == true) {
+                            chipInfo.isVisible = false
+                            sortAndRedrawChips(contentChanged = true)
+                        }
+                        return
+                    }
+
                     val requestIntent = Intent(ChipPluginContract.ACTION_REQUEST_DATA).apply {
                         component = ComponentName(plugin.packageName, plugin.receiverClassName)
                         addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES) // Пробиваем сон
                     }
                     context.sendBroadcast(requestIntent)
                     Logger.d("SmartChipManager"){"Plugin timer triggered: $packageName"}
+                    startTimeoutCheck(packageName)
                     handler.postDelayed(this, intervalSec * 1000L)
                 }
             }
@@ -418,11 +523,20 @@ fun updateAllChips() {
             }
             
             if (isEnabled) {
+                if (!isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
+                    if (chipInfo.isVisible) {
+                        chipInfo.isVisible = false
+                        isContentChanged = true
+                    }
+                    return@forEach
+                }
+
                 val requestIntent = Intent().apply {
                     action = ChipPluginContract.ACTION_REQUEST_DATA
                     component = ComponentName(plugin.packageName, plugin.receiverClassName)
                 }
                 context.sendBroadcast(requestIntent)
+                startTimeoutCheck(plugin.packageName)
             }
         }
 
@@ -431,7 +545,7 @@ fun updateAllChips() {
 
     private fun sortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
-        val orderString = sharedPreferences.getString("smart_chip_order", "show_battery_alert,show_updates,system_bg_progress") ?: ""
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
        // Logger.d("SmartChipManager"){"orderString: $orderString"}
         val orderList = orderString.split(",").map { it.trim() }
 
@@ -514,6 +628,7 @@ fun updateAllChips() {
             }
         }
         constraintSet.applyTo(container)
+        updateChipsClickability()
     }
 
     fun onPreferencesChanged() {

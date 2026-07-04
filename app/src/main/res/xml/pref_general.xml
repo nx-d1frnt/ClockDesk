@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:key="suntimeapi_category"
+        app:title="@string/sun_sunrise_api_settings">
+
+        <androidx.preference.ListPreference
+            app:key="location_mode"
+            app:title="@string/location_mode_title"
+            app:summary="@string/location_mode_summary"
+            app:defaultValue="auto"
+            app:entries="@array/location_mode_entries"
+            app:entryValues="@array/location_mode_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <androidx.preference.EditTextPreference
+            app:key="location_city_name"
+            app:title="@string/location_city_name_title"
+            app:dialogTitle="@string/location_city_name_dialog_title"
+            app:useSimpleSummaryProvider="false" />
+
+        <androidx.preference.EditTextPreference
+            app:key="latitude"
+            app:title="@string/latitude_label"
+            app:dialogTitle="@string/enter_latitude"
+            app:useSimpleSummaryProvider="true"
+            android:inputType="numberDecimal|numberSigned" />
+
+        <androidx.preference.EditTextPreference
+            app:key="longitude"
+            app:title="@string/longitude"
+            app:dialogTitle="@string/enter_longitude"
+            app:useSimpleSummaryProvider="true"
+            android:inputType="numberDecimal|numberSigned" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="weather_settings_category"
+        app:title="@string/weather_settings_category_title">
+
+        <androidx.preference.ListPreference
+            app:key="weather_refresh_interval"
+            app:title="@string/weather_refresh_interval_title"
+            app:summary="@string/weather_refresh_interval_summary"
+            app:defaultValue="30"
+            app:entries="@array/weather_refresh_entries"
+            app:entryValues="@array/weather_refresh_values"
+            app:useSimpleSummaryProvider="true" />
+    </androidx.preference.PreferenceCategory>
+</androidx.preference.PreferenceScreen>

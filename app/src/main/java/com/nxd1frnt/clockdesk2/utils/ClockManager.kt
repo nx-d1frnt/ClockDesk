@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.utils
 
+import android.content.SharedPreferences
 import android.os.Handler
 import android.util.Log
 import android.widget.TextView
@@ -18,6 +19,7 @@ class ClockManager(
     private val locationManager: LocationManager,
     private val debugCallback: (String, String, String) -> Unit,
     private val onTimeChanged: (Date) -> Unit,
+    private val prefs: SharedPreferences,
     initialLoggingState: Boolean
 ) : PowerSaveObserver {
 
@@ -27,6 +29,7 @@ class ClockManager(
         isLowPower = isEnabled
         updateTimeText()
         Logger.d("ClockManager"){"Power saving mode changed: isLowPower=$isLowPower"}
+        startUpdates()
     }
     private var isDebugMode = false
     private val debugCycleInterval = 5L // milliseconds
@@ -42,9 +45,10 @@ class ClockManager(
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
             updateClock()
+            val limitClock = prefs.getBoolean("power_saver_limit_clock", true)
             val interval = when {
                 isDebugMode -> debugCycleInterval
-                isLowPower -> 60000L // 1 minute
+                isLowPower && limitClock -> 60000L // 1 minute
                 else -> 1000L // 1 second
             }
             handler.postDelayed(this, interval)
