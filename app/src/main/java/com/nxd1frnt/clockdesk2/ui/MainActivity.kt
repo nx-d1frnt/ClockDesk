@@ -17,9 +17,6 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Outline
 import android.graphics.PorterDuff
-import android.graphics.RenderEffect
-import android.graphics.Shader
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.hardware.Sensor
@@ -49,7 +46,6 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.RequestOptions
@@ -1412,12 +1408,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 fontManager.setDynamicScheme(seedColor)
                                 fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
 
-                                var noiseColor = Color.WHITE
-                                if (fontManager.getDynamicScheme() == null) {
-                                    noiseColor = getColor(R.color.md_theme_primary)
-                                } else {
-                                    noiseColor = fontManager.getDynamicScheme()!!.primary
-                                }
+                                val noiseColor = fontManager.getDynamicScheme().primary
 
                                 if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
                                     turbulenceOverlay.playAnimation(noiseColor) {}
@@ -1525,223 +1516,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-//    private fun loadBackgroundInternal(model: Any, blurIntensity: Int, onComplete: (() -> Unit)? = null) {
-//        if (isFinishing) return
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
-//        try {
-//            val targetMode = backgroundManager.getDimMode()
-//            val targetIntensity = backgroundManager.getDimIntensity()
-//            val effectiveIntensity = getEffectiveDimIntensity(targetMode, targetIntensity)
-//            val targetZoom = calculateZoom(effectiveIntensity)
-//
-//            gradientManager.stopUpdates()
-//
-//            val gradientDrawable = GradientDrawable(
-//                GradientDrawable.Orientation.TOP_BOTTOM,
-//                intArrayOf(Color.parseColor("#0F141A"), Color.parseColor("#171E28"))
-//            )
-//
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-//                backgroundLayout.background = gradientDrawable
-//            } else {
-//                @Suppress("DEPRECATION")
-//                backgroundLayout.setBackgroundDrawable(gradientDrawable)
-//            }
-//
-//            backgroundImageView.visibility = View.VISIBLE
-//            backgroundImageView.scaleX = targetZoom
-//            backgroundImageView.scaleY = targetZoom
-//            backgroundImageView.animate()
-//                .scaleX(targetZoom + 0.4f)
-//                .scaleY(targetZoom + 0.4f)
-//                .alpha(0f)
-//                .setDuration(700)
-//                .setListener(null)
-//                .start()
-//
-//            val usePlatformBlur = blurIntensity > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-//            val metrics = resources.displayMetrics
-//            val maxDim = 1080
-//
-//            val blurScaleFactor = if (blurIntensity <= 0) 1.0f else {
-//                val normalized = blurIntensity.coerceIn(0, 100) / 100f
-//                1.0f - (normalized * 0.75f)
-//            }
-//
-//            val targetW = (minOf(metrics.widthPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
-//            val targetH = (minOf(metrics.heightPixels, maxDim) * blurScaleFactor).toInt().coerceAtLeast(64)
-//
-//            val req = RequestOptions()
-//                .transform(CenterCrop())
-//                .override(targetW, targetH)
-//                .downsample(DownsampleStrategy.CENTER_INSIDE)
-//                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-//
-//            val finalReq = if (usePlatformBlur) {
-//                req
-//            } else if (blurIntensity > 0) {
-//                req.transform(
-//                    CenterCrop(),
-//                    BlurTransformation(this, blurIntensity, 1) {
-//                        if (!isDestroyed && !isFinishing) {
-//                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING)
-//                        }
-//                    }
-//                )
-//            } else {
-//                req
-//            }
-//
-//            val mainTarget = object : CustomTarget<Drawable>() {
-//                override fun onResourceReady(
-//                    resource: Drawable,
-//                    transition: Transition<in Drawable>?
-//                ) {
-//                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.EXTRACTING_COLORS)
-//                    val bitmap = (resource as? BitmapDrawable)?.bitmap
-//
-//                    if (bitmap != null) {
-//                        Thread {
-//                            ColorExtractor.extractColor(bitmap) { seedColor ->
-//                                handler.post {
-//                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
-//
-//                                    fontManager.setDynamicScheme(seedColor)
-//                                    fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
-//
-//                                    var noiseColor = Color.WHITE
-//                                    if (fontManager.getDynamicScheme() == null) {
-//                                        noiseColor = getColor(R.color.md_theme_primary)
-//                                    } else {
-//                                        noiseColor = fontManager.getDynamicScheme()!!.primary
-//                                    }
-//
-//                                    if (isAdvancedGraphicsEnabled) {
-//                                        turbulenceOverlay.playAnimation(noiseColor) {}
-//                                    }
-//
-//                                    backgroundImageView.setImageDrawable(resource)
-//
-//                                    val bgOffsetX = backgroundManager.getBgOffsetX()
-//                                    val bgOffsetY = backgroundManager.getBgOffsetY()
-//                                    val bgScale   = backgroundManager.getBgScale()
-//
-//                                    if (bgScale != 1f || bgOffsetX != 0f || bgOffsetY != 0f) {
-//                                        backgroundImageView.scaleType = ImageView.ScaleType.MATRIX
-//                                        backgroundImageView.post {
-//                                            cropController.applyStoredTransform(bgOffsetX, bgOffsetY, bgScale)
-//                                        }
-//                                    } else {
-//                                        backgroundImageView.scaleType = ImageView.ScaleType.CENTER_CROP
-//                                    }
-//
-//                                    if (usePlatformBlur) {
-//                                        try {
-//                                            val radiusPx = (blurIntensity * blurScaleFactor).coerceAtLeast(1f)
-//                                            val renderEffect = RenderEffect.createBlurEffect(
-//                                                radiusPx,
-//                                                radiusPx,
-//                                                Shader.TileMode.CLAMP
-//                                            )
-//                                            backgroundImageView.setRenderEffect(renderEffect)
-//                                        } catch (e: Throwable) { /* ignore */ }
-//                                    } else {
-//                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//                                            backgroundImageView.setRenderEffect(null)
-//                                        }
-//                                    }
-//
-//                                    backgroundImageView.visibility = View.VISIBLE
-//                                    val currentTargetMode = backgroundManager.getDimMode()
-//                                    val currentTargetIntensity = backgroundManager.getDimIntensity()
-//                                    val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
-//                                    val finalZoom = calculateZoom(currentEffectiveIntensity)
-//
-//                                    backgroundImageView.scaleX = finalZoom + 0.4f
-//                                    backgroundImageView.scaleY = finalZoom + 0.4f
-//
-//                                    fontManager.applyNightShiftTransition(
-//                                        clockManager.getCurrentTime(),
-//                                        dayTimeGetter,
-//                                        true
-//                                    )
-//
-//                                    onComplete?.invoke()
-//
-//                                    backgroundImageView.animate()
-//                                        .scaleX(finalZoom)
-//                                        .scaleY(finalZoom)
-//                                        .alpha(1.0f)
-//                                        .setDuration(700)
-//                                        .setListener(object : AnimatorListenerAdapter() {
-//                                            override fun onAnimationEnd(animation: Animator) {
-//                                                updateBackgroundFilters()
-//                                                handler.postDelayed({
-//                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-//                                                }, 500)
-//                                            }
-//                                        }).start()
-//                                }
-//                            }
-//                        }.start()
-//                    } else {
-//                        backgroundImageView.setImageDrawable(resource)
-//                        backgroundImageView.visibility = View.VISIBLE
-//                        onComplete?.invoke()
-//                    }
-//                }
-//
-//                override fun onLoadCleared(placeholder: Drawable?) {
-//                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-//                }
-//
-//                override fun onLoadFailed(errorDrawable: Drawable?) {
-//                    super.onLoadFailed(errorDrawable)
-//                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
-//                    Logger.w("MainActivity") {"Glide failed to load background: $model"}
-//                    handler.postDelayed({
-//                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-//                    }, 2000)
-//
-//                    onComplete?.invoke()
-//
-//                    try {
-//                        val savedUri = backgroundManager.getSavedBackgroundUri()
-//                        if (model.toString() != savedUri) {
-//                            restoreUserBackground(savedUri)
-//                        }
-//                    } catch (e: Exception) {
-//                        Logger.e("MainActivity"){"Failed to restore user background with exception: ${e.message}"}
-//                    }
-//                }
-//
-//                override fun onLoadStarted(placeholder: Drawable?) {
-//                    super.onLoadStarted(placeholder)
-//                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.DOWNLOADING)
-//                }
-//            }
-//
-//            GlideApp.with(this)
-//                .load(model)
-//                .apply(finalReq)
-//                .into(mainTarget)
-//
-//            if (isAdvancedGraphicsEnabled) {
-//                applyEditModeBlurLayer(model)
-//            } else {
-//                editModeBlurLayer.setImageDrawable(null)
-//                editModeBlurLayer.visibility = View.GONE
-//            }
-//
-//        } catch (e: Exception) {
-//            updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
-//            handler.postDelayed({
-//                updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-//            }, 2000)
-//            Logger.e("MainActivity"){"loadBackgroundInternal failed with exception: ${e.message}"}
-//            onComplete?.invoke()
-//        }
-//    }
     private fun applyEditModeBlurLayer(model: Any) {
         editModeBlurLayer.visibility = View.VISIBLE
         val ambientReq = RequestOptions()
