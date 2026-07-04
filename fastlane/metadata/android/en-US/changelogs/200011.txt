@@ -1,0 +1,6 @@
+- Overhauled settings UI with modular category fragments and dual-pane layout.
+- Rewrote the rendering engine to use OpenGL ES 2.0 (DynamicBackgroundView).
+- Added Battery and Weather Alert plugins (severe weather, wind, UV index).
+- Overhauled onboarding flow with step-by-step guides.
+- Improved plugin reliability with watchdog timeouts and availability checks.
+- Centralized night shift color shifting to prevent flickering.
