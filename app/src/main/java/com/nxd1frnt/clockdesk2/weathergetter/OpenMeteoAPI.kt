@@ -16,7 +16,7 @@ class OpenMeteoAPI(
         val url =
             "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
                     "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility,uv_index" +
-                    "&hourly=weather_code&timezone=auto&forecast_days=2"
+                    "&hourly=weather_code&daily=weather_code,temperature_2m_max&timezone=auto&forecast_days=5"
 
         val request = JsonObjectRequest(
             Request.Method.GET, url, null,
@@ -72,11 +72,33 @@ class OpenMeteoAPI(
                         Logger.e("OpenMeteoApi") { "Error parsing hourly forecast: ${e.message}" }
                     }
 
+                    val dailyCodesList = mutableListOf<Int>()
+                    val dailyMaxTempsList = mutableListOf<Double>()
+                    try {
+                        if (response.has("daily")) {
+                            val daily = response.getJSONObject("daily")
+                            val dailyCodesArray = daily.optJSONArray("weather_code")
+                            val dailyMaxTempsArray = daily.optJSONArray("temperature_2m_max")
+                            if (dailyCodesArray != null && dailyMaxTempsArray != null) {
+                                val len = minOf(dailyCodesArray.length(), dailyMaxTempsArray.length())
+                                for (i in 0 until len) {
+                                    dailyCodesList.add(dailyCodesArray.getInt(i))
+                                    dailyMaxTempsList.add(dailyMaxTempsArray.getDouble(i))
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("OpenMeteoApi") { "Error parsing daily forecast: ${e.message}" }
+                    }
+
                     Logger.d("OpenMeteoApi"){"Weather: Code=$weatherCode, Wind=$windSpeed km/h, " +
                             "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m, " +
-                            "UvIndex=$uvIndex, HourlyCodesSize=${hourlyCodesList.size}"}
+                            "UvIndex=$uvIndex, HourlyCodesSize=${hourlyCodesList.size}, DailyCodesSize=${dailyCodesList.size}"}
 
-                    WeatherGetter.updateCache(temperature, weatherCode, isDay, windSpeed, hourlyCodesList, uvIndex)
+                    WeatherGetter.updateCache(
+                        temperature, weatherCode, isDay, windSpeed, hourlyCodesList, uvIndex,
+                        dailyCodes = dailyCodesList, dailyMaxTemps = dailyMaxTempsList
+                    )
 
                     onWeatherUpdated()
 

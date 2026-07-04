@@ -60,4 +60,9 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
     kapt("com.github.bumptech.glide:compiler:4.15.1")
+
+    // Dashboard dependencies
+    implementation("io.github.dokar3:quickjs-kt:1.0.0-alpha13")
+    implementation("com.caverock:androidsvg-aar:1.4")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

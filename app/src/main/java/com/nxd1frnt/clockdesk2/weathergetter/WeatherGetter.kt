@@ -22,6 +22,8 @@ open class WeatherGetter(
         var cachedWindSpeed: Double? = null
         var cachedHourlyCodes: List<Int> = emptyList()
         var cachedUvIndex: Double? = null
+        var cachedDailyCodes: List<Int> = emptyList()
+        var cachedDailyMaxTemps: List<Double> = emptyList()
 
         private val listeners = mutableSetOf<() -> Unit>()
 
@@ -33,13 +35,24 @@ open class WeatherGetter(
             listeners.remove(listener)
         }
 
-        fun updateCache(temp: Double?, code: Int?, isDay: Boolean?, wind: Double?, hourlyCodes: List<Int>, uvIndex: Double? = null) {
+        fun updateCache(
+            temp: Double?,
+            code: Int?,
+            isDay: Boolean?,
+            wind: Double?,
+            hourlyCodes: List<Int>,
+            uvIndex: Double? = null,
+            dailyCodes: List<Int> = emptyList(),
+            dailyMaxTemps: List<Double> = emptyList()
+        ) {
             cachedTemperature = temp
             cachedWeatherCode = code
             cachedIsDay = isDay
             cachedWindSpeed = wind
             cachedHourlyCodes = hourlyCodes
             cachedUvIndex = uvIndex
+            cachedDailyCodes = dailyCodes
+            cachedDailyMaxTemps = dailyMaxTemps
             listeners.forEach {
                 try { it() } catch (e: Exception) {}
             }

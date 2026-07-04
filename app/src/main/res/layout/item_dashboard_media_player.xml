@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="28dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="170dp">
+
+        <!-- 1. Stretched Album Art Background -->
+        <ImageView
+            android:id="@+id/media_bg_album_art"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_music_icon" />
+
+        <!-- 2. Semi-transparent Dark Overlay for Premium Look -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#950B0E14" />
+
+        <!-- 3. Player Controls -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp">
+
+            <!-- Source Player Icon (Top Left) -->
+            <ImageView
+                android:id="@+id/media_source_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/music_note"
+                app:tint="#FFFFFF"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Title & Artist (Middle Left) -->
+            <LinearLayout
+                android:id="@+id/media_details"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginEnd="16dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/media_btn_play_pause_card"
+                app:layout_constraintTop_toBottomOf="@id/media_source_icon"
+                app:layout_constraintBottom_toTopOf="@id/media_btn_prev"
+                app:layout_constraintVertical_bias="0.5">
+
+                <TextView
+                    android:id="@+id/media_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Track Title"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:ellipsize="end"
+                    android:singleLine="true" />
+
+                <TextView
+                    android:id="@+id/media_artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Artist Name"
+                    android:textSize="14sp"
+                    android:textColor="#B3FFFFFF"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:singleLine="true" />
+
+            </LinearLayout>
+
+            <!-- Play/Pause Button (Middle Right, Squircle) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/media_btn_play_pause_card"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                app:cardCornerRadius="18dp"
+                app:strokeWidth="0dp"
+                app:cardBackgroundColor="#E2E6F5"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/media_source_icon"
+                app:layout_constraintBottom_toTopOf="@id/media_btn_repeat"
+                app:layout_constraintVertical_bias="0.5"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/media_btn_play_pause"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:scaleType="fitCenter"
+                    android:src="@android:drawable/ic_media_pause"
+                    app:tint="#0B0E14" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Previous Button (Bottom Row Left) -->
+            <ImageButton
+                android:id="@+id/media_btn_prev"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_media_previous"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <!-- Squiggly Progress Slider (Bottom Row Center) -->
+            <com.nxd1frnt.clockdesk2.ui.view.SquigglySlider
+                android:id="@+id/media_progress_slider"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                app:layout_constraintStart_toEndOf="@id/media_btn_prev"
+                app:layout_constraintEnd_toStartOf="@id/media_btn_next"
+                app:layout_constraintTop_toTopOf="@id/media_btn_prev"
+                app:layout_constraintBottom_toBottomOf="@id/media_btn_prev" />
+
+            <!-- Next Button (Bottom Row Right-Middle) -->
+            <ImageButton
+                android:id="@+id/media_btn_next"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_media_next"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF"
+                app:layout_constraintEnd_toStartOf="@id/media_btn_like"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:layout_marginEnd="12dp" />
+
+            <!-- Like/Heart Button (Bottom Row Right-Middle) -->
+            <ImageButton
+                android:id="@+id/media_btn_like"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_heart"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF"
+                app:layout_constraintEnd_toStartOf="@id/media_btn_repeat"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:layout_marginEnd="12dp" />
+
+            <!-- Repeat Button (Bottom Row Right) -->
+            <ImageButton
+                android:id="@+id/media_btn_repeat"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_repeat"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Edit Overlay -->
+        <LinearLayout
+            android:id="@+id/edit_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:orientation="horizontal"
+            android:background="#D0000000"
+            android:layout_margin="8dp"
+            android:padding="2dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageButton
+                android:id="@+id/btn_tile_edit"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/pencil_outline"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF"
+                android:contentDescription="Edit tile" />
+
+            <ImageButton
+                android:id="@+id/btn_tile_delete"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_menu_delete"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FF5252"
+                android:contentDescription="Delete tile" />
+        </LinearLayout>
+
+    </FrameLayout>
+</com.google.android.material.card.MaterialCardView>

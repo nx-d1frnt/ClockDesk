@@ -92,6 +92,24 @@ import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
+import androidx.viewpager2.widget.ViewPager2
+import android.widget.Spinner
+import android.widget.ArrayAdapter
+import android.view.LayoutInflater
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ItemTouchHelper
+import com.google.android.material.button.MaterialButton
+import android.content.Context
+import android.media.session.MediaSessionManager
+import android.content.ComponentName
+import com.nxd1frnt.clockdesk2.music.ClockDeskMediaService
+import com.nxd1frnt.clockdesk2.ui.dashboard.DashboardTile
+import com.nxd1frnt.clockdesk2.ui.dashboard.DashboardAdapter
+import com.nxd1frnt.clockdesk2.ui.dashboard.DashboardManager
+import java.util.Calendar
+import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var timeText: TextView
@@ -181,12 +199,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
     private val PICK_FONT_REQUEST = 400
+    private val PICK_ZIP_REQUEST = 402
     private val minPowerSaveBrightness = 0.01f
 
     private var lightSensor: Sensor? = null
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var pendingRestoreRunnable: Runnable? = null
     private lateinit var entranceAnimationManager: EntranceAnimationManager
+
+    private lateinit var viewPager: ViewPager2
+    private lateinit var mainPage: View
+    private lateinit var dashboardPage: View
+    private lateinit var dashboardRecyclerView: RecyclerView
+    private lateinit var dashboardGreeting: TextView
+    private lateinit var dashboardSubtitle: TextView
+    private lateinit var btnScenarioLightsOff: MaterialButton
+    private lateinit var btnScenarioMediaStop: MaterialButton
+
+    private var dashboardManager: DashboardManager? = null
+    private var dashboardAdapter: DashboardAdapter? = null
     private var isWidgetLayoutComplete = false
     private var isBackgroundReady = false
     private var entranceAnimationPlayed = false
@@ -265,6 +296,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         setupWindowFlags()
         setContentView(R.layout.activity_main)
 
+        viewPager = super.findViewById(R.id.view_pager)
+        val inflater = LayoutInflater.from(this)
+        dashboardPage = inflater.inflate(R.layout.dashboard_page, null).apply {
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        mainPage = inflater.inflate(R.layout.content_main, null).apply {
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        viewPager.adapter = MainPagerAdapter(dashboardPage, mainPage)
+        viewPager.currentItem = 1
+
         initViews()
 
         sideSheetBehavior = SideSheetBehavior.from(sideSheet).apply {
@@ -281,6 +329,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         loadSavedBackground(skipAnimation)
         checkForFirstLaunchAnimation()
         setupSideSheet()
+        setupDashboard()
         restoreSavedWeatherState()
         startUpdates()
     }
@@ -324,6 +373,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
 
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
+
+        dashboardRecyclerView = findViewById(R.id.dashboard_recycler_view)
+        dashboardGreeting = findViewById(R.id.dashboard_greeting)
+        dashboardSubtitle = findViewById(R.id.dashboard_subtitle)
+        btnScenarioLightsOff = findViewById(R.id.btn_scenario_lights_off)
+        btnScenarioMediaStop = findViewById(R.id.btn_scenario_media_stop)
 
         settingsButton.alpha = 0f
         settingsButton.visibility = View.GONE
@@ -394,6 +449,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (hasCustomImageBackground) {
                     updateBackgroundFilters()
                 }
+                
+                dashboardManager?.pushWeatherState()
             }
         }
 
@@ -780,6 +837,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (::viewPager.isInitialized && viewPager.currentItem == 0) {
+                    viewPager.currentItem = 1
+                    return
+                }
+
                 if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
                     backgroundSheetManager.cancelAndHide()
                     return
@@ -885,7 +947,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     override fun onDestroy() {
         super.onDestroy()
         weatherGetter.stopUpdates()
+        stopUpdates()
         musicManager?.destroy()
+        dashboardManager?.destroy()
         pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
         if (::backgroundSheetManager.isInitialized) backgroundSheetManager.onDestroy()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
@@ -897,6 +961,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         musicManager = MusicPluginManager(this, prefs) { state ->
             runOnUiThread {
                 handleMusicStateUpdate(state)
+                dashboardManager?.pushMusicState(state)
             }
         }
     }
@@ -1265,6 +1330,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val uriStr = uri.toString()
             backgroundManager.addSavedUri(uriStr)
             backgroundSheetManager.onImageAdded(uriStr)
+        }
+        if (requestCode == PICK_ZIP_REQUEST && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            val fileName = getFileName(uri) ?: "imported_plugin.zip"
+            val success = dashboardManager?.importPluginFromZip(uri, fileName) ?: false
+            if (success) {
+                Toast.makeText(this, "Widget imported successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Failed to import ZIP widget. Make sure it contains layout.json and logic.js", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -2416,5 +2491,790 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             handler.removeCallbacks(it)
             performanceRunnable = null
         }
+    }
+
+    private fun setupDashboard() {
+        dashboardAdapter = DashboardAdapter(
+            tiles = emptyList(),
+            onTileClick = { tile -> dashboardManager?.handleTileClick(tile) },
+            onToggleChange = { tile, state -> dashboardManager?.handleToggleChange(tile, state) },
+            onSliderChange = { tile, value -> dashboardManager?.handleSliderChange(tile, value) },
+            onMediaControl = { tile, action -> dashboardManager?.evaluateJs(tile.pluginId, "ClockDesk.controlMedia('$action')") }
+        ).apply {
+            onEditClick = { tile -> showWidgetEditorDialog(tile) }
+            onDeleteClick = { tile ->
+                MaterialAlertDialogBuilder(this@MainActivity)
+                    .setTitle("Delete Widget")
+                    .setMessage("Are you sure you want to delete this widget?")
+                    .setPositiveButton("Yes") { _, _ ->
+                        dashboardManager?.deletePlugin(tile.pluginId)
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+
+        dashboardManager = DashboardManager(this) { tiles ->
+            runOnUiThread {
+                dashboardAdapter?.tiles = tiles
+                dashboardAdapter?.notifyDataSetChanged()
+            }
+        }
+        
+        dashboardManager?.adapter = dashboardAdapter
+        
+        dashboardRecyclerView.adapter = dashboardAdapter
+        val gridLayoutManager = GridLayoutManager(this, 4)
+        gridLayoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int {
+                return dashboardAdapter?.tiles?.getOrNull(position)?.span ?: 2
+            }
+        }
+        dashboardRecyclerView.layoutManager = gridLayoutManager
+
+        // Set up ItemTouchHelper for drag and drop reordering
+        val itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+            0
+        ) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val fromPos = viewHolder.adapterPosition
+                val toPos = target.adapterPosition
+                if (fromPos == RecyclerView.NO_POSITION || toPos == RecyclerView.NO_POSITION) return false
+                
+                dashboardAdapter?.tiles?.let { list ->
+                    if (fromPos < list.size && toPos < list.size) {
+                        val mutableList = list.toMutableList()
+                        val item = mutableList.removeAt(fromPos)
+                        mutableList.add(toPos, item)
+                        dashboardAdapter?.tiles = mutableList
+                        dashboardAdapter?.notifyItemMoved(fromPos, toPos)
+                        saveTilesOrder(mutableList)
+                    }
+                }
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
+
+            override fun isLongPressDragEnabled(): Boolean {
+                return dashboardAdapter?.isEditMode == true
+            }
+
+            override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+                super.onSelectedChanged(viewHolder, actionState)
+                if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                    dashboardRecyclerView.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+
+            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+                super.clearView(recyclerView, viewHolder)
+                dashboardRecyclerView.parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        })
+        itemTouchHelper.attachToRecyclerView(dashboardRecyclerView)
+
+        updateDashboardGreeting()
+
+        btnScenarioLightsOff.setOnClickListener {
+            dashboardManager?.triggerMasterScenario("LIGHTS", "TURN_OFF")
+        }
+        btnScenarioMediaStop.setOnClickListener {
+            dashboardManager?.triggerMasterScenario("MEDIA", "TURN_OFF")
+            try {
+                val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+                val componentName = ComponentName(this, ClockDeskMediaService::class.java)
+                val controllers = mediaSessionManager.getActiveSessions(componentName)
+                controllers.forEach { it.transportControls.pause() }
+            } catch (e: Exception) {
+                Logger.e("MainActivity") { "Failed to stop media sessions: ${e.message}" }
+            }
+        }
+
+        // Configure edit buttons
+        val btnToggleEdit = dashboardPage.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_dashboard_toggle_edit)
+        val btnAddWidget = dashboardPage.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_dashboard_add_widget)
+        val btnImportWidget = dashboardPage.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_dashboard_import_widget)
+        val btnRestoreDefaults = dashboardPage.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_dashboard_restore_defaults)
+
+        btnToggleEdit?.setOnClickListener {
+            val adapter = dashboardAdapter ?: return@setOnClickListener
+            adapter.isEditMode = !adapter.isEditMode
+            adapter.notifyDataSetChanged()
+            
+            val visibility = if (adapter.isEditMode) View.VISIBLE else View.GONE
+            btnAddWidget?.visibility = visibility
+            btnImportWidget?.visibility = visibility
+            btnRestoreDefaults?.visibility = visibility
+            
+            if (adapter.isEditMode) {
+                btnToggleEdit.setIconResource(R.drawable.ic_check)
+            } else {
+                btnToggleEdit.setIconResource(R.drawable.pencil_outline)
+            }
+        }
+
+        btnAddWidget?.setOnClickListener {
+            showWidgetTemplatesDialog()
+        }
+
+        btnImportWidget?.setOnClickListener {
+            launchZipChooser()
+        }
+
+        btnRestoreDefaults?.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Restore Defaults")
+                .setMessage("Are you sure you want to restore default widgets and delete your custom widgets?")
+                .setPositiveButton("Yes") { _, _ ->
+                    dashboardManager?.restoreDefaultPlugins()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun saveTilesOrder(tiles: List<DashboardTile>) {
+        val orderArray = JSONArray()
+        tiles.forEach { orderArray.put(it.id) }
+        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            .edit()
+            .putString("dashboard_tiles_order", orderArray.toString())
+            .apply()
+    }
+
+    private fun launchZipChooser() {
+        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/x-zip-compressed"))
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        startActivityForResult(Intent.createChooser(intent, "Select Widget ZIP"), PICK_ZIP_REQUEST)
+    }
+
+    private fun showWidgetTemplatesDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_widget_templates, null)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialogView.findViewById<View>(R.id.card_template_weather).setOnClickListener {
+            dialog.dismiss()
+            val success = dashboardManager?.addBuiltInWidget("weather") ?: false
+            if (success) {
+                Toast.makeText(this, "Weather Widget restored successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Failed to restore Weather Widget", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_music).setOnClickListener {
+            dialog.dismiss()
+            val success = dashboardManager?.addBuiltInWidget("music") ?: false
+            if (success) {
+                Toast.makeText(this, "Music Player restored successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Failed to restore Music Player", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_switch).setOnClickListener {
+            dialog.dismiss()
+            showWidgetTemplateForm("SWITCH")
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_slider).setOnClickListener {
+            dialog.dismiss()
+            showWidgetTemplateForm("SLIDER")
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_monitor).setOnClickListener {
+            dialog.dismiss()
+            showWidgetTemplateForm("MONITOR")
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_button).setOnClickListener {
+            dialog.dismiss()
+            showWidgetTemplateForm("BUTTON")
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_zip).setOnClickListener {
+            dialog.dismiss()
+            launchZipChooser()
+        }
+
+        dialogView.findViewById<View>(R.id.card_template_advanced).setOnClickListener {
+            dialog.dismiss()
+            showWidgetEditorDialog(null)
+        }
+
+        dialog.show()
+    }
+
+    private fun showWidgetTemplateForm(templateType: String) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_widget_template_form, null)
+        val textHeader = dialogView.findViewById<TextView>(R.id.text_form_header)
+        val editTitle = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.form_widget_title)
+        val editSubtitle = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.form_widget_subtitle)
+        val spinnerSpan = dialogView.findViewById<Spinner>(R.id.form_widget_span)
+        val spinnerIcon = dialogView.findViewById<Spinner>(R.id.form_widget_icon_spinner)
+        
+        val layoutUrl = dialogView.findViewById<View>(R.id.layout_section_url)
+        val editUrl = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.form_widget_url)
+        
+        val layoutMethod = dialogView.findViewById<View>(R.id.layout_section_method)
+        val spinnerMethod = dialogView.findViewById<Spinner>(R.id.form_widget_method)
+        
+        val layoutJsonPath = dialogView.findViewById<View>(R.id.layout_section_json_path)
+        val editJsonPath = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.form_widget_json_path)
+        
+        val layoutInterval = dialogView.findViewById<View>(R.id.layout_section_interval)
+        val spinnerInterval = dialogView.findViewById<Spinner>(R.id.form_widget_interval)
+        
+        val layoutCategory = dialogView.findViewById<View>(R.id.layout_section_category)
+        val editCategory = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.form_widget_category)
+
+        // Populate spinners
+        val spans = arrayOf("1", "2", "3", "4")
+        spinnerSpan.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, spans)
+        spinnerSpan.setSelection(1) // Default to 2 span
+
+        val icons = arrayOf("ic_widgets_outline", "ic_dim", "ic_info_outline", "music_note", "ic_alarm", "ic_cog", "ic_palette_swatch", "ic_auto_awesome")
+        spinnerIcon.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, icons)
+
+        val methods = arrayOf("GET", "POST")
+        spinnerMethod.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, methods)
+
+        val intervals = arrayOf("5 seconds", "30 seconds", "1 minute", "5 minutes", "15 minutes")
+        spinnerInterval.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, intervals)
+        spinnerInterval.setSelection(2) // Default to 1 minute
+
+        // Configure visibility based on type
+        textHeader.text = "Configure " + when (templateType) {
+            "SWITCH" -> "Smart Switch"
+            "SLIDER" -> "Smart Slider"
+            "MONITOR" -> "Info Monitor"
+            "BUTTON" -> "Quick Action Button"
+            else -> "Widget"
+        }
+
+        // Show/hide sections
+        when (templateType) {
+            "SWITCH" -> {
+                layoutUrl.visibility = View.VISIBLE
+                layoutMethod.visibility = View.VISIBLE
+                layoutJsonPath.visibility = View.GONE
+                layoutInterval.visibility = View.GONE
+                layoutCategory.visibility = View.VISIBLE
+                editCategory.setText("LIGHTS")
+                spinnerIcon.setSelection(icons.indexOf("ic_widgets_outline"))
+            }
+            "SLIDER" -> {
+                layoutUrl.visibility = View.VISIBLE
+                layoutMethod.visibility = View.GONE
+                layoutJsonPath.visibility = View.GONE
+                layoutInterval.visibility = View.GONE
+                layoutCategory.visibility = View.VISIBLE
+                editCategory.setText("MEDIA")
+                spinnerIcon.setSelection(icons.indexOf("ic_dim"))
+                editSubtitle.setText("Brightness: 50%")
+            }
+            "MONITOR" -> {
+                layoutUrl.visibility = View.VISIBLE
+                layoutMethod.visibility = View.GONE
+                layoutJsonPath.visibility = View.VISIBLE
+                layoutInterval.visibility = View.VISIBLE
+                layoutCategory.visibility = View.VISIBLE
+                editCategory.setText("SENSORS")
+                spinnerIcon.setSelection(icons.indexOf("ic_info_outline"))
+            }
+            "BUTTON" -> {
+                layoutUrl.visibility = View.VISIBLE
+                layoutMethod.visibility = View.VISIBLE
+                layoutJsonPath.visibility = View.GONE
+                layoutInterval.visibility = View.GONE
+                layoutCategory.visibility = View.VISIBLE
+                editCategory.setText("TRIGGERS")
+                spinnerIcon.setSelection(icons.indexOf("ic_auto_awesome"))
+            }
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("New Widget Setup")
+            .setView(dialogView)
+            .setPositiveButton("Save") { _, _ ->
+                val title = editTitle.text.toString().trim()
+                val subtitle = editSubtitle.text.toString().trim()
+                val span = spinnerSpan.selectedItem.toString().toInt()
+                val icon = spinnerIcon.selectedItem.toString()
+                val url = editUrl.text.toString().trim()
+                val category = editCategory.text.toString().trim()
+                
+                if (title.isEmpty()) {
+                    Toast.makeText(this, "Title cannot be empty", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (url.isEmpty()) {
+                    Toast.makeText(this, "URL cannot be empty", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                // Generate code dynamically
+                generateTemplateWidget(templateType, title, subtitle, span, icon, url, category, dialogView)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun generateTemplateWidget(
+        templateType: String,
+        title: String,
+        subtitle: String,
+        span: Int,
+        icon: String,
+        url: String,
+        category: String,
+        dialogView: View
+    ) {
+        val pluginId = "user_plugin_" + System.currentTimeMillis()
+        val tileId = "tile_" + System.currentTimeMillis()
+        
+        val layoutObj = JSONObject()
+        val tilesArray = JSONArray()
+        val tileObj = JSONObject().apply {
+            put("id", tileId)
+            put("title", title)
+            put("info", if (subtitle.isNotEmpty()) subtitle else "Ready")
+            put("span", span)
+            put("icon", icon)
+            if (category.isNotEmpty()) put("deviceCategory", category)
+        }
+
+        var jsCode = ""
+
+        when (templateType) {
+            "SWITCH" -> {
+                val method = dialogView.findViewById<Spinner>(R.id.form_widget_method).selectedItem.toString()
+                tileObj.put("type", "TOGGLE")
+                tileObj.put("state", false)
+                tileObj.put("action", "onToggleChanged(state)")
+                
+                jsCode = """
+                    var tileId = "$tileId";
+                    var url = "$url";
+                    var method = "$method";
+                    
+                    function init() {
+                        if (method === "GET") {
+                            ClockDesk.fetch(url)
+                                .then(function(res) {
+                                    try {
+                                        var data = JSON.parse(res);
+                                        var isOne = data.state === true || data.status === "on" || data.status === "active";
+                                        var update = {};
+                                        update[tileId] = { "state": isOne };
+                                        ClockDesk.updateState(update);
+                                    } catch(e) {}
+                                });
+                        }
+                    }
+                    
+                    function onToggleChanged(state) {
+                        var options = {
+                            method: method,
+                            headers: { "Content-Type": "application/json" }
+                        };
+                        var targetUrl = url;
+                        if (method === "GET") {
+                            targetUrl = url.replace("state", state.toString());
+                        } else {
+                            options.body = JSON.stringify({ state: state });
+                        }
+                        
+                        var update = {};
+                        update[tileId] = { "state": state };
+                        ClockDesk.updateState(update);
+                        
+                        ClockDesk.fetch(targetUrl, options)
+                            .catch(function(err) {
+                                var revert = {};
+                                revert[tileId] = { "state": !state };
+                                ClockDesk.updateState(revert);
+                            });
+                    }
+                """.trimIndent()
+            }
+            "SLIDER" -> {
+                tileObj.put("type", "SLIDER")
+                tileObj.put("value", 50)
+                tileObj.put("action", "onSliderChanged(value)")
+                
+                jsCode = """
+                    var tileId = "$tileId";
+                    var url = "$url";
+                    
+                    function init() {}
+                    
+                    function onSliderChanged(value) {
+                        var targetUrl = url.replace("value", value.toString());
+                        var update = {};
+                        update[tileId] = { "value": value, "info": "Value: " + Math.round(value) + "%" };
+                        ClockDesk.updateState(update);
+                        
+                        ClockDesk.fetch(targetUrl, { method: "GET" })
+                            .catch(function(err) {});
+                    }
+                """.trimIndent()
+            }
+            "MONITOR" -> {
+                val jsonPath = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.form_widget_json_path).text.toString().trim()
+                val intervalStr = dialogView.findViewById<Spinner>(R.id.form_widget_interval).selectedItem.toString()
+                val intervalMs = when (intervalStr) {
+                    "5 seconds" -> 5000
+                    "30 seconds" -> 30000
+                    "1 minute" -> 60000
+                    "5 minutes" -> 300000
+                    "15 minutes" -> 900000
+                    else -> 60000
+                }
+                tileObj.put("type", "INFO")
+                
+                jsCode = """
+                    var tileId = "$tileId";
+                    var url = "$url";
+                    var jsonPath = "$jsonPath";
+                    var intervalMs = $intervalMs;
+                    
+                    function init() {
+                        updateInfo();
+                        if (intervalMs > 0) {
+                            setInterval(updateInfo, intervalMs);
+                        }
+                    }
+                    
+                    function updateInfo() {
+                        ClockDesk.fetch(url)
+                            .then(function(res) {
+                                var valueStr = res;
+                                try {
+                                    var data = JSON.parse(res);
+                                    if (jsonPath) {
+                                        var parts = jsonPath.split('.');
+                                        var obj = data;
+                                        for (var i = 0; i < parts.length; i++) {
+                                            if (obj[parts[i]] !== undefined) {
+                                                obj = obj[parts[i]];
+                                            } else {
+                                                obj = null;
+                                                break;
+                                            }
+                                        }
+                                        if (obj !== null) {
+                                            valueStr = obj.toString();
+                                        }
+                                    }
+                                } catch(e) {}
+                                
+                                var update = {};
+                                update[tileId] = { "info": valueStr };
+                                ClockDesk.updateState(update);
+                            })
+                            .catch(function(err) {
+                                var update = {};
+                                update[tileId] = { "info": "Err: " + err.message };
+                                ClockDesk.updateState(update);
+                            });
+                    }
+                """.trimIndent()
+            }
+            "BUTTON" -> {
+                val method = dialogView.findViewById<Spinner>(R.id.form_widget_method).selectedItem.toString()
+                tileObj.put("type", "BUTTON")
+                tileObj.put("action", "onButtonClick()")
+                
+                jsCode = """
+                    var tileId = "$tileId";
+                    var url = "$url";
+                    var method = "$method";
+                    var defaultSubtitle = "$subtitle";
+                    
+                    function init() {}
+                    
+                    function onButtonClick() {
+                        var options = {
+                            method: method,
+                            headers: { "Content-Type": "application/json" }
+                        };
+                        
+                        var update = {};
+                        update[tileId] = { "info": "Sending..." };
+                        ClockDesk.updateState(update);
+                        
+                        ClockDesk.fetch(url, options)
+                            .then(function() {
+                                var update = {};
+                                update[tileId] = { "info": "Success" };
+                                ClockDesk.updateState(update);
+                                setTimeout(function() {
+                                    var reset = {};
+                                    reset[tileId] = { "info": defaultSubtitle || "Ready" };
+                                    ClockDesk.updateState(reset);
+                                }, 1500);
+                            })
+                            .catch(function(err) {
+                                var update = {};
+                                update[tileId] = { "info": "Failed" };
+                                ClockDesk.updateState(update);
+                                setTimeout(function() {
+                                    var reset = {};
+                                    reset[tileId] = { "info": defaultSubtitle || "Ready" };
+                                    ClockDesk.updateState(reset);
+                                }, 1500);
+                            });
+                    }
+                """.trimIndent()
+            }
+        }
+
+        tilesArray.put(tileObj)
+        layoutObj.put("tiles", tilesArray)
+
+        dashboardManager?.createOrUpdatePlugin(pluginId, layoutObj.toString(4), jsCode)
+        Toast.makeText(this, "Widget created successfully", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showWidgetEditorDialog(tile: DashboardTile?) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_widget_editor, null)
+        val editTitle = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_widget_title)
+        val editSubtitle = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_widget_subtitle)
+        val editIcon = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_widget_icon)
+        val editIconUrl = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_widget_icon_url)
+        val editCategory = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_widget_category)
+        val editJsCode = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.edit_widget_js_code)
+        
+        val spinnerType = dialogView.findViewById<Spinner>(R.id.spinner_widget_type)
+        val spinnerSpan = dialogView.findViewById<Spinner>(R.id.spinner_widget_span)
+
+        val typesList = mutableListOf("INFO", "TOGGLE", "SLIDER", "BUTTON")
+        if (tile != null && !typesList.contains(tile.type.uppercase())) {
+            typesList.add(tile.type.uppercase())
+        }
+        val types = typesList.toTypedArray()
+        val spans = arrayOf("1", "2", "3", "4")
+
+        spinnerType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, types)
+        spinnerSpan.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, spans)
+
+        val pluginId = tile?.pluginId ?: "user_plugin_" + System.currentTimeMillis()
+        if (tile != null) {
+            val displayTitle = if (tile.title.isNullOrEmpty()) {
+                when (tile.type.uppercase()) {
+                    "WEATHER_FORECAST" -> "Weather"
+                    "MEDIA_PLAYER" -> "Music Player"
+                    else -> ""
+                }
+            } else {
+                tile.title
+            }
+            editTitle.setText(displayTitle)
+            editSubtitle.setText(tile.info)
+            editIcon.setText(tile.icon)
+            editIconUrl.setText(tile.iconUrl)
+            editCategory.setText(tile.deviceCategory)
+            
+            val typeIndex = types.indexOf(tile.type.uppercase())
+            if (typeIndex >= 0) spinnerType.setSelection(typeIndex)
+            
+            val spanIndex = spans.indexOf(tile.span.toString())
+            if (spanIndex >= 0) spinnerSpan.setSelection(spanIndex)
+
+            try {
+                val dir = File(filesDir, "plugins/$pluginId")
+                if (File(dir, "logic.js").exists()) {
+                    editJsCode.setText(File(dir, "logic.js").readText())
+                }
+            } catch (e: Exception) {
+                Logger.e("MainActivity") { "Failed to read logic.js: ${e.message}" }
+            }
+        } else {
+            val defaultJs = """
+                // JavaScript Logic for your widget
+                var state = {
+                    state: false,
+                    value: 50
+                };
+
+                function init() {
+                    ClockDesk.updateState(JSON.stringify(state));
+                }
+
+                function onClick() {
+                    state.state = !state.state;
+                    ClockDesk.updateState(JSON.stringify(state));
+                }
+
+                function onSliderChange(value) {
+                    state.value = value;
+                    ClockDesk.updateState(JSON.stringify(state));
+                }
+            """.trimIndent()
+            editJsCode.setText(defaultJs)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (tile == null) "Add Widget" else "Edit Widget")
+            .setView(dialogView)
+            .setPositiveButton("Save") { _, _ ->
+                val title = editTitle.text.toString().trim()
+                val subtitle = editSubtitle.text.toString().trim()
+                val icon = editIcon.text.toString().trim()
+                val iconUrl = editIconUrl.text.toString().trim()
+                val category = editCategory.text.toString().trim()
+                val jsCode = editJsCode.text.toString().trim()
+                val type = spinnerType.selectedItem.toString()
+                val span = spinnerSpan.selectedItem.toString().toInt()
+
+                if (title.isEmpty()) {
+                    Toast.makeText(this, "Title cannot be empty", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                val tileId = tile?.id ?: "tile_" + System.currentTimeMillis()
+                
+                var existingLayout: JSONObject? = null
+                if (tile != null) {
+                    try {
+                        val file = File(filesDir, "plugins/$pluginId/layout.json")
+                        if (file.exists()) {
+                            existingLayout = JSONObject(file.readText())
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("MainActivity") { "Failed to read layout.json: ${e.message}" }
+                    }
+                }
+
+                val layoutObj = existingLayout ?: JSONObject()
+                val tilesArray = layoutObj.optJSONArray("tiles") ?: JSONArray()
+                
+                var tileFound = false
+                for (i in 0 until tilesArray.length()) {
+                    val tObj = tilesArray.getJSONObject(i)
+                    if (tObj.getString("id") == tileId) {
+                        tObj.put("title", title)
+                        if (subtitle.isNotEmpty()) tObj.put("info", subtitle) else tObj.remove("info")
+                        tObj.put("span", span)
+                        if (icon.isNotEmpty()) tObj.put("icon", icon) else tObj.remove("icon")
+                        if (iconUrl.isNotEmpty()) tObj.put("iconUrl", iconUrl) else tObj.remove("iconUrl")
+                        if (category.isNotEmpty()) tObj.put("deviceCategory", category) else tObj.remove("deviceCategory")
+                        
+                        if (type != "WEATHER_FORECAST" && type != "MEDIA_PLAYER" && type != "NATIVE_APK") {
+                            tObj.put("type", type)
+                        }
+                        tileFound = true
+                        break
+                    }
+                }
+                
+                if (!tileFound) {
+                    val tileObj = JSONObject().apply {
+                        put("id", tileId)
+                        put("type", type)
+                        put("title", title)
+                        if (subtitle.isNotEmpty()) put("info", subtitle)
+                        put("span", span)
+                        if (icon.isNotEmpty()) put("icon", icon)
+                        if (iconUrl.isNotEmpty()) put("iconUrl", iconUrl)
+                        if (category.isNotEmpty()) put("deviceCategory", category)
+                        put("state", tile?.state ?: false)
+                        put("value", tile?.value ?: 50f)
+                    }
+                    tilesArray.put(tileObj)
+                    layoutObj.put("tiles", tilesArray)
+                }
+
+                dashboardManager?.createOrUpdatePlugin(pluginId, layoutObj.toString(4), jsCode)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun updateDashboardGreeting() {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val greeting = when (hour) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..20 -> "Good evening"
+            else -> "Good night"
+        }
+        dashboardGreeting.text = greeting
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) {
+                        result = cursor.getString(index)
+                    }
+                }
+            } finally {
+                cursor?.close()
+            }
+        }
+        if (result == null) {
+            result = uri.path
+            val cut = result?.lastIndexOf('/')
+            if (cut != null && cut != -1) {
+                result = result?.substring(cut + 1)
+            }
+        }
+        return result
+    }
+
+    override fun <T : View> findViewById(id: Int): T {
+        val view = super.findViewById<View>(id)
+        if (view != null) return view as T
+        if (::mainPage.isInitialized) {
+            val v = mainPage.findViewById<View>(id)
+            if (v != null) return v as T
+        }
+        if (::dashboardPage.isInitialized) {
+            val v = dashboardPage.findViewById<View>(id)
+            if (v != null) return v as T
+        }
+        return super.findViewById(id)
+    }
+
+    private class MainPagerAdapter(
+        private val dashboardView: View,
+        private val mainView: View
+    ) : androidx.recyclerview.widget.RecyclerView.Adapter<MainPagerAdapter.PageViewHolder>() {
+
+        class PageViewHolder(itemView: View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(itemView)
+
+        override fun getItemCount(): Int = 2
+
+        override fun getItemViewType(position: Int): Int = position
+
+        override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): PageViewHolder {
+            val view = if (viewType == 0) dashboardView else mainView
+            (view.parent as? android.view.ViewGroup)?.removeView(view)
+            view.layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            return PageViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: PageViewHolder, position: Int) {}
     }
 }

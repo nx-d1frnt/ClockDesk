@@ -1,0 +1,17 @@
+{
+  "tiles": [
+    {
+      "id": "music_player",
+      "type": "MEDIA_PLAYER",
+      "span": 4,
+      "title": "Music Player",
+      "state": false,
+      "value": 0,
+      "trackTitle": "No Media Playing",
+      "trackArtist": "",
+      "deviceCategory": "MEDIA",
+      "deviceAction": "TURN_OFF",
+      "action": "mediaPlayPause()"
+    }
+  ]
+}

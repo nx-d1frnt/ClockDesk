@@ -3,61 +3,46 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="88dp"
     android:layout_margin="8dp"
+    android:clickable="true"
+    android:focusable="true"
     app:cardCornerRadius="24dp"
     app:cardElevation="0dp"
     app:strokeWidth="0dp"
-    app:cardBackgroundColor="?attr/colorSurfaceContainer">
+    app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center"
             android:padding="16dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
-
-                <ImageView
-                    android:id="@+id/icon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_info_outline"
-                    android:layout_marginEnd="8dp"
-                    app:tint="?attr/colorOnSurfaceVariant"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
-
-                <TextView
-                    android:id="@+id/title"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="System Info"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-            </LinearLayout>
+            <ImageView
+                android:id="@+id/icon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/ic_auto_awesome"
+                android:layout_marginEnd="12dp"
+                app:tint="?attr/colorOnSurface" />
 
             <TextView
-                android:id="@+id/info"
-                android:layout_width="match_parent"
+                android:id="@+id/title"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Battery: 85%\nRAM: 4.2GB Free"
-                android:textSize="18sp"
+                android:text="Action"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="?attr/colorOnSurface"
+                android:ellipsize="end"
+                android:maxLines="1" />
 
         </LinearLayout>
 

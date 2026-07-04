@@ -15,51 +15,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <LinearLayout
+        <FrameLayout
+            android:id="@+id/native_view_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
-
-                <ImageView
-                    android:id="@+id/icon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_info_outline"
-                    android:layout_marginEnd="8dp"
-                    app:tint="?attr/colorOnSurfaceVariant"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
-
-                <TextView
-                    android:id="@+id/title"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="System Info"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/info"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Battery: 85%\nRAM: 4.2GB Free"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
-
-        </LinearLayout>
+            android:minHeight="88dp" />
 
         <!-- Edit Overlay -->
         <LinearLayout

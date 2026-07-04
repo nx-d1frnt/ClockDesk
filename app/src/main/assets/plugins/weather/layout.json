@@ -1,0 +1,19 @@
+{
+  "tiles": [
+    {
+      "id": "weather_main",
+      "type": "WEATHER_FORECAST",
+      "span": 4,
+      "title": "Weather",
+      "temp": "--°C",
+      "description": "Loading...",
+      "localIcon": "sun.svg",
+      "forecast": [
+        { "day": "Mon", "temp": "--°", "icon": "ic_weather_unknown" },
+        { "day": "Tue", "temp": "--°", "icon": "ic_weather_unknown" },
+        { "day": "Wed", "temp": "--°", "icon": "ic_weather_unknown" },
+        { "day": "Thu", "temp": "--°", "icon": "ic_weather_unknown" }
+      ]
+    }
+  ]
+}

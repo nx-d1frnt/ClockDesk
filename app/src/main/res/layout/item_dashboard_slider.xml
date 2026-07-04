@@ -32,32 +32,42 @@
                     android:id="@+id/icon"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
-                    android:src="@drawable/ic_info_outline"
+                    android:src="@drawable/ic_dim"
                     android:layout_marginEnd="8dp"
-                    app:tint="?attr/colorOnSurfaceVariant"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
+                    app:tint="?attr/colorOnSurfaceVariant" />
 
                 <TextView
                     android:id="@+id/title"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="System Info"
+                    android:text="Slider Title"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
+                <TextView
+                    android:id="@+id/slider_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="50%"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
+
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/info"
+            <com.google.android.material.slider.Slider
+                android:id="@+id/slider"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Battery: 85%\nRAM: 4.2GB Free"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:valueFrom="0"
+                android:valueTo="100"
+                android:value="50"
+                app:labelBehavior="gone"
+                app:thumbColor="?attr/colorPrimary"
+                app:trackColorActive="?attr/colorPrimary"
+                app:trackColorInactive="?attr/colorSurfaceContainerHigh" />
 
         </LinearLayout>
 
