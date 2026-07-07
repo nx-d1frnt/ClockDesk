@@ -38,6 +38,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.EditText
+import android.widget.FrameLayout
+import com.nxd1frnt.clockdesk2.utils.GeocodingHelper
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -736,6 +739,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 resetEditModeTimeout()
             }
         }
+        weatherLayout.setOnClickListener {
+            if (isEditMode) {
+                customizationSheetManager.showForView(it)
+                resetEditModeTimeout()
+            } else {
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                val mode = prefs.getString("location_mode", "auto") ?: "auto"
+                val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                if (mode == "auto" && !hasCoarse && !hasFine) {
+                    showCitySearchDialog()
+                }
+            }
+        }
 
         backgroundCustomizationTab.setOnClickListener {
             backgroundSheetManager.show()
@@ -1165,7 +1182,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         } else {
             val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             val rationaleShown = prefs.getBoolean("location_permission_rationale_shown", false)
-            if (!rationaleShown) showLocationRationaleDialog()
+            if (!rationaleShown) {
+                showLocationRationaleDialog()
+            } else {
+                loadCoordinatesAndFetchData()
+                showManualLocationOptionDialog()
+            }
         }
     }
 
@@ -1198,7 +1220,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun showLocationRationaleDialog() {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.location_permission_title))
             .setMessage(getString(R.string.location_permission_message))
             .setPositiveButton(getString(R.string.location_permission_grant)) { _, _ ->
@@ -1209,17 +1231,122 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 )
             }
             .setNegativeButton(getString(R.string.location_permission_manual)) { _, _ ->
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                prefs.edit().putBoolean("location_permission_rationale_shown", true).apply()
                 startActivity(Intent(this, SettingsActivity::class.java))
             }
             .setNeutralButton(getString(android.R.string.cancel)) { dialog, _ ->
                 dialog.dismiss()
                 val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
                 prefs.edit().putBoolean("location_permission_rationale_shown", true).apply()
+                loadCoordinatesAndFetchData()
+                showManualLocationOptionDialog()
+            }
+            .setOnCancelListener {
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                prefs.edit().putBoolean("location_permission_rationale_shown", true).apply()
+                loadCoordinatesAndFetchData()
+                showManualLocationOptionDialog()
+            }
+            .show()
+    }
+
+    private fun showManualLocationOptionDialog() {
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val promptShown = prefs.getBoolean("manual_location_prompt_shown", false)
+        if (promptShown) return
+
+        prefs.edit().putBoolean("manual_location_prompt_shown", true).apply()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.location_permission_title))
+            .setMessage(getString(R.string.location_search_city_prompt))
+            .setPositiveButton(getString(android.R.string.yes)) { _, _ ->
+                showCitySearchDialog()
+            }
+            .setNegativeButton(getString(android.R.string.no)) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showCitySearchDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.location_city_name_summary)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            setSingleLine()
+        }
+        val container = FrameLayout(this).apply {
+            val padding = (24 * resources.displayMetrics.density).toInt()
+            setPadding(padding, 8, padding, 8)
+            addView(input)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.location_city_name_dialog_title))
+            .setView(container)
+            .setPositiveButton(getString(android.R.string.ok)) { dialog, _ ->
+                val cityName = input.text.toString().trim()
+                if (cityName.isNotEmpty()) {
+                    GeocodingHelper.geocodeCity(this, cityName,
+                        onSuccess = { lat, lon, resolvedCity ->
+                            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                            prefs.edit()
+                                .putString("location_mode", "city")
+                                .putString("location_city_name", cityName)
+                                .putString("resolved_latitude", lat.toString())
+                                .putString("resolved_longitude", lon.toString())
+                                .putString("resolved_city_display_name", resolvedCity)
+                                .apply()
+
+                            Toast.makeText(this, getString(R.string.city_resolved_format, resolvedCity, lat, lon), Toast.LENGTH_LONG).show()
+                            loadCoordinatesAndFetchData()
+                        },
+                        onError = { error ->
+                            Toast.makeText(this, getString(R.string.city_resolve_error_format, cityName), Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(getString(android.R.string.cancel)) { dialog, _ ->
+                dialog.dismiss()
             }
             .show()
     }
 
     private fun loadCoordinatesAndFetchData() {
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val mode = prefs.getString("location_mode", "auto") ?: "auto"
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+        if (mode == "auto" && !hasCoarse && !hasFine) {
+            weatherGetter.stopUpdates()
+            runOnUiThread {
+                weatherText.text = getString(R.string.no_location_tap_to_set)
+                weatherIcon.setImageResource(R.drawable.ic_weather_unknown)
+                weatherLayout.visibility = View.VISIBLE
+            }
+            // Load coordinates for daytime calculations anyway (using fallback)
+            locationManager.loadCoordinates { lat, lon ->
+                dayTimeGetter.fetch(lat, lon) {
+                    if (!hasCustomImageBackground) gradientManager.updateGradient()
+                    if (isNightShiftEnabled) {
+                        fontManager.applyNightShiftTransition(
+                            clockManager.getCurrentTime(),
+                            dayTimeGetter,
+                            isNightShiftEnabled
+                        )
+                    }
+                    if (dynamicBackgroundView.visibility == View.VISIBLE) {
+                        updateBackgroundFilters()
+                    }
+                }
+            }
+            return
+        }
+
         locationManager.loadCoordinates { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
@@ -1936,11 +2063,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             dynamicBackgroundView.areAnimationsPaused = isPowerSavingMode && disableAnimations
         }
         setupWindowFlags()
+        val disableWeather = isPowerSavingMode && prefs.getBoolean("power_saver_disable_weather", true)
         locationManager.loadCoordinates { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
                 if (isNightShiftEnabled) fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, isNightShiftEnabled)
                 if (dynamicBackgroundView.visibility == View.VISIBLE) updateBackgroundFilters()
+            }
+            if (!disableWeather && ::weatherGetter.isInitialized) {
+                weatherGetter.startUpdates(lat, lon)
             }
         }
         if (isEditMode && !isLaunchingFilePicker) exitEditMode()
@@ -2040,9 +2171,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (::tutorialManager.isInitialized) {
             tutorialManager.checkAndUpdatePermissionState()
         }
-        locationManager.onRequestPermissionsResult(requestCode, grantResults) { lat, lon ->
-            dayTimeGetter.fetch(lat, lon) {
-                if (!hasCustomImageBackground) gradientManager.updateGradient()
+        if (requestCode == permissionRequestCode) {
+            loadCoordinatesAndFetchData()
+            val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (!hasCoarse && !hasFine) {
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                prefs.edit().putBoolean("location_permission_rationale_shown", true).apply()
+                showManualLocationOptionDialog()
             }
         }
     }

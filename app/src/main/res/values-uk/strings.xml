@@ -356,4 +356,6 @@
     <string name="weather_alert_uv_threshold_summary">Рівень УФ-індексу для спрацьовування попередження</string>
     <string name="weather_alert_forecast_hours_title">Вікно прогнозу</string>
     <string name="weather_alert_forecast_hours_summary">На скільки годин вперед перевіряти погіршення погоди</string>
+    <string name="no_location_tap_to_set">Місцезнаходження не задано (Натисніть для налаштування)</string>
+    <string name="location_search_city_prompt">Доступ до геопозиції заборонено. Бажаєте ввести назву міста вручну?</string>
 </resources>

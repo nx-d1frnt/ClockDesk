@@ -373,4 +373,6 @@
     <string name="weather_alert_uv_threshold_summary">UV index level to trigger alert</string>
     <string name="weather_alert_forecast_hours_title">Forecast Window</string>
     <string name="weather_alert_forecast_hours_summary">Hours ahead to check for worsening weather</string>
+    <string name="no_location_tap_to_set">No location (Tap to set)</string>
+    <string name="location_search_city_prompt">Location permission was denied. Would you like to enter your city name manually?</string>
 </resources>
