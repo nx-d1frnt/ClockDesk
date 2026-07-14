@@ -480,6 +480,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var uShowerHasTexLoc = 0; private var uShowerFgTexLoc = 0; private var uShowerHasFgTexLoc = 0
         private var uShowerIntensityLoc = 0; private var uShowerAspectLoc = 0; private var uShowerGlobalAlphaLoc = 0
         private var showerAPos = -1
+        private var uShowerWindFactorLoc = 0
+        private var uGlassWindFactorLoc = 0
+        private val BASE_WIND_FACTOR = 2.0f
 
         private var uTimeLoc = 0; private var uResLoc = 0; private var uTexLoc = 0; private var uHasTexLoc = 0
         private var uGlassFgTexLoc = 0; private var uGlassHasFgTexLoc = 0; private var uLightningLoc = 0
@@ -674,6 +677,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             uLightningLoc = GLES20.glGetUniformLocation(glassRainProgram, "u_lightningAlpha")
             uGlassAspectLoc = GLES20.glGetUniformLocation(glassRainProgram, "u_screenAspectRatio")
             uGlassGlobalAlphaLoc = GLES20.glGetUniformLocation(glassRainProgram, "u_globalAlpha")
+            uGlassWindFactorLoc = GLES20.glGetUniformLocation(glassRainProgram, "u_windFactor")
             glassAPos = GLES20.glGetAttribLocation(glassRainProgram, "a_Position")
 
             // --- RAIN SHOWER ---
@@ -687,6 +691,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             uShowerIntensityLoc = GLES20.glGetUniformLocation(rainShowerProgram, "u_intensity")
             uShowerAspectLoc = GLES20.glGetUniformLocation(rainShowerProgram, "u_screenAspectRatio")
             uShowerGlobalAlphaLoc = GLES20.glGetUniformLocation(rainShowerProgram, "u_globalAlpha")
+            uShowerWindFactorLoc = GLES20.glGetUniformLocation(rainShowerProgram, "u_windFactor")
             showerAPos = GLES20.glGetAttribLocation(rainShowerProgram, "a_Position")
 
             // --- SNOW ---
@@ -1021,9 +1026,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             when (state.type) {
                 WeatherType.RAIN, WeatherType.THUNDERSTORM -> {
-                    drawRainShower(state.intensity, alpha, backgroundTexId, w, h)
+                    drawRainShower(state.intensity, state.windFactor, alpha, backgroundTexId, w, h)
                     updateAndDrawParticles(state, alpha, w, h)
-                    drawGlassRain(state.intensity, alpha, backgroundTexId, w, h)
+                    drawGlassRain(state.intensity, state.windFactor, alpha, backgroundTexId, w, h)
                 }
                 WeatherType.SNOW -> {
                     drawSnowLayer(state.intensity, alpha, backgroundTexId, w, h)
@@ -1157,7 +1162,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glDisableVertexAttribArray(snowAPos)
         }
 
-        private fun drawGlassRain(intensityMult: Float, alpha: Float, backgroundTexId: Int, w: Int, h: Int) {
+        private fun drawGlassRain(intensityMult: Float, windFactor: Float, alpha: Float, backgroundTexId: Int, w: Int, h: Int) {
             if (glassRainProgram == 0) return
             GLES20.glUseProgram(glassRainProgram)
 
@@ -1168,6 +1173,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glUniform2f(uResLoc, w.toFloat(), h.toFloat())
             GLES20.glUniform1f(uLightningLoc, lightningAlpha)
             GLES20.glUniform1f(uGlassGlobalAlphaLoc, alpha)
+            GLES20.glUniform1f(uGlassWindFactorLoc, windFactor)
 
             bindBaseTextures(uTexLoc, uHasTexLoc, uGlassFgTexLoc, uGlassHasFgTexLoc, backgroundTexId)
 
@@ -1178,7 +1184,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glDisableVertexAttribArray(glassAPos)
         }
 
-        private fun drawRainShower(intensityMult: Float, alpha: Float, backgroundTexId: Int, w: Int, h: Int) {
+        private fun drawRainShower(intensityMult: Float, windFactor: Float, alpha: Float, backgroundTexId: Int, w: Int, h: Int) {
             if (rainShowerProgram == 0) return
             GLES20.glUseProgram(rainShowerProgram)
 
@@ -1188,6 +1194,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glUniform1f(uShowerIntensityLoc, intensityMult.coerceIn(0f, 1f))
             GLES20.glUniform1f(uShowerAspectLoc, w.toFloat() / h.toFloat())
             GLES20.glUniform1f(uShowerGlobalAlphaLoc, alpha)
+            GLES20.glUniform1f(uShowerWindFactorLoc, windFactor)
 
             bindBaseTextures(uShowerTexLoc, uShowerHasTexLoc, uShowerFgTexLoc, uShowerHasFgTexLoc, backgroundTexId)
 
@@ -1231,7 +1238,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private fun updateParticle(p: Particle, state: WeatherState, w: Int, h: Int) {
             when (state.type) {
                 WeatherType.RAIN, WeatherType.THUNDERSTORM -> {
-                    p.x += state.windFactor; p.y += p.speedY
+                    val effectiveWind = state.windFactor + BASE_WIND_FACTOR
+                    p.x += effectiveWind; p.y += p.speedY
                 }
                 WeatherType.SNOW -> {
                     p.x += state.windFactor; p.y += p.speedY; p.angle += 0.03f; p.x += sin(p.angle) * 1.5f
@@ -1282,7 +1290,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private fun packLineData(p: Particle, state: WeatherState, alpha: Float) {
             val scaledSize = p.size * weatherResolutionScale
             val tailY = p.y - scaledSize
-            val horizontalOffset = if (p.speedY != 0f) (state.windFactor / p.speedY) * scaledSize * 0.8f else state.windFactor * 2f * weatherResolutionScale
+            val effectiveWind = state.windFactor + BASE_WIND_FACTOR
+            val horizontalOffset = if (p.speedY != 0f) (effectiveWind / p.speedY) * scaledSize * 0.8f else effectiveWind * 2f * weatherResolutionScale
             val tailX = p.x - horizontalOffset
             lineDataBuffer.put(p.x).put(p.y).put(p.r).put(p.g).put(p.b).put(p.alpha * alpha)
             lineDataBuffer.put(tailX).put(tailY).put(p.r).put(p.g).put(p.b).put(0f)
@@ -1860,6 +1869,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             const float dropTintIntensity   = 0.09;
             const float highlightIntensity  = 0.7;
             const float dropShadowIntensity = 0.5;
+            uniform float u_windFactor;
         """
 
         private const val GLSL_SUN_EFFECT = """
@@ -2073,6 +2083,10 @@ class DynamicBackgroundView @JvmOverloads constructor(
             Rain generateRain(vec2 uv, float screenAspectRatio, float time, vec2 rainGridSize, float rainIntensity) {
                 float cellAspectRatio = rainGridSize.x / rainGridSize.y;
                 rainGridSize.y /= screenAspectRatio;
+                
+                float slant = -0.08 - u_windFactor * 0.012;
+                uv.x += uv.y * slant;
+                
                 vec2 gridUv = uv * rainGridSize;
                 gridUv.y = 1.0 - gridUv.y;
                 
@@ -2116,6 +2130,10 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
                 float cellAspectRatio = rainGridSize.x / rainGridSize.y;
                 rainGridSize.y /= screenAspectRatio;
+                
+                float slant = -u_windFactor * 0.008;
+                uv.x += uv.y * slant;
+                
                 vec2 gridUv = uv * rainGridSize;
                 gridUv.y = 1.0 - gridUv.y;
                 gridUv += vec2(10.0); 
