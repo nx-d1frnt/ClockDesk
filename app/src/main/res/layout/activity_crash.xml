@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/crash_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp">
+
+    <!-- Guideline separating left and right pane (45% - 55% split) -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/pane_guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.45" />
+
+    <!-- Left Pane: Info, Icon and Main Actions wrapped in NestedScrollView to prevent cutoffs -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/left_pane"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        app:layout_constraintWidth_max="480dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"> <!-- Centered by default using start/end -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_vertical|start"
+            android:paddingVertical="8dp">
+
+            <ImageView
+                android:id="@+id/crash_icon"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_crash_alert"
+                android:layout_marginBottom="16dp"
+                android:tint="?attr/colorError"
+                tools:ignore="ContentDescription"/>
+
+            <TextView
+                android:id="@+id/crash_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/crash_title"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/googlesansflex"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/crash_message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/crash_message"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.2"
+                android:layout_marginBottom="24dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_restart"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="@string/crash_btn_restart"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"
+                style="@style/Widget.Material3Expressive.Button"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_copy"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="@string/crash_btn_copy"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="8dp"
+                    style="@style/Widget.Material3Expressive.Button.OutlinedButton"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_toggle_details"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1.2"
+                    android:text="@string/crash_btn_details_show"
+                    android:textSize="12sp"
+                    style="@style/Widget.Material3Expressive.Button.OutlinedButton"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Right Pane: Styled developer console/log card -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/right_pane_card"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+        android:layout_marginStart="24dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/pane_guideline"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="System Diagnostics &amp; Crash Log"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05"
+                android:layout_marginBottom="16dp"/>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="?attr/colorSurfaceContainerHigh"
+                android:padding="16dp">
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scrollbars="vertical">
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_crash_details"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:textColor="?attr/colorError"
+                            android:textSize="11sp"
+                            android:lineSpacingMultiplier="1.2"
+                            tools:text="java.lang.NullPointerException\n\tat com.nxd1frnt.clockdesk2.ui.MainActivity.onCreate(MainActivity.kt:260)"/>
+
+                    </HorizontalScrollView>
+
+                </ScrollView>
+
+            </FrameLayout>
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -358,4 +358,13 @@
     <string name="weather_alert_forecast_hours_summary">На скільки годин вперед перевіряти погіршення погоди</string>
     <string name="no_location_tap_to_set">Місцезнаходження не задано (Натисніть для налаштування)</string>
     <string name="location_search_city_prompt">Доступ до геопозиції заборонено. Бажаєте ввести назву міста вручну?</string>
+
+    <!-- Crash Screen -->
+    <string name="crash_title">ClockDesk зупинив роботу</string>
+    <string name="crash_message">Сталася неочікувана помилка. Перепрошуємо за незручності. Ви можете перезапустити додаток або переглянути деталі нижче.</string>
+    <string name="crash_btn_restart">Перезапустити</string>
+    <string name="crash_btn_copy">Копіювати журнал</string>
+    <string name="crash_btn_details_show">Показати деталі</string>
+    <string name="crash_btn_details_hide">Сховати деталі</string>
+    <string name="crash_log_copied">Діагностичний журнал скопійовано</string>
 </resources>
