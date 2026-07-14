@@ -17,4 +17,36 @@
             app:summary="@string/smart_pixels_summary"
             app:dependency="burn_in_protection" />
     </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="smart_night_brightness_category"
+        app:title="@string/smart_night_brightness_category">
+
+        <androidx.preference.ListPreference
+            app:key="brightness_mode"
+            app:title="@string/brightness_mode_title"
+            app:summary="@string/brightness_mode_summary"
+            app:defaultValue="system"
+            app:entries="@array/brightness_mode_entries"
+            app:entryValues="@array/brightness_mode_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="smart_night_min_brightness"
+            app:title="@string/smart_night_min_brightness_title"
+            app:summary="@string/smart_night_min_brightness_summary"
+            android:min="1"
+            android:max="100"
+            android:defaultValue="5"
+            app:showSeekBarValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="smart_night_lux_threshold"
+            app:title="@string/smart_night_lux_threshold_title"
+            app:summary="@string/smart_night_lux_threshold_summary"
+            android:min="1"
+            android:max="50"
+            android:defaultValue="5"
+            app:showSeekBarValue="true" />
+    </androidx.preference.PreferenceCategory>
 </androidx.preference.PreferenceScreen>

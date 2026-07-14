@@ -367,4 +367,15 @@
     <string name="crash_btn_details_show">Показать детали</string>
     <string name="crash_btn_details_hide">Скрыть детали</string>
     <string name="crash_log_copied">Диагностический журнал скопирован</string>
+
+    <!-- Brightness Control Settings -->
+    <string name="smart_night_brightness_category">Управление яркостью</string>
+    <string name="brightness_mode_title">Режим яркости</string>
+    <string name="brightness_mode_summary">Выберите способ управления яркостью экрана</string>
+    <string name="brightness_mode_system">Автоматический (Системный)</string>
+    <string name="brightness_mode_smart_night">Умное ночное затемнение</string>
+    <string name="smart_night_min_brightness_title">Минимальная ночная яркость</string>
+    <string name="smart_night_min_brightness_summary">Предпочтительный уровень яркости при затемнении ночью</string>
+    <string name="smart_night_lux_threshold_title">Порог освещенности (lux)</string>
+    <string name="smart_night_lux_threshold_summary">Уровень освещенности (люкс), ниже которого включается ночное затемнение</string>
 </resources>

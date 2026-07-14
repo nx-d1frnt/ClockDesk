@@ -181,6 +181,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private val PICK_FONT_REQUEST = 400
     private val minPowerSaveBrightness = 0.01f
 
+    private var isResumed = false
+    private enum class NightDimState { NORMAL, DIMMED }
+    private var currentNightDimState = NightDimState.NORMAL
+    private var pendingNightDimState: NightDimState? = null
+    private val dimDebounceHandler = Handler(Looper.getMainLooper())
+    private var lastSeenLux: Float? = null
+    private val dimDebounceRunnable = Runnable {
+        pendingNightDimState?.let { targetState ->
+            currentNightDimState = targetState
+            applyNightDimMode(targetState)
+            pendingNightDimState = null
+        }
+    }
+
     private var lightSensor: Sensor? = null
     private lateinit var preferenceChangeListener: SharedPreferences.OnSharedPreferenceChangeListener
     private var pendingRestoreRunnable: Runnable? = null
@@ -212,23 +226,54 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
             if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
-                if (!isPowerSavingMode) {
+                val lux = event.values[0]
+                lastSeenLux = lux
+
+                if (isPowerSavingMode) {
+                    val layoutParams = window.attributes
+                    val newBrightness = when {
+                        lux <= 20 -> minPowerSaveBrightness
+                        lux <= 500 -> 0.1f
+                        lux <= 5000 -> 0.25f
+                        else -> 0.4f
+                    }
+
+                    if (layoutParams.screenBrightness != newBrightness) {
+                        layoutParams.screenBrightness = newBrightness
+                        window.attributes = layoutParams
+                    }
                     return
                 }
 
-                val lux = event.values[0]
-                val layoutParams = window.attributes
+                // Smart Night Dimming logic
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
+                if (brightnessMode == "smart_night") {
+                    val threshold = prefs.getInt("smart_night_lux_threshold", 5)
+                    val hysteresis = 3 // 3 lux hysteresis
 
-                val newBrightness = when {
-                    lux <= 20 -> minPowerSaveBrightness
-                    lux <= 500 -> 0.1f
-                    lux <= 5000 -> 0.25f
-                    else -> 0.4f
-                }
+                    val candidateState = when (currentNightDimState) {
+                        NightDimState.NORMAL -> {
+                            if (lux < threshold) NightDimState.DIMMED else NightDimState.NORMAL
+                        }
+                        NightDimState.DIMMED -> {
+                            if (lux >= threshold + hysteresis) NightDimState.NORMAL else NightDimState.DIMMED
+                        }
+                    }
 
-                if (layoutParams.screenBrightness != newBrightness) {
-                    layoutParams.screenBrightness = newBrightness
-                    window.attributes = layoutParams
+                    if (candidateState != currentNightDimState) {
+                        if (candidateState != pendingNightDimState) {
+                            dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+                            pendingNightDimState = candidateState
+                            dimDebounceHandler.postDelayed(dimDebounceRunnable, 2500L) // 2.5 seconds debounce
+                        }
+                    } else {
+                        // Candidate matches current state; cancel any pending transition to a different state
+                        if (pendingNightDimState != null) {
+                            dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+                            pendingNightDimState = null
+                        }
+                    }
                 }
             }
         }
@@ -873,6 +918,28 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         ))
                     }
                     handleMusicStateUpdate(currentMusicState)
+                }
+                "brightness_mode" -> runOnUiThread {
+                    updateSensorRegistration()
+                    val mode = prefs.getString("brightness_mode", "system") ?: "system"
+                    if (mode == "system") {
+                        cancelPendingDimTransition()
+                        currentNightDimState = NightDimState.NORMAL
+                        applyNightDimMode(NightDimState.NORMAL)
+                    } else {
+                        reEvaluateSmartNightDimming()
+                    }
+                }
+                "smart_night_min_brightness" -> runOnUiThread {
+                    if (!isPowerSavingMode && prefs.getString("brightness_mode", "system") == "smart_night" && currentNightDimState == NightDimState.DIMMED) {
+                        val minBrightPct = prefs.getInt("smart_night_min_brightness", 5) / 100f
+                        applyBrightnessOverride(minBrightPct.coerceIn(0.01f, 1.0f))
+                    }
+                }
+                "smart_night_lux_threshold" -> runOnUiThread {
+                    if (!isPowerSavingMode && prefs.getString("brightness_mode", "system") == "smart_night") {
+                        reEvaluateSmartNightDimming()
+                    }
                 }
             }
         }
@@ -2056,6 +2123,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     override fun onResume() {
         super.onResume()
+        isResumed = true
+        updateSensorRegistration()
         if (::tutorialManager.isInitialized) {
             tutorialManager.checkAndUpdatePermissionState()
         }
@@ -2156,6 +2225,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     override fun onPause() {
         super.onPause()
+        isResumed = false
+        updateSensorRegistration()
         if (::dynamicBackgroundView.isInitialized) {
             dynamicBackgroundView.onPause()
         }
@@ -2224,26 +2295,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
 
             // 3. Ambient Light Sensor
-            if (disableLightSensor) {
-                lightSensor?.let { sensorManager.unregisterListener(sensorEventListener, it) }
-            } else {
-                lightSensor?.let {
-                    sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
-                }
-            }
+            updateSensorRegistration()
 
             // 4. Brightness Override
             if (lockBrightness) {
                 val brightnessPct = prefs.getInt("power_saver_brightness_level", 1) / 100f
-                val layoutParams = window.attributes
-                layoutParams.screenBrightness = brightnessPct.coerceIn(0.01f, 1.0f)
-                window.attributes = layoutParams
+                applyBrightnessOverride(brightnessPct.coerceIn(0.01f, 1.0f))
             } else {
                 val layoutParams = window.attributes
                 val savedBrightness = prefs.getInt("power_saver_brightness_level", 1) / 100f
                 if (layoutParams.screenBrightness == savedBrightness.coerceIn(0.01f, 1.0f) || layoutParams.screenBrightness == minPowerSaveBrightness) {
-                    layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                    window.attributes = layoutParams
+                    applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
                 }
             }
 
@@ -2273,12 +2335,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 }
 
                 // 3. Sensors & brightness
-                lightSensor?.let {
-                    sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+                updateSensorRegistration()
+                val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
+                if (brightnessMode == "smart_night") {
+                    applyNightDimMode(currentNightDimState)
+                } else {
+                    applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
                 }
-                val layoutParams = window.attributes
-                layoutParams.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                window.attributes = layoutParams
 
                 // 4. Smart pixels (restore state matching user preference)
                 if (prefs.getBoolean("smart_pixels_enabled", false)) {
@@ -2328,6 +2391,81 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         performanceRunnable?.let {
             handler.removeCallbacks(it)
             performanceRunnable = null
+        }
+    }
+
+    private fun applyBrightnessOverride(brightnessValue: Float) {
+        val layoutParams = window.attributes
+        if (layoutParams.screenBrightness != brightnessValue) {
+            layoutParams.screenBrightness = brightnessValue
+            window.attributes = layoutParams
+        }
+    }
+
+    private fun applyNightDimMode(state: NightDimState) {
+        if (isPowerSavingMode) return // Let power save mode handle its own brightness
+
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        if (state == NightDimState.DIMMED) {
+            val minBrightPct = prefs.getInt("smart_night_min_brightness", 5) / 100f
+            applyBrightnessOverride(minBrightPct.coerceIn(0.01f, 1.0f))
+        } else {
+            applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+        }
+    }
+
+    private fun updateSensorRegistration() {
+        if (!::sensorManager.isInitialized) return
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
+        val disableLightSensorInPowerSave = prefs.getBoolean("power_saver_disable_light_sensor", true)
+
+        val shouldRegister = isResumed && (
+            (isPowerSavingMode && !disableLightSensorInPowerSave) ||
+            (!isPowerSavingMode && brightnessMode == "smart_night")
+        )
+
+        if (shouldRegister) {
+            lightSensor?.let {
+                sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+        } else {
+            sensorManager.unregisterListener(sensorEventListener)
+            cancelPendingDimTransition()
+        }
+    }
+
+    private fun cancelPendingDimTransition() {
+        dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+        pendingNightDimState = null
+    }
+
+    private fun reEvaluateSmartNightDimming() {
+        val lux = lastSeenLux ?: return
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val threshold = prefs.getInt("smart_night_lux_threshold", 5)
+        val hysteresis = 3
+
+        val candidateState = when (currentNightDimState) {
+            NightDimState.NORMAL -> {
+                if (lux < threshold) NightDimState.DIMMED else NightDimState.NORMAL
+            }
+            NightDimState.DIMMED -> {
+                if (lux >= threshold + hysteresis) NightDimState.NORMAL else NightDimState.DIMMED
+            }
+        }
+
+        if (candidateState != currentNightDimState) {
+            if (candidateState != pendingNightDimState) {
+                dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+                pendingNightDimState = candidateState
+                dimDebounceHandler.postDelayed(dimDebounceRunnable, 2500L)
+            }
+        } else {
+            if (pendingNightDimState != null) {
+                dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+                pendingNightDimState = null
+            }
         }
     }
 }

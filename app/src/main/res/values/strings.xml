@@ -384,4 +384,15 @@
     <string name="crash_btn_details_show">Show Details</string>
     <string name="crash_btn_details_hide">Hide Details</string>
     <string name="crash_log_copied">Crash log copied to clipboard</string>
+
+    <!-- Brightness Control Settings -->
+    <string name="smart_night_brightness_category">Brightness Control</string>
+    <string name="brightness_mode_title">Brightness Mode</string>
+    <string name="brightness_mode_summary">Choose how display brightness is managed</string>
+    <string name="brightness_mode_system">Auto (System)</string>
+    <string name="brightness_mode_smart_night">Smart Night Dimming</string>
+    <string name="smart_night_min_brightness_title">Night Minimum Brightness</string>
+    <string name="smart_night_min_brightness_summary">Preferred brightness level when dimmed in bedtime conditions</string>
+    <string name="smart_night_lux_threshold_title">Ambient Lux Threshold</string>
+    <string name="smart_night_lux_threshold_summary">Ambient light level (lux) below which night dimming activates</string>
 </resources>

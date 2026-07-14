@@ -16,6 +16,11 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.view.WindowManager
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BlurTransformation
@@ -74,6 +79,66 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var themedContext: Context
 
+    private lateinit var sensorManager: SensorManager
+    private var lightSensor: Sensor? = null
+    private var isDreaming = false
+    private enum class NightDimState { NORMAL, DIMMED }
+    private var currentNightDimState = NightDimState.NORMAL
+    private var pendingNightDimState: NightDimState? = null
+    private val dimDebounceHandler = Handler(Looper.getMainLooper())
+    private var lastSeenLux: Float? = null
+    private val dimDebounceRunnable = Runnable {
+        pendingNightDimState?.let { targetState ->
+            currentNightDimState = targetState
+            applyNightDimMode(targetState)
+            pendingNightDimState = null
+        }
+    }
+
+    private val sensorEventListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
+                val lux = event.values[0]
+                lastSeenLux = lux
+
+                if (isPowerSavingMode) {
+                    return
+                }
+
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
+                if (brightnessMode == "smart_night") {
+                    val threshold = prefs.getInt("smart_night_lux_threshold", 5)
+                    val hysteresis = 3
+
+                    val candidateState = when (currentNightDimState) {
+                        NightDimState.NORMAL -> {
+                            if (lux < threshold) NightDimState.DIMMED else NightDimState.NORMAL
+                        }
+                        NightDimState.DIMMED -> {
+                            if (lux >= threshold + hysteresis) NightDimState.NORMAL else NightDimState.DIMMED
+                        }
+                    }
+
+                    if (candidateState != currentNightDimState) {
+                        if (candidateState != pendingNightDimState) {
+                            dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+                            pendingNightDimState = candidateState
+                            dimDebounceHandler.postDelayed(dimDebounceRunnable, 2500L)
+                        }
+                    } else {
+                        if (pendingNightDimState != null) {
+                            dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+                            pendingNightDimState = null
+                        }
+                    }
+                }
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
     /** Mirrors MainActivity.hasCustomImageBackground — controls gradient vs image path */
     private var hasCustomImageBackground = false
     private var isNightShiftEnabled = false
@@ -116,6 +181,10 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
     override fun onDreamingStarted() {
         super.onDreamingStarted()
+        isDreaming = true
+        currentNightDimState = NightDimState.NORMAL
+        pendingNightDimState = null
+        lastSeenLux = null
 
         if (!::locationManager.isInitialized || !::clockManager.isInitialized) {
             Log.e("ClockDeskDream", "Managers not initialized. Skipping updates.")
@@ -174,10 +243,14 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         togglePerformanceOverlay(showPerformance)
 
         updateBackgroundFilters()
+        updateSensorRegistration()
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+        isDreaming = false
+        updateSensorRegistration()
+        applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
 
         if (::powerStateManager.isInitialized) {
             powerStateManager.unregisterObserver(this)
@@ -336,6 +409,9 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         powerStateManager = PowerStateManager(themedContext)
         powerStateManager.registerObserver(clockManager)
         powerStateManager.registerObserver(weatherGetter)
+
+        sensorManager = themedContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
     }
 
     // endregion
@@ -633,5 +709,48 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         val zoom = calculateZoom(effectiveDim)
         dynamicBackgroundView.scaleX = zoom
         dynamicBackgroundView.scaleY = zoom
+    }
+
+    private fun applyBrightnessOverride(brightnessValue: Float) {
+        val windowInstance = window ?: return
+        val layoutParams = windowInstance.attributes
+        if (layoutParams.screenBrightness != brightnessValue) {
+            layoutParams.screenBrightness = brightnessValue
+            windowInstance.attributes = layoutParams
+        }
+    }
+
+    private fun applyNightDimMode(state: NightDimState) {
+        if (isPowerSavingMode) return // Let power save mode handle its own brightness
+
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        if (state == NightDimState.DIMMED) {
+            val minBrightPct = prefs.getInt("smart_night_min_brightness", 5) / 100f
+            applyBrightnessOverride(minBrightPct.coerceIn(0.01f, 1.0f))
+        } else {
+            applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+        }
+    }
+
+    private fun updateSensorRegistration() {
+        if (!::sensorManager.isInitialized) return
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
+
+        val shouldRegister = isDreaming && !isPowerSavingMode && brightnessMode == "smart_night"
+
+        if (shouldRegister) {
+            lightSensor?.let {
+                sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+        } else {
+            sensorManager.unregisterListener(sensorEventListener)
+            cancelPendingDimTransition()
+        }
+    }
+
+    private fun cancelPendingDimTransition() {
+        dimDebounceHandler.removeCallbacks(dimDebounceRunnable)
+        pendingNightDimState = null
     }
 }

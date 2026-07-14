@@ -28,4 +28,13 @@
         <item>city</item>
         <item>coords</item>
     </string-array>
+
+    <string-array name="brightness_mode_entries">
+        <item>@string/brightness_mode_system</item>
+        <item>@string/brightness_mode_smart_night</item>
+    </string-array>
+    <string-array name="brightness_mode_values">
+        <item>system</item>
+        <item>smart_night</item>
+    </string-array>
 </resources>

@@ -106,6 +106,22 @@ class DisplaySettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
         setPreferencesFromResource(R.xml.pref_display, rootKey)
+
+        val modePref = findPreference<androidx.preference.ListPreference>("brightness_mode")
+        val minBrightPref = findPreference<androidx.preference.SeekBarPreference>("smart_night_min_brightness")
+        val luxPref = findPreference<androidx.preference.SeekBarPreference>("smart_night_lux_threshold")
+
+        fun updateStates(mode: String?) {
+            val isSmartNight = mode == "smart_night"
+            minBrightPref?.isEnabled = isSmartNight
+            luxPref?.isEnabled = isSmartNight
+        }
+
+        updateStates(modePref?.value)
+        modePref?.setOnPreferenceChangeListener { _, newValue ->
+            updateStates(newValue as? String)
+            true
+        }
     }
 }
 

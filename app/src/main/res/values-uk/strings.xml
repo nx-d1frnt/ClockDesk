@@ -367,4 +367,15 @@
     <string name="crash_btn_details_show">Показати деталі</string>
     <string name="crash_btn_details_hide">Сховати деталі</string>
     <string name="crash_log_copied">Діагностичний журнал скопійовано</string>
+
+    <!-- Brightness Control Settings -->
+    <string name="smart_night_brightness_category">Керування яскравістю</string>
+    <string name="brightness_mode_title">Режим яскравості</string>
+    <string name="brightness_mode_summary">Виберіть спосіб керування яскравістю екрана</string>
+    <string name="brightness_mode_system">Автоматичний (Системний)</string>
+    <string name="brightness_mode_smart_night">Розумне нічне затемнення</string>
+    <string name="smart_night_min_brightness_title">Мінімальна нічна яскравість</string>
+    <string name="smart_night_min_brightness_summary">Бажаний рівень яскравості при затемненні вночі</string>
+    <string name="smart_night_lux_threshold_title">Поріг освітленості (lux)</string>
+    <string name="smart_night_lux_threshold_summary">Рівень освітленості (люкс), нижче якого вмикається нічне затемнення</string>
 </resources>
