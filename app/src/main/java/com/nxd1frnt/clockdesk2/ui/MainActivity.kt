@@ -4,7 +4,6 @@ import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
-import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.SharedPreferences
@@ -34,13 +33,12 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.EditText
-import android.widget.FrameLayout
-import com.nxd1frnt.clockdesk2.utils.GeocodingHelper
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -82,6 +80,7 @@ import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.EntranceAnimationManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.utils.GeocodingHelper
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
@@ -372,9 +371,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         weatherGetter = OpenMeteoAPI(this, locationManager) {
             runOnUiThread {
-                if (weatherGetter.temperature != null) {
-                    weatherText.text = "${weatherGetter.temperature}°C"
-                }
+//                if (weatherGetter.temperature != null) {
+//                    weatherText.text = "${weatherGetter.temperature}°C"
+//                }
 
                 val code = weatherGetter.weatherCode ?: 0
                 val wind = weatherGetter.windSpeed ?: 0.0
@@ -785,6 +784,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
             }
         }
+
+//        debugButton.setOnLongClickListener {
+//            throw RuntimeException("Test crash triggered by user long-pressing the Demo button.")
+//        }
 
         settingsButton.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -1323,11 +1326,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         if (mode == "auto" && !hasCoarse && !hasFine) {
             weatherGetter.stopUpdates()
-            runOnUiThread {
-                weatherText.text = getString(R.string.no_location_tap_to_set)
-                weatherIcon.setImageResource(R.drawable.ic_weather_unknown)
-                weatherLayout.visibility = View.VISIBLE
-            }
+//            runOnUiThread {
+//                weatherText.text = getString(R.string.no_location_tap_to_set)
+//                weatherIcon.setImageResource(R.drawable.ic_weather_unknown)
+//                weatherLayout.visibility = View.VISIBLE
+//            }
             // Load coordinates for daytime calculations anyway (using fallback)
             locationManager.loadCoordinates { lat, lon ->
                 dayTimeGetter.fetch(lat, lon) {
