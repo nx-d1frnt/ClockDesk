@@ -17,6 +17,7 @@
     </queries>
 
     <application
+        android:name=".ClockDeskApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -94,6 +95,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <activity
+            android:name=".ui.CrashActivity"
+            android:process=":crash"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
 
     </application>
 

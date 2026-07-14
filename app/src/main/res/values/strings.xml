@@ -375,4 +375,13 @@
     <string name="weather_alert_forecast_hours_summary">Hours ahead to check for worsening weather</string>
     <string name="no_location_tap_to_set">No location (Tap to set)</string>
     <string name="location_search_city_prompt">Location permission was denied. Would you like to enter your city name manually?</string>
+
+    <!-- Crash Screen -->
+    <string name="crash_title">ClockDesk has stopped</string>
+    <string name="crash_message">An unexpected error occurred. We\'re sorry for the inconvenience. You can restart the app or view the details below.</string>
+    <string name="crash_btn_restart">Restart App</string>
+    <string name="crash_btn_copy">Copy Log</string>
+    <string name="crash_btn_details_show">Show Details</string>
+    <string name="crash_btn_details_hide">Hide Details</string>
+    <string name="crash_log_copied">Crash log copied to clipboard</string>
 </resources>

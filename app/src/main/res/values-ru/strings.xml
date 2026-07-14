@@ -358,4 +358,13 @@
     <string name="weather_alert_forecast_hours_summary">На сколько часов вперед проверять ухудшение погоды</string>
     <string name="no_location_tap_to_set">Местоположение не задано (Нажмите для настройки)</string>
     <string name="location_search_city_prompt">Доступ к геопозиции запрещен. Хотите ввести название города вручную?</string>
+
+    <!-- Crash Screen -->
+    <string name="crash_title">ClockDesk остановил работу</string>
+    <string name="crash_message">Произошла непредвиденная ошибка. Приносим извинения за неудобства. Вы можете перезапустить приложение или просмотреть сведения ниже.</string>
+    <string name="crash_btn_restart">Перезапустить</string>
+    <string name="crash_btn_copy">Копировать журнал</string>
+    <string name="crash_btn_details_show">Показать детали</string>
+    <string name="crash_btn_details_hide">Скрыть детали</string>
+    <string name="crash_log_copied">Диагностический журнал скопирован</string>
 </resources>
