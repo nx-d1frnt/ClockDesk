@@ -501,6 +501,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     } else {
                         restoreSavedWeatherState()
                     }
+                    updateSensorRegistration()
+                    if (!isNight) {
+                        applyNightDimMode(NightDimState.NORMAL)
+                    }
                 }
 
                 try {
@@ -2141,6 +2145,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (!hasCustomImageBackground) gradientManager.updateGradient()
                 if (isNightShiftEnabled) fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, isNightShiftEnabled)
                 if (dynamicBackgroundView.visibility == View.VISIBLE) updateBackgroundFilters()
+                updateSensorRegistration()
+                if (dayTimeGetter.isDay()) {
+                    applyNightDimMode(NightDimState.NORMAL)
+                } else {
+                    reEvaluateSmartNightDimming()
+                }
             }
             if (!disableWeather && ::weatherGetter.isInitialized) {
                 weatherGetter.startUpdates(lat, lon)
@@ -2405,6 +2415,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun applyNightDimMode(state: NightDimState) {
         if (isPowerSavingMode) return // Let power save mode handle its own brightness
 
+        if (dayTimeGetter.isDay()) {
+            applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+            return
+        }
+
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         if (state == NightDimState.DIMMED) {
             val minBrightPct = prefs.getInt("smart_night_min_brightness", 5) / 100f
@@ -2422,7 +2437,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         val shouldRegister = isResumed && (
             (isPowerSavingMode && !disableLightSensorInPowerSave) ||
-            (!isPowerSavingMode && brightnessMode == "smart_night")
+            (!isPowerSavingMode && brightnessMode == "smart_night" && !dayTimeGetter.isDay())
         )
 
         if (shouldRegister) {
