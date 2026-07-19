@@ -12,6 +12,12 @@
             app:summary="@string/power_saver_manual_summary" />
 
         <androidx.preference.SwitchPreferenceCompat
+            app:key="power_saver_sync_system"
+            app:title="@string/power_saver_sync_system_title"
+            app:summary="@string/power_saver_sync_system_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="automatic_battery_saver_mode"
             app:title="@string/automatic_battery_saver_mode_title"
             app:summary="@string/automatic_battery_saver_mode_summary" />

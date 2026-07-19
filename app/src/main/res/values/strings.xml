@@ -129,6 +129,8 @@
     <string name="battery_saver_trigger_summary">Set the battery level (%) at which battery saver mode activates</string>
     <string name="battery_saver_settings_title">Battery saving settings</string>
     <string name="power_saver_manual_title">Manual Battery Saver</string>
+    <string name="power_saver_sync_system_title">Sync with System Battery Saver</string>
+    <string name="power_saver_sync_system_summary">Automatically enable power save mode when Android system battery saver is active</string>
     <string name="power_saver_rules_title">Battery Saver Actions</string>
     <string name="power_saver_manual_summary">Force battery saver mode on manually to reduce resource usage</string>
     <string name="power_saver_disable_animations_title">Disable animations</string>

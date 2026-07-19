@@ -883,7 +883,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     val showOverlay = prefs.getBoolean("show_performance_overlay", false)
                     togglePerformanceOverlay(showOverlay)
                 }
-                "automatic_battery_saver_mode", "battery_saver_trigger", "battery_saver_mode",
+                "automatic_battery_saver_mode", "battery_saver_trigger", "power_saver_manual", "power_saver_sync_system",
                 "battery_alert_show_low", "battery_alert_low_threshold", "battery_alert_show_charging",
                 "battery_alert_show_full", "battery_alert_show_saver",
                 "weather_alert_enable_storms", "weather_alert_enable_wind", "weather_alert_enable_worsening",

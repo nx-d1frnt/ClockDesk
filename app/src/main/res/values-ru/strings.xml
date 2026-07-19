@@ -129,6 +129,8 @@
     <string name="battery_saver_trigger_summary">Установите уровень заряда батареи (%), при котором активируется режим экономии</string>
     <string name="battery_saver_settings_title">Настройки экономии батареи</string>
     <string name="power_saver_manual_title">Ручной режим экономии</string>
+    <string name="power_saver_sync_system_title">Синхронизация с экономией батареи Android</string>
+    <string name="power_saver_sync_system_summary">Автоматически включать режим экономии, когда активирован системный режим экономии заряда</string>
     <string name="power_saver_rules_title">Действия при экономии заряда</string>
     <string name="power_saver_manual_summary">Принудительно включить режим экономии батареи для снижения потребления ресурсов</string>
     <string name="power_saver_disable_animations_title">Отключить анимацию</string>

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.BatteryManager
+import android.os.PowerManager
 import java.lang.ref.WeakReference
 
 class PowerStateManager(private val context: Context) {
@@ -17,14 +18,15 @@ class PowerStateManager(private val context: Context) {
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
-                checkBatteryState(intent)
+            val action = intent.action
+            if (action == Intent.ACTION_BATTERY_CHANGED || action == PowerManager.ACTION_POWER_SAVE_MODE_CHANGED) {
+                checkPowerSaveStatus()
             }
         }
     }
 
     private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "power_saver_manual" || key == "automatic_battery_saver_mode" || key == "battery_saver_trigger") {
+        if (key == "power_saver_manual" || key == "automatic_battery_saver_mode" || key == "battery_saver_trigger" || key == "power_saver_sync_system") {
             checkPowerSaveStatus()
         } else if (key == "power_saver_disable_animations" || key == "power_saver_disable_weather" ||
             key == "power_saver_lock_brightness" || key == "power_saver_limit_clock" ||
@@ -40,11 +42,12 @@ class PowerStateManager(private val context: Context) {
     }
 
     init {
-        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val intent = context.registerReceiver(batteryReceiver, filter)
-        if (intent != null) {
-            checkBatteryState(intent)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
         }
+        val intent = context.registerReceiver(batteryReceiver, filter)
+        checkBatteryState(intent)
         prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
     }
 
@@ -65,30 +68,27 @@ class PowerStateManager(private val context: Context) {
 
     fun checkPowerSaveStatus() {
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        if (intent != null) {
-            checkBatteryState(intent)
-        } else {
-            val isManualOverride = prefs.getBoolean("power_saver_manual", false)
-            if (isPowerSavingMode != isManualOverride) {
-                setPowerSaveMode(isManualOverride)
-            }
-        }
+        checkBatteryState(intent)
     }
 
-    private fun checkBatteryState(intent: Intent) {
-        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+    private fun checkBatteryState(intent: Intent?) {
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                 status == BatteryManager.BATTERY_STATUS_FULL
 
-        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val batteryPct = if (scale > 0) (level.toFloat() / scale.toFloat() * 100).toInt() else 100
 
         val threshold = prefs.getInt("battery_saver_trigger", 15)
         val isManualOverride = prefs.getBoolean("power_saver_manual", false)
         val isAutoEnabled = prefs.getBoolean("automatic_battery_saver_mode", false)
+        val isSyncSystemEnabled = prefs.getBoolean("power_saver_sync_system", true)
 
-        val shouldBeEnabled = isManualOverride || (isAutoEnabled && batteryPct <= threshold && !isCharging)
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val isSystemPowerSave = isSyncSystemEnabled && powerManager?.isPowerSaveMode == true
+
+        val shouldBeEnabled = isManualOverride || (isAutoEnabled && batteryPct <= threshold && !isCharging) || isSystemPowerSave
 
         if (isPowerSavingMode != shouldBeEnabled) {
             setPowerSaveMode(shouldBeEnabled)
