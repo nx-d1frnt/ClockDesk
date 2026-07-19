@@ -10,6 +10,8 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.fragment.app.Fragment
 import com.nxd1frnt.clockdesk2.R
@@ -36,6 +38,12 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
     }
 
     private val callbackMap = mutableMapOf<MediaController, MediaController.Callback>()
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var missingArtRetryRunnable: Runnable? = null
+    private var currentMissingArtTrackKey: String? = null
+    private var artRetryCount = 0
+    private val maxArtRetries = 5
 
     override fun init() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
@@ -67,6 +75,10 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
 
     private fun stopSessionMonitoring() {
         try {
+            cancelArtworkRetry()
+            currentMissingArtTrackKey = null
+            artRetryCount = 0
+
             mediaSessionManager.removeOnActiveSessionsChangedListener(sessionsListener)
             callbackMap.keys.forEach { it.unregisterCallback(callbackMap[it]!!) }
             callbackMap.clear()
@@ -121,11 +133,54 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
             if (playingController != null) {
                 updateStateFromController(playingController)
             } else {
+                cancelArtworkRetry()
+                currentMissingArtTrackKey = null
+                artRetryCount = 0
                 callback?.invoke(PluginState.Idle)
             }
         } catch (e: Exception) {
+            cancelArtworkRetry()
+            currentMissingArtTrackKey = null
+            artRetryCount = 0
             callback?.invoke(PluginState.Idle)
         }
+    }
+
+    private fun cancelArtworkRetry() {
+        missingArtRetryRunnable?.let { handler.removeCallbacks(it) }
+        missingArtRetryRunnable = null
+    }
+
+    private fun scheduleArtworkRetry(controller: MediaController, trackKey: String) {
+        if (currentMissingArtTrackKey != trackKey) {
+            cancelArtworkRetry()
+            currentMissingArtTrackKey = trackKey
+            artRetryCount = 0
+        }
+
+        if (artRetryCount >= maxArtRetries || missingArtRetryRunnable != null) return
+
+        artRetryCount++
+        val delayMs = when (artRetryCount) {
+            1 -> 300L
+            2 -> 1200L
+            3 -> 2500L
+            4 -> 4500L
+            else -> 7000L
+        }
+
+        Logger.d("SystemMediaPlugin") { "Scheduling artwork retry #$artRetryCount for $trackKey in ${delayMs}ms" }
+
+        val runnable = Runnable {
+            missingArtRetryRunnable = null
+            if (currentMissingArtTrackKey == trackKey && isEnabled) {
+                Logger.d("SystemMediaPlugin") { "Executing periodic artwork check #$artRetryCount for $trackKey" }
+                updateStateFromController(controller)
+            }
+        }
+
+        missingArtRetryRunnable = runnable
+        handler.postDelayed(runnable, delayMs)
     }
 
     private fun updateStateFromController(controller: MediaController) {
@@ -137,14 +192,30 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
             val meta = controller.metadata
 
             val (bitmap, artUri) = extractArtwork(controller, meta)
-
             val displayIcon = extractDisplayIcon(controller, meta)
+
+            val title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown"
+            val artist = meta?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+            val trackKey = "${controller.packageName}:$artist:$title"
+
+            val isArtMissing = bitmap == null && artUri.isNullOrEmpty()
+
+            if (isArtMissing) {
+                scheduleArtworkRetry(controller, trackKey)
+            } else {
+                if (currentMissingArtTrackKey == trackKey) {
+                    Logger.d("SystemMediaPlugin") { "Artwork successfully loaded for $trackKey after $artRetryCount retries" }
+                    cancelArtworkRetry()
+                    currentMissingArtTrackKey = null
+                    artRetryCount = 0
+                }
+            }
 
             Logger.d("SystemMediaPlugin"){"Update: ${controller.packageName}, hasBitmap=${bitmap != null}, uri=$artUri"}
 
             val track = MusicTrack(
-                title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown",
-                artist = meta?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "",
+                title = title,
+                artist = artist,
                 album = meta?.getString(MediaMetadata.METADATA_KEY_ALBUM),
                 artworkBitmap = bitmap,
                 artworkUrl = artUri,
@@ -153,6 +224,9 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
             )
             callback?.invoke(PluginState.Playing(track))
         } else {
+            cancelArtworkRetry()
+            currentMissingArtTrackKey = null
+            artRetryCount = 0
             callback?.invoke(PluginState.Idle)
         }
     }
