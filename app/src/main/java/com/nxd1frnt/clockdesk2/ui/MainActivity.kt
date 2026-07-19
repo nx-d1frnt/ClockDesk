@@ -1088,8 +1088,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 nowPlayingTextView.text = trackInfoText
                 val isTextDifferent = trackInfoText != lastTrackInfo
                 lastTrackInfo = trackInfoText
+                val hasValidBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
                 val hasNewArt = !wasMusicBackgroundApplied &&
-                        (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
+                        (hasValidBitmap || !track.artworkUrl.isNullOrEmpty())
                 if (isTextDifferent || hasNewArt) {
                     handleBackgroundUpdate(track)
                 }
@@ -1112,8 +1113,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 val trackInfoText = "${track.artist} - ${track.title}"
                 val isTextDifferent = trackInfoText != lastTrackInfo
 
+                val hasValidBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
                 val hasNewArt = !wasMusicBackgroundApplied &&
-                        (track.artworkBitmap != null || !track.artworkUrl.isNullOrEmpty())
+                        (hasValidBitmap || !track.artworkUrl.isNullOrEmpty())
                 if (isTextDifferent || hasNewArt) {
                     handleBackgroundUpdate(track)
                 }
@@ -1210,7 +1212,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
             return
         }
-        if (track.artworkBitmap != null) {
+        if (track.artworkBitmap != null && !track.artworkBitmap.isRecycled) {
             Logger.d("MainActivity"){"Applying bitmap album art background"}
             applyBitmapBackground(track.artworkBitmap, blurIntensity)
             wasMusicBackgroundApplied = true

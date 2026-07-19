@@ -2,10 +2,13 @@ package com.nxd1frnt.clockdesk2.music.plugins
 
 import android.content.ComponentName
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.fragment.app.Fragment
@@ -133,14 +136,9 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
         if (isPlaying) {
             val meta = controller.metadata
 
-            val bitmap = meta?.getBitmap(MediaMetadata.METADATA_KEY_ART)
-                ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            val (bitmap, artUri) = extractArtwork(controller, meta)
 
-            val artUri = meta?.getString(MediaMetadata.METADATA_KEY_ART_URI)
-                ?: meta?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
-
-            val displayIcon = ClockDeskMediaService.getMediaIconBitmap(controller.packageName, context)
-                ?: meta?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+            val displayIcon = extractDisplayIcon(controller, meta)
 
             Logger.d("SystemMediaPlugin"){"Update: ${controller.packageName}, hasBitmap=${bitmap != null}, uri=$artUri"}
 
@@ -157,6 +155,129 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
         } else {
             callback?.invoke(PluginState.Idle)
         }
+    }
+
+    private fun extractArtwork(controller: MediaController, meta: MediaMetadata?): Pair<Bitmap?, String?> {
+        var bitmap: Bitmap? = null
+        var artUri: String? = null
+
+        // 1. Try Metadata Bitmap keys
+        val bitmapKeys = arrayOf(
+            MediaMetadata.METADATA_KEY_ART,
+            MediaMetadata.METADATA_KEY_ALBUM_ART,
+            MediaMetadata.METADATA_KEY_DISPLAY_ICON
+        )
+
+        for (key in bitmapKeys) {
+            val b = runCatching { meta?.getBitmap(key) }.getOrNull()
+            if (b != null && !b.isRecycled && b.width > 0 && b.height > 0) {
+                Logger.d("SystemMediaPlugin") { "Extracted artwork bitmap from metadata key '$key' for ${controller.packageName}" }
+                bitmap = ClockDeskMediaService.downscaleIfNeeded(b)
+                break
+            }
+        }
+
+        // 2. Try MediaDescription iconBitmap if metadata bitmap is still null
+        if (bitmap == null) {
+            val descBitmap = runCatching { meta?.description?.iconBitmap }.getOrNull()
+            if (descBitmap != null && !descBitmap.isRecycled && descBitmap.width > 0 && descBitmap.height > 0) {
+                Logger.d("SystemMediaPlugin") { "Extracted artwork bitmap from MediaDescription iconBitmap for ${controller.packageName}" }
+                bitmap = ClockDeskMediaService.downscaleIfNeeded(descBitmap)
+            }
+        }
+
+        // 3. Extract Uri strings from Metadata / MediaDescription
+        val uriKeys = arrayOf(
+            MediaMetadata.METADATA_KEY_ART_URI,
+            MediaMetadata.METADATA_KEY_ALBUM_ART_URI,
+            MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI
+        )
+
+        for (key in uriKeys) {
+            val uriStr = runCatching { meta?.getString(key) }.getOrNull()
+            if (!uriStr.isNullOrBlank()) {
+                artUri = uriStr
+                Logger.d("SystemMediaPlugin") { "Found artwork URI '$artUri' from key '$key' for ${controller.packageName}" }
+                break
+            }
+        }
+
+        if (artUri.isNullOrBlank()) {
+            val descUriStr = runCatching { meta?.description?.iconUri?.toString() }.getOrNull()
+            if (!descUriStr.isNullOrBlank()) {
+                artUri = descUriStr
+                Logger.d("SystemMediaPlugin") { "Found artwork URI '$artUri' from MediaDescription for ${controller.packageName}" }
+            }
+        }
+
+        // 4. If artwork bitmap is missing, but artUri is local (content:// or file://), try resolving via ContentResolver
+        if (bitmap == null && !artUri.isNullOrBlank()) {
+            Logger.d("SystemMediaPlugin") { "Attempting to resolve local artwork URI '$artUri' for ${controller.packageName}" }
+            val resolvedBitmap = loadBitmapFromUri(artUri)
+            if (resolvedBitmap != null && !resolvedBitmap.isRecycled) {
+                Logger.d("SystemMediaPlugin") { "Successfully resolved artwork bitmap from URI '$artUri' for ${controller.packageName}" }
+                bitmap = resolvedBitmap
+            } else {
+                Logger.w("SystemMediaPlugin") { "Could not decode bitmap from URI '$artUri' for ${controller.packageName}" }
+            }
+        }
+
+        // 5. If artwork bitmap is still missing, fallback to Notification artwork from ClockDeskMediaService
+        if (bitmap == null) {
+            Logger.d("SystemMediaPlugin") { "Attempting notification artwork fallback for ${controller.packageName}" }
+            val notifBitmap = ClockDeskMediaService.getMediaNotificationArtwork(controller.packageName, context)
+            if (notifBitmap != null && !notifBitmap.isRecycled && notifBitmap.width > 0 && notifBitmap.height > 0) {
+                Logger.d("SystemMediaPlugin") { "Notification artwork fallback succeeded for ${controller.packageName}" }
+                bitmap = notifBitmap
+            } else {
+                Logger.d("SystemMediaPlugin") { "Notification artwork fallback returned null for ${controller.packageName}" }
+            }
+        }
+
+        return Pair(bitmap, artUri)
+    }
+
+    private fun extractDisplayIcon(controller: MediaController, meta: MediaMetadata?): Bitmap? {
+        val notifIcon = ClockDeskMediaService.getMediaIconBitmap(controller.packageName, context)
+        if (notifIcon != null && !notifIcon.isRecycled) return notifIcon
+
+        val metaIcon = runCatching { meta?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON) }.getOrNull()
+            ?: runCatching { meta?.description?.iconBitmap }.getOrNull()
+
+        return if (metaIcon != null && !metaIcon.isRecycled) {
+            ClockDeskMediaService.downscaleIfNeeded(metaIcon, 256)
+        } else null
+    }
+
+    private fun loadBitmapFromUri(uriString: String): Bitmap? {
+        return runCatching {
+            val uri = Uri.parse(uriString)
+            val scheme = uri.scheme
+            if (scheme == "content" || scheme == "file") {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val bytes = stream.readBytes()
+                    val options = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                    }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+                    val maxDim = maxOf(options.outWidth, options.outHeight)
+                    var sampleSize = 1
+                    if (maxDim > 1024) {
+                        sampleSize = maxDim / 1024
+                    }
+
+                    val decodeOptions = BitmapFactory.Options().apply {
+                        inSampleSize = sampleSize.coerceAtLeast(1)
+                    }
+
+                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)
+                    if (decoded != null && !decoded.isRecycled && decoded.width > 0 && decoded.height > 0) {
+                        ClockDeskMediaService.downscaleIfNeeded(decoded)
+                    } else null
+                }
+            } else null
+        }.getOrNull()
     }
 
     override fun setCallback(callback: (PluginState) -> Unit) {

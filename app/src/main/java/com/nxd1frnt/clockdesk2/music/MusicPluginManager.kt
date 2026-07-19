@@ -77,7 +77,7 @@ class MusicPluginManager(
         if (activeState is PluginState.Playing && primaryPluginId != null) {
             val primaryTrack = activeState.track
 
-            val isArtMissing = primaryTrack.artworkBitmap == null && primaryTrack.artworkUrl.isNullOrEmpty()
+            val isArtMissing = (primaryTrack.artworkBitmap == null || primaryTrack.artworkBitmap.isRecycled) && primaryTrack.artworkUrl.isNullOrEmpty()
 
             if (isArtMissing) {
 
@@ -88,12 +88,13 @@ class MusicPluginManager(
                         val candidateTrack = state.track
 
                         if (areTracksSame(primaryTrack, candidateTrack)) {
-                            if (candidateTrack.artworkUrl != null || candidateTrack.artworkBitmap != null) {
+                            val candidateBitmapValid = candidateTrack.artworkBitmap != null && !candidateTrack.artworkBitmap.isRecycled
+                            if (candidateTrack.artworkUrl != null || candidateBitmapValid) {
                                 Logger.d("MusicManager"){"Merging art from $id into $primaryPluginId for '${primaryTrack.title}'"}
 
                                 val mergedTrack = primaryTrack.copy(
                                     artworkUrl = candidateTrack.artworkUrl,
-                                    artworkBitmap = candidateTrack.artworkBitmap
+                                    artworkBitmap = if (candidateBitmapValid) candidateTrack.artworkBitmap else null
                                 )
                                 activeState = PluginState.Playing(mergedTrack)
                                 break
