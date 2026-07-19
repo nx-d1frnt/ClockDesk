@@ -2,8 +2,16 @@ package com.nxd1frnt.clockdesk2.ui
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
 import android.content.SharedPreferences
+import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -113,13 +121,70 @@ class TutorialManager(
         }
     }
 
+    private var iconFloatingAnimator: ObjectAnimator? = null
+    private var nextBtnPulseAnimator: ObjectAnimator? = null
+
+    private fun applyBackgroundBlur() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val blurEffect = RenderEffect.createBlurEffect(50f, 50f, Shader.TileMode.CLAMP)
+                mainLayout.setRenderEffect(blurEffect)
+                tutorialLayout.setBackgroundColor(Color.parseColor("#66000000"))
+            } catch (_: Throwable) {
+                tutorialLayout.setBackgroundColor(Color.parseColor("#D9000000"))
+            }
+        } else {
+            tutorialLayout.setBackgroundColor(Color.parseColor("#D9000000"))
+        }
+    }
+
+    private fun removeBackgroundBlur() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                mainLayout.setRenderEffect(null)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun startContinuousAnimations() {
+        stopContinuousAnimations()
+
+        // Gentle floating bobbing animation for the slide icon
+        iconFloatingAnimator = ObjectAnimator.ofFloat(
+            iconView,
+            "translationY",
+            -5f * tutorialLayout.resources.displayMetrics.density,
+            5f * tutorialLayout.resources.displayMetrics.density
+        ).apply {
+            duration = 1600
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+
+    }
+
+    private fun stopContinuousAnimations() {
+        iconFloatingAnimator?.cancel()
+        iconFloatingAnimator = null
+        nextBtnPulseAnimator?.cancel()
+        nextBtnPulseAnimator = null
+        iconView.translationY = 0f
+        btnRight.scaleX = 1f
+        btnRight.scaleY = 1f
+    }
+
     fun start() {
         isTutorialRunning = true
+        applyBackgroundBlur()
+        startContinuousAnimations()
+
         tutorialLayout.visibility = View.VISIBLE
         tutorialLayout.alpha = 0f
 
-        cardView.scaleX = 0.8f
-        cardView.scaleY = 0.8f
+        cardView.scaleX = 0.92f
+        cardView.scaleY = 0.92f
         cardView.alpha = 0f
 
         // Reset overlays
@@ -135,8 +200,8 @@ class TutorialManager(
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
-            .setDuration(500)
-            .setInterpolator(OvershootInterpolator(1.1f))
+            .setDuration(450)
+            .setInterpolator(OvershootInterpolator(1.05f))
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     showSlide(0, 1)
@@ -164,17 +229,28 @@ class TutorialManager(
         val context = tutorialLayout.context
         val density = context.resources.displayMetrics.density
 
+        // Cancel previous element animations
+        iconView.animate().cancel()
+        titleView.animate().cancel()
+        descView.animate().cancel()
+        actionBtn.animate().cancel()
+
         // Clean slide transition animation: Fade out current, slide in next
         val contentContainer = tutorialLayout.findViewById<View>(R.id.onboarding_content_container)
 
         contentContainer.animate()
             .alpha(0f)
-            .translationX(-direction * 40f * density)
-            .setDuration(180)
+            .translationX(-direction * 30f * density)
+            .setDuration(160)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     // Update views with new slide content
                     iconView.setImageResource(nextSlide.iconResId)
+                    if (index == 0) {
+                        iconView.clearColorFilter()
+                    } else {
+                        iconView.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN)
+                    }
                     titleView.setText(nextSlide.titleResId)
                     descView.setText(nextSlide.descResId)
 
@@ -186,6 +262,7 @@ class TutorialManager(
                         } else {
                             actionBtn.setIconResource(nextSlide.actionBtnIconResId)
                         }
+                        actionBtn.setIconTint(android.content.res.ColorStateList.valueOf(Color.parseColor("#121212")))
                         checkAndUpdatePermissionState()
                     } else {
                         actionBtn.visibility = View.GONE
@@ -198,15 +275,68 @@ class TutorialManager(
                     updateIndicators(index, slides.size)
 
                     // Position incoming content for slide-in
-                    contentContainer.translationX = direction * 40f * density
+                    contentContainer.translationX = direction * 30f * density
+                    contentContainer.alpha = 1f
 
-                    // Fade and slide in
+                    // Prepare initial values for staggered entrance
+                    iconView.scaleX = 0.5f
+                    iconView.scaleY = 0.5f
+                    iconView.alpha = 0f
+
+                    titleView.translationY = 18f * density
+                    titleView.alpha = 0f
+
+                    descView.translationY = 18f * density
+                    descView.alpha = 0f
+
+                    if (nextSlide.hasActionBtn) {
+                        actionBtn.scaleX = 0.8f
+                        actionBtn.scaleY = 0.8f
+                        actionBtn.alpha = 0f
+                    }
+
+                    // Slide container in
                     contentContainer.animate()
-                        .alpha(1f)
                         .translationX(0f)
                         .setDuration(220)
                         .setListener(null)
                         .start()
+
+                    // Staggered pop-in animations for individual slide components
+                    iconView.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .alpha(1f)
+                        .setDuration(320)
+                        .setInterpolator(OvershootInterpolator(1.4f))
+                        .start()
+
+                    titleView.animate()
+                        .translationY(0f)
+                        .alpha(1f)
+                        .setDuration(240)
+                        .setStartDelay(40)
+                        .setInterpolator(DecelerateInterpolator())
+                        .start()
+
+                    descView.animate()
+                        .translationY(0f)
+                        .alpha(1f)
+                        .setDuration(240)
+                        .setStartDelay(80)
+                        .setInterpolator(DecelerateInterpolator())
+                        .start()
+
+                    if (nextSlide.hasActionBtn) {
+                        actionBtn.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .alpha(1f)
+                            .setDuration(280)
+                            .setStartDelay(120)
+                            .setInterpolator(OvershootInterpolator(1.2f))
+                            .start()
+                    }
                 }
             }).start()
 
@@ -264,8 +394,8 @@ class TutorialManager(
             .apply()
 
         cardView.animate()
-            .scaleX(0.8f)
-            .scaleY(0.8f)
+            .scaleX(0.92f)
+            .scaleY(0.92f)
             .alpha(0f)
             .setDuration(250)
             .start()
@@ -277,6 +407,7 @@ class TutorialManager(
                 override fun onAnimationEnd(animation: Animator) {
                     tutorialLayout.visibility = View.GONE
                     isTutorialRunning = false
+                    removeBackgroundBlur()
                     onTutorialFinished()
                 }
             })
@@ -290,12 +421,13 @@ class TutorialManager(
 
         cardView.animate()
             .alpha(0f)
-            .scaleX(0.8f)
-            .scaleY(0.8f)
+            .scaleX(0.92f)
+            .scaleY(0.92f)
             .setDuration(300)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     cardView.visibility = View.GONE
+                    removeBackgroundBlur()
 
                     tutorialFinger.visibility = View.VISIBLE
                     tutorialText.visibility = View.VISIBLE
@@ -313,6 +445,7 @@ class TutorialManager(
 
     private fun cancelInteractiveGuide() {
         isInteractiveGuideRunning = false
+        applyBackgroundBlur()
 
         tutorialFinger.animate().cancel()
         tutorialFinger.visibility = View.GONE
@@ -323,14 +456,14 @@ class TutorialManager(
 
         cardView.visibility = View.VISIBLE
         cardView.alpha = 0f
-        cardView.scaleX = 0.8f
-        cardView.scaleY = 0.8f
+        cardView.scaleX = 0.92f
+        cardView.scaleY = 0.92f
         cardView.animate()
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
             .setDuration(300)
-            .setInterpolator(OvershootInterpolator(1.1f))
+            .setInterpolator(OvershootInterpolator(1.05f))
             .setListener(null)
             .start()
 
@@ -430,7 +563,6 @@ class TutorialManager(
 
                     tutorialLayout.setOnClickListener {
                         hideBottomSheetAction()
-
                         tutorialFinger.animate().cancel()
                         tutorialFinger.visibility = View.GONE
                         tutorialText.animate().cancel()
@@ -438,17 +570,19 @@ class TutorialManager(
                         tutorialLayout.setOnClickListener(null)
                         isInteractiveGuideRunning = false
 
+                        applyBackgroundBlur()
+
                         // Restore onboarding card and move to the next slide (widgets)
                         cardView.visibility = View.VISIBLE
                         cardView.alpha = 0f
-                        cardView.scaleX = 0.8f
-                        cardView.scaleY = 0.8f
+                        cardView.scaleX = 0.92f
+                        cardView.scaleY = 0.92f
                         cardView.animate()
                             .alpha(1f)
                             .scaleX(1f)
                             .scaleY(1f)
                             .setDuration(300)
-                            .setInterpolator(OvershootInterpolator(1.1f))
+                            .setInterpolator(OvershootInterpolator(1.05f))
                             .setListener(null)
                             .start()
 
