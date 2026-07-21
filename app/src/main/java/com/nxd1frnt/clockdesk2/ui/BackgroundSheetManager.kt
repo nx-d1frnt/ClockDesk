@@ -524,7 +524,7 @@ class BackgroundSheetManager(
             }
             val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val floatIntensity = bgIntensitySeek.value / 100f
-            weatherView.forceWeather(type, floatIntensity, 5.0f, isNight)
+            weatherView.forceWeather(type, floatIntensity, floatIntensity * 1.5f, isNight)
         } else {
             weatherView.updateFromOpenMeteoSmart(
                 weatherGetter.weatherCode ?: 0,

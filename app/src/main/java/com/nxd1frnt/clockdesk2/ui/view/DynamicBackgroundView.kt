@@ -240,7 +240,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         wmoCode: Int, windSpeedKmh: Double, night: Boolean,
         precipitation: Double?, cloudCover: Int?, visibility: Double?
     ) {
-        val windFactor = (windSpeedKmh.toFloat() / 2f).coerceIn(-20f, 20f)
+        val windFactor = (windSpeedKmh.toFloat() / 15f).coerceIn(-4f, 4f)
         val calculatedIntensity = calculateWeatherIntensity(
             wmoCode, windSpeedKmh, precipitation, cloudCover, visibility
         )

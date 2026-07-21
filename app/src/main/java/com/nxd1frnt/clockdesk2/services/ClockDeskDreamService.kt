@@ -527,7 +527,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
             val typeOrdinal = backgroundManager.getManualWeatherType()
             val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
-            dynamicBackgroundView.forceWeather(type, intensity, 5.0f, isNight)
+            dynamicBackgroundView.forceWeather(type, intensity, intensity * 1.5f, isNight)
         } else {
             val code = weatherGetter.weatherCode ?: 0
             val wind = weatherGetter.windSpeed ?: 0.0

@@ -23,92 +23,96 @@ fun calculateWeatherIntensity(
     val vis = visibility ?: 10000.0
 
     val intensity = when (wmoCode) {
-        //clear sky
+        // clear sky
         0 -> {
-            val windBoost = min(wind / 30.0, 0.5) // wind can add some intensity
-            (1.0 + windBoost).toFloat()
+            val windBoost = min(wind / 40.0, 0.3)
+            (0.8 + windBoost).toFloat()
         }
-        //cloudy
+        // cloudy
         1, 2, 3 -> {
             val baseIntensity = when {
-                clouds >= 75 -> 1.2  // overcast
+                clouds >= 80 -> 1.0  // overcast
                 clouds >= 50 -> 0.8  // cloudy
-                clouds >= 25 -> 0.5  // partly cloudy
-                else -> 0.3          // mostly clear
+                clouds >= 25 -> 0.6  // partly cloudy
+                else -> 0.4          // mostly clear
             }
-            val windBoost = min(wind / 40.0, 0.4)
+            val windBoost = min(wind / 40.0, 0.3)
             (baseIntensity + windBoost).toFloat()
         }
 
-        //fog
+        // fog
         45, 48 -> {
             val baseIntensity = when {
-                vis < 200 -> 1.8 // thick fog
-                vis < 300 -> 1.6 // moderate fog
-                vis < 500 -> 1.4 // dense fog
+                vis < 300 -> 1.2  // thick fog
                 vis < 1000 -> 1.0 // fog
-                vis < 2000 -> 0.6 // light fog
-                else -> 0.4 // haze
+                vis < 3000 -> 0.7 // light fog
+                else -> 0.5       // haze
             }
             baseIntensity.toFloat()
         }
 
-        //drizzle
+        // drizzle
         51, 53, 55, 56, 57 -> {
             val baseIntensity = when {
-                precip >= 1.0 -> 0.8  // moderate drizzle
-                precip >= 0.5 -> 0.6  // light drizzle
-                else -> 0.4           // very light drizzle
+                precip >= 1.5 -> 1.0  // moderate drizzle
+                precip >= 0.5 -> 0.8  // light drizzle
+                precip > 0.0 -> 0.6   // very light drizzle
+                else -> 0.6           // default for drizzle code
             }
-            val windBoost = min(wind / 50.0, 0.3)
+            val windBoost = min(wind / 50.0, 0.2)
             (baseIntensity + windBoost).toFloat()
         }
 
-        //rain
+        // rain
         61, 63, 65, 80, 81, 82 -> {
             val baseIntensity = when {
-                precip >= 10.0 -> 2.0 // heavy rain
-                precip >= 4.0 -> 1.6   // moderate rain
-                precip >= 2.0 -> 1.2   // light rain
-                precip >= 0.5 -> 0.8   // very light rain
-                else -> 0.6            // no rain
+                precip >= 8.0 -> 1.5   // heavy rain
+                precip >= 3.0 -> 1.2   // moderate rain
+                precip >= 1.0 -> 1.0   // light rain
+                precip > 0.0 -> 0.8    // very light rain
+                else -> when (wmoCode) {
+                    65, 82 -> 1.4      // heavy rain code
+                    63, 81 -> 1.1      // moderate rain code
+                    else -> 0.8        // light rain code (61, 80)
+                }
             }
-            val windBoost = min(wind / 40.0, 0.4)
-            min((baseIntensity + windBoost).toFloat(), 2.0f)
+            val windBoost = min(wind / 40.0, 0.3)
+            (baseIntensity + windBoost).toFloat()
         }
+
         // snow
         71, 73, 75, 77, 85, 86 -> {
             val baseIntensity = when {
-                precip >= 5.0 -> 1.8   // heavy snow
-                precip >= 3.0 -> 1.6   // moderate snow
-                precip >= 2.0 -> 1.4   // light snow
-                precip >= 1.0 -> 1.0   // very light snow
-                precip >= 0.5 -> 0.7   // flurries
-                else -> 0.5           // no snow
+                precip >= 4.0 -> 1.5   // heavy snow
+                precip >= 2.0 -> 1.2   // moderate snow
+                precip >= 0.5 -> 1.0   // light snow
+                precip > 0.0 -> 0.8    // flurries
+                else -> when (wmoCode) {
+                    75, 86 -> 1.4      // heavy snow code
+                    73, 85 -> 1.1      // moderate snow code
+                    else -> 0.8        // light snow code (71, 77)
+                }
             }
-            val windBoost = min(wind / 30.0, 0.5)
-            min((baseIntensity + windBoost).toFloat(), 2.0f)
+            val windBoost = min(wind / 30.0, 0.3)
+            (baseIntensity + windBoost).toFloat()
         }
 
         // thunderstorm
         95, 96, 99 -> {
             val baseIntensity = when {
-                precip >= 15.0 -> 2.0  // severe thunderstorm
-                precip >= 8.0 -> 1.8   // strong thunderstorm
-                precip >= 4.0 -> 1.5   // thunderstorm
-                else -> 1.3            // moderate thunderstorm
+                precip >= 10.0 -> 1.6  // severe thunderstorm
+                precip >= 4.0 -> 1.4   // strong thunderstorm
+                precip > 0.0 -> 1.2    // thunderstorm
+                else -> if (wmoCode == 99 || wmoCode == 96) 1.5 else 1.3
             }
-            min(baseIntensity.toFloat(), 2.0f)
+            baseIntensity.toFloat()
         }
 
         // default case for unlisted WMO codes
-        else -> 0.5f
+        else -> 0.8f
     }
 
-    //Log.d("WeatherIntensity",
-    //    "WMO=$wmoCode, Wind=${wind.toInt()}, Precip=$precip, Clouds=$clouds%, Vis=${vis.toInt()}m -> Intensity=${"%.2f".format(intensity)}")
-
-    return intensity.coerceIn(0.0f, 2.0f)
+    return intensity.coerceIn(0.2f, 1.6f)
 }
 
 
