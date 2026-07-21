@@ -421,4 +421,21 @@
     <string name="pref_temperature_unit_title">Одиниця температури</string>
     <string name="pref_wind_speed_unit_title">Одиниця швидкості вітру</string>
     <string name="pref_precipitation_unit_title">Одиниця опадів</string>
+
+    <!-- Additional Translations -->
+    <string name="weather_auto_loading">Очікування даних…</string>
+    <string name="weather_auto_no_data">Немає даних про погоду</string>
+    <string name="smart_chips_plugins_title">Управління розумними чіпами</string>
+    <string name="crop_hint">Зведіть пальці для масштабу · Перетягніть для переміщення</string>
+    <string name="crop_reset">Скинути</string>
+    <string name="crop_button">Оборізати</string>
+    <string name="date_time_format_custom">Власний</string>
+    <string name="time_format_pattern_hint">Шаблон (напр., HH:mm:ss)</string>
+    <string name="date_format_pattern_hint">Шаблон (напр., yyyy-MM-dd)</string>
+    <string name="show_media_icon">Іконка медіаплеєра</string>
+    <string name="show_media_icon_summary">Відображати значок поточного медіаплеєра</string>
+    <string name="percent_100">100%</string>
+    <string name="weight_default">400</string>
+    <string name="width_default">100</string>
+    <string name="roundness_default">0</string>
 </resources>

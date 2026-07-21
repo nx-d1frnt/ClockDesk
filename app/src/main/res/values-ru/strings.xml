@@ -421,4 +421,21 @@
     <string name="pref_temperature_unit_title">Единица температуры</string>
     <string name="pref_wind_speed_unit_title">Единица скорости ветра</string>
     <string name="pref_precipitation_unit_title">Единица осадков</string>
+
+    <!-- Additional Translations -->
+    <string name="weather_auto_loading">Ожидание данных…</string>
+    <string name="weather_auto_no_data">Нет данных о погоде</string>
+    <string name="smart_chips_plugins_title">Управление умными чипами</string>
+    <string name="crop_hint">Сведите пальцы для масштаба · Перетащите для перемещения</string>
+    <string name="crop_reset">Сбросить</string>
+    <string name="crop_button">Обрезать</string>
+    <string name="date_time_format_custom">Пользовательский</string>
+    <string name="time_format_pattern_hint">Шаблон (напр., HH:mm:ss)</string>
+    <string name="date_format_pattern_hint">Шаблон (напр., yyyy-MM-dd)</string>
+    <string name="show_media_icon">Иконка медиаплеера</string>
+    <string name="show_media_icon_summary">Отображать значок текущего медиаплеера</string>
+    <string name="percent_100">100%</string>
+    <string name="weight_default">400</string>
+    <string name="width_default">100</string>
+    <string name="roundness_default">0</string>
 </resources>
