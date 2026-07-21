@@ -237,12 +237,19 @@ class DynamicBackgroundView @JvmOverloads constructor(
      * Установка погоды на основе метеоданных.
      */
     fun updateFromOpenMeteoSmart(
-        wmoCode: Int, windSpeedKmh: Double, night: Boolean,
-        precipitation: Double?, cloudCover: Int?, visibility: Double?
+        wmoCode: Int, windSpeed: Double, night: Boolean,
+        precipitation: Double?, cloudCover: Int?, visibility: Double?,
+        windUnit: String = "kmh", precipUnit: String = "mm"
     ) {
-        val windFactor = (windSpeedKmh.toFloat() / 15f).coerceIn(-4f, 4f)
+        val rawWind = windSpeed.toFloat()
+        val windKmh = when (windUnit) {
+            "mph" -> rawWind * 1.60934f
+            "ms" -> rawWind * 3.6f
+            else -> rawWind
+        }
+        val windFactor = (windKmh / 15f).coerceIn(-4f, 4f)
         val calculatedIntensity = calculateWeatherIntensity(
-            wmoCode, windSpeedKmh, precipitation, cloudCover, visibility
+            wmoCode, windSpeed, precipitation, cloudCover, visibility, windUnit, precipUnit
         )
 
         val type = when (wmoCode) {

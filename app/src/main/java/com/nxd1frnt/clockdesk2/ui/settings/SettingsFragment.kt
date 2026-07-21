@@ -28,7 +28,7 @@ class GeneralSettingsFragment : PreferenceFragmentCompat() {
         }
 
         val locationModePref = findPreference<androidx.preference.ListPreference>("location_mode")
-        val cityPref = findPreference<androidx.preference.EditTextPreference>("location_city_name")
+        val cityPref = findPreference<androidx.preference.Preference>("location_city_name")
         val latPref = findPreference<androidx.preference.Preference>("latitude")
         val lonPref = findPreference<androidx.preference.Preference>("longitude")
 
@@ -56,27 +56,18 @@ class GeneralSettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
-        cityPref?.setOnPreferenceChangeListener { _, newValue ->
-            val newCity = newValue as? String
-            if (!newCity.isNullOrBlank()) {
-                com.nxd1frnt.clockdesk2.utils.GeocodingHelper.geocodeCity(requireContext(), newCity,
-                    onSuccess = { lat, lon, resolvedCity ->
-                        prefs.edit()
-                            .putString("resolved_latitude", lat.toString())
-                            .putString("resolved_longitude", lon.toString())
-                            .putString("resolved_city_display_name", resolvedCity)
-                            .apply()
-                        activity?.runOnUiThread {
-                            cityPref.summary = resolvedCity
-                            toast(getString(R.string.city_resolved_format, resolvedCity, lat, lon))
-                        }
-                    },
-                    onError = { error ->
-                        activity?.runOnUiThread {
-                            toast(getString(R.string.city_resolve_error_format, newCity))
-                        }
-                    }
-                )
+        cityPref?.setOnPreferenceClickListener {
+            com.nxd1frnt.clockdesk2.ui.dialog.CitySearchDialog.show(requireContext()) { selected ->
+                prefs.edit()
+                    .putString("location_mode", "city")
+                    .putString("location_city_name", selected.name)
+                    .putString("resolved_latitude", selected.latitude.toString())
+                    .putString("resolved_longitude", selected.longitude.toString())
+                    .putString("resolved_city_display_name", selected.displayName)
+                    .apply()
+
+                cityPref.summary = selected.displayName
+                toast(getString(R.string.city_resolved_format, selected.displayName, selected.latitude, selected.longitude))
             }
             true
         }

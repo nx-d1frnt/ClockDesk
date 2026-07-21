@@ -526,13 +526,18 @@ class BackgroundSheetManager(
             val floatIntensity = bgIntensitySeek.value / 100f
             weatherView.forceWeather(type, floatIntensity, floatIntensity * 1.5f, isNight)
         } else {
+            val prefs = weatherView.context.getSharedPreferences("ClockDeskPrefs", android.content.Context.MODE_PRIVATE)
+            val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
+            val precipUnit = prefs.getString("precipitation_unit", "mm") ?: "mm"
             weatherView.updateFromOpenMeteoSmart(
                 weatherGetter.weatherCode ?: 0,
                 weatherGetter.windSpeed ?: 0.0,
                 isNight,
                 weatherGetter.precipitation,
                 weatherGetter.cloudCover,
-                weatherGetter.visibility
+                weatherGetter.visibility,
+                windUnit,
+                precipUnit
             )
         }
         onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())

@@ -9,4 +9,23 @@
         <item>12 годин</item>
         <item>24 години</item>
     </string-array>
+
+    <!-- Temperature Unit -->
+    <string-array name="temperature_unit_entries">
+        <item>Цельсій (°C)</item>
+        <item>Фаренгейт (°F)</item>
+    </string-array>
+
+    <!-- Wind Speed Unit -->
+    <string-array name="wind_speed_unit_entries">
+        <item>Кілометри за годину (км/год)</item>
+        <item>Метри за секунду (м/с)</item>
+        <item>Милі за годину (миль/год)</item>
+    </string-array>
+
+    <!-- Precipitation Unit -->
+    <string-array name="precipitation_unit_entries">
+        <item>Міліметри (мм)</item>
+        <item>Дюйми (дюйм)</item>
+    </string-array>
 </resources>

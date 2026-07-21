@@ -335,13 +335,18 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
             if (backgroundManager.isWeatherEffectsEnabled() &&
                 !backgroundManager.isManualWeatherEnabled()
             ) {
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
+                val precipUnit = prefs.getString("precipitation_unit", "mm") ?: "mm"
                 dynamicBackgroundView.updateFromOpenMeteoSmart(
                     wmoCode = code,
-                    windSpeedKmh = wind,
+                    windSpeed = wind,
                     night = isNight,
                     precipitation = precip,
                     cloudCover = clouds,
-                    visibility = vis
+                    visibility = vis,
+                    windUnit = windUnit,
+                    precipUnit = precipUnit
                 )
             }
 
@@ -534,9 +539,13 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
             val precip = weatherGetter.precipitation
             val clouds = weatherGetter.cloudCover
             val vis = weatherGetter.visibility
+            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
+            val precipUnit = prefs.getString("precipitation_unit", "mm") ?: "mm"
             dynamicBackgroundView.updateFromOpenMeteoSmart(
                 code, wind, isNight,
-                precip, clouds, vis
+                precip, clouds, vis,
+                windUnit, precipUnit
             )
         }
         updateBackgroundFilters()

@@ -380,4 +380,45 @@
     <string name="smart_night_min_brightness_summary">Бажаний рівень яскравості при затемненні вночі</string>
     <string name="smart_night_lux_threshold_title">Поріг освітленості (lux)</string>
     <string name="smart_night_lux_threshold_summary">Рівень освітленості (люкс), нижче якого вмикається нічне затемнення</string>
+
+    <!-- Weather Details Dialog -->
+    <string name="weather_dialog_title">Деталі погоди</string>
+    <string name="weather_details_title">Поточні параметри</string>
+    <string name="weather_metric_wind">Швидкість вітру</string>
+    <string name="weather_metric_uv">УФ-індекс</string>
+    <string name="weather_metric_precip">Опади</string>
+    <string name="weather_metric_clouds">Хмарність</string>
+    <string name="weather_metric_visibility">Видимість</string>
+    <string name="weather_hourly_forecast_title">Прогноз по годинах</string>
+
+    <!-- Weather Condition Descriptions -->
+    <string name="weather_code_0">Ясно</string>
+    <string name="weather_code_1">Здебільшого ясно</string>
+    <string name="weather_code_2">Мінлива хмарність</string>
+    <string name="weather_code_3">Хмаро</string>
+    <string name="weather_code_fog">Туман</string>
+    <string name="weather_code_drizzle">Мряка</string>
+    <string name="weather_code_freezing_drizzle">Замерзаюча мряка</string>
+    <string name="weather_code_rain">Дощ</string>
+    <string name="weather_code_freezing_rain">Крижаний дощ</string>
+    <string name="weather_code_snow">Снігопад</string>
+    <string name="weather_code_snow_grains">Сніжні крупи</string>
+    <string name="weather_code_rain_showers">Злива</string>
+    <string name="weather_code_snow_showers">Снігова злива</string>
+    <string name="weather_code_thunderstorm">Гроза</string>
+    <string name="weather_code_thunderstorm_hail">Гроза з градом</string>
+    <string name="weather_code_unknown">Невідома погода</string>
+
+    <!-- City Search Dialog -->
+    <string name="city_search_title">Вибір міста</string>
+    <string name="city_search_hint">Введіть назву міста…</string>
+    <string name="city_search_empty_prompt">Введіть текст для пошуку міст по всьому світу</string>
+    <string name="city_search_no_results">Міста не знайдено</string>
+    <string name="city_search_searching">Пошук міст…</string>
+
+    <!-- Units Settings -->
+    <string name="pref_units_category_title">Одиниці вимірювання</string>
+    <string name="pref_temperature_unit_title">Одиниця температури</string>
+    <string name="pref_wind_speed_unit_title">Одиниця швидкості вітру</string>
+    <string name="pref_precipitation_unit_title">Одиниця опадів</string>
 </resources>

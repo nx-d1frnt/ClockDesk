@@ -13,10 +13,16 @@ class OpenMeteoAPI(
 ): WeatherGetter(context, locationManager, onWeatherUpdated) {
 
     override fun fetch(latitude: Double, longitude: Double) {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val tempUnit = prefs.getString("temperature_unit", "celsius") ?: "celsius"
+        val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
+        val precipUnit = prefs.getString("precipitation_unit", "mm") ?: "mm"
+
         val url =
             "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude" +
                     "&current=temperature_2m,weather_code,is_day,wind_speed_10m,precipitation,cloud_cover,visibility,uv_index" +
-                    "&hourly=weather_code&timezone=auto&forecast_days=2"
+                    "&hourly=weather_code,temperature_2m&timezone=auto&forecast_days=2" +
+                    "&temperature_unit=$tempUnit&wind_speed_unit=$windUnit&precipitation_unit=$precipUnit"
 
         val request = JsonObjectRequest(
             Request.Method.GET, url, null,
@@ -58,6 +64,7 @@ class OpenMeteoAPI(
                     }
 
                     val hourlyCodesList = mutableListOf<Int>()
+                    val hourlyTempsList = mutableListOf<Double>()
                     try {
                         if (response.has("hourly")) {
                             val hourly = response.getJSONObject("hourly")
@@ -65,6 +72,12 @@ class OpenMeteoAPI(
                             if (hourlyCodesArray != null) {
                                 for (i in 0 until hourlyCodesArray.length()) {
                                     hourlyCodesList.add(hourlyCodesArray.getInt(i))
+                                }
+                            }
+                            val hourlyTempsArray = hourly.optJSONArray("temperature_2m")
+                            if (hourlyTempsArray != null) {
+                                for (i in 0 until hourlyTempsArray.length()) {
+                                    hourlyTempsList.add(hourlyTempsArray.getDouble(i))
                                 }
                             }
                         }
@@ -76,7 +89,18 @@ class OpenMeteoAPI(
                             "Precipitation=$precipitation mm/h, CloudCover=$cloudCover%, Visibility=$visibility m, " +
                             "UvIndex=$uvIndex, HourlyCodesSize=${hourlyCodesList.size}"}
 
-                    WeatherGetter.updateCache(temperature, weatherCode, isDay, windSpeed, hourlyCodesList, uvIndex)
+                    WeatherGetter.updateCache(
+                        temp = temperature,
+                        code = weatherCode,
+                        isDay = isDay,
+                        wind = windSpeed,
+                        hourlyCodes = hourlyCodesList,
+                        hourlyTemps = hourlyTempsList,
+                        uvIndex = uvIndex,
+                        precipitation = precipitation,
+                        cloudCover = cloudCover,
+                        visibility = visibility
+                    )
 
                     onWeatherUpdated()
 

@@ -10,7 +10,7 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 
 open class WeatherGetter(
-    private val context: Context,
+    protected val context: Context,
     private val locationManager: LocationManager,
     private val callback: () -> Unit
 ) : PowerSaveObserver, SharedPreferences.OnSharedPreferenceChangeListener {
@@ -21,7 +21,11 @@ open class WeatherGetter(
         var cachedIsDay: Boolean? = null
         var cachedWindSpeed: Double? = null
         var cachedHourlyCodes: List<Int> = emptyList()
+        var cachedHourlyTemps: List<Double> = emptyList()
         var cachedUvIndex: Double? = null
+        var cachedPrecipitation: Double? = null
+        var cachedCloudCover: Int? = null
+        var cachedVisibility: Double? = null
 
         private val listeners = mutableSetOf<() -> Unit>()
 
@@ -33,13 +37,28 @@ open class WeatherGetter(
             listeners.remove(listener)
         }
 
-        fun updateCache(temp: Double?, code: Int?, isDay: Boolean?, wind: Double?, hourlyCodes: List<Int>, uvIndex: Double? = null) {
+        fun updateCache(
+            temp: Double?,
+            code: Int?,
+            isDay: Boolean?,
+            wind: Double?,
+            hourlyCodes: List<Int>,
+            hourlyTemps: List<Double> = emptyList(),
+            uvIndex: Double? = null,
+            precipitation: Double? = null,
+            cloudCover: Int? = null,
+            visibility: Double? = null
+        ) {
             cachedTemperature = temp
             cachedWeatherCode = code
             cachedIsDay = isDay
             cachedWindSpeed = wind
             cachedHourlyCodes = hourlyCodes
+            cachedHourlyTemps = hourlyTemps
             cachedUvIndex = uvIndex
+            cachedPrecipitation = precipitation
+            cachedCloudCover = cloudCover
+            cachedVisibility = visibility
             listeners.forEach {
                 try { it() } catch (e: Exception) {}
             }
@@ -60,6 +79,11 @@ open class WeatherGetter(
             if (lastLatitude != null && lastLongitude != null) {
                 Logger.d("WeatherGetter") { "Weather refresh rate preference changed. Rescheduling updates." }
                 startUpdates(lastLatitude!!, lastLongitude!!)
+            }
+        } else if (key == "temperature_unit" || key == "wind_speed_unit" || key == "precipitation_unit") {
+            if (lastLatitude != null && lastLongitude != null) {
+                Logger.d("WeatherGetter") { "Weather unit preference changed ($key). Fetching updated data..." }
+                fetch(lastLatitude!!, lastLongitude!!)
             }
         }
     }

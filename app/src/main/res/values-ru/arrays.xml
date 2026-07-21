@@ -9,4 +9,23 @@
         <item>12 часов</item>
         <item>24 часа</item>
     </string-array>
+
+    <!-- Temperature Unit -->
+    <string-array name="temperature_unit_entries">
+        <item>Цельсий (°C)</item>
+        <item>Фаренгейт (°F)</item>
+    </string-array>
+
+    <!-- Wind Speed Unit -->
+    <string-array name="wind_speed_unit_entries">
+        <item>Километры в час (км/ч)</item>
+        <item>Метры в секунду (м/с)</item>
+        <item>Мили в час (миля/ч)</item>
+    </string-array>
+
+    <!-- Precipitation Unit -->
+    <string-array name="precipitation_unit_entries">
+        <item>Миллиметры (мм)</item>
+        <item>Дюймы (дюйм)</item>
+    </string-array>
 </resources>

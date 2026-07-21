@@ -15,11 +15,9 @@
             app:entryValues="@array/location_mode_values"
             app:useSimpleSummaryProvider="true" />
 
-        <androidx.preference.EditTextPreference
+        <androidx.preference.Preference
             app:key="location_city_name"
-            app:title="@string/location_city_name_title"
-            app:dialogTitle="@string/location_city_name_dialog_title"
-            app:useSimpleSummaryProvider="false" />
+            app:title="@string/location_city_name_title" />
 
         <androidx.preference.EditTextPreference
             app:key="latitude"
@@ -47,6 +45,35 @@
             app:defaultValue="30"
             app:entries="@array/weather_refresh_entries"
             app:entryValues="@array/weather_refresh_values"
+            app:useSimpleSummaryProvider="true" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="units_settings_category"
+        app:title="@string/pref_units_category_title">
+
+        <androidx.preference.ListPreference
+            app:key="temperature_unit"
+            app:title="@string/pref_temperature_unit_title"
+            app:defaultValue="celsius"
+            app:entries="@array/temperature_unit_entries"
+            app:entryValues="@array/temperature_unit_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <androidx.preference.ListPreference
+            app:key="wind_speed_unit"
+            app:title="@string/pref_wind_speed_unit_title"
+            app:defaultValue="kmh"
+            app:entries="@array/wind_speed_unit_entries"
+            app:entryValues="@array/wind_speed_unit_values"
+            app:useSimpleSummaryProvider="true" />
+
+        <androidx.preference.ListPreference
+            app:key="precipitation_unit"
+            app:title="@string/pref_precipitation_unit_title"
+            app:defaultValue="mm"
+            app:entries="@array/precipitation_unit_entries"
+            app:entryValues="@array/precipitation_unit_values"
             app:useSimpleSummaryProvider="true" />
     </androidx.preference.PreferenceCategory>
 </androidx.preference.PreferenceScreen>

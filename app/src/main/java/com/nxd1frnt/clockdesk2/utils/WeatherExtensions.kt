@@ -15,10 +15,24 @@ fun calculateWeatherIntensity(
     windSpeed: Double?,
     precipitation: Double?,
     cloudCover: Int?,
-    visibility: Double?
+    visibility: Double?,
+    windUnit: String = "kmh",
+    precipUnit: String = "mm"
 ): Float {
-    val wind = windSpeed ?: 0.0
-    val precip = precipitation ?: 0.0
+    val rawWind = windSpeed ?: 0.0
+    val rawPrecip = precipitation ?: 0.0
+
+    val wind = when (windUnit) {
+        "mph" -> rawWind * 1.60934
+        "ms" -> rawWind * 3.6
+        else -> rawWind
+    }
+
+    val precip = when (precipUnit) {
+        "inch" -> rawPrecip * 25.4
+        else -> rawPrecip
+    }
+
     val clouds = cloudCover ?: 0
     val vis = visibility ?: 10000.0
 

@@ -397,4 +397,45 @@
     <string name="smart_night_min_brightness_summary">Preferred brightness level when dimmed in bedtime conditions</string>
     <string name="smart_night_lux_threshold_title">Ambient Lux Threshold</string>
     <string name="smart_night_lux_threshold_summary">Ambient light level (lux) below which night dimming activates</string>
+
+    <!-- Weather Details Dialog -->
+    <string name="weather_dialog_title">Weather Details</string>
+    <string name="weather_details_title">Current Parameters</string>
+    <string name="weather_metric_wind">Wind Speed</string>
+    <string name="weather_metric_uv">UV Index</string>
+    <string name="weather_metric_precip">Precipitation</string>
+    <string name="weather_metric_clouds">Cloud Cover</string>
+    <string name="weather_metric_visibility">Visibility</string>
+    <string name="weather_hourly_forecast_title">Upcoming Forecast</string>
+
+    <!-- Weather Condition Descriptions -->
+    <string name="weather_code_0">Clear sky</string>
+    <string name="weather_code_1">Mainly clear</string>
+    <string name="weather_code_2">Partly cloudy</string>
+    <string name="weather_code_3">Overcast</string>
+    <string name="weather_code_fog">Foggy</string>
+    <string name="weather_code_drizzle">Drizzle</string>
+    <string name="weather_code_freezing_drizzle">Freezing drizzle</string>
+    <string name="weather_code_rain">Rain</string>
+    <string name="weather_code_freezing_rain">Freezing rain</string>
+    <string name="weather_code_snow">Snowfall</string>
+    <string name="weather_code_snow_grains">Snow grains</string>
+    <string name="weather_code_rain_showers">Rain showers</string>
+    <string name="weather_code_snow_showers">Snow showers</string>
+    <string name="weather_code_thunderstorm">Thunderstorm</string>
+    <string name="weather_code_thunderstorm_hail">Thunderstorm with hail</string>
+    <string name="weather_code_unknown">Unknown weather</string>
+
+    <!-- City Search Dialog -->
+    <string name="city_search_title">Select Location</string>
+    <string name="city_search_hint">Type a city name…</string>
+    <string name="city_search_empty_prompt">Type to search for cities worldwide</string>
+    <string name="city_search_no_results">No matching cities found</string>
+    <string name="city_search_searching">Searching cities…</string>
+
+    <!-- Units Settings -->
+    <string name="pref_units_category_title">Units of Measurement</string>
+    <string name="pref_temperature_unit_title">Temperature Unit</string>
+    <string name="pref_wind_speed_unit_title">Wind Speed Unit</string>
+    <string name="pref_precipitation_unit_title">Precipitation Unit</string>
 </resources>

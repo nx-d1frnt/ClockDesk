@@ -430,9 +430,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 val vis = weatherGetter.visibility
 
                 if (backgroundManager.isWeatherEffectsEnabled() && !backgroundManager.isManualWeatherEnabled()) {
+                    val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                    val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
+                    val precipUnit = prefs.getString("precipitation_unit", "mm") ?: "mm"
                     dynamicBackgroundView.updateFromOpenMeteoSmart(
                         code, wind, isNight,
-                        precip, clouds, vis
+                        precip, clouds, vis,
+                        windUnit, precipUnit
                     )
                 }
 
@@ -794,13 +798,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 customizationSheetManager.showForView(it)
                 resetEditModeTimeout()
             } else {
-                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-                val mode = prefs.getString("location_mode", "auto") ?: "auto"
-                val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                if (mode == "auto" && !hasCoarse && !hasFine) {
-                    showCitySearchDialog()
-                }
+                com.nxd1frnt.clockdesk2.smartchips.ui.WeatherDialog.show(this)
             }
         }
 
@@ -1335,14 +1333,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
             dynamicBackgroundView.forceWeather(type, intensity, intensity * 1.5f, isNight)
         } else {
+            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             val code = weatherGetter.weatherCode ?: 0
             val wind = weatherGetter.windSpeed ?: 0.0
             val precip = weatherGetter.precipitation
             val clouds = weatherGetter.cloudCover
             val vis = weatherGetter.visibility
+            val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
+            val precipUnit = prefs.getString("precipitation_unit", "mm") ?: "mm"
             dynamicBackgroundView.updateFromOpenMeteoSmart(
                 code, wind, isNight,
-                precip, clouds, vis
+                precip, clouds, vis,
+                windUnit, precipUnit
             )
         }
     }
@@ -1399,48 +1401,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun showCitySearchDialog() {
-        val input = EditText(this).apply {
-            hint = getString(R.string.location_city_name_summary)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-            setSingleLine()
-        }
-        val container = FrameLayout(this).apply {
-            val padding = (24 * resources.displayMetrics.density).toInt()
-            setPadding(padding, 8, padding, 8)
-            addView(input)
-        }
+        com.nxd1frnt.clockdesk2.ui.dialog.CitySearchDialog.show(this) { selected ->
+            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+            prefs.edit()
+                .putString("location_mode", "city")
+                .putString("location_city_name", selected.name)
+                .putString("resolved_latitude", selected.latitude.toString())
+                .putString("resolved_longitude", selected.longitude.toString())
+                .putString("resolved_city_display_name", selected.displayName)
+                .apply()
 
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.location_city_name_dialog_title))
-            .setView(container)
-            .setPositiveButton(getString(android.R.string.ok)) { dialog, _ ->
-                val cityName = input.text.toString().trim()
-                if (cityName.isNotEmpty()) {
-                    GeocodingHelper.geocodeCity(this, cityName,
-                        onSuccess = { lat, lon, resolvedCity ->
-                            val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-                            prefs.edit()
-                                .putString("location_mode", "city")
-                                .putString("location_city_name", cityName)
-                                .putString("resolved_latitude", lat.toString())
-                                .putString("resolved_longitude", lon.toString())
-                                .putString("resolved_city_display_name", resolvedCity)
-                                .apply()
-
-                            Toast.makeText(this, getString(R.string.city_resolved_format, resolvedCity, lat, lon), Toast.LENGTH_LONG).show()
-                            loadCoordinatesAndFetchData()
-                        },
-                        onError = { error ->
-                            Toast.makeText(this, getString(R.string.city_resolve_error_format, cityName), Toast.LENGTH_LONG).show()
-                        }
-                    )
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton(getString(android.R.string.cancel)) { dialog, _ ->
-                dialog.dismiss()
-            }
-            .show()
+            Toast.makeText(this, getString(R.string.city_resolved_format, selected.displayName, selected.latitude, selected.longitude), Toast.LENGTH_LONG).show()
+            loadCoordinatesAndFetchData()
+        }
     }
 
     private fun loadCoordinatesAndFetchData() {

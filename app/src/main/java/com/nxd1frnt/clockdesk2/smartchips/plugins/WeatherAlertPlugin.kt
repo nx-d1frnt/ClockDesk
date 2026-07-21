@@ -11,6 +11,8 @@ import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 import java.util.Calendar
 
+import com.nxd1frnt.clockdesk2.smartchips.ui.WeatherDialog
+
 class WeatherAlertPlugin(private val context: Context) : ISmartChip {
 
     override val preferenceKey: String = "show_weather_alert_chip"
@@ -34,8 +36,12 @@ class WeatherAlertPlugin(private val context: Context) : ISmartChip {
     }
 
     override fun createView(context: Context): View {
-        return LayoutInflater.from(context)
+        val view = LayoutInflater.from(context)
             .inflate(R.layout.smart_chip_layout, null, false)
+        view.setOnClickListener {
+            WeatherDialog.show(context)
+        }
+        return view
     }
 
     override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {

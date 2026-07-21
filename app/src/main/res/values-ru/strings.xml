@@ -380,4 +380,45 @@
     <string name="smart_night_min_brightness_summary">Предпочтительный уровень яркости при затемнении ночью</string>
     <string name="smart_night_lux_threshold_title">Порог освещенности (lux)</string>
     <string name="smart_night_lux_threshold_summary">Уровень освещенности (люкс), ниже которого включается ночное затемнение</string>
+
+    <!-- Weather Details Dialog -->
+    <string name="weather_dialog_title">Детали погоды</string>
+    <string name="weather_details_title">Текущие параметры</string>
+    <string name="weather_metric_wind">Скорость ветра</string>
+    <string name="weather_metric_uv">УФ-индекс</string>
+    <string name="weather_metric_precip">Осадки</string>
+    <string name="weather_metric_clouds">Облачность</string>
+    <string name="weather_metric_visibility">Видимость</string>
+    <string name="weather_hourly_forecast_title">Прогноз по часам</string>
+
+    <!-- Weather Condition Descriptions -->
+    <string name="weather_code_0">Ясно</string>
+    <string name="weather_code_1">В основном ясно</string>
+    <string name="weather_code_2">Переменная облачность</string>
+    <string name="weather_code_3">Пасмурно</string>
+    <string name="weather_code_fog">Туман</string>
+    <string name="weather_code_drizzle">Морось</string>
+    <string name="weather_code_freezing_drizzle">Замерзающая морось</string>
+    <string name="weather_code_rain">Дождь</string>
+    <string name="weather_code_freezing_rain">Ледяной дождь</string>
+    <string name="weather_code_snow">Снегопад</string>
+    <string name="weather_code_snow_grains">Снежные зерна</string>
+    <string name="weather_code_rain_showers">Ливневый дождь</string>
+    <string name="weather_code_snow_showers">Снегопад с ливнем</string>
+    <string name="weather_code_thunderstorm">Гроза</string>
+    <string name="weather_code_thunderstorm_hail">Гроза с градом</string>
+    <string name="weather_code_unknown">Неизвестные погодные условия</string>
+
+    <!-- City Search Dialog -->
+    <string name="city_search_title">Выбор города</string>
+    <string name="city_search_hint">Введите название города…</string>
+    <string name="city_search_empty_prompt">Введите текст для поиска городов по всему миру</string>
+    <string name="city_search_no_results">Города не найдены</string>
+    <string name="city_search_searching">Поиск городов…</string>
+
+    <!-- Units Settings -->
+    <string name="pref_units_category_title">Единицы измерения</string>
+    <string name="pref_temperature_unit_title">Единица температуры</string>
+    <string name="pref_wind_speed_unit_title">Единица скорости ветра</string>
+    <string name="pref_precipitation_unit_title">Единица осадков</string>
 </resources>

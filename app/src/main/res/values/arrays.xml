@@ -37,4 +37,36 @@
         <item>system</item>
         <item>smart_night</item>
     </string-array>
+
+    <!-- Temperature Unit -->
+    <string-array name="temperature_unit_entries">
+        <item>Celsius (°C)</item>
+        <item>Fahrenheit (°F)</item>
+    </string-array>
+    <string-array name="temperature_unit_values">
+        <item>celsius</item>
+        <item>fahrenheit</item>
+    </string-array>
+
+    <!-- Wind Speed Unit -->
+    <string-array name="wind_speed_unit_entries">
+        <item>Kilometers per hour (km/h)</item>
+        <item>Meters per second (m/s)</item>
+        <item>Miles per hour (mph)</item>
+    </string-array>
+    <string-array name="wind_speed_unit_values">
+        <item>kmh</item>
+        <item>ms</item>
+        <item>mph</item>
+    </string-array>
+
+    <!-- Precipitation Unit -->
+    <string-array name="precipitation_unit_entries">
+        <item>Millimeters (mm)</item>
+        <item>Inches (in)</item>
+    </string-array>
+    <string-array name="precipitation_unit_values">
+        <item>mm</item>
+        <item>inch</item>
+    </string-array>
 </resources>

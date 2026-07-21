@@ -151,7 +151,7 @@ class SmartChipManager(
                 child.isFocusable = false
             } else {
                 val chipInfo = allChips.find { it.view == child }
-                val hasClick = chipInfo?.clickActivityClassName != null
+                val hasClick = chipInfo?.clickActivityClassName != null || child.hasOnClickListeners()
                 child.isClickable = hasClick
                 child.isFocusable = hasClick
             }
