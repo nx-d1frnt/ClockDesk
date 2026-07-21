@@ -1274,7 +1274,6 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             if (p.y > h + p.size) {
                 p.reset(w, h, state)
-                p.y = -p.size * 2
             }
         }
 
@@ -2092,11 +2091,11 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 
                 gridUv += vec2(10.0); 
                 
-                float verticalGridPos = 0.4 * time;
-                gridUv.y += verticalGridPos;
-                
                 float columnId = idGenerator(floor(gridUv.x));
-                gridUv.y += columnId * 2.6;
+                float colSpeed = 0.85 + 0.3 * idGenerator(floor(gridUv.x) + 42.1);
+                
+                float verticalGridPos = 0.4 * time * colSpeed;
+                gridUv.y += verticalGridPos + columnId * 2.6;
 
                 float cellId = idGenerator(floor(gridUv));
                 vec2 cellUv = fract(gridUv) - 0.5;
@@ -2108,8 +2107,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 float scaleVariation  = 1.0 - 0.3 * cellId;
 
                 float horizontalStart = 0.8 * (cellId - 0.5);
+                float verticalStart = (idGenerator(floor(gridUv) + vec2(13.51, 71.39)) - 0.5) * 0.7;
                 vec2 dropPos = cellUv;
-                dropPos.y += -0.052;
+                dropPos.y += verticalStart - 0.052;
                 dropPos.x += horizontalStart;
                 dropPos *= scaleVariation * vec2(14.2, 2.728);
 
