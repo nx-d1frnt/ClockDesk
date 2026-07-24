@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="ClockDesk">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-06-14T19:25:09.370370616Z">
+        <DropdownSelection timestamp="2026-07-24T17:51:43.238025454Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=b08b37d4" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=ZY22HXQFTF" />
             </handle>
           </Target>
         </DropdownSelection>

@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var powerStateManager: PowerStateManager
     private lateinit var sensorManager: SensorManager
+    private lateinit var nowPlayingExpandableManager: com.nxd1frnt.clockdesk2.music.ui.NowPlayingExpandableManager
 
     // State Variables
     private var musicManager: MusicPluginManager? = null
@@ -370,6 +371,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
 
+        nowPlayingExpandableManager = com.nxd1frnt.clockdesk2.music.ui.NowPlayingExpandableManager(
+            activity = this,
+            mainLayout = mainLayout,
+            lastfmLayout = lastfmLayout,
+            timeText = timeText,
+            musicManagerProvider = { musicManager },
+            fontManagerProvider = { fontManager }
+        )
+
         settingsButton.alpha = 0f
         settingsButton.visibility = View.GONE
         debugButton.alpha = 0f
@@ -471,6 +481,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             chipContainer,
             enableAdditionalLogging
         )
+
+        fontManager.onApplyToViewListener = { viewId ->
+            if (viewId == R.id.time_text && ::nowPlayingExpandableManager.isInitialized && nowPlayingExpandableManager.isExpanded) {
+                nowPlayingExpandableManager.reapplyScale()
+            }
+        }
 
         smartChipManager = SmartChipManager(
             this,
@@ -785,6 +801,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             if (isEditMode) {
                 customizationSheetManager.showForView(it)
                 resetEditModeTimeout()
+            } else {
+                nowPlayingExpandableManager.toggle(currentMusicState)
             }
         }
         chipContainer.setOnClickListener {
@@ -845,6 +863,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (::nowPlayingExpandableManager.isInitialized && nowPlayingExpandableManager.isExpanded) {
+                    nowPlayingExpandableManager.collapse()
+                    return
+                }
+
                 if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
                     backgroundSheetManager.cancelAndHide()
                     return
@@ -1126,6 +1149,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             return
         }
 
+        if (::nowPlayingExpandableManager.isInitialized) {
+            nowPlayingExpandableManager.updateContent(state)
+        }
+
         when (state) {
             is PluginState.Playing -> {
                 pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
@@ -1146,42 +1173,47 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 if (isTextDifferent) {
                     lastTrackInfo = trackInfoText
 
-                    lastfmLayout.animate().cancel()
-                    updateSourceIcon(track)
-
-                    if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
-                        lastfmLayout.visibility = View.VISIBLE
-                        lastfmLayout.alpha = 0f
-                        lastfmLayout.translationX = 10f
+                    if (nowPlayingExpandableManager.isExpanded) {
                         nowPlayingTextView.text = trackInfoText
-                        nowPlayingTextView.isSelected = true
-
-                        lastfmLayout.animate()
-                            .alpha(1f)
-                            .translationX(0f)
-                            .setDuration(500)
-                            .setListener(null)
-                            .start()
+                        updateSourceIcon(track)
                     } else {
-                        lastfmLayout.animate()
-                            .alpha(0f)
-                            .translationX(-10f)
-                            .setDuration(500)
-                            .setListener(object : AnimatorListenerAdapter() {
-                                override fun onAnimationEnd(animation: Animator) {
-                                    if (!isEditMode) {
-                                        nowPlayingTextView.text = trackInfoText
-                                        nowPlayingTextView.isSelected = true
-                                        lastfmLayout.animate()
-                                            .alpha(1f)
-                                            .translationX(0f)
-                                            .setDuration(500)
-                                            .setListener(null)
-                                            .start()
+                        lastfmLayout.animate().cancel()
+                        updateSourceIcon(track)
+
+                        if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
+                            lastfmLayout.visibility = View.VISIBLE
+                            lastfmLayout.alpha = 0f
+                            lastfmLayout.translationX = 10f
+                            nowPlayingTextView.text = trackInfoText
+                            nowPlayingTextView.isSelected = true
+
+                            lastfmLayout.animate()
+                                .alpha(1f)
+                                .translationX(0f)
+                                .setDuration(500)
+                                .setListener(null)
+                                .start()
+                        } else {
+                            lastfmLayout.animate()
+                                .alpha(0f)
+                                .translationX(-10f)
+                                .setDuration(500)
+                                .setListener(object : AnimatorListenerAdapter() {
+                                    override fun onAnimationEnd(animation: Animator) {
+                                        if (!isEditMode) {
+                                            nowPlayingTextView.text = trackInfoText
+                                            nowPlayingTextView.isSelected = true
+                                            lastfmLayout.animate()
+                                                .alpha(1f)
+                                                .translationX(0f)
+                                                .setDuration(500)
+                                                .setListener(null)
+                                                .start()
+                                        }
                                     }
-                                }
-                            })
-                            .start()
+                                })
+                                .start()
+                        }
                     }
                 }
             }
@@ -1205,7 +1237,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         lastfmLayout.animate().cancel()
 
-        if (lastfmLayout.visibility == View.VISIBLE) {
+        if (!isEditMode && lastfmLayout.visibility == View.VISIBLE) {
             lastfmLayout.animate()
                 .alpha(0f)
                 .translationX(10f)
@@ -1218,6 +1250,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 })
                 .start()
+        } else if (isEditMode) {
+            lastfmLayout.visibility = View.VISIBLE
+            lastfmLayout.alpha = 1f
         }
 
         if (wasMusicBackgroundApplied) {
@@ -2004,6 +2039,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         widgetMover.setEditMode(isEditMode)
         val targetRadius = dpToPx(36f)
         if (isEditMode) {
+            if (::nowPlayingExpandableManager.isInitialized && nowPlayingExpandableManager.isExpanded) {
+                nowPlayingExpandableManager.collapse()
+            }
             settingsButton.visibility = View.VISIBLE
             debugButton.visibility = View.VISIBLE
             backgroundCustomizationTab.visibility = View.VISIBLE
@@ -2037,11 +2075,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             chipContainer.setBackgroundResource(R.drawable.editable_border)
             lastfmLayout.animate().cancel()
             lastfmLayout.clearAnimation()
-            lastfmLayout.post {
-                lastfmLayout.visibility = View.VISIBLE
-                lastfmLayout.alpha = 1f
-                lastfmLayout.setBackgroundResource(R.drawable.editable_border)
-            }
+            lastfmLayout.visibility = View.VISIBLE
+            lastfmLayout.alpha = 1f
             if (nowPlayingTextView.text.isNullOrEmpty()) {
                 nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
             }

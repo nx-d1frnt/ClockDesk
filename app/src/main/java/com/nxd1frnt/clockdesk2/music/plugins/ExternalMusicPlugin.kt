@@ -46,6 +46,7 @@ class ExternalMusicPlugin(
 
     private fun processUpdate(intent: Intent) {
         val isPlaying = intent.getBooleanExtra(ExternalPluginContract.KEY_IS_PLAYING, false)
+        lastIsPlaying = isPlaying
 
         if (isPlaying) {
             val track = MusicTrack(
@@ -59,6 +60,53 @@ class ExternalMusicPlugin(
         } else {
             callback?.invoke(PluginState.Idle)
         }
+    }
+
+    private var lastIsPlaying = false
+
+    override fun getPlaybackInfo(): com.nxd1frnt.clockdesk2.music.PlaybackInfo {
+        return com.nxd1frnt.clockdesk2.music.PlaybackInfo(
+            isPlaying = lastIsPlaying,
+            canPlayPause = true,
+            canSkipNext = true,
+            canSkipPrevious = true,
+            canSeek = false
+        )
+    }
+
+    private fun sendControlIntent(action: String, positionMs: Long = 0L) {
+        val intent = Intent(ExternalPluginContract.ACTION_MEDIA_CONTROL).apply {
+            setPackage(id)
+            putExtra(ExternalPluginContract.KEY_CONTROL_ACTION, action)
+            if (action == ExternalPluginContract.CONTROL_SEEK) {
+                putExtra(ExternalPluginContract.KEY_SEEK_POSITION, positionMs)
+            }
+        }
+        context.sendBroadcast(intent)
+    }
+
+    override fun play() {
+        sendControlIntent(ExternalPluginContract.CONTROL_PLAY)
+    }
+
+    override fun pause() {
+        sendControlIntent(ExternalPluginContract.CONTROL_PAUSE)
+    }
+
+    override fun togglePlayPause() {
+        sendControlIntent(ExternalPluginContract.CONTROL_TOGGLE_PLAY_PAUSE)
+    }
+
+    override fun skipToNext() {
+        sendControlIntent(ExternalPluginContract.CONTROL_SKIP_NEXT)
+    }
+
+    override fun skipToPrevious() {
+        sendControlIntent(ExternalPluginContract.CONTROL_SKIP_PREVIOUS)
+    }
+
+    override fun seekTo(positionMs: Long) {
+        sendControlIntent(ExternalPluginContract.CONTROL_SEEK, positionMs)
     }
 
     override fun setCallback(callback: (PluginState) -> Unit) {

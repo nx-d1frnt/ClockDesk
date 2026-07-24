@@ -95,34 +95,300 @@
             android:layout_height="wrap_content"
             android:layout_marginLeft="8dp"
             android:layout_marginBottom="16dp"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             app:layout_constraintBottom_toTopOf="@+id/date_text"
             app:layout_constraintStart_toStartOf="parent">
 
-            <ImageView
-                android:id="@+id/lastfm_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="center_vertical"
-                android:scaleType="fitCenter"
-                android:src="@drawable/music_note"
-                app:tint="#FFFFFFFF" />
-            <TextView
-                android:id="@+id/now_playing_text"
+            <!-- Collapsed View Mode -->
+            <LinearLayout
+                android:id="@+id/collapsed_now_playing_container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_marginLeft="8dp"
-                android:ellipsize="marquee"
-                android:marqueeRepeatLimit="marquee_forever"
-                android:scrollHorizontally="true"
-                android:singleLine="true"
-                android:text="@string/now_playing_placeholder"
-                android:textColor="#FFFFFFFF"
-                android:layout_gravity="center_vertical"
-                android:textSize="16sp" />
+                android:orientation="horizontal">
 
+                <ImageView
+                    android:id="@+id/lastfm_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center_vertical"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/music_note"
+                    app:tint="#FFFFFFFF" />
 
+                <TextView
+                    android:id="@+id/now_playing_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginLeft="8dp"
+                    android:ellipsize="marquee"
+                    android:marqueeRepeatLimit="marquee_forever"
+                    android:scrollHorizontally="true"
+                    android:singleLine="true"
+                    android:text="@string/now_playing_placeholder"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- Expanded View Mode (Material You Inline Player Card) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/expanded_now_playing_container"
+                android:layout_width="460dp"
+                android:layout_height="170dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="#211517"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="10dp"
+                app:strokeWidth="0dp">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <!-- Background Artwork -->
+                    <ImageView
+                        android:id="@+id/expanded_bg_artwork"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:alpha="0.45"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_music_icon" />
+
+                    <!-- Dark Gradient Vignette Overlay -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_media_card_gradient" />
+
+                    <!-- Foreground Content -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="16dp">
+
+                        <!-- Top Header Row -->
+                        <RelativeLayout
+                            android:id="@+id/expanded_top_header"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentTop="true">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_alignParentStart="true"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.imageview.ShapeableImageView
+                                    android:id="@+id/expanded_source_icon"
+                                    android:layout_width="22dp"
+                                    android:layout_height="22dp"
+                                    android:contentDescription="@string/app_name"
+                                    android:scaleType="fitCenter"
+                                    android:src="@drawable/music_note"
+                                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full" />
+
+                                <TextView
+                                    android:id="@+id/expanded_source_name"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:ellipsize="end"
+                                    android:singleLine="true"
+                                    android:text="@string/now_playing_dialog_title"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <ImageView
+                                android:id="@+id/expanded_collapse_btn"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_alignParentEnd="true"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/cancel"
+                                android:padding="2dp"
+                                android:scaleType="fitCenter"
+                                android:src="@drawable/ic_close"
+                                app:tint="#DEFFFFFF" />
+                        </RelativeLayout>
+
+                        <!-- Middle Row (Metadata & Squircle Play/Pause FAB) -->
+                        <RelativeLayout
+                            android:id="@+id/expanded_middle_row"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_below="@id/expanded_top_header"
+                            android:layout_marginTop="8dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_centerVertical="true"
+                                android:layout_marginEnd="12dp"
+                                android:layout_toStartOf="@id/expanded_play_pause_card"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/expanded_track_title"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="marquee"
+                                    android:marqueeRepeatLimit="marquee_forever"
+                                    android:scrollHorizontally="true"
+                                    android:singleLine="true"
+                                    android:text="@string/media_unknown_title"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/expanded_track_artist"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:ellipsize="end"
+                                    android:singleLine="true"
+                                    android:text="@string/media_unknown_artist"
+                                    android:textColor="#D0C0C2"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+
+                            <!-- Squircle Play/Pause FAB Card -->
+                            <com.google.android.material.card.MaterialCardView
+                                android:id="@+id/expanded_play_pause_card"
+                                android:layout_width="54dp"
+                                android:layout_height="54dp"
+                                android:layout_alignParentEnd="true"
+                                android:layout_centerVertical="true"
+                                android:clickable="true"
+                                android:focusable="true"
+                                app:cardBackgroundColor="#FCE0DD"
+                                app:cardCornerRadius="18dp"
+                                app:cardElevation="4dp"
+                                app:strokeWidth="0dp">
+
+                                <ImageView
+                                    android:id="@+id/expanded_btn_play_pause"
+                                    android:layout_width="26dp"
+                                    android:layout_height="26dp"
+                                    android:layout_gravity="center"
+                                    android:contentDescription="@string/media_play"
+                                    android:scaleType="fitCenter"
+                                    android:src="@drawable/ic_play"
+                                    app:tint="#2B1B1D" />
+                            </com.google.android.material.card.MaterialCardView>
+                        </RelativeLayout>
+
+                        <!-- Bottom Controls & Seekbar Strip -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentBottom="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageButton
+                                android:id="@+id/expanded_btn_previous"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/media_previous"
+                                android:padding="2dp"
+                                android:scaleType="fitCenter"
+                                android:src="@drawable/ic_skip_previous"
+                                app:tint="#FFFFFF" />
+
+                            <!-- Seekbar Container -->
+                            <LinearLayout
+                                android:id="@+id/expanded_seekbar_container"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <SeekBar
+                                    android:id="@+id/expanded_media_seekbar"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:max="1000"
+                                    android:paddingStart="0dp"
+                                    android:paddingEnd="0dp"
+                                    android:progressTint="#FFFFFF"
+                                    android:thumbTint="#FFFFFF"
+                                    android:theme="@style/Widget.Material3.Slider"/>
+
+                                <RelativeLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="-4dp"
+                                    android:visibility="gone">
+
+                                    <TextView
+                                        android:id="@+id/expanded_time_elapsed"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_alignParentStart="true"
+                                        android:text="@string/media_time_default"
+                                        android:textColor="#D0C0C2"
+                                        android:textSize="9sp" />
+
+                                    <TextView
+                                        android:id="@+id/expanded_time_total"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_alignParentEnd="true"
+                                        android:text="@string/media_time_default"
+                                        android:textColor="#D0C0C2"
+                                        android:textSize="9sp" />
+                                </RelativeLayout>
+                            </LinearLayout>
+
+                            <ImageButton
+                                android:id="@+id/expanded_btn_next"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/media_next"
+                                android:padding="2dp"
+                                android:scaleType="fitCenter"
+                                android:src="@drawable/ic_skip_next"
+                                app:tint="#FFFFFF" />
+
+                            <ImageButton
+                                android:id="@+id/expanded_btn_like"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginStart="14dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/app_name"
+                                android:padding="2dp"
+                                android:scaleType="fitCenter"
+                                android:src="@drawable/ic_heart_outline"
+                                android:visibility="gone"
+                                app:tint="#FFFFFF" />
+
+                            <ImageButton
+                                android:id="@+id/expanded_btn_extra"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginStart="14dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/app_name"
+                                android:padding="2dp"
+                                android:scaleType="fitCenter"
+                                android:src="@drawable/ic_repeat"
+                                android:visibility="gone"
+                                app:tint="#FFFFFF" />
+                        </LinearLayout>
+                    </RelativeLayout>
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
         <TextView
@@ -174,7 +440,7 @@
             android:layout_marginLeft="8dp"
             android:layout_marginBottom="16dp"
             android:fontFamily="@font/kanit_regular"
-            android:gravity="center_horizontal"
+            android:gravity="start|center_vertical"
             android:includeFontPadding="false"
             android:text="00:00"
             android:textColor="#DEFFFFFF"

@@ -1,5 +1,14 @@
 <resources>
     <string name="app_name">ClockDesk</string>
+    <!-- Media Dialog Strings -->
+    <string name="now_playing_dialog_title">Now Playing</string>
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_previous">Previous track</string>
+    <string name="media_next">Next track</string>
+    <string name="media_unknown_artist">Unknown Artist</string>
+    <string name="media_unknown_title">Unknown Title</string>
+    <string name="media_time_default">0:00</string>
     <string name="settings_button">Settings</string>
     <string name="demo_button">Demo</string>
     <string name="settings_title">Settings</string>

@@ -61,6 +61,9 @@ class MusicPluginManager(
         recalculateOutput()
     }
 
+    var currentPrimaryPluginId: String? = null
+        private set
+
     private fun recalculateOutput() {
         var activeState: PluginState = PluginState.Idle
         var primaryPluginId: String? = null
@@ -73,6 +76,7 @@ class MusicPluginManager(
                 break
             }
         }
+        currentPrimaryPluginId = primaryPluginId
 
         if (activeState is PluginState.Playing && primaryPluginId != null) {
             val primaryTrack = activeState.track
@@ -106,6 +110,47 @@ class MusicPluginManager(
         }
 
         onUpdate(activeState)
+    }
+
+    fun getActivePlugin(): IMusicPlugin? {
+        val id = currentPrimaryPluginId ?: return plugins.values.firstOrNull()
+        return plugins[id] ?: plugins.values.firstOrNull()
+    }
+
+    fun getActivePlaybackInfo(): PlaybackInfo {
+        return getActivePlugin()?.getPlaybackInfo() ?: PlaybackInfo()
+    }
+
+    fun playActive() {
+        getActivePlugin()?.play()
+    }
+
+    fun pauseActive() {
+        getActivePlugin()?.pause()
+    }
+
+    fun togglePlayPauseActive() {
+        getActivePlugin()?.togglePlayPause()
+    }
+
+    fun skipToNextActive() {
+        getActivePlugin()?.skipToNext()
+    }
+
+    fun skipToPreviousActive() {
+        getActivePlugin()?.skipToPrevious()
+    }
+
+    fun seekToActive(positionMs: Long) {
+        getActivePlugin()?.seekTo(positionMs)
+    }
+
+    fun toggleLikeActive() {
+        getActivePlugin()?.toggleLike()
+    }
+
+    fun performCustomActionActive(actionId: String) {
+        getActivePlugin()?.performCustomAction(actionId)
     }
 
     private fun areTracksSame(t1: MusicTrack, t2: MusicTrack): Boolean {

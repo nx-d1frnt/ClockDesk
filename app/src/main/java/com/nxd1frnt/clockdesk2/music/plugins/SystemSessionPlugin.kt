@@ -121,6 +121,8 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
         evaluateOverallState()
     }
 
+    private var activeMediaController: MediaController? = null
+
     private fun evaluateOverallState() {
         try {
             val controllers = mediaSessionManager.getActiveSessions(componentName)
@@ -129,6 +131,8 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
                 val state = it.playbackState?.state ?: PlaybackState.STATE_NONE
                 state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
             }
+
+            activeMediaController = playingController ?: controllers.firstOrNull()
 
             if (playingController != null) {
                 updateStateFromController(playingController)
@@ -139,10 +143,171 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
                 callback?.invoke(PluginState.Idle)
             }
         } catch (e: Exception) {
+            activeMediaController = null
             cancelArtworkRetry()
             currentMissingArtTrackKey = null
             artRetryCount = 0
             callback?.invoke(PluginState.Idle)
+        }
+    }
+
+    override fun getPlaybackInfo(): com.nxd1frnt.clockdesk2.music.PlaybackInfo {
+        val controller = activeMediaController ?: return com.nxd1frnt.clockdesk2.music.PlaybackInfo()
+        val playbackState = controller.playbackState ?: return com.nxd1frnt.clockdesk2.music.PlaybackInfo()
+        val metadata = controller.metadata
+
+        val isPlaying = playbackState.state == PlaybackState.STATE_PLAYING ||
+                playbackState.state == PlaybackState.STATE_BUFFERING
+
+        val actions = playbackState.actions
+        val canPlayPause = (actions and (PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE)) != 0L
+        val canSkipNext = (actions and PlaybackState.ACTION_SKIP_TO_NEXT) != 0L
+        val canSkipPrevious = (actions and PlaybackState.ACTION_SKIP_TO_PREVIOUS) != 0L
+        val canSeek = (actions and PlaybackState.ACTION_SEEK_TO) != 0L
+
+        var currentPos = playbackState.position
+        if (isPlaying && playbackState.lastPositionUpdateTime > 0) {
+            val timeDelta = android.os.SystemClock.elapsedRealtime() - playbackState.lastPositionUpdateTime
+            val speed = playbackState.playbackSpeed
+            if (speed > 0) {
+                currentPos += (timeDelta * speed).toLong()
+            }
+        }
+
+        val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+
+        var isLiked = false
+        var canLike = false
+
+        val ratingType = controller.ratingType
+        if (ratingType != android.media.Rating.RATING_NONE) {
+            canLike = true
+            val userRating = metadata?.getRating(MediaMetadata.METADATA_KEY_USER_RATING)
+            if (userRating != null && userRating.isRated) {
+                isLiked = userRating.hasHeart() || userRating.isThumbUp
+            }
+        }
+
+        val customActionsList = mutableListOf<com.nxd1frnt.clockdesk2.music.CustomMediaAction>()
+        playbackState.customActions?.forEach { action ->
+            val actionId = action.action ?: ""
+            val isLikeAction = actionId.contains("like", ignoreCase = true) ||
+                    actionId.contains("fav", ignoreCase = true) ||
+                    actionId.contains("heart", ignoreCase = true)
+            if (isLikeAction) {
+                canLike = true
+                if (action.extras?.getBoolean("active") == true || action.name?.toString()?.contains("Unlike", ignoreCase = true) == true) {
+                    isLiked = true
+                }
+            }
+            customActionsList.add(
+                com.nxd1frnt.clockdesk2.music.CustomMediaAction(
+                    id = actionId,
+                    name = action.name?.toString() ?: actionId,
+                    isLiked = isLiked
+                )
+            )
+        }
+
+        return com.nxd1frnt.clockdesk2.music.PlaybackInfo(
+            isPlaying = isPlaying,
+            positionMs = maxOf(0L, currentPos),
+            durationMs = maxOf(0L, duration),
+            canPlayPause = canPlayPause || true,
+            canSkipNext = canSkipNext || true,
+            canSkipPrevious = canSkipPrevious || true,
+            canSeek = canSeek || (duration > 0),
+            isLiked = isLiked,
+            canLike = canLike,
+            customActions = customActionsList
+        )
+    }
+
+    override fun play() {
+        try {
+            activeMediaController?.transportControls?.play()
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error issuing play: ${e.message}" }
+        }
+    }
+
+    override fun pause() {
+        try {
+            activeMediaController?.transportControls?.pause()
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error issuing pause: ${e.message}" }
+        }
+    }
+
+    override fun togglePlayPause() {
+        try {
+            val controller = activeMediaController ?: return
+            val state = controller.playbackState?.state ?: PlaybackState.STATE_NONE
+            if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
+                controller.transportControls.pause()
+            } else {
+                controller.transportControls.play()
+            }
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error toggling play/pause: ${e.message}" }
+        }
+    }
+
+    override fun skipToNext() {
+        try {
+            activeMediaController?.transportControls?.skipToNext()
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error skipping next: ${e.message}" }
+        }
+    }
+
+    override fun skipToPrevious() {
+        try {
+            activeMediaController?.transportControls?.skipToPrevious()
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error skipping previous: ${e.message}" }
+        }
+    }
+
+    override fun seekTo(positionMs: Long) {
+        try {
+            activeMediaController?.transportControls?.seekTo(positionMs)
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error seeking to $positionMs: ${e.message}" }
+        }
+    }
+
+    override fun toggleLike() {
+        try {
+            val controller = activeMediaController ?: return
+            val currentInfo = getPlaybackInfo()
+            val newLikedState = !currentInfo.isLiked
+
+            if (controller.ratingType != android.media.Rating.RATING_NONE) {
+                val rating = android.media.Rating.newHeartRating(newLikedState)
+                controller.transportControls.setRating(rating)
+                return
+            }
+
+            controller.playbackState?.customActions?.forEach { customAction ->
+                val actionId = customAction.action ?: ""
+                if (actionId.contains("like", ignoreCase = true) ||
+                    actionId.contains("fav", ignoreCase = true) ||
+                    actionId.contains("heart", ignoreCase = true)) {
+                    controller.transportControls.sendCustomAction(actionId, customAction.extras)
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error toggling like: ${e.message}" }
+        }
+    }
+
+    override fun performCustomAction(actionId: String) {
+        try {
+            activeMediaController?.transportControls?.sendCustomAction(actionId, null)
+        } catch (e: Exception) {
+            Logger.e("SystemMediaPlugin") { "Error performing custom action $actionId: ${e.message}" }
         }
     }
 

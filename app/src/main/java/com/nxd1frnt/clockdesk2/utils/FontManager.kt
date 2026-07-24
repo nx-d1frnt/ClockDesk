@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
+import android.util.TypedValue
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -535,6 +536,8 @@ class FontManager(
         keyPrefixMap.keys.forEach { applyToView(it, colorOnly) }
     }
 
+    var onApplyToViewListener: ((viewId: Int) -> Unit)? = null
+
     private fun applyToView(viewId: Int, colorOnly: Boolean = false) {
         val settings = settingsMap[viewId] ?: return
         val typeface = getTypeface(settings.fontIndex)
@@ -567,6 +570,7 @@ class FontManager(
                 }
             }
         }
+        onApplyToViewListener?.invoke(viewId)
     }
 
     @SuppressLint("RestrictedApi")
@@ -708,10 +712,16 @@ class FontManager(
         cardView?.setCardBackgroundColor(finalBgColor)
     }
 
+    var clockFontSizeOverridePx: Float? = null
+
     private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int, colorOnly: Boolean = false) {
         if (!colorOnly) {
             textView.typeface = typeface
-            textView.textSize = settings.size
+            if (textView == timeText && clockFontSizeOverridePx != null) {
+                textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, clockFontSizeOverridePx!!)
+            } else {
+                textView.textSize = settings.size
+            }
             textView.alpha = settings.alpha
 
             if (settings.maxWidthPercent >= 100) {
