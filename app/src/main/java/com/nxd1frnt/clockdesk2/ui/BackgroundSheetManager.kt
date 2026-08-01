@@ -226,7 +226,7 @@ class BackgroundSheetManager(
             bgAutoWeatherCard.visibility = if (isChecked && !bgManualWeatherSwitch.isChecked) View.VISIBLE else View.GONE
 
             if (!isChecked) {
-                weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, !dayTimeGetter.isDay())
+                weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, !dayTimeGetter.isDay(), dayTimeGetter.getDayFactor())
                 onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
             } else {
                 applyWeatherPreview()
@@ -512,6 +512,7 @@ class BackgroundSheetManager(
 
     fun applyWeatherPreview() {
         val isNight = !dayTimeGetter.isDay()
+        val dayFactor = dayTimeGetter.getDayFactor()
         if (bgManualWeatherSwitch.isChecked) {
             val typeOrdinal = when (bgWeatherToggleGroup.checkedButtonId) {
                 R.id.btn_weather_clear -> WeatherView.WeatherType.CLEAR.ordinal
@@ -524,7 +525,7 @@ class BackgroundSheetManager(
             }
             val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val floatIntensity = bgIntensitySeek.value / 100f
-            weatherView.forceWeather(type, floatIntensity, floatIntensity * 1.5f, isNight)
+            weatherView.forceWeather(type, floatIntensity, floatIntensity * 1.5f, isNight, dayFactor)
         } else {
             val prefs = weatherView.context.getSharedPreferences("ClockDeskPrefs", android.content.Context.MODE_PRIVATE)
             val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
@@ -537,7 +538,8 @@ class BackgroundSheetManager(
                 weatherGetter.cloudCover,
                 weatherGetter.visibility,
                 windUnit,
-                precipUnit
+                precipUnit,
+                dayFactor
             )
         }
         onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())

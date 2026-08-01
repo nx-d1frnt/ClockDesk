@@ -29,9 +29,10 @@ class GradientManager(
 
     private val gradientUpdateRunnable = object : Runnable {
         override fun run() {
-            updateGradient()
-            handler.postDelayed(this, if (isDemoMode) debugCycleInterval else 60000)
-            Log.d("GradientUpdate", "Gradient updated at ${System.currentTimeMillis()}")
+            if (!isDemoMode) {
+                updateGradient()
+            }
+            handler.postDelayed(this, 60000)
         }
     }
 

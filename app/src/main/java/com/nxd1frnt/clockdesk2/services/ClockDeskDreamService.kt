@@ -42,6 +42,8 @@ import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import com.nxd1frnt.clockdesk2.utils.PowerStateManager
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
+import java.util.Calendar
+import java.util.Date
 
 class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
@@ -517,13 +519,15 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
      * Mirrors MainActivity's weather-view setup logic so the WeatherView
      * state is consistent with user preferences on dream start.
      */
-    private fun restoreWeatherView() {
+    private fun restoreWeatherView(simulatedTime: Date? = null) {
         val isEnabled = backgroundManager.isWeatherEffectsEnabled()
-        val isNight = !dayTimeGetter.isDay()
+        val targetTime = simulatedTime ?: Calendar.getInstance().time
+        val dayFactor = dayTimeGetter.getDayFactor(targetTime)
+        val isNight = dayFactor < 0.1f
         lastIsNight = isNight
 
         if (!isEnabled) {
-            dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight)
+            dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight, dayFactor)
             updateBackgroundFilters()
             return
         }
@@ -532,7 +536,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
             val typeOrdinal = backgroundManager.getManualWeatherType()
             val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
-            dynamicBackgroundView.forceWeather(type, intensity, intensity * 1.5f, isNight)
+            dynamicBackgroundView.forceWeather(type, intensity, intensity * 1.5f, isNight, dayFactor)
         } else {
             val code = weatherGetter.weatherCode ?: 0
             val wind = weatherGetter.windSpeed ?: 0.0
@@ -545,7 +549,8 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
             dynamicBackgroundView.updateFromOpenMeteoSmart(
                 code, wind, isNight,
                 precip, clouds, vis,
-                windUnit, precipUnit
+                windUnit, precipUnit,
+                dayFactor
             )
         }
         updateBackgroundFilters()

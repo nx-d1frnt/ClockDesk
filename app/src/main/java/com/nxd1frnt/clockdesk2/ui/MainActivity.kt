@@ -43,6 +43,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
+import java.util.Calendar
+import java.util.Date
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -499,17 +501,21 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     Logger.w("MainActivity") { "Failed to update gradient simulated time: ${e.message}" }
                 }
 
-                val isNight = !dayTimeGetter.isDay()
-                if (lastIsNight == null || lastIsNight != isNight) {
-                    lastIsNight = isNight
-                    if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
-                        backgroundSheetManager.applyWeatherPreview()
-                    } else {
-                        restoreSavedWeatherState()
-                    }
-                    updateSensorRegistration()
-                    if (!isNight) {
-                        applyNightDimMode(NightDimState.NORMAL)
+                if (isDemoMode) {
+                    restoreSavedWeatherState(currentTime)
+                } else {
+                    val isNight = !dayTimeGetter.isDay()
+                    if (lastIsNight == null || lastIsNight != isNight) {
+                        lastIsNight = isNight
+                        if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
+                            backgroundSheetManager.applyWeatherPreview()
+                        } else {
+                            restoreSavedWeatherState()
+                        }
+                        updateSensorRegistration()
+                        if (!isNight) {
+                            applyNightDimMode(NightDimState.NORMAL)
+                        }
                     }
                 }
 
@@ -1317,13 +1323,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
-    private fun restoreSavedWeatherState() {
+    private fun restoreSavedWeatherState(simulatedTime: Date? = null) {
         val isEnabled = backgroundManager.isWeatherEffectsEnabled()
-        val isNight = !dayTimeGetter.isDay()
+        val targetTime = simulatedTime ?: Calendar.getInstance().time
+        val dayFactor = dayTimeGetter.getDayFactor(targetTime)
+        val isNight = dayFactor < 0.1f
         lastIsNight = isNight
 
         if (!isEnabled) {
-            dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight)
+            dynamicBackgroundView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight, dayFactor)
             return
         }
 
@@ -1331,7 +1339,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val typeOrdinal = backgroundManager.getManualWeatherType()
             val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
             val intensity = backgroundManager.getManualWeatherIntensity() / 100f
-            dynamicBackgroundView.forceWeather(type, intensity, intensity * 1.5f, isNight)
+            dynamicBackgroundView.forceWeather(type, intensity, intensity * 1.5f, isNight, dayFactor)
         } else {
             val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             val code = weatherGetter.weatherCode ?: 0
@@ -1344,7 +1352,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             dynamicBackgroundView.updateFromOpenMeteoSmart(
                 code, wind, isNight,
                 precip, clouds, vis,
-                windUnit, precipUnit
+                windUnit, precipUnit, dayFactor
             )
         }
     }

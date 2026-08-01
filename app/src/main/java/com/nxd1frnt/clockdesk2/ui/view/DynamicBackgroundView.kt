@@ -227,9 +227,15 @@ class DynamicBackgroundView @JvmOverloads constructor(
     /**
      * Установка параметров погоды.
      */
-    fun forceWeather(type: WeatherType, intensity: Float, wind: Float, isNight: Boolean) {
+    fun forceWeather(
+        type: WeatherType,
+        intensity: Float,
+        wind: Float,
+        isNight: Boolean,
+        dayFactor: Float = if (!isNight) 1.0f else 0.0f
+    ) {
         queueEvent {
-            renderer.updateWeatherConfig(type, intensity, wind, isNight)
+            renderer.updateWeatherConfig(type, intensity, wind, isNight, dayFactor)
         }
     }
 
@@ -239,7 +245,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
     fun updateFromOpenMeteoSmart(
         wmoCode: Int, windSpeed: Double, night: Boolean,
         precipitation: Double?, cloudCover: Int?, visibility: Double?,
-        windUnit: String = "kmh", precipUnit: String = "mm"
+        windUnit: String = "kmh", precipUnit: String = "mm",
+        dayFactor: Float = if (!night) 1.0f else 0.0f
     ) {
         val rawWind = windSpeed.toFloat()
         val windKmh = when (windUnit) {
@@ -265,7 +272,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
 
         queueEvent {
-            renderer.updateWeatherConfig(type, calculatedIntensity, windFactor, night)
+            renderer.updateWeatherConfig(type, calculatedIntensity, windFactor, night, dayFactor)
         }
     }
 
@@ -450,6 +457,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             var windFactor = 0f
             var targetWindFactor = 0f
             var isNight = false
+            var dayFactor = 0.5f
             var particles = Array(maxParticles) { Particle() }
         }
 
@@ -458,7 +466,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
         private var isTransitioning = false
         private var transitionStartTime = 0L
-        private val TRANSITION_DURATION_MS = 1500L
+        private val TRANSITION_DURATION_MS = 3500L
         private var lastFrameTime = 0L
 
         private val projectionMatrix = FloatArray(16)
@@ -1042,18 +1050,22 @@ class DynamicBackgroundView @JvmOverloads constructor(
                     updateAndDrawParticles(state, alpha, w, h)
                 }
                 WeatherType.FOG -> {
-                    drawFogLayer(state.intensity, alpha, false, backgroundTexId, w, h)
+                    drawFogLayer(state.intensity, alpha, false, backgroundTexId, w, h, state.dayFactor)
                     updateAndDrawParticles(state, alpha, w, h)
                 }
                 WeatherType.CLOUDY -> {
-                    drawFogLayer(state.intensity, alpha, true, backgroundTexId, w, h)
+                    drawFogLayer(state.intensity, alpha, true, backgroundTexId, w, h, state.dayFactor)
                     updateAndDrawParticles(state, alpha, w, h)
                 }
                 WeatherType.CLEAR -> {
-                    if (!state.isNight) {
-                        drawSunLayer(state.intensity, alpha, backgroundTexId, w, h)
-                    } else {
-                        drawClearBackground(alpha, backgroundTexId, w, h)
+                    val sunAlpha = alpha * state.dayFactor
+                    val nightAlpha = alpha * (1.0f - state.dayFactor)
+
+                    if (sunAlpha > 0.005f) {
+                        drawSunLayer(state.intensity, sunAlpha, backgroundTexId, w, h)
+                    }
+                    if (nightAlpha > 0.005f) {
+                        drawClearBackground(nightAlpha, backgroundTexId, w, h)
                     }
                     updateAndDrawParticles(state, alpha, w, h)
                 }
@@ -1115,14 +1127,15 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glDisableVertexAttribArray(sunAPos)
         }
 
-        private fun drawFogLayer(intensityMult: Float, alpha: Float, isCloudy: Boolean, backgroundTexId: Int, w: Int, h: Int) {
+        private fun drawFogLayer(intensityMult: Float, alpha: Float, isCloudy: Boolean, backgroundTexId: Int, w: Int, h: Int, dayFactor: Float = 0.5f) {
             if (fogProgram == 0) return
             GLES20.glUseProgram(fogProgram)
 
             val time = (System.currentTimeMillis() - startTime) / 1000f
             GLES20.glUniform1f(uFogTimeLoc, time)
             GLES20.glUniform2f(uFogResLoc, w.toFloat(), h.toFloat())
-            GLES20.glUniform1f(uFogIntensityLoc, intensityMult.coerceIn(0f, 1f))
+            val adjustedIntensity = intensityMult.coerceIn(0f, 1f) * (0.35f + 0.65f * dayFactor)
+            GLES20.glUniform1f(uFogIntensityLoc, adjustedIntensity)
             GLES20.glUniform1f(uFogGlobalAlphaLoc, alpha)
             GLES20.glUniform1f(uFogIsCloudyLoc, if (isCloudy) 1.0f else 0.0f)
 
@@ -1287,7 +1300,13 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private fun packPointData(p: Particle, state: WeatherState, alpha: Float) {
             pointDataBuffer.put(p.x).put(p.y).put(p.size * p.scaleX * weatherResolutionScale)
             var finalAlpha = p.alpha * alpha
-            if (state.type == WeatherType.FOG || state.type == WeatherType.CLOUDY || (!state.isNight && state.type == WeatherType.CLEAR)) {
+            if (state.type == WeatherType.CLEAR) {
+                if (p.speedX == 0f && p.speedY == 0f) {
+                    finalAlpha *= (1.0f - state.dayFactor).coerceIn(0f, 1f)
+                } else {
+                    finalAlpha *= state.dayFactor.coerceIn(0f, 1f)
+                }
+            } else if (state.type == WeatherType.FOG || state.type == WeatherType.CLOUDY) {
                 finalAlpha *= (0.3f + state.intensity * 0.7f).coerceIn(0f, 1f)
             }
             pointDataBuffer.put(p.r).put(p.g).put(p.b).put(finalAlpha)
@@ -1474,10 +1493,18 @@ class DynamicBackgroundView @JvmOverloads constructor(
             fboHeight = 0
         }
 
-        fun updateWeatherConfig(type: WeatherType, intens: Float, wind: Float, night: Boolean) {
-            if (currentState.type == type && currentState.isNight == night) {
+        fun updateWeatherConfig(
+            type: WeatherType,
+            intens: Float,
+            wind: Float,
+            night: Boolean,
+            dayFactor: Float = if (!night) 1.0f else 0.0f
+        ) {
+            val targetDayFactor = dayFactor.coerceIn(0f, 1f)
+            if (currentState.type == type && currentState.isNight == night && kotlin.math.abs(currentState.dayFactor - targetDayFactor) < 0.01f) {
                 currentState.targetIntensity = intens
                 currentState.targetWindFactor = wind
+                currentState.dayFactor = targetDayFactor
                 renderMode = RENDERMODE_CONTINUOUSLY
                 requestRender()
                 return
@@ -1489,6 +1516,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             previousState.windFactor = currentState.windFactor
             previousState.targetWindFactor = currentState.windFactor
             previousState.isNight = currentState.isNight
+            previousState.dayFactor = currentState.dayFactor
 
             val tempParticles = previousState.particles
             previousState.particles = currentState.particles
@@ -1500,10 +1528,11 @@ class DynamicBackgroundView @JvmOverloads constructor(
             currentState.windFactor = wind
             currentState.targetWindFactor = wind
             currentState.isNight = night
+            currentState.dayFactor = targetDayFactor
 
             currentState.particles.forEach { it.active = false }
 
-            if (previousState.type != WeatherType.NONE || currentState.type != WeatherType.NONE) {
+            if (previousState.type != WeatherType.NONE || currentState.type != WeatherType.NONE || previousState.isNight != currentState.isNight || kotlin.math.abs(previousState.dayFactor - currentState.dayFactor) > 0.01f) {
                 isTransitioning = true
                 transitionStartTime = System.currentTimeMillis()
                 renderMode = RENDERMODE_CONTINUOUSLY

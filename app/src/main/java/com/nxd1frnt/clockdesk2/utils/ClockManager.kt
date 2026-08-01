@@ -32,7 +32,7 @@ class ClockManager(
         startUpdates()
     }
     private var isDebugMode = false
-    private val debugCycleInterval = 5L // milliseconds
+    private val debugCycleInterval = 40L // milliseconds (25 ticks/sec for smooth performance)
     private var simulatedTime: Calendar = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
