@@ -31,6 +31,16 @@ import androidx.transition.ChangeBounds
 import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
+import androidx.transition.TransitionValues
+import androidx.transition.Visibility
+import android.animation.Animator
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.annotation.SuppressLint
+import android.view.MotionEvent
+import android.view.animation.OvershootInterpolator
+import android.view.animation.PathInterpolator
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.plugins.AlarmChipPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
@@ -63,6 +73,9 @@ class SmartChipManager(
     private val pluginTimers = mutableMapOf<String, Runnable>()
     private val timeoutRunnables = mutableMapOf<String, Runnable>()
     private val pluginTimeoutCounts = mutableMapOf<String, Int>()
+
+    private var isFirstLoad = true
+    private val springInterpolator = PathInterpolator(0.2f, 1.0f, 0.3f, 1.0f)
 
 //    private val periodicUpdateRunnable = object : Runnable {
 //        override fun run() {
@@ -126,7 +139,7 @@ class SmartChipManager(
             }
         }
         timeoutRunnables[packageName] = timeoutRunnable
-        handler.postDelayed(timeoutRunnable, 6000L)
+        handler.postDelayed(timeoutRunnable, 15000L)
     }
 
     private fun clearPluginTimeout(packageName: String) {
@@ -142,6 +155,7 @@ class SmartChipManager(
         onEditClickListener = listener
         updateChipsClickability()
     }
+
 
     private fun updateChipsClickability() {
         for (i in 0 until chipContainer.childCount) {
@@ -462,6 +476,45 @@ class SmartChipManager(
         }.start()
     }
 
+    private fun animateTextChange(textView: TextView, newText: String) {
+        if (textView.text.toString() == newText) return
+        if (textView.text.isNullOrEmpty() || textView.visibility != View.VISIBLE) {
+            textView.text = newText
+            textView.isSelected = true
+            return
+        }
+
+        val container = chipContainer as? ViewGroup
+
+        textView.animate()
+            .alpha(0f)
+            .setDuration(100)
+            .setInterpolator(FastOutSlowInInterpolator())
+            .withEndAction {
+                if (container != null) {
+                    val boundsTransition = TransitionSet().apply {
+                        ordering = TransitionSet.ORDERING_TOGETHER
+                        duration = 350L
+                        interpolator = springInterpolator
+                        addTransition(ChangeBounds().apply {
+                            resizeClip = false
+                        })
+                    }
+                    TransitionManager.beginDelayedTransition(container, boundsTransition)
+                }
+
+                textView.text = newText
+                textView.isSelected = true
+
+                textView.animate()
+                    .alpha(1f)
+                    .setDuration(150)
+                    .setInterpolator(FastOutSlowInInterpolator())
+                    .start()
+            }
+            .start()
+    }
+
     private fun updateExternalChipView(view: View, pkg: String, text: String, iconName: String): Boolean {
         val iconView = view.findViewById<ImageView>(R.id.chip_icon)
         val textView = view.findViewById<TextView>(R.id.chip_text)
@@ -472,10 +525,11 @@ class SmartChipManager(
                 iconView.setImageDrawable(ResourcesCompat.getDrawable(pluginRes, iconId, null))
 
                 if (textView.text.toString() != text) {
-                    textView.text = text
+                    animateTextChange(textView, text)
+                } else {
+                    textView.isSelected = true
                 }
 
-                textView.isSelected = true
                 return true
             }
         } catch (e: Exception) {
@@ -484,8 +538,21 @@ class SmartChipManager(
         return false
     }
 
-fun updateAllChips() {
+    fun updateAllChips() {
         var isContentChanged = false
+
+        val container = chipContainer as? ViewGroup
+        if (container != null) {
+            val boundsTransition = TransitionSet().apply {
+                ordering = TransitionSet.ORDERING_TOGETHER
+                duration = 350L
+                interpolator = springInterpolator
+                addTransition(ChangeBounds().apply {
+                    resizeClip = false
+                })
+            }
+            TransitionManager.beginDelayedTransition(container, boundsTransition)
+        }
 
         // Internal chips
         internalPlugins.forEach { plugin ->
@@ -546,7 +613,6 @@ fun updateAllChips() {
     private fun sortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
         val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
-       // Logger.d("SmartChipManager"){"orderString: $orderString"}
         val orderList = orderString.split(",").map { it.trim() }
 
         // Фильтруем видимые чипы и сортируем их по индексу в orderList
@@ -554,10 +620,8 @@ fun updateAllChips() {
             .filter { it.isVisible }
             .sortedBy { chipInfo ->
                 val index = orderList.indexOf(chipInfo.id)
-                // Если плагина нет в списке (например, только что установлен), кидаем его в конец
                 if (index != -1) index else Int.MAX_VALUE
             }
-      //  Logger.d("SmartChipManager"){"visibleChips: $visibleChips"}
 
         val container = chipContainer as? ConstraintLayout
             ?: throw IllegalStateException("chipContainer must be ConstraintLayout")
@@ -567,14 +631,13 @@ fun updateAllChips() {
 
         val transition = TransitionSet().apply {
             ordering = TransitionSet.ORDERING_TOGETHER
-            duration = 300 
-            interpolator = FastOutSlowInInterpolator()
+            duration = 350L
+            interpolator = springInterpolator
 
             addTransition(ChangeBounds().apply {
                 resizeClip = false
             })
-            addTransition(Fade(Fade.IN))
-            addTransition(Fade(Fade.OUT))
+            addTransition(ScaleAndFade())
         }
 
         if (currentTags == newTags) {
@@ -591,24 +654,38 @@ fun updateAllChips() {
 
         TransitionManager.beginDelayedTransition(container, transition)
 
-        container.removeAllViews()
+        val visibleViews = visibleChips.map { it.view }.toSet()
+        val childrenToRemove = mutableListOf<View>()
+        for (i in 0 until container.childCount) {
+            val child = container.getChildAt(i)
+            if (child !in visibleViews) {
+                childrenToRemove.add(child)
+            }
+        }
+        childrenToRemove.forEach { container.removeView(it) }
+
         if (visibleChips.isEmpty()) return
 
         visibleChips.forEach { chipInfo ->
-            if (chipInfo.view.id == View.NO_ID) {
-                chipInfo.view.id = ViewCompat.generateViewId()
+            val v = chipInfo.view
+            if (v.id == View.NO_ID) {
+                v.id = ViewCompat.generateViewId()
             }
-            (chipInfo.view.parent as? ViewGroup)?.removeView(chipInfo.view)
+            if (v.parent != container) {
+                (v.parent as? ViewGroup)?.removeView(v)
+                v.visibility = View.VISIBLE
+                v.tag = chipInfo.id
+                container.addView(v)
+            } else {
+                v.visibility = View.VISIBLE
+            }
 
-            chipInfo.view.visibility = View.VISIBLE
-            chipInfo.view.tag = chipInfo.id
+            setupChipTouchFeedback(v)
 
-            container.addView(chipInfo.view)
-
-            val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+            val textView = v.findViewById<TextView>(R.id.chip_text)
             textView?.isSelected = true
 
-            fontManager.applyStyleToSmartChip(chipInfo.view)
+            fontManager.applyStyleToSmartChip(v)
         }
         Logger.d("SmartChipManager"){"Chips updated"}
 
@@ -629,9 +706,100 @@ fun updateAllChips() {
         }
         constraintSet.applyTo(container)
         updateChipsClickability()
+
+        if (isFirstLoad && visibleChips.isNotEmpty()) {
+            isFirstLoad = false
+            animateStaggeredEntrance(visibleChips)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupChipTouchFeedback(view: View) {
+        if (view.getTag(R.id.tag_touch_listener_set) == true) return
+        view.setTag(R.id.tag_touch_listener_set, true)
+
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate()
+                        .scaleX(0.95f)
+                        .scaleY(0.95f)
+                        .setDuration(120)
+                        .setInterpolator(FastOutSlowInInterpolator())
+                        .start()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .setDuration(220)
+                        .setInterpolator(OvershootInterpolator(1.4f))
+                        .start()
+                }
+            }
+            false
+        }
+    }
+
+    private fun animateStaggeredEntrance(visibleChips: List<ChipInfo>) {
+        visibleChips.forEachIndexed { index, chipInfo ->
+            val view = chipInfo.view
+            val targetAlpha = if (view.alpha > 0f) view.alpha else 1f
+            view.alpha = 0f
+            view.translationY = 24f
+            view.scaleX = 0.9f
+            view.scaleY = 0.9f
+
+            view.animate()
+                .alpha(targetAlpha)
+                .translationY(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setStartDelay(index * 50L)
+                .setDuration(350L)
+                .setInterpolator(springInterpolator)
+                .start()
+        }
     }
 
     fun onPreferencesChanged() {
         updateAllChips()
+    }
+}
+
+private class ScaleAndFade : Visibility() {
+    override fun onAppear(
+        sceneRoot: ViewGroup,
+        view: View,
+        startValues: TransitionValues?,
+        endValues: TransitionValues?
+    ): Animator {
+        val targetAlpha = if (view.alpha > 0f) view.alpha else 1f
+        view.alpha = 0f
+        view.scaleX = 0.85f
+        view.scaleY = 0.85f
+
+        val alphaAnim = ObjectAnimator.ofFloat(view, View.ALPHA, 0f, targetAlpha)
+        val scaleXAnim = ObjectAnimator.ofFloat(view, View.SCALE_X, 0.85f, 1f)
+        val scaleYAnim = ObjectAnimator.ofFloat(view, View.SCALE_Y, 0.85f, 1f)
+
+        return AnimatorSet().apply {
+            playTogether(alphaAnim, scaleXAnim, scaleYAnim)
+        }
+    }
+
+    override fun onDisappear(
+        sceneRoot: ViewGroup,
+        view: View,
+        startValues: TransitionValues?,
+        endValues: TransitionValues?
+    ): Animator {
+        val alphaAnim = ObjectAnimator.ofFloat(view, View.ALPHA, view.alpha, 0f)
+        val scaleXAnim = ObjectAnimator.ofFloat(view, View.SCALE_X, view.scaleX, 0.85f)
+        val scaleYAnim = ObjectAnimator.ofFloat(view, View.SCALE_Y, view.scaleY, 0.85f)
+
+        return AnimatorSet().apply {
+            playTogether(alphaAnim, scaleXAnim, scaleYAnim)
+        }
     }
 }

@@ -79,6 +79,8 @@
             android:layout_marginEnd="16dp"
             android:scrollbars="none"
             android:fillViewport="true"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -86,6 +88,8 @@
                 android:id="@+id/smart_chip_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:padding="4dp" />
         </ScrollView>
 
