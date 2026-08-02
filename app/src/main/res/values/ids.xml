@@ -2,4 +2,5 @@
 <resources>
     <item name="tag_touch_listener_set" type="id" />
     <item name="tag_pulse_animator" type="id" />
+    <item name="tag_target_alpha" type="id" />
 </resources>

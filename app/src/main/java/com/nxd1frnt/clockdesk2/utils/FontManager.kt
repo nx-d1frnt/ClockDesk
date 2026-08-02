@@ -633,6 +633,7 @@ class FontManager(
         val iconView = view.findViewById<ImageView>(R.id.chip_icon)
 
         if (!colorOnly) {
+            view.setTag(R.id.tag_target_alpha, settings.alpha)
             view.alpha = settings.alpha
         }
 

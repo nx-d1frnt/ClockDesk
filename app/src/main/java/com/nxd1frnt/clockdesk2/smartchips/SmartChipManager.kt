@@ -1,5 +1,11 @@
 package com.nxd1frnt.clockdesk2.smartchips
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityOptions
 import android.content.BroadcastReceiver
@@ -15,8 +21,11 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Pair
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -28,19 +37,10 @@ import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.transition.ChangeBounds
-import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
 import androidx.transition.TransitionValues
 import androidx.transition.Visibility
-import android.animation.Animator
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
-import android.animation.PropertyValuesHolder
-import android.annotation.SuppressLint
-import android.view.MotionEvent
-import android.view.animation.OvershootInterpolator
-import android.view.animation.PathInterpolator
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.plugins.AlarmChipPlugin
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
@@ -227,12 +227,10 @@ class SmartChipManager(
             }
             allChips.add(ChipInfo(plugin.preferenceKey, view))
             plugin.setOnStateChangeListener {
-                requestInitialState()
+                updateAllChips()
             }
         }
         discoverExternalPlugins()
-
-        // We don't register receivers anymore in init
     }
 
     override fun onStart(owner: LifecycleOwner) {
@@ -478,6 +476,9 @@ class SmartChipManager(
 
     private fun animateTextChange(textView: TextView, newText: String) {
         if (textView.text.toString() == newText) return
+
+        textView.animate().cancel()
+
         if (textView.text.isNullOrEmpty() || textView.visibility != View.VISIBLE) {
             textView.text = newText
             textView.isSelected = true
@@ -583,34 +584,42 @@ class SmartChipManager(
         externalPlugins.forEach { plugin ->
             val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
             val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
-            
+
             if (!isEnabled && chipInfo.isVisible) {
                 chipInfo.isVisible = false
                 isContentChanged = true
             }
-            
-            if (isEnabled) {
-                if (!isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
-                    if (chipInfo.isVisible) {
-                        chipInfo.isVisible = false
-                        isContentChanged = true
-                    }
-                    return@forEach
-                }
 
-                val requestIntent = Intent().apply {
-                    action = ChipPluginContract.ACTION_REQUEST_DATA
-                    component = ComponentName(plugin.packageName, plugin.receiverClassName)
+            if (isEnabled && !isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
+                if (chipInfo.isVisible) {
+                    chipInfo.isVisible = false
+                    isContentChanged = true
                 }
-                context.sendBroadcast(requestIntent)
-                startTimeoutCheck(plugin.packageName)
             }
         }
 
         sortAndRedrawChips(isContentChanged)
     }
 
+    private var isRedrawPending = false
+    private var pendingContentChanged = false
+
+    private val redrawRunnable = Runnable {
+        isRedrawPending = false
+        val changed = pendingContentChanged
+        pendingContentChanged = false
+        executeSortAndRedrawChips(changed)
+    }
+
     private fun sortAndRedrawChips(contentChanged: Boolean = false) {
+        if (contentChanged) pendingContentChanged = true
+        if (isRedrawPending) return
+        isRedrawPending = true
+        handler.removeCallbacks(redrawRunnable)
+        handler.post(redrawRunnable)
+    }
+
+    private fun executeSortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
         val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
         val orderList = orderString.split(",").map { it.trim() }
@@ -678,6 +687,10 @@ class SmartChipManager(
                 container.addView(v)
             } else {
                 v.visibility = View.VISIBLE
+                if (!isEditMode && v.getTag(R.id.tag_pulse_animator) == null) {
+                    v.scaleX = 1.0f
+                    v.scaleY = 1.0f
+                }
             }
 
             setupChipTouchFeedback(v)
@@ -744,7 +757,7 @@ class SmartChipManager(
     private fun animateStaggeredEntrance(visibleChips: List<ChipInfo>) {
         visibleChips.forEachIndexed { index, chipInfo ->
             val view = chipInfo.view
-            val targetAlpha = if (view.alpha > 0f) view.alpha else 1f
+            val targetAlpha = (view.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
             view.alpha = 0f
             view.translationY = 24f
             view.scaleX = 0.9f
@@ -758,6 +771,12 @@ class SmartChipManager(
                 .setStartDelay(index * 50L)
                 .setDuration(350L)
                 .setInterpolator(springInterpolator)
+                .withEndAction {
+                    view.scaleX = 1f
+                    view.scaleY = 1f
+                    view.translationY = 0f
+                    view.alpha = targetAlpha
+                }
                 .start()
         }
     }
@@ -774,7 +793,7 @@ private class ScaleAndFade : Visibility() {
         startValues: TransitionValues?,
         endValues: TransitionValues?
     ): Animator {
-        val targetAlpha = if (view.alpha > 0f) view.alpha else 1f
+        val targetAlpha = (view.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
         view.alpha = 0f
         view.scaleX = 0.85f
         view.scaleY = 0.85f
@@ -783,9 +802,22 @@ private class ScaleAndFade : Visibility() {
         val scaleXAnim = ObjectAnimator.ofFloat(view, View.SCALE_X, 0.85f, 1f)
         val scaleYAnim = ObjectAnimator.ofFloat(view, View.SCALE_Y, 0.85f, 1f)
 
-        return AnimatorSet().apply {
+        val set = AnimatorSet().apply {
             playTogether(alphaAnim, scaleXAnim, scaleYAnim)
         }
+        set.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                view.scaleX = 1.0f
+                view.scaleY = 1.0f
+                view.alpha = targetAlpha
+            }
+            override fun onAnimationCancel(animation: Animator) {
+                view.scaleX = 1.0f
+                view.scaleY = 1.0f
+                view.alpha = targetAlpha
+            }
+        })
+        return set
     }
 
     override fun onDisappear(
@@ -794,7 +826,9 @@ private class ScaleAndFade : Visibility() {
         startValues: TransitionValues?,
         endValues: TransitionValues?
     ): Animator {
-        val alphaAnim = ObjectAnimator.ofFloat(view, View.ALPHA, view.alpha, 0f)
+        val targetAlpha = (view.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
+        val startAlpha = if (view.alpha > 0f) view.alpha else targetAlpha
+        val alphaAnim = ObjectAnimator.ofFloat(view, View.ALPHA, startAlpha, 0f)
         val scaleXAnim = ObjectAnimator.ofFloat(view, View.SCALE_X, view.scaleX, 0.85f)
         val scaleYAnim = ObjectAnimator.ofFloat(view, View.SCALE_Y, view.scaleY, 0.85f)
 
