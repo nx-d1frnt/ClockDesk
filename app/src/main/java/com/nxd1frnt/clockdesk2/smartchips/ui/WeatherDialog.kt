@@ -61,17 +61,17 @@ object WeatherDialog {
                 val cityName = prefs.getString("resolved_city_display_name", null)
                     ?: prefs.getString("location_city_name", targetContext.getString(R.string.weather_auto_current))
                 locationText.text = cityName
-                modeBadge.text = "City"
+                modeBadge.text = targetContext.getString(R.string.weather_mode_badge_city)
             }
             "coords" -> {
                 val lat = prefs.getString("latitude", "0")
                 val lon = prefs.getString("longitude", "0")
                 locationText.text = "$lat, $lon"
-                modeBadge.text = "Coords"
+                modeBadge.text = targetContext.getString(R.string.weather_mode_badge_coords)
             }
             else -> {
                 locationText.text = targetContext.getString(R.string.weather_auto_current)
-                modeBadge.text = "GPS Auto"
+                modeBadge.text = targetContext.getString(R.string.weather_mode_badge_auto)
             }
         }
 
@@ -112,7 +112,7 @@ object WeatherDialog {
                 if (visibility >= 1000.0) String.format(Locale.US, "%.1f km", visibility / 1000.0)
                 else "${visibility.toInt()} m"
             } else "--"
-            cycleValue.text = if (isDay) "Day" else "Night"
+            cycleValue.text = if (isDay) targetContext.getString(R.string.weather_cycle_day) else targetContext.getString(R.string.weather_cycle_night)
             cycleIcon.setImageResource(if (isDay) R.drawable.ic_clear_day else R.drawable.ic_clear_night)
 
             // Active Alert check

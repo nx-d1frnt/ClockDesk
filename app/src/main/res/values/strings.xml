@@ -432,6 +432,14 @@
     <string name="city_search_empty_prompt">Type to search for cities worldwide</string>
     <string name="city_search_no_results">No matching cities found</string>
     <string name="city_search_searching">Searching cities…</string>
+    <string name="city_search_network_error">Network connection error. Please check your internet connection.</string>
+
+    <!-- Weather Details Badges -->
+    <string name="weather_mode_badge_auto">GPS Auto</string>
+    <string name="weather_mode_badge_city">City</string>
+    <string name="weather_mode_badge_coords">Coordinates</string>
+    <string name="weather_cycle_day">Day</string>
+    <string name="weather_cycle_night">Night</string>
 
     <!-- Units Settings -->
     <string name="pref_units_category_title">Units of Measurement</string>

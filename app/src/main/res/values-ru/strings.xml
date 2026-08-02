@@ -415,6 +415,14 @@
     <string name="city_search_empty_prompt">Введите текст для поиска городов по всему миру</string>
     <string name="city_search_no_results">Города не найдены</string>
     <string name="city_search_searching">Поиск городов…</string>
+    <string name="city_search_network_error">Ошибка сетевого подключения. Проверьте соединение с интернетом.</string>
+
+    <!-- Weather Details Badges -->
+    <string name="weather_mode_badge_auto">Авто (GPS)</string>
+    <string name="weather_mode_badge_city">Город</string>
+    <string name="weather_mode_badge_coords">Координаты</string>
+    <string name="weather_cycle_day">День</string>
+    <string name="weather_cycle_night">Ночь</string>
 
     <!-- Units Settings -->
     <string name="pref_units_category_title">Единицы измерения</string>

@@ -87,7 +87,7 @@ object CitySearchDialog {
                     progressBar.visibility = View.GONE
                     recyclerView.visibility = View.GONE
                     statusText.visibility = View.VISIBLE
-                    statusText.text = targetContext.getString(R.string.city_search_no_results)
+                    statusText.text = targetContext.getString(R.string.city_search_network_error)
                     adapter.submitList(emptyList())
                 }
             )
