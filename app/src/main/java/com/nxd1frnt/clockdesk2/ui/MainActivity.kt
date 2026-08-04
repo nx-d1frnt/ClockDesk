@@ -321,6 +321,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         handler.postDelayed(entranceAnimationRunnable, ENTRANCE_ANIMATION_TIMEOUT)
 
         initCoreManagers()
+        setupEntranceAnimation()
         initUIManagers()
         setupListeners()
 
@@ -330,6 +331,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         setupSideSheet()
         restoreSavedWeatherState()
         startUpdates()
+    }
+
+    private fun setupEntranceAnimation() {
+        entranceAnimationManager = EntranceAnimationManager(
+            rootView = mainLayout,
+            widgets = listOf(timeText, dateText, chipContainer, lastfmLayout),
+            turbulenceOverlay = turbulenceOverlay,
+            isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled
+        )
+        entranceAnimationManager.prepareViews()
     }
 
     private fun setupWindowFlags() {
@@ -378,14 +389,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         debugButton.visibility = View.GONE
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
-
-        entranceAnimationManager = EntranceAnimationManager(
-            rootView = mainLayout,
-            widgets = listOf(timeText, dateText, chipContainer, lastfmLayout)
-        )
-        entranceAnimationManager.prepareViews()
-
-        turbulenceOverlay.playAnimation(Color.parseColor("#5A7184")) {}
     }
 
     private fun initCoreManagers() {

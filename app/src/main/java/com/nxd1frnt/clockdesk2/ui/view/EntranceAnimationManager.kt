@@ -1,14 +1,18 @@
 package com.nxd1frnt.clockdesk2.utils
 
 import android.content.Context
+import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.PathInterpolator
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 
 class EntranceAnimationManager(
     private val rootView: ViewGroup,
-    private val widgets: List<View>
+    private val widgets: List<View>,
+    private val turbulenceOverlay: TurbulenceView? = null,
+    private val isTurbulenceEnabled: Boolean = true
 ) {
     private var hasAnimationPlayed = false
 
@@ -20,6 +24,10 @@ class EntranceAnimationManager(
 
     fun prepareViews() {
         if (hasAnimationPlayed) return
+
+        if (isTurbulenceEnabled) {
+            turbulenceOverlay?.playAnimation(Color.parseColor("#5A7184")) {}
+        }
 
         widgets.forEach { view ->
             view.alpha = 0f
