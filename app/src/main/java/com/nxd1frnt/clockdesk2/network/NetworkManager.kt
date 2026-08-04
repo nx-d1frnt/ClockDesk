@@ -5,30 +5,37 @@ import android.os.Build
 import com.android.volley.RequestQueue
 import com.android.volley.toolbox.HurlStack
 import com.android.volley.toolbox.Volley
-import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
-import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
-
 
 object NetworkManager {
 
+    @Volatile
+    private var requestQueue: RequestQueue? = null
+
     /**
-     * Returns a RequestQueue that is configured to accept all SSL certificates on Android versions
-     * up to and including KitKat (API level 19). For later versions, it returns a standard RequestQueue.
+     * Returns a thread-safe singleton RequestQueue to prevent creating multiple queues
+     * and spawning unnecessary dispatcher threads.
      */
     fun getRequestQueue(context: Context): RequestQueue {
-        return if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
-            createUnsafeQueue(context) // Accept all SSL certificates
-        } else {
-            Volley.newRequestQueue(context.applicationContext)
+        return requestQueue ?: synchronized(this) {
+            requestQueue ?: createQueue(context.applicationContext).also {
+                requestQueue = it
+            }
         }
     }
 
+    private fun createQueue(context: Context): RequestQueue {
+        return if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
+            createUnsafeQueue(context)
+        } else {
+            Volley.newRequestQueue(context)
+        }
+    }
 
     private fun createUnsafeQueue(context: Context): RequestQueue {
         try {
@@ -46,17 +53,11 @@ object NetworkManager {
 
             HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
 
-            return Volley.newRequestQueue(context.applicationContext, hurlStack)
+            return Volley.newRequestQueue(context, hurlStack)
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        return Volley.newRequestQueue(context.applicationContext)
+        return Volley.newRequestQueue(context)
     }
-
-    private fun defaultTrustManager(): X509TrustManager {
-        val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        tmf.init(null as KeyStore?)
-        return tmf.trustManagers[0] as X509TrustManager
-    }
-}
+}

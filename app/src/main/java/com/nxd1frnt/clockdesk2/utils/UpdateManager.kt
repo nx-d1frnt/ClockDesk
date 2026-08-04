@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
+import com.nxd1frnt.clockdesk2.network.NetworkManager
 import org.json.JSONException
 
 object UpdateManager {
@@ -78,7 +78,7 @@ object UpdateManager {
             onUpdateStateChanged?.invoke()}
         )
 
-        Volley.newRequestQueue(context).add(request)
+        NetworkManager.getRequestQueue(context).add(request)
     }
 
    private fun isNewer(server: String, current: String): Boolean {
