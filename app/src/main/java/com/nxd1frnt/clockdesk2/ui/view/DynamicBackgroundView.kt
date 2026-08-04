@@ -4,7 +4,6 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.drawable.GradientDrawable
 import android.opengl.GLES20
@@ -287,16 +286,29 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
+    private var currentRenderScale: Float = 1.0f
+
     /**
      * Установка коэффициента масштабирования рендеринга (оптимизация).
      */
     fun setRenderScale(scale: Float) {
         val safeScale = scale.coerceIn(0.1f, 1.0f)
-        post {
-            val scaledWidth = (width * safeScale).toInt().coerceAtLeast(1)
-            val scaledHeight = (height * safeScale).toInt().coerceAtLeast(1)
-            holder.setFixedSize(scaledWidth, scaledHeight)
+        if (currentRenderScale != safeScale) {
+            currentRenderScale = safeScale
+            applyRenderScale()
+            requestRender()
         }
+    }
+
+    private fun applyRenderScale() {
+        post {
+            holder.setSizeFromLayout()
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        applyRenderScale()
     }
 
     override fun onPause() {
@@ -422,6 +434,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var dummyTextureId = 0
         private var viewWidth = 0
         private var viewHeight = 0
+        private var lastWeatherW = 0
+        private var lastWeatherH = 0
 
         @Volatile var isSurfaceCreated = false
 
@@ -895,16 +909,25 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             val hasWeather = currentState.type != WeatherType.NONE || isTransitioning
 
-            val targetFboWidth = (viewWidth * weatherResolutionScale).toInt().coerceAtLeast(64)
-            val targetFboHeight = (viewHeight * weatherResolutionScale).toInt().coerceAtLeast(64)
+            val finalRenderScale = if (hasWeather) minOf(currentRenderScale, weatherResolutionScale) else currentRenderScale
+            val useFbo = finalRenderScale < 0.99f || hasWeather
 
-            // 1. Draw Background to FBO 1 if hasWeather is true
-            if (hasWeather) {
+            val targetFboWidth = (viewWidth * finalRenderScale).toInt().coerceAtLeast(64)
+            val targetFboHeight = (viewHeight * finalRenderScale).toInt().coerceAtLeast(64)
+
+            // 1. Draw Background to FBO 1 if useFbo is true
+            if (useFbo) {
                 if (fboId == 0 || fboWidth != targetFboWidth || fboHeight != targetFboHeight) {
                     createFBO(targetFboWidth, targetFboHeight)
                 }
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboId)
-                GLES20.glViewport(0, 0, targetFboWidth, targetFboHeight)
+                if (fboId != 0) {
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboId)
+                    GLES20.glViewport(0, 0, targetFboWidth, targetFboHeight)
+                } else {
+                    // creation failed — fall back to direct full-res render
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                    GLES20.glViewport(0, 0, viewWidth, viewHeight)
+                }
             } else {
                 if (fboId != 0) deleteFBO()
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
@@ -917,57 +940,85 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 commitTransition()
             }
 
-            // 2. Render weather composite in FBO 2 if hasWeather is true
-            if (hasWeather) {
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, weatherFboId)
-                // Viewport is still targetFboWidth / targetFboHeight
-                renderWeather(fboTexId, targetFboWidth, targetFboHeight)
+            // 2. Render weather or upscale
+            if (useFbo) {
+                if (hasWeather) {
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, weatherFboId)
+                    // Viewport is still targetFboWidth / targetFboHeight
+                    renderWeather(fboTexId, targetFboWidth, targetFboHeight)
 
-                // Determine transition alpha for the FBO screen composition pass
-                val isTransitioningToOrFromNone = isTransitioning && 
-                        (previousState.type == WeatherType.NONE || currentState.type == WeatherType.NONE)
-                
-                var screenAlpha = 1.0f
-                if (isTransitioningToOrFromNone) {
-                    val elapsed = System.currentTimeMillis() - transitionStartTime
-                    var progress = elapsed / TRANSITION_DURATION_MS.toFloat()
-                    if (progress > 1.0f) progress = 1.0f
-                    val easeProgress = progress * progress * (3f - 2f * progress)
-                    screenAlpha = if (currentState.type != WeatherType.NONE) easeProgress else (1.0f - easeProgress)
-                }
+                    // Determine transition alpha for the FBO screen composition pass
+                    val isTransitioningToOrFromNone = isTransitioning && 
+                            (previousState.type == WeatherType.NONE || currentState.type == WeatherType.NONE)
+                    
+                    var screenAlpha = 1.0f
+                    if (isTransitioningToOrFromNone) {
+                        val elapsed = System.currentTimeMillis() - transitionStartTime
+                        var progress = elapsed / TRANSITION_DURATION_MS.toFloat()
+                        if (progress > 1.0f) progress = 1.0f
+                        val easeProgress = progress * progress * (3f - 2f * progress)
+                        screenAlpha = if (currentState.type != WeatherType.NONE) easeProgress else (1.0f - easeProgress)
+                    }
 
-                // If transitioning to/from NONE, draw the clean full-res background directly to the screen first
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
-                GLES20.glViewport(0, 0, viewWidth, viewHeight)
+                    // If transitioning to/from NONE, draw the clean full-res background directly to the screen first
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                    GLES20.glViewport(0, 0, viewWidth, viewHeight)
 
-                if (isTransitioningToOrFromNone) {
-                    drawBackgroundQuad()
+                    if (isTransitioningToOrFromNone) {
+                        drawBackgroundQuad()
+                    } else {
+                        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+                        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+                    }
+
+                    // Upscale FBO composite texture on top of the screen with screenAlpha blending
+                    GLES20.glUseProgram(screenProgram)
+
+                    vertexBuffer.position(0)
+                    GLES20.glVertexAttribPointer(screenPositionHandle, 3, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
+                    GLES20.glEnableVertexAttribArray(screenPositionHandle)
+
+                    vertexBuffer.position(3)
+                    GLES20.glVertexAttribPointer(screenTexCoordHandle, 2, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
+                    GLES20.glEnableVertexAttribArray(screenTexCoordHandle)
+
+                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, weatherFboTexId)
+                    GLES20.glUniform1i(screenTextureHandle, 0)
+                    GLES20.glUniform1f(screenAlphaHandle, screenAlpha)
+
+                    // Enable blending and set correct blend mode for premultiplied FBO upscale pass
+                    GLES20.glEnable(GLES20.GL_BLEND)
+                    GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+                    GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
                 } else {
+                    // No weather, just upscale FBO 1 (background FBO) to the screen
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                    GLES20.glViewport(0, 0, viewWidth, viewHeight)
+
                     GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
                     GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+
+                    GLES20.glUseProgram(screenProgram)
+
+                    vertexBuffer.position(0)
+                    GLES20.glVertexAttribPointer(screenPositionHandle, 3, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
+                    GLES20.glEnableVertexAttribArray(screenPositionHandle)
+
+                    vertexBuffer.position(3)
+                    GLES20.glVertexAttribPointer(screenTexCoordHandle, 2, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
+                    GLES20.glEnableVertexAttribArray(screenTexCoordHandle)
+
+                    GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fboTexId)
+                    GLES20.glUniform1i(screenTextureHandle, 0)
+                    GLES20.glUniform1f(screenAlphaHandle, 1.0f)
+
+                    GLES20.glDisable(GLES20.GL_BLEND)
+
+                    GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
                 }
-
-                // Upscale FBO composite texture on top of the screen with screenAlpha blending
-                GLES20.glUseProgram(screenProgram)
-
-                vertexBuffer.position(0)
-                GLES20.glVertexAttribPointer(screenPositionHandle, 3, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
-                GLES20.glEnableVertexAttribArray(screenPositionHandle)
-
-                vertexBuffer.position(3)
-                GLES20.glVertexAttribPointer(screenTexCoordHandle, 2, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
-                GLES20.glEnableVertexAttribArray(screenTexCoordHandle)
-
-                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, weatherFboTexId)
-                GLES20.glUniform1i(screenTextureHandle, 0)
-                GLES20.glUniform1f(screenAlphaHandle, screenAlpha)
-
-                // Enable blending and set correct blend mode for premultiplied FBO upscale pass
-                GLES20.glEnable(GLES20.GL_BLEND)
-                GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-
-                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
             }
 
             // Update renderMode based on active simulation, transition, or interpolation
@@ -993,6 +1044,12 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private fun renderWeather(backgroundTexId: Int, w: Int, h: Int) {
             GLES20.glEnable(GLES20.GL_BLEND)
             GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+            val dimensionsChanged = lastWeatherW != w || lastWeatherH != h
+            if (dimensionsChanged) {
+                lastWeatherW = w
+                lastWeatherH = h
+            }
 
             if (currentState.type == WeatherType.THUNDERSTORM || previousState.type == WeatherType.THUNDERSTORM) {
                 updateLightning()
@@ -1024,38 +1081,38 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 val easeProgress = progress * progress * (3f - 2f * progress)
 
                 if (previousState.type != WeatherType.NONE) {
-                    drawWeatherState(previousState, 1.0f - easeProgress, backgroundTexId, w, h)
+                    drawWeatherState(previousState, 1.0f - easeProgress, backgroundTexId, w, h, dimensionsChanged)
                 }
                 if (currentState.type != WeatherType.NONE) {
-                    drawWeatherState(currentState, easeProgress, backgroundTexId, w, h)
+                    drawWeatherState(currentState, easeProgress, backgroundTexId, w, h, dimensionsChanged)
                 }
             } else {
                 if (currentState.type != WeatherType.NONE) {
-                    drawWeatherState(currentState, 1.0f, backgroundTexId, w, h)
+                    drawWeatherState(currentState, 1.0f, backgroundTexId, w, h, dimensionsChanged)
                 }
             }
         }
 
-        private fun drawWeatherState(state: WeatherState, alpha: Float, backgroundTexId: Int, w: Int, h: Int) {
+        private fun drawWeatherState(state: WeatherState, alpha: Float, backgroundTexId: Int, w: Int, h: Int, dimensionsChanged: Boolean) {
             if (alpha <= 0.001f) return
 
             when (state.type) {
                 WeatherType.RAIN, WeatherType.THUNDERSTORM -> {
                     drawRainShower(state.intensity, state.windFactor, alpha, backgroundTexId, w, h)
-                    updateAndDrawParticles(state, alpha, w, h)
+                    updateAndDrawParticles(state, alpha, w, h, dimensionsChanged)
                     drawGlassRain(state.intensity, state.windFactor, alpha, backgroundTexId, w, h)
                 }
                 WeatherType.SNOW -> {
                     drawSnowLayer(state.intensity, alpha, backgroundTexId, w, h)
-                    updateAndDrawParticles(state, alpha, w, h)
+                    updateAndDrawParticles(state, alpha, w, h, dimensionsChanged)
                 }
                 WeatherType.FOG -> {
                     drawFogLayer(state.intensity, alpha, false, backgroundTexId, w, h, state.dayFactor)
-                    updateAndDrawParticles(state, alpha, w, h)
+                    updateAndDrawParticles(state, alpha, w, h, dimensionsChanged)
                 }
                 WeatherType.CLOUDY -> {
                     drawFogLayer(state.intensity, alpha, true, backgroundTexId, w, h, state.dayFactor)
-                    updateAndDrawParticles(state, alpha, w, h)
+                    updateAndDrawParticles(state, alpha, w, h, dimensionsChanged)
                 }
                 WeatherType.CLEAR -> {
                     val sunAlpha = alpha * state.dayFactor
@@ -1067,7 +1124,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
                     if (nightAlpha > 0.005f) {
                         drawClearBackground(nightAlpha, backgroundTexId, w, h)
                     }
-                    updateAndDrawParticles(state, alpha, w, h)
+                    updateAndDrawParticles(state, alpha, w, h, dimensionsChanged)
                 }
                 else -> {}
             }
@@ -1225,7 +1282,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glDisableVertexAttribArray(showerAPos)
         }
 
-        private fun updateAndDrawParticles(state: WeatherState, alpha: Float, w: Int, h: Int) {
+        private fun updateAndDrawParticles(state: WeatherState, alpha: Float, w: Int, h: Int, dimensionsChanged: Boolean) {
             val isLineMode = state.type == WeatherType.RAIN || state.type == WeatherType.THUNDERSTORM
             val activeLimit = getActiveLimit(state)
 
@@ -1239,6 +1296,10 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 if (i >= activeLimit) {
                     p.active = false
                     continue
+                }
+
+                if (dimensionsChanged) {
+                    p.active = false
                 }
 
                 if (!p.active) p.reset(w, h, state)
