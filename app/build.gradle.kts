@@ -27,6 +27,44 @@ android {
             )
         }
     }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
+    // Assign higher version code offsets to 64-bit architectures so devices update cleanly
+    val abiCodes = mapOf(
+        "armeabi-v7a" to 1,
+        "x86" to 2,
+        "arm64-v8a" to 3,
+        "x86_64" to 4
+    )
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val apkOutput = this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            val abiFilter = apkOutput?.filters?.find {
+                it.filterType == com.android.build.OutputFile.ABI
+            }?.identifier
+
+            val appName = "ClockDesk"
+            val versionName = variant.versionName
+            val buildType = variant.buildType.name
+            val abiName = abiFilter ?: "universal"
+
+            val abiCode = abiCodes[abiFilter] ?: 0
+            if (abiCode != 0) {
+                apkOutput?.versionCodeOverride = (variant.versionCode * 10) + abiCode
+            }
+
+            apkOutput?.outputFileName = "${appName}-${buildType}-${abiName}-v${versionName}.apk"
+        }
+    }
     androidResources{
         generateLocaleConfig = true
     }
