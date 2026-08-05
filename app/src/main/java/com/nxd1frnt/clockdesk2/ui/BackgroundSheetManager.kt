@@ -20,7 +20,6 @@ import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
-import com.nxd1frnt.clockdesk2.ui.view.WeatherView
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
@@ -434,12 +433,12 @@ class BackgroundSheetManager(
         bgIntensitySeek.value = backgroundManager.getManualWeatherIntensity().toFloat()
 
         bgWeatherToggleGroup.check(when (backgroundManager.getManualWeatherType()) {
-            WeatherView.WeatherType.RAIN.ordinal -> R.id.btn_weather_rain
-            WeatherView.WeatherType.SNOW.ordinal -> R.id.btn_weather_snow
-            WeatherView.WeatherType.FOG.ordinal -> R.id.btn_weather_fog
-            WeatherView.WeatherType.THUNDERSTORM.ordinal -> R.id.btn_weather_thunder
-            WeatherView.WeatherType.CLOUDY.ordinal -> R.id.btn_weather_cloudy
-            WeatherView.WeatherType.CLEAR.ordinal -> R.id.btn_weather_clear
+            DynamicBackgroundView.WeatherType.RAIN.ordinal -> R.id.btn_weather_rain
+            DynamicBackgroundView.WeatherType.SNOW.ordinal -> R.id.btn_weather_snow
+            DynamicBackgroundView.WeatherType.FOG.ordinal -> R.id.btn_weather_fog
+            DynamicBackgroundView.WeatherType.THUNDERSTORM.ordinal -> R.id.btn_weather_thunder
+            DynamicBackgroundView.WeatherType.CLOUDY.ordinal -> R.id.btn_weather_cloudy
+            DynamicBackgroundView.WeatherType.CLEAR.ordinal -> R.id.btn_weather_clear
             else -> R.id.btn_weather_rain
         })
 
@@ -468,13 +467,13 @@ class BackgroundSheetManager(
         backgroundManager.setDimMinIntensity(bgDimRangeSeek.values[0].toInt())
         backgroundManager.setDimMaxIntensity(bgDimRangeSeek.values[1].toInt())
         backgroundManager.setManualWeatherType(when (bgWeatherToggleGroup.checkedButtonId) {
-            R.id.btn_weather_clear -> WeatherView.WeatherType.CLEAR.ordinal
-            R.id.btn_weather_cloudy -> WeatherView.WeatherType.CLOUDY.ordinal
-            R.id.btn_weather_rain -> WeatherView.WeatherType.RAIN.ordinal
-            R.id.btn_weather_snow -> WeatherView.WeatherType.SNOW.ordinal
-            R.id.btn_weather_fog -> WeatherView.WeatherType.FOG.ordinal
-            R.id.btn_weather_thunder -> WeatherView.WeatherType.THUNDERSTORM.ordinal
-            else -> WeatherView.WeatherType.RAIN.ordinal
+            R.id.btn_weather_clear -> DynamicBackgroundView.WeatherType.CLEAR.ordinal
+            R.id.btn_weather_cloudy -> DynamicBackgroundView.WeatherType.CLOUDY.ordinal
+            R.id.btn_weather_rain -> DynamicBackgroundView.WeatherType.RAIN.ordinal
+            R.id.btn_weather_snow -> DynamicBackgroundView.WeatherType.SNOW.ordinal
+            R.id.btn_weather_fog -> DynamicBackgroundView.WeatherType.FOG.ordinal
+            R.id.btn_weather_thunder -> DynamicBackgroundView.WeatherType.THUNDERSTORM.ordinal
+            else -> DynamicBackgroundView.WeatherType.RAIN.ordinal
         })
 
         onApplyCompleted(previewBackgroundUri)
@@ -515,12 +514,12 @@ class BackgroundSheetManager(
         val dayFactor = dayTimeGetter.getDayFactor()
         if (bgManualWeatherSwitch.isChecked) {
             val typeOrdinal = when (bgWeatherToggleGroup.checkedButtonId) {
-                R.id.btn_weather_clear -> WeatherView.WeatherType.CLEAR.ordinal
-                R.id.btn_weather_cloudy -> WeatherView.WeatherType.CLOUDY.ordinal
-                R.id.btn_weather_rain -> WeatherView.WeatherType.RAIN.ordinal
-                R.id.btn_weather_snow -> WeatherView.WeatherType.SNOW.ordinal
-                R.id.btn_weather_fog -> WeatherView.WeatherType.FOG.ordinal
-                R.id.btn_weather_thunder -> WeatherView.WeatherType.THUNDERSTORM.ordinal
+                R.id.btn_weather_clear -> DynamicBackgroundView.WeatherType.CLEAR.ordinal
+                R.id.btn_weather_cloudy -> DynamicBackgroundView.WeatherType.CLOUDY.ordinal
+                R.id.btn_weather_rain -> DynamicBackgroundView.WeatherType.RAIN.ordinal
+                R.id.btn_weather_snow -> DynamicBackgroundView.WeatherType.SNOW.ordinal
+                R.id.btn_weather_fog -> DynamicBackgroundView.WeatherType.FOG.ordinal
+                R.id.btn_weather_thunder -> DynamicBackgroundView.WeatherType.THUNDERSTORM.ordinal
                 else -> backgroundManager.getManualWeatherType()
             }
             val type = DynamicBackgroundView.WeatherType.values().getOrElse(typeOrdinal) { DynamicBackgroundView.WeatherType.CLEAR }
