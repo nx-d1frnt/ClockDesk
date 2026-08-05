@@ -117,14 +117,12 @@ class WidgetMover(
 
 
     private fun beginLayoutTransition() {
-        // TransitionManager available since API 19 (KitKat).
-        // On older devices, changes will happen instantly without animation, which is safe.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && parentView is ViewGroup) {
-            val transition = android.transition.AutoTransition()
+        if (parentView is ViewGroup) {
+            val transition = androidx.transition.AutoTransition()
             transition.duration = 300 // 300ms for smoothness
             // Soft bounce
             transition.interpolator = OvershootInterpolator(0.8f)
-            android.transition.TransitionManager.beginDelayedTransition(parentView, transition)
+            androidx.transition.TransitionManager.beginDelayedTransition(parentView, transition)
         }
     }
 

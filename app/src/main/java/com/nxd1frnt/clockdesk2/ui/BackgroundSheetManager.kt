@@ -2,8 +2,8 @@ package com.nxd1frnt.clockdesk2.ui.settings
 
 import android.net.Uri
 import android.os.Build
-import android.transition.AutoTransition
-import android.transition.TransitionManager
+import androidx.transition.AutoTransition
+import androidx.transition.TransitionManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator

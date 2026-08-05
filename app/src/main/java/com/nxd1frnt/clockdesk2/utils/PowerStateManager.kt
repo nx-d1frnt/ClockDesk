@@ -6,9 +6,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.BatteryManager
+import android.os.Build
 import android.os.PowerManager
+import androidx.annotation.RequiresApi
 import java.lang.ref.WeakReference
 
+@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 class PowerStateManager(private val context: Context) {
 
     private var isPowerSavingMode = false
@@ -71,6 +74,7 @@ class PowerStateManager(private val context: Context) {
         checkBatteryState(intent)
     }
 
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     private fun checkBatteryState(intent: Intent?) {
         val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||

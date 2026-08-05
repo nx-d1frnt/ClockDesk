@@ -25,7 +25,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
-import android.view.animation.PathInterpolator
+import androidx.core.view.animation.PathInterpolatorCompat
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -75,7 +75,7 @@ class SmartChipManager(
     private val pluginTimeoutCounts = mutableMapOf<String, Int>()
 
     private var isFirstLoad = true
-    private val springInterpolator = PathInterpolator(0.2f, 1.0f, 0.3f, 1.0f)
+    private val springInterpolator = PathInterpolatorCompat.create(0.2f, 1.0f, 0.3f, 1.0f)
 
 //    private val periodicUpdateRunnable = object : Runnable {
 //        override fun run() {

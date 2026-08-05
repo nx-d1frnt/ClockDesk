@@ -4,7 +4,10 @@ import android.content.Context
 import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.PathInterpolator
+import androidx.core.view.ViewCompat
+import androidx.core.view.animation.PathInterpolatorCompat
+import android.widget.ProgressBar
+import androidx.annotation.RequiresApi
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 
@@ -16,11 +19,11 @@ class EntranceAnimationManager(
 ) {
     private var hasAnimationPlayed = false
 
-    private val expressiveInterpolator = PathInterpolator(0.2f, 0.0f, 0.0f, 1.0f)
+    private val expressiveInterpolator = PathInterpolatorCompat.create(0.2f, 0.0f, 0.0f, 1.0f)
 
     private val targetTranslationsY = mutableMapOf<View, Float>()
 
-    private var loaderView: com.google.android.material.loadingindicator.LoadingIndicator? = null
+    private var loaderView: ProgressBar? = null
 
     fun prepareViews() {
         if (hasAnimationPlayed) return
@@ -34,7 +37,7 @@ class EntranceAnimationManager(
             view.visibility = View.GONE
         }
 
-        loaderView = com.google.android.material.loadingindicator.LoadingIndicator(rootView.context).apply {
+        loaderView = ProgressBar(rootView.context).apply {
             layoutParams = ConstraintLayout.LayoutParams(
                 dpToPx(context, 48f).toInt(),
                 dpToPx(context, 48f).toInt()
@@ -45,7 +48,7 @@ class EntranceAnimationManager(
                 endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
             }
             alpha = 0f
-            id = View.generateViewId()
+            id = ViewCompat.generateViewId()
         }
 
         rootView.addView(loaderView)
@@ -75,7 +78,7 @@ class EntranceAnimationManager(
             ?.scaleX(0.5f)
             ?.scaleY(0.5f)
             ?.setDuration(400L)
-            ?.setInterpolator(PathInterpolator(0.4f, 0.0f, 0.2f, 1.0f))
+            ?.setInterpolator(PathInterpolatorCompat.create(0.4f, 0.0f, 0.2f, 1.0f))
             ?.withEndAction {
                 rootView.removeView(loaderView)
                 loaderView = null

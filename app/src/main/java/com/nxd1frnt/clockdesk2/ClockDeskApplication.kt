@@ -3,6 +3,7 @@ package com.nxd1frnt.clockdesk2
 import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
+import androidx.multidex.MultiDex
 import android.content.Intent
 import android.os.Build
 import android.os.Process
@@ -12,6 +13,11 @@ import java.io.PrintWriter
 import java.io.StringWriter
 
 class ClockDeskApplication : Application() {
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        MultiDex.install(this)
+    }
 
     override fun onCreate() {
         super.onCreate()

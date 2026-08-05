@@ -17,6 +17,8 @@ glideTransformations = "4.3.0"
 preferenceKtx = "1.2.1"
 cardview = "1.0.0"
 uiGraphics = "1.10.0"
+startup = "1.1.1"
+transition = "1.4.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -24,16 +26,18 @@ androidx-palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.7.1" }
-material = { group = "com.google.android.material", name = "material", version = "1.14.0" }
-androidx-activity = { group = "androidx.activity", name = "activity", version = "1.13.0" }
-androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version = "2.2.1" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.6.1" }
+material = { group = "com.google.android.material", name = "material", version = "1.9.0" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-transition = { group = "androidx.transition", name = "transition", version.ref = "transition" }
 volley = { module = "com.android.volley:volley", version.ref = "volley" }
 glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
 glideTransformations = { group = "jp.wasabeef", name = "glide-transformations", version.ref = "glideTransformations" }
 androidx-preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "preferenceKtx" }
 androidx-cardview = { group = "androidx.cardview", name = "cardview", version.ref = "cardview" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version = "1.9.0" }
+androidx-startup = { group = "androidx.startup", name = "startup-runtime", version.ref = "startup" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

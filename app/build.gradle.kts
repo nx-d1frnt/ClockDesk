@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nxd1frnt.clockdesk2"
-        minSdk = 23
+        minSdk = 14
         targetSdk = 35
         versionCode = 200010
         versionName = "2.0.0-rc1"
@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.transition)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.cardview)
     testImplementation(libs.junit)
@@ -94,7 +95,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.volley)
     implementation(libs.androidx.palette.ktx)
-    implementation("com.vanniktech:android-image-cropper:4.3.3")
+    implementation(libs.androidx.startup)
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
     kapt("com.github.bumptech.glide:compiler:4.15.1")
