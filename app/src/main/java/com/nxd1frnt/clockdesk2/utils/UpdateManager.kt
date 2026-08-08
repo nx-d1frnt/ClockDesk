@@ -13,6 +13,7 @@ object UpdateManager {
     private const val GITHUB_OWNER = "nx-d1frnt"
     private const val GITHUB_REPO = "clockdesk"
     private const val API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+    private const val RELEASE_PAGE_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
     private const val PREFS_NAME = "update_prefs"
     private const val KEY_LAST_CHECK = "last_check_time"
 
@@ -51,18 +52,10 @@ object UpdateManager {
                     val currentVersion = pInfo.versionName?.removePrefix("v") ?: "0"
                     Logger.d("UpdateManager"){"Current version: $currentVersion, Server version: $serverVersion"}
                     if (isNewer(serverVersion, currentVersion)) {
-                        val assets = response.getJSONArray("assets")
-                        for (i in 0 until assets.length()) {
-                            val asset = assets.getJSONObject(i)
-                            val url = asset.getString("browser_download_url")
-                            if (url.endsWith(".apk")) {
-                                downloadUrl = url
-                                latestVersion = tagName
-                                isUpdateAvailable = true
-                                onUpdateStateChanged?.invoke()
-                                break
-                            }
-                        }
+                        downloadUrl = response.optString("html_url", RELEASE_PAGE_URL)
+                        latestVersion = tagName
+                        isUpdateAvailable = true
+                        onUpdateStateChanged?.invoke()
                     }
                     prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
                     onUpdateStateChanged?.invoke()
@@ -131,7 +124,11 @@ object UpdateManager {
 }
 
     fun downloadAndInstall(context: Context) {
-        val url = downloadUrl ?: return
+        openReleasePage(context)
+    }
+
+    fun openReleasePage(context: Context) {
+        val url = downloadUrl ?: RELEASE_PAGE_URL
 
         try {
         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
