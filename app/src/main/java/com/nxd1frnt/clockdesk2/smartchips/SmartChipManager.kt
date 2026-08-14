@@ -58,8 +58,17 @@ class SmartChipManager(
     private val sharedPreferences: SharedPreferences,
     private val fontManager: FontManager
 ) : DefaultLifecycleObserver {
+    /**
+     * Internal representation of a smart chip instance.
+     *
+     * @property id Unique identifier for this specific chip instance (e.g. "download_task_1").
+     * @property channelId The Notification Channel / Category ID (e.g. "downloads_channel") used to group
+     *                     and control user preferences (enable/disable and layout ordering).
+     * @property view Inflated UI View for displaying the chip.
+     */
     private data class ChipInfo(
         val id: String,
+        val channelId: String,
         val view: View,
        //val priority: Int,
         var isVisible: Boolean = false,
@@ -121,8 +130,8 @@ class SmartChipManager(
         val timeoutRunnable = Runnable {
             Logger.w("SmartChipManager") { "Plugin $packageName response timed out. Hiding chip." }
             timeoutRunnables.remove(packageName)
-            val plugin = externalPlugins.find { it.packageName == packageName } ?: return@Runnable
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@Runnable
+            val matchingChannels = externalPlugins.filter { it.packageName == packageName }.map { it.preferenceKey }
+            if (matchingChannels.isEmpty()) return@Runnable
 
             val count = (pluginTimeoutCounts[packageName] ?: 0) + 1
             pluginTimeoutCounts[packageName] = count
@@ -132,9 +141,15 @@ class SmartChipManager(
                 Logger.w("SmartChipManager") { "Plugin $packageName timed out 3 times consecutively. Stopped timer." }
             }
 
-            if (chipInfo.isVisible) {
-                chipInfo.isVisible = false
-                chipInfo.clickActivityClassName = null
+            var contentChanged = false
+            allChips.filter { it.channelId in matchingChannels }.forEach { chipInfo ->
+                if (chipInfo.isVisible) {
+                    chipInfo.isVisible = false
+                    chipInfo.clickActivityClassName = null
+                    contentChanged = true
+                }
+            }
+            if (contentChanged) {
                 sortAndRedrawChips(contentChanged = true)
             }
         }
@@ -172,49 +187,121 @@ class SmartChipManager(
         }
     }
 
+    /**
+     * Receiver handling data updates from external smart chip plugins.
+     * Supports both single-chip broadcast payloads and multi-chip channel payloads ([ChipPluginContract.KEY_CHIPS_ARRAY]).
+     */
     private val dataUpdateReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
             if (intent?.action != ChipPluginContract.ACTION_UPDATE_DATA) return
             val packageName = intent.getStringExtra(ChipPluginContract.KEY_PLUGIN_PACKAGE) ?: return
 
-            val plugin = externalPlugins.find { it.packageName == packageName } ?: return
-
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return
+            val matchingPlugins = externalPlugins.filter { it.packageName == packageName }
+            if (matchingPlugins.isEmpty()) return
 
             clearPluginTimeout(packageName)
 
-            val isVisible = intent.getBooleanExtra(ChipPluginContract.KEY_CHIP_VISIBLE, true)
             val updateIntervalSec = intent.getIntExtra("update_interval_seconds", -1)
-            val text = intent.getStringExtra(ChipPluginContract.KEY_CHIP_TEXT)
-            val iconName = intent.getStringExtra(ChipPluginContract.KEY_CHIP_ICON_NAME)
-            val clickActivity = intent.getStringExtra(ChipPluginContract.KEY_CHIP_CLICK_ACTIVITY)
-
-
             var contentChanged = false
 
-            if (!isVisible) {
-                if (chipInfo.isVisible) contentChanged = true
-                chipInfo.isVisible = false
-                chipInfo.clickActivityClassName = null
-            } else if (text != null && iconName != null) {
-                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
-                val oldText = textView.text.toString()
+            /**
+             * Processes an update for a single chip instance under a specified Notification Channel.
+             *
+             * @param chipId Unique identifier for this chip instance.
+             * @param channelId Category/Channel ID controlling user preference toggles & layout order.
+             * @param isVisible Desired visibility state requested by the plugin.
+             * @param text Display text.
+             * @param iconName Drawable resource name in plugin package.
+             * @param clickActivity Optional Activity class to launch on chip click.
+             */
+            fun processSingleChipUpdate(
+                chipId: String,
+                channelId: String,
+                isVisible: Boolean,
+                text: String?,
+                iconName: String?,
+                clickActivity: String?
+            ) {
+                // Enforce Channel-level user preference toggle
+                val isChannelEnabled = sharedPreferences.getBoolean(channelId, true)
+                val effectiveVisible = isVisible && isChannelEnabled
 
-                val success = updateExternalChipView(chipInfo.view, packageName, text, iconName)
-                
-                if (chipInfo.isVisible != success) contentChanged = true
-                if (success && oldText != text) contentChanged = true 
-                chipInfo.isVisible = success
-                if (success) {
-                    chipInfo.currentText = text
-                    chipInfo.clickActivityClassName = clickActivity?.takeIf { it.isNotBlank() }
+                var chipInfo = allChips.find { it.id == chipId }
+                // Dynamically instantiate chip View if a new chipId arrives under an enabled channel
+                if (chipInfo == null && effectiveVisible && text != null && iconName != null) {
+                    val view = LayoutInflater.from(context)
+                        .inflate(R.layout.smart_chip_layout, chipContainer, false)
+                        .apply {
+                            visibility = View.GONE
+                            isClickable = true
+                            isFocusable = true
+                            tag = chipId
+                        }
+                    setupExternalChipClickListener(view, chipId, packageName)
+                    chipInfo = ChipInfo(chipId, channelId, view)
+                    allChips.add(chipInfo)
+                }
+
+                val targetChipInfo = chipInfo ?: return
+
+                if (!effectiveVisible) {
+                    if (targetChipInfo.isVisible) contentChanged = true
+                    targetChipInfo.isVisible = false
+                    targetChipInfo.clickActivityClassName = null
+                } else if (text != null && iconName != null) {
+                    val textView = targetChipInfo.view.findViewById<TextView>(R.id.chip_text)
+                    val oldText = textView.text.toString()
+
+                    val success = updateExternalChipView(targetChipInfo.view, packageName, text, iconName)
+
+                    if (targetChipInfo.isVisible != success) contentChanged = true
+                    if (success && oldText != text) contentChanged = true
+                    targetChipInfo.isVisible = success
+                    if (success) {
+                        targetChipInfo.currentText = text
+                        targetChipInfo.clickActivityClassName = clickActivity?.takeIf { it.isNotBlank() }
+                    }
+                } else {
+                    if (targetChipInfo.isVisible) contentChanged = true
+                    targetChipInfo.isVisible = false
+                    targetChipInfo.clickActivityClassName = null
+                }
+            }
+
+            // Multi-chip broadcast payload (KEY_CHIPS_ARRAY contains ArrayList<Bundle>)
+            if (intent.hasExtra(ChipPluginContract.KEY_CHIPS_ARRAY)) {
+                val chipsList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableArrayListExtra(ChipPluginContract.KEY_CHIPS_ARRAY, Bundle::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableArrayListExtra<Bundle>(ChipPluginContract.KEY_CHIPS_ARRAY)
+                }
+
+                chipsList?.forEach { chipBundle ->
+                    val defaultChannel = matchingPlugins.firstOrNull()?.preferenceKey ?: packageName
+                    val channelId = chipBundle.getString(ChipPluginContract.KEY_CHANNEL_ID) ?: defaultChannel
+                    val chipId = chipBundle.getString(ChipPluginContract.KEY_CHIP_ID) ?: channelId
+                    val isVisible = chipBundle.getBoolean(ChipPluginContract.KEY_CHIP_VISIBLE, true)
+                    val text = chipBundle.getString(ChipPluginContract.KEY_CHIP_TEXT)
+                    val iconName = chipBundle.getString(ChipPluginContract.KEY_CHIP_ICON_NAME)
+                    val clickActivity = chipBundle.getString(ChipPluginContract.KEY_CHIP_CLICK_ACTIVITY)
+                    processSingleChipUpdate(chipId, channelId, isVisible, text, iconName, clickActivity)
                 }
             } else {
-                if (chipInfo.isVisible) contentChanged = true
-                chipInfo.isVisible = false
-                chipInfo.clickActivityClassName = null
+                // Legacy single-chip broadcast payload
+                val defaultChannel = matchingPlugins.firstOrNull()?.preferenceKey ?: packageName
+                val channelId = intent.getStringExtra(ChipPluginContract.KEY_CHANNEL_ID) ?: defaultChannel
+                val chipId = intent.getStringExtra(ChipPluginContract.KEY_CHIP_ID) ?: channelId
+
+                val isVisible = intent.getBooleanExtra(ChipPluginContract.KEY_CHIP_VISIBLE, true)
+                val text = intent.getStringExtra(ChipPluginContract.KEY_CHIP_TEXT)
+                val iconName = intent.getStringExtra(ChipPluginContract.KEY_CHIP_ICON_NAME)
+                val clickActivity = intent.getStringExtra(ChipPluginContract.KEY_CHIP_CLICK_ACTIVITY)
+
+                processSingleChipUpdate(chipId, channelId, isVisible, text, iconName, clickActivity)
             }
-            managePluginTimer(packageName, updateIntervalSec, isVisible)
+
+            managePluginTimer(packageName, updateIntervalSec, true)
             sortAndRedrawChips(contentChanged)
         }
     }
@@ -225,7 +312,7 @@ class SmartChipManager(
                 visibility = View.GONE
                 tag = plugin.preferenceKey
             }
-            allChips.add(ChipInfo(plugin.preferenceKey, view))
+            allChips.add(ChipInfo(plugin.preferenceKey, plugin.preferenceKey, view))
             plugin.setOnStateChangeListener {
                 updateAllChips()
             }
@@ -305,14 +392,21 @@ class SmartChipManager(
         }
 
         // Запрашиваем данные у внешних плагинов
-        externalPlugins.forEach { plugin ->
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
-            if (isEnabled) {
+        val distinctReceivers = externalPlugins.distinctBy { Pair(it.packageName, it.receiverClassName) }
+        distinctReceivers.forEach { plugin ->
+            val receiverChips = externalPlugins.filter {
+                it.packageName == plugin.packageName && it.receiverClassName == plugin.receiverClassName
+            }
+            val anyEnabled = receiverChips.any { sharedPreferences.getBoolean(it.preferenceKey, false) }
+
+            if (anyEnabled) {
                 if (!isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
-                    val chipInfo = allChips.find { it.id == plugin.preferenceKey }
-                    if (chipInfo?.isVisible == true) {
-                        chipInfo.isVisible = false
-                        isContentChanged = true
+                    receiverChips.forEach { chipDef ->
+                        val chipInfo = allChips.find { it.id == chipDef.preferenceKey }
+                        if (chipInfo?.isVisible == true) {
+                            chipInfo.isVisible = false
+                            isContentChanged = true
+                        }
                     }
                     return@forEach
                 }
@@ -326,10 +420,12 @@ class SmartChipManager(
                 context.sendBroadcast(requestIntent)
                 startTimeoutCheck(plugin.packageName)
             } else {
-                val chipInfo = allChips.find { it.id == plugin.preferenceKey }
-                if (chipInfo?.isVisible == true) {
-                    chipInfo.isVisible = false
-                    isContentChanged = true
+                receiverChips.forEach { chipDef ->
+                    val chipInfo = allChips.find { it.id == chipDef.preferenceKey }
+                    if (chipInfo?.isVisible == true) {
+                        chipInfo.isVisible = false
+                        isContentChanged = true
+                    }
                 }
             }
         }
@@ -376,6 +472,45 @@ class SmartChipManager(
         }
     }
 
+    private fun setupExternalChipClickListener(view: View, chipId: String, packageName: String) {
+        view.setOnClickListener {
+            if (isEditMode) {
+                onEditClickListener?.invoke(chipContainer)
+                return@setOnClickListener
+            }
+            val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
+            chipInfo.clickActivityClassName?.let { cls ->
+                try {
+                    val pluginPkg = externalPlugins.find { it.preferenceKey == chipInfo.id }?.packageName ?: packageName
+                    val fullClassName = if (cls.startsWith(".")) pluginPkg + cls else cls
+                    val intent = Intent().setClassName(pluginPkg, fullClassName)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    var options: Bundle? = null
+
+                    if (context is Activity) {
+                        val transitionName = "shared_chip_container"
+                        view.transitionName = transitionName
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            options = ActivityOptions.makeSceneTransitionAnimation(
+                                context,
+                                Pair.create(view, transitionName)
+                            ).toBundle()
+                        } else {
+                            options = ActivityOptions.makeScaleUpAnimation(
+                                view, 0, 0, view.width, view.height
+                            ).toBundle()
+                        }
+                    } else {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                    context.startActivity(intent, options)
+                } catch (e: Exception) { }
+            }
+        }
+    }
+
     private fun discoverExternalPlugins() {
         Thread {
             val pm = context.packageManager
@@ -396,18 +531,15 @@ class SmartChipManager(
                     try {
                         val pluginRes = pm.getResourcesForApplication(packageName)
                         val parser = pluginRes.getXml(resId)
-                        var prefKey: String? = null
-                        var dispName: String? = null
 
                         while (parser.next() != XmlPullParser.END_DOCUMENT) {
                             if (parser.eventType == XmlPullParser.START_TAG && parser.name == "smart-chip-plugin") {
-                                prefKey = parser.getAttributeValue(null, "preferenceKey")
-                                dispName = parser.getAttributeValue(null, "displayName")
+                                val prefKey = parser.getAttributeValue(null, "preferenceKey")
+                                val dispName = parser.getAttributeValue(null, "displayName")
+                                if (prefKey != null && dispName != null) {
+                                    foundData.add(DiscoveredPlugin(packageName, className, prefKey, dispName))
+                                }
                             }
-                        }
-
-                        if (prefKey != null && dispName != null) {
-                            foundData.add(DiscoveredPlugin(packageName, className, prefKey, dispName))
                         }
                     } catch (e: Exception) {
                         Logger.w("SmartChipManager"){"Failed to parse plugin metadata from $packageName"}
@@ -427,46 +559,10 @@ class SmartChipManager(
                             isFocusable = true
                             tag = data.key
                         }
-                    Logger.d("SmartChipManager"){"Plugin ${data.pkg} loaded"}
+                    Logger.d("SmartChipManager"){"Plugin ${data.pkg} loaded chip: ${data.key}"}
 
-                    view.setOnClickListener {
-                        if (isEditMode) {
-                            onEditClickListener?.invoke(chipContainer)
-                            return@setOnClickListener
-                        }
-                        val chipInfo = allChips.find { it.view == view } ?: return@setOnClickListener
-                        chipInfo.clickActivityClassName?.let { cls ->
-                            try {
-                                val pluginPkg = externalPlugins.find { it.preferenceKey == chipInfo.id }?.packageName ?: return@let
-                                val fullClassName = if (cls.startsWith(".")) pluginPkg + cls else cls
-                                val intent = Intent().setClassName(pluginPkg, fullClassName)
-                                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                                var options: Bundle? = null
-
-                                if (context is Activity) {
-                                    val transitionName = "shared_chip_container"
-                                    view.transitionName = transitionName
-
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                        options = ActivityOptions.makeSceneTransitionAnimation(
-                                            context,
-                                            Pair.create(view, transitionName)
-                                        ).toBundle()
-                                    }
-                                    else {
-                                        options = ActivityOptions.makeScaleUpAnimation(
-                                            view, 0, 0, view.width, view.height
-                                        ).toBundle()
-                                    }
-                                } else {
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-
-                                context.startActivity(intent, options)
-                            } catch (e: Exception) { }
-                        }
-                    }
-                    allChips.add(ChipInfo(data.key, view))
+                    setupExternalChipClickListener(view, data.key, data.pkg)
+                    allChips.add(ChipInfo(data.key, data.key, view))
                 }
                 this.externalPlugins = foundPlugins
                 requestInitialState()
@@ -582,18 +678,19 @@ class SmartChipManager(
         }
 
         externalPlugins.forEach { plugin ->
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
             val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, false)
 
-            if (!isEnabled && chipInfo.isVisible) {
-                chipInfo.isVisible = false
-                isContentChanged = true
-            }
-
-            if (isEnabled && !isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
-                if (chipInfo.isVisible) {
+            allChips.filter { it.channelId == plugin.preferenceKey }.forEach { chipInfo ->
+                if (!isEnabled && chipInfo.isVisible) {
                     chipInfo.isVisible = false
                     isContentChanged = true
+                }
+
+                if (isEnabled && !isReceiverAvailable(plugin.packageName, plugin.receiverClassName)) {
+                    if (chipInfo.isVisible) {
+                        chipInfo.isVisible = false
+                        isContentChanged = true
+                    }
                 }
             }
         }
@@ -626,9 +723,12 @@ class SmartChipManager(
 
         // Фильтруем видимые чипы и сортируем их по индексу в orderList
         val visibleChips = allChips
-            .filter { it.isVisible }
+            .filter { chipInfo ->
+                val isChannelEnabled = sharedPreferences.getBoolean(chipInfo.channelId, true)
+                chipInfo.isVisible && isChannelEnabled
+            }
             .sortedBy { chipInfo ->
-                val index = orderList.indexOf(chipInfo.id)
+                val index = orderList.indexOf(chipInfo.channelId)
                 if (index != -1) index else Int.MAX_VALUE
             }
 

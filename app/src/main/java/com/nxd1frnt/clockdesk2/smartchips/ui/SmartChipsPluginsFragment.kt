@@ -251,6 +251,12 @@ class SmartChipsPluginsFragment : Fragment() {
                     while (parser.next() != XmlPullParser.END_DOCUMENT) {
                         if (parser.eventType == XmlPullParser.START_TAG && parser.name == "smart-chip-plugin") {
 
+                            var prefKey: String? = null
+                            var dispName: String? = null
+                            var description = getString(R.string.external_plugin_desc)
+                            var iconDrawable: android.graphics.drawable.Drawable? = null
+                            var settingsActivity: String? = null
+
                             for (i in 0 until parser.attributeCount) {
                                 val attrName = parser.getAttributeName(i)
                                 val resId = parser.getAttributeResourceValue(i, 0)
@@ -291,20 +297,19 @@ class SmartChipsPluginsFragment : Fragment() {
                                     }
                                 }
                             }
-                            break
-                        }
-                    }
 
-                    if (prefKey != null && dispName != null) {
-                        map[prefKey] = ChipDef(
-                            id = prefKey,
-                            packageName = packageName,
-                            name = dispName,
-                            desc = description,
-                            isInternal = false,
-                            iconDrawable = iconDrawable ?: resolveInfo.loadIcon(pm), // If icon is not found, use default icon
-                            settingsActivityClassName = settingsActivity // Pass a settings activity class name
-                        )
+                            if (prefKey != null && dispName != null) {
+                                map[prefKey] = ChipDef(
+                                    id = prefKey,
+                                    packageName = packageName,
+                                    name = dispName,
+                                    desc = description,
+                                    isInternal = false,
+                                    iconDrawable = iconDrawable ?: resolveInfo.loadIcon(pm), // If icon is not found, use default icon
+                                    settingsActivityClassName = settingsActivity // Pass a settings activity class name
+                                )
+                            }
+                        }
                     }
                 } catch (e: Exception) {
                     Logger.e("SmartChipsFragment") { "Failed to parse plugin info from $packageName" }

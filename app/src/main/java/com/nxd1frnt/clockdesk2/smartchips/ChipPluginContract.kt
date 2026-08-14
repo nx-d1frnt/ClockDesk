@@ -30,6 +30,28 @@ object ChipPluginContract {
     const val KEY_PLUGIN_PACKAGE = "plugin_package_name"
     const val KEY_CHIP_VISIBLE = "chip_visible"
 
+    /**
+     * Unique identifier for a specific chip instance (e.g. "download_task_42").
+     * When posting multiple chips, each chip payload must specify a distinct [KEY_CHIP_ID].
+     * If omitted, defaults to the channel/preferenceKey ID for single-chip plugins.
+     */
+    const val KEY_CHIP_ID = "chip_id"
+
+    /**
+     * Notification Channel / Category ID (e.g. "downloads_channel").
+     * Multiple chip instances can be posted under a single [KEY_CHANNEL_ID].
+     * The user enables, disables, or reorders the channel in Settings, controlling all chips under that channel.
+     * If omitted, defaults to the plugin's preferenceKey.
+     */
+    const val KEY_CHANNEL_ID = "channel_id"
+
+    /**
+     * Extra key containing an ArrayList<Bundle> for multi-chip broadcast responses.
+     * Each Bundle in the list represents a single chip payload containing [KEY_CHIP_ID], [KEY_CHANNEL_ID],
+     * [KEY_CHIP_TEXT], [KEY_CHIP_ICON_NAME], [KEY_CHIP_VISIBLE], and optional [KEY_CHIP_CLICK_ACTIVITY].
+     */
+    const val KEY_CHIPS_ARRAY = "chips_array"
+
     const val KEY_CHIP_TEXT = "chip_text"
 
     const val KEY_CHIP_ICON_NAME = "chip_icon_name" // e.g., "ic_plugin_icon"
