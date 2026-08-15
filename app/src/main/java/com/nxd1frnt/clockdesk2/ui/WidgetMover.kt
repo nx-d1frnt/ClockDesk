@@ -153,6 +153,12 @@ class WidgetMover(
     fun setFreeMovementEnabled(view: View, enabled: Boolean) {
         val idName = getResourceName(view.id)
         prefs.edit().putBoolean("${idName}_individual_free_mode", enabled).apply()
+        if (enabled) {
+            val hasUserSavedPos = prefs.getBoolean("${idName}_has_user_saved_pos", false)
+            if (!hasUserSavedPos) {
+                savePositionRaw(view, view.x, view.y)
+            }
+        }
         restoreOrderAndPositions()
     }
 
@@ -202,24 +208,35 @@ class WidgetMover(
     // RESTORE LOGIC
     // ============================================================================
 
+    private val restoreRunnable = Runnable {
+        views.forEach { view ->
+            val idName = getResourceName(view.id)
+            val internalGravity = prefs.getInt("${idName}_internal_gravity", GRAVITY_CENTER)
+            applyInternalGravity(view, internalGravity)
+        }
+        applyHybridLayout()
+    }
+
+    private var pendingPostApplyRunnable: Runnable? = null
+
     fun restoreOrderAndPositions() {
         if (parentView !is ConstraintLayout) return
 
-        // loadInitialState()
-        // checkAndInitializeDefaults()
-
-        parentView.post {
-            views.forEach { view ->
-                val idName = getResourceName(view.id)
-                val internalGravity = prefs.getInt("${idName}_internal_gravity", GRAVITY_CENTER)
-                applyInternalGravity(view, internalGravity)
-            }
-
-            applyHybridLayout()
-        }
+        parentView.removeCallbacks(restoreRunnable)
+        parentView.post(restoreRunnable)
     }
 
     private fun applyHybridLayout() {
+        pendingPostApplyRunnable?.let { parentView.removeCallbacks(it) }
+
+        views.forEach { view ->
+            view.animate().cancel()
+        }
+
+        val oldVisualPositions = views.associateWith { view ->
+            Pair(view.x, view.y)
+        }
+
         val set = ConstraintSet()
         set.clone(parentView as ConstraintLayout)
 
@@ -315,12 +332,6 @@ class WidgetMover(
                     }
                 }
             }
-
-            stackedViews.forEach {
-                it.visibility = View.VISIBLE
-                it.translationX = 0f
-                it.translationY = 0f
-            }
         }
 
         freeViews.forEach { view ->
@@ -334,14 +345,55 @@ class WidgetMover(
 
         set.applyTo(parentView)
 
-        parentView.post {
+        val postRunnable = Runnable {
+            stackedViews.forEach { view ->
+                if (isEditMode) {
+                    view.visibility = View.VISIBLE
+                }
+                if (view.visibility == View.VISIBLE && view.alpha < 1f) {
+                    view.alpha = 1f
+                }
+                if (isFirstRestore) {
+                    view.translationX = 0f
+                    view.translationY = 0f
+                } else {
+                    val (oldX, oldY) = oldVisualPositions[view] ?: Pair(view.x, view.y)
+                    val startTransX = oldX - view.left
+                    val startTransY = oldY - view.top
+
+                    if (abs(startTransX) > 1f || abs(startTransY) > 1f) {
+                        view.animate().cancel()
+                        view.translationX = startTransX
+                        view.translationY = startTransY
+                        view.animate()
+                            .translationX(0f)
+                            .translationY(0f)
+                            .setDuration(300)
+                            .setInterpolator(OvershootInterpolator(0.8f))
+                            .start()
+                    } else {
+                        view.translationX = 0f
+                        view.translationY = 0f
+                    }
+                }
+            }
+
             freeViews.forEach { view ->
+                if (isEditMode) {
+                    view.visibility = View.VISIBLE
+                }
+                if (view.visibility == View.VISIBLE && view.alpha < 1f) {
+                    view.alpha = 1f
+                }
                 val idName = getResourceName(view.id)
                 val savedX = prefs.getFloat("${idName}_x", 0f)
                 val savedY = prefs.getFloat("${idName}_y", 0f)
                 sanitizeAndApplyPosition(view, savedX, savedY)
             }
         }
+
+        pendingPostApplyRunnable = postRunnable
+        parentView.post(postRunnable)
 
         if (isFirstRestore) {
             isFirstRestore = false
@@ -927,6 +979,7 @@ class WidgetMover(
         prefs.edit()
             .putFloat("${idName}_x", x)
             .putFloat("${idName}_y", y)
+            .putBoolean("${idName}_has_user_saved_pos", true)
             .apply()
         Logger.d("WidgetMover"){"Saved position for $idName: ($x, $y)"}
     }

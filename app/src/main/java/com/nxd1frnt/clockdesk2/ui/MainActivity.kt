@@ -1170,18 +1170,24 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     val baseX = if (isFree) prefs.getFloat("lastfm_layout_x", lastfmLayout.translationX) else 0f
 
                     if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
+                        val needsFadeIn = lastfmLayout.visibility != View.VISIBLE
                         lastfmLayout.visibility = View.VISIBLE
-                        lastfmLayout.alpha = 0f
-                        lastfmLayout.translationX = baseX + 10f
                         nowPlayingTextView.text = trackInfoText
                         nowPlayingTextView.isSelected = true
 
-                        lastfmLayout.animate()
-                            .alpha(1f)
-                            .translationX(baseX)
-                            .setDuration(500)
-                            .setListener(null)
-                            .start()
+                        if (needsFadeIn) {
+                            lastfmLayout.alpha = 0f
+                            lastfmLayout.translationX = baseX + 10f
+                            lastfmLayout.animate()
+                                .alpha(1f)
+                                .translationX(baseX)
+                                .setDuration(500)
+                                .setListener(null)
+                                .start()
+                        } else {
+                            lastfmLayout.alpha = 1f
+                            lastfmLayout.translationX = baseX
+                        }
                     } else {
                         lastfmLayout.animate()
                             .alpha(0f)
