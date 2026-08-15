@@ -33,6 +33,7 @@ import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 import android.graphics.Bitmap
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import com.nxd1frnt.clockdesk2.ui.view.PerformanceOverlayView
+import com.nxd1frnt.clockdesk2.ui.WidgetMover
 import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
@@ -72,6 +73,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var gradientManager: GradientManager
     private lateinit var smartChipManager: SmartChipManager
     private lateinit var burnInProtectionManager: BurnInProtectionManager
+    private lateinit var widgetMover: WidgetMover
     private lateinit var locationManager: LocationManager
     private lateinit var dayTimeGetter: SunriseAPI
     private lateinit var powerStateManager: PowerStateManager
@@ -414,6 +416,12 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         burnInProtectionManager = BurnInProtectionManager(
             listOf(timeText, dateText, lastfmLayout, smartChipContainer)
         )
+
+        val mainLayout = findViewById<ConstraintLayout>(R.id.main_layout)
+        if (mainLayout != null) {
+            widgetMover = WidgetMover(themedContext, listOf(lastfmLayout, dateText, timeText), mainLayout)
+            widgetMover.burnInProtectionManager = burnInProtectionManager
+        }
 
         val isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
         val graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)

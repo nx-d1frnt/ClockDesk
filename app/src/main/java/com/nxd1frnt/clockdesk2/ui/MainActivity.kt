@@ -547,6 +547,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         burnInProtectionManager = BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
 
         widgetMover = WidgetMover(this, listOf(lastfmLayout, dateText, timeText), mainLayout)
+        widgetMover.burnInProtectionManager = burnInProtectionManager
 
         widgetMover.onInitialLayoutComplete = {
             isWidgetLayoutComplete = true

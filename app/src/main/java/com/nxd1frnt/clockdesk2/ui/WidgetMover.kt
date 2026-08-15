@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.BurnInProtectionManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -50,6 +51,7 @@ class WidgetMover(
 
     private var isFirstRestore = true
     var onInitialLayoutComplete: (() -> Unit)? = null
+    var burnInProtectionManager: BurnInProtectionManager? = null
 
     // Touch Handling
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -360,20 +362,22 @@ class WidgetMover(
                     val (oldX, oldY) = oldVisualPositions[view] ?: Pair(view.x, view.y)
                     val startTransX = oldX - view.left
                     val startTransY = oldY - view.top
+                    val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+                    val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
 
-                    if (abs(startTransX) > 1f || abs(startTransY) > 1f) {
+                    if (abs(startTransX - shiftX) > 1f || abs(startTransY - shiftY) > 1f) {
                         view.animate().cancel()
                         view.translationX = startTransX
                         view.translationY = startTransY
                         view.animate()
-                            .translationX(0f)
-                            .translationY(0f)
+                            .translationX(shiftX)
+                            .translationY(shiftY)
                             .setDuration(300)
                             .setInterpolator(OvershootInterpolator(0.8f))
                             .start()
                     } else {
-                        view.translationX = 0f
-                        view.translationY = 0f
+                        view.translationX = shiftX
+                        view.translationY = shiftY
                     }
                 }
             }
@@ -448,8 +452,11 @@ class WidgetMover(
             finalY = 0f
         }
 
-        view.translationX = finalX
-        view.translationY = finalY
+        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
+
+        view.translationX = finalX + shiftX
+        view.translationY = finalY + shiftY
 
         Logger.d("WidgetMover"){"Sanitized position for ${getResourceName(view.id)}: ($desiredX, $desiredY) -> ($finalX, $finalY) [free=$isFree]"}
     }
@@ -904,6 +911,7 @@ class WidgetMover(
         Logger.d("WidgetMover"){"Edit mode: $enabled"}
 
         if (enabled) {
+            burnInProtectionManager?.resetPositions()
             restoreOrderAndPositions()
             views.forEach { view ->
                 view.animate().cancel()
@@ -971,7 +979,9 @@ class WidgetMover(
     // ============================================================================
 
     private fun savePosition(view: View) {
-        savePositionRaw(view, view.translationX, view.translationY)
+        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
+        savePositionRaw(view, view.translationX - shiftX, view.translationY - shiftY)
     }
 
     private fun savePositionRaw(view: View, x: Float, y: Float) {
