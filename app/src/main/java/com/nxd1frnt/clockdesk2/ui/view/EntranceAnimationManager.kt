@@ -31,7 +31,7 @@ class EntranceAnimationManager(
 
         widgets.forEach { view ->
             view.alpha = 0f
-            view.visibility = View.GONE
+            view.visibility = View.INVISIBLE
         }
 
         loaderView = com.google.android.material.loadingindicator.LoadingIndicator(rootView.context).apply {

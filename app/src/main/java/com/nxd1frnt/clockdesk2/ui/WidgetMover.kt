@@ -90,13 +90,19 @@ class WidgetMover(
         loadInitialState()
 
         parentView.post {
-            if (parentView.width > 0 && parentView.height > 0) {
+            ensureLayoutReady {
                 Logger.d("WidgetMover"){"Auto-initializing widget positions..."}
                 checkAndInitializeDefaults()
                 restoreOrderAndPositions()
-            } else {
-                Logger.d("WidgetMover"){"Layout not ready, skipping auto-init"}
             }
+        }
+    }
+
+    private fun ensureLayoutReady(action: () -> Unit) {
+        if (parentView.width > 0 && parentView.height > 0) {
+            action()
+        } else {
+            parentView.post { ensureLayoutReady(action) }
         }
     }
 
@@ -312,27 +318,14 @@ class WidgetMover(
 
             stackedViews.forEach {
                 it.visibility = View.VISIBLE
-                if (isFirstRestore) {
-                    it.translationX = 0f
-                    it.translationY = 0f
-                } else {
-                    it.animate().translationX(0f).translationY(0f).setDuration(300).start()
-                }
+                it.translationX = 0f
+                it.translationY = 0f
             }
         }
 
         freeViews.forEach { view ->
-            val idName = getResourceName(view.id)
             set.connect(view.id, ConstraintSet.TOP, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.TOP)
             set.connect(view.id, ConstraintSet.START, ConstraintLayout.LayoutParams.PARENT_ID, ConstraintSet.START)
-            val savedX = prefs.getFloat("${idName}_x", 0f)
-            val savedY = prefs.getFloat("${idName}_y", 0f)
-
-            if (isFirstRestore) {
-                sanitizeAndApplyPosition(view, savedX, savedY)
-            } else {
-                parentView.post { sanitizeAndApplyPosition(view, savedX, savedY) }
-            }
         }
 
         if (!isFirstRestore) {
@@ -340,6 +333,15 @@ class WidgetMover(
         }
 
         set.applyTo(parentView)
+
+        parentView.post {
+            freeViews.forEach { view ->
+                val idName = getResourceName(view.id)
+                val savedX = prefs.getFloat("${idName}_x", 0f)
+                val savedY = prefs.getFloat("${idName}_y", 0f)
+                sanitizeAndApplyPosition(view, savedX, savedY)
+            }
+        }
 
         if (isFirstRestore) {
             isFirstRestore = false
@@ -390,14 +392,8 @@ class WidgetMover(
             finalX = desiredX.coerceIn(0f, maxTransX)
             finalY = desiredY.coerceIn(0f, maxTransY)
         } else {
-            // Для стекових віджетів: використовуємо відносні координати
-            val minTransX = -view.left.toFloat()
-            val maxTransX = (parentView.width - view.width).toFloat() - view.left
-            val minTransY = -view.top.toFloat()
-            val maxTransY = (parentView.height - view.height).toFloat() - view.top
-
-            finalX = desiredX.coerceIn(minTransX, maxTransX)
-            finalY = desiredY.coerceIn(minTransY, maxTransY)
+            finalX = 0f
+            finalY = 0f
         }
 
         view.translationX = finalX
