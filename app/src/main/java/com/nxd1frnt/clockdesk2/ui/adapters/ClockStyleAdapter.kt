@@ -1,6 +1,5 @@
 package com.nxd1frnt.clockdesk2.ui.adapters
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
@@ -51,7 +50,11 @@ class ClockStyleAdapter(
            //holder.selectionDivider.visibility = View.GONE
         }
 
-        val textColor = if (isSelected) Color.parseColor("#3E1C1C") else Color.parseColor("#E6C2C2")
+        val textColor = if (isSelected) {
+            getThemeColor(context, com.google.android.material.R.attr.colorOnPrimary, R.color.clock_style_card_selected_text)
+        } else {
+            getThemeColor(context, com.google.android.material.R.attr.colorOnSurface, R.color.clock_style_card_unselected_text)
+        }
 
         if (style.isAnalog) {
             holder.twoLineContainer.visibility = View.GONE
@@ -117,8 +120,19 @@ class ClockStyleAdapter(
         if (index != -1 && index != selectedPosition) {
             val prev = selectedPosition
             selectedPosition = index
-            notifyItemChanged(prev)
+            if (prev != -1) notifyItemChanged(prev)
             notifyItemChanged(selectedPosition)
         }
+    }
+
+    private fun getThemeColor(context: android.content.Context, attrResId: Int, fallbackColorRes: Int): Int {
+        val typedValue = android.util.TypedValue()
+        if (context.theme.resolveAttribute(attrResId, typedValue, true)) {
+            if (typedValue.type >= android.util.TypedValue.TYPE_FIRST_COLOR_INT &&
+                typedValue.type <= android.util.TypedValue.TYPE_LAST_COLOR_INT) {
+                return typedValue.data
+            }
+        }
+        return androidx.core.content.ContextCompat.getColor(context, fallbackColorRes)
     }
 }

@@ -5,21 +5,29 @@
     android:layout_height="wrap_content"
     android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:padding="4dp">
+    android:paddingStart="4dp"
+    android:paddingEnd="12dp"
+    android:paddingVertical="4dp">
 
-    <TextView
-        android:id="@+id/font_preview"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:layout_margin="2dp"
-        android:background="@drawable/item_font_card"
-        android:ellipsize="end"
-        android:gravity="center"
-        android:maxLines="1"
-        android:padding="4dp"
-        android:textColor="@android:color/black"
-        android:textSize="24sp"
-        tools:text="Aa" />
+    <FrameLayout
+        android:id="@+id/font_card_container"
+        android:layout_width="76dp"
+        android:layout_height="76dp"
+        android:background="@drawable/bg_clock_style_unselected"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/font_preview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="22sp"
+            tools:text="Aa" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/font_name"
@@ -30,7 +38,7 @@
         android:gravity="center"
         android:maxLines="1"
         android:maxWidth="80dp"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="12sp"
         android:visibility="gone"
         tools:text="Roboto"

@@ -56,6 +56,7 @@ class CustomizationSheetManager(
 
     private var focusedView: View? = null
     private var isEditingBackground = false
+    private var isUpdatingUIFromSettings = false
     private val animationDuration = 350L
 
     private var calculatedTargetTx = 0f
@@ -442,11 +443,16 @@ class CustomizationSheetManager(
         sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (isDate) View.VISIBLE else View.GONE
         bsDateCustomInputLayout.visibility = if (isDate && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
 
-        sideSheetView.findViewById<View>(R.id.block_positioning_title)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        sideSheetView.findViewById<View>(R.id.card_alignment)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        sideSheetView.findViewById<View>(R.id.card_vertical_alignment)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        sideSheetView.findViewById<View>(R.id.card_gravity)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
-        sideSheetView.findViewById<View>(R.id.card_widget_order)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        val positioningVisibility = if (showLayoutControls) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.block_positioning_title)?.visibility = positioningVisibility
+        listOf(R.id.card_alignment, R.id.card_vertical_alignment, R.id.card_gravity, R.id.card_widget_order).forEach { cardId ->
+            sideSheetView.findViewById<View>(cardId)?.let { card ->
+                card.visibility = positioningVisibility
+                if (positioningVisibility == View.GONE) {
+                    card.alpha = 1.0f
+                }
+            }
+        }
 
         sideSheetView.findViewById<View>(R.id.block_additional_title)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
         sideSheetView.findViewById<View>(R.id.card_free_mode)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
@@ -590,28 +596,33 @@ class CustomizationSheetManager(
             prefs.edit().putBoolean("show_media_icon", isChecked).apply()
         }
 
-        val savedGravity = widgetMover.getInternalGravity(view)
-        bsTextGravityGroup.check(when (savedGravity) {
-            widgetMover.GRAVITY_START -> R.id.gravity_left_button
-            widgetMover.GRAVITY_END -> R.id.gravity_right_button
-            else -> R.id.gravity_center_button
-        })
+        isUpdatingUIFromSettings = true
+        try {
+            val savedGravity = widgetMover.getInternalGravity(view)
+            bsTextGravityGroup.check(when (savedGravity) {
+                widgetMover.GRAVITY_START -> R.id.gravity_left_button
+                widgetMover.GRAVITY_END -> R.id.gravity_right_button
+                else -> R.id.gravity_center_button
+            })
 
-        val savedValign = widgetMover.getAlignmentOnlyV(view)
-        bsVerticalAlignGroup.check(when (savedValign) {
-            widgetMover.ALIGN_V_TOP -> R.id.align_top_button
-            widgetMover.ALIGN_V_CENTER -> R.id.align_center_vertical_button
-            widgetMover.ALIGN_V_BOTTOM -> R.id.align_bottom_button
-            else -> View.NO_ID
-        })
+            val savedValign = widgetMover.getAlignmentOnlyV(view)
+            bsVerticalAlignGroup.check(when (savedValign) {
+                widgetMover.ALIGN_V_TOP -> R.id.align_top_button
+                widgetMover.ALIGN_V_CENTER -> R.id.align_center_vertical_button
+                widgetMover.ALIGN_V_BOTTOM -> R.id.align_bottom_button
+                else -> View.NO_ID
+            })
 
-        val savedHalign = widgetMover.getAlignmentOnlyH(view)
-        bsHorizontalAlignGroup.check(when (savedHalign) {
-            widgetMover.ALIGN_H_LEFT -> R.id.left_button
-            widgetMover.ALIGN_H_CENTER -> R.id.center_button
-            widgetMover.ALIGN_H_RIGHT -> R.id.right_button
-            else -> View.NO_ID
-        })
+            val savedHalign = widgetMover.getAlignmentOnlyH(view)
+            bsHorizontalAlignGroup.check(when (savedHalign) {
+                widgetMover.ALIGN_H_LEFT -> R.id.left_button
+                widgetMover.ALIGN_H_CENTER -> R.id.center_button
+                widgetMover.ALIGN_H_RIGHT -> R.id.right_button
+                else -> View.NO_ID
+            })
+        } finally {
+            isUpdatingUIFromSettings = false
+        }
     }
 
     private fun setupSizeAndTransparency() {
@@ -651,7 +662,7 @@ class CustomizationSheetManager(
         bsIgnoreCollisionSwitch.setOnCheckedChangeListener { _, isChecked -> widgetMover.setCollisionCheckEnabled(isChecked) }
 
         bsHorizontalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            if (isUpdatingUIFromSettings || !isChecked || focusedView == null) return@addOnButtonCheckedListener
             widgetMover.alignViewHorizontal(focusedView!!, when (checkedId) {
                 R.id.left_button -> 0
                 R.id.right_button -> 2
@@ -661,7 +672,7 @@ class CustomizationSheetManager(
         }
 
         bsVerticalAlignGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            if (isUpdatingUIFromSettings || !isChecked || focusedView == null) return@addOnButtonCheckedListener
             widgetMover.alignViewVertical(focusedView!!, when (checkedId) {
                 R.id.align_top_button -> 0
                 R.id.align_bottom_button -> 2
@@ -670,7 +681,7 @@ class CustomizationSheetManager(
         }
 
         bsTextGravityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked || focusedView == null) return@addOnButtonCheckedListener
+            if (isUpdatingUIFromSettings || !isChecked || focusedView == null) return@addOnButtonCheckedListener
             widgetMover.setTextGravity(focusedView!!, when (checkedId) {
                 R.id.gravity_left_button -> widgetMover.GRAVITY_START
                 R.id.gravity_right_button -> widgetMover.GRAVITY_END
@@ -901,7 +912,11 @@ class CustomizationSheetManager(
 
     private fun setCardEnabled(cardView: View?, enabled: Boolean) {
         cardView?.let { card ->
-            card.alpha = if (enabled) 1.0f else 0.4f
+            if (card.visibility == View.VISIBLE) {
+                card.alpha = if (enabled) 1.0f else 0.4f
+            } else {
+                card.alpha = 1.0f
+            }
             setViewsEnabledRecursive(card, enabled)
         }
     }
