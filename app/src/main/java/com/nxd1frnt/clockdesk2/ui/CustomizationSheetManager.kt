@@ -562,6 +562,14 @@ class CustomizationSheetManager(
                         .setBottomRightCornerSize(pxBottom)
                         .build()
                 }
+
+                val cardAlignment = sideSheetView.findViewById<View>(R.id.card_alignment)
+                val cardVerticalAlignment = sideSheetView.findViewById<View>(R.id.card_vertical_alignment)
+                val cardWidgetOrder = sideSheetView.findViewById<View>(R.id.card_widget_order)
+
+                setCardEnabled(cardAlignment, !isEnabled)
+                setCardEnabled(cardVerticalAlignment, !isEnabled)
+                setCardEnabled(cardWidgetOrder, !isEnabled)
             }
         }
 
@@ -889,5 +897,21 @@ class CustomizationSheetManager(
                     .start()
             }
             .start()
+    }
+
+    private fun setCardEnabled(cardView: View?, enabled: Boolean) {
+        cardView?.let { card ->
+            card.alpha = if (enabled) 1.0f else 0.4f
+            setViewsEnabledRecursive(card, enabled)
+        }
+    }
+
+    private fun setViewsEnabledRecursive(view: View, enabled: Boolean) {
+        view.isEnabled = enabled
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                setViewsEnabledRecursive(view.getChildAt(i), enabled)
+            }
+        }
     }
 }
