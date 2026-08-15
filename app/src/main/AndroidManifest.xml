@@ -50,19 +50,19 @@
             android:name=".ui.settings.SettingsActivity"
             android:label="@string/settings_title"
             android:theme="@style/Theme.ClockDesk.Settings"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:exported="false" />
         <activity
             android:name=".smartchips.ui.WeatherAlertSettingsActivity"
             android:label="@string/weather_alert_settings_title"
             android:theme="@style/Theme.ClockDesk.Settings"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:exported="false" />
         <activity
             android:name=".smartchips.ui.BatteryAlertSettingsActivity"
             android:label="@string/battery_alert_settings_title"
             android:theme="@style/Theme.ClockDesk.Settings"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:exported="false" />
         <service
             android:name=".music.ClockDeskMediaService"
