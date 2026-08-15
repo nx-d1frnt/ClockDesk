@@ -112,6 +112,7 @@ class FontManager(
     private var dynamicColor: Int? = null
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
+    private var clockStyle: ClockStyle = ClockStyle.STANDARD
 
     private val baseChipContainerSizeDp = 165f
     private val baseChipFontSizeSp = 14f
@@ -370,6 +371,8 @@ class FontManager(
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
         timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
+        clockStyle = ClockStyle.fromId(prefs.getString("clockStyle", ClockStyle.STANDARD.id))
+        applyClockStyleToTimeView()
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val defaults = getDefaultSettingsFor(viewId)
@@ -447,6 +450,7 @@ class FontManager(
         editor.putBoolean("use_dynamic_color", isDynamicColorEnabled)
         editor.putString("timeFormatPattern", timeFormatPattern)
         editor.putString("dateFormatPattern", dateFormatPattern)
+        editor.putString("clockStyle", clockStyle.id)
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val settings = settingsMap[viewId] ?: return@forEach
@@ -529,6 +533,7 @@ class FontManager(
         val settings = settingsMap[viewId] ?: return
         block(settings)
         applyToView(viewId)
+        saveSettings()
     }
 
     private fun applyAll(colorOnly: Boolean = false) {
@@ -551,7 +556,10 @@ class FontManager(
         }
 
         when (viewId) {
-            R.id.time_text -> applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
+            R.id.time_text -> {
+                applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
+                applyClockStyleToTimeView()
+            }
             R.id.date_text -> applyStyleToTextView(dateText, settings, typeface, finalColor, colorOnly)
             R.id.lastfm_layout -> {
                 applyStyleToTextView(lastfmText, settings, typeface, finalColor, colorOnly)
@@ -726,9 +734,13 @@ class FontManager(
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 textView.fontVariationSettings = null
-                if (settings.variationAxes.isNotEmpty()) {
-                    val variationSettings = settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
-                    textView.fontVariationSettings = variationSettings
+                val variationSettings = if (settings.variationAxes.isNotEmpty()) {
+                    settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
+                } else null
+
+                textView.fontVariationSettings = variationSettings
+                if (textView is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
+                    textView.customFontVariationSettings = variationSettings
                 }
             }
         }
@@ -742,6 +754,35 @@ class FontManager(
 
     fun getDateFormatPattern() = dateFormatPattern
     fun setDateFormatPattern(pattern: String) { dateFormatPattern = pattern; saveSettings() }
+
+    fun getClockStyle(): ClockStyle = clockStyle
+    fun setClockStyle(style: ClockStyle) {
+        clockStyle = style
+        applyToView(R.id.time_text)
+        saveSettings()
+    }
+
+    fun applyClockStyleToTimeView() {
+        if (timeText is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
+            timeText.isAnalogMode = clockStyle.isAnalog
+            timeText.showBackdrop = clockStyle.hasBackdrop
+        }
+
+        when (clockStyle) {
+            ClockStyle.TWO_LINE -> {
+                timeText.setLineSpacing(0f, 0.80f)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    timeText.letterSpacing = -0.02f
+                }
+            }
+            else -> {
+                timeText.setLineSpacing(0f, 1.0f)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    timeText.letterSpacing = 0.0f
+                }
+            }
+        }
+    }
 
     fun setNightShiftEnabledForView(view: View, enabled: Boolean) {
         val settings = getOrCreateSettings(view)

@@ -36,6 +36,15 @@
     <string name="date_format_medium">EEE, MMM dd</string>
     <string name="date_format_long">EEEE, MMMM dd, yyyy</string>
 
+    <!-- Clock Widget Styles -->
+    <string name="clock_style">Clock Widget Style</string>
+    <string name="clock_style_standard">Standard</string>
+    <string name="clock_style_two_line">Stacked 2-Line</string>
+    <string name="clock_style_two_line_bold">Chunky 2-Line</string>
+    <string name="clock_style_two_line_outline">Outline 2-Line</string>
+    <string name="clock_style_analog">Analog Dial</string>
+    <string name="clock_style_analog_minimal">Analog Clean</string>
+
     <!-- New strings for background selection -->
     <string name="choose_background">Choose background</string>
     <string name="clear_background">Clear background</string>

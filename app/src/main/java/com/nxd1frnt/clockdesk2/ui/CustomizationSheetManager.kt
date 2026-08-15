@@ -7,8 +7,13 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.Button
+import androidx.transition.AutoTransition
+import androidx.transition.TransitionManager
 import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.TextView
@@ -24,9 +29,11 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import com.nxd1frnt.clockdesk2.ui.adapters.ClockStyleAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.utils.ClockManager
+import com.nxd1frnt.clockdesk2.utils.ClockStyle
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
@@ -67,6 +74,9 @@ class CustomizationSheetManager(
 
     private val bsFontRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.font_recycler_view) }
     private val bsColorRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.color_recycler_view) }
+    private val bsClockStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.clock_style_recycler_view) }
+    private val bsClockStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_clock_style) }
+    private var clockStyleAdapter: ClockStyleAdapter? = null
 
     private val bsApplyButton by lazy { sideSheetView.findViewById<Button>(R.id.apply_button) }
     private val bsCancelButton by lazy { sideSheetView.findViewById<Button>(R.id.cancel_button) }
@@ -269,6 +279,7 @@ class CustomizationSheetManager(
         setupSwitchesAndToggles()
         setupButtons()
         setupFontAdapter()
+        setupClockStyleAdapter()
     }
 
     fun showForView(viewToCustomize: View) {
@@ -420,6 +431,7 @@ class CustomizationSheetManager(
             }
         )
 
+        bsClockStyleCard.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatLabel.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
@@ -488,6 +500,7 @@ class CustomizationSheetManager(
 
         // Загрузка формата времени
         if (view.id == R.id.time_text) {
+            clockStyleAdapter?.setSelectedStyle(fontManager.getClockStyle())
             val timePattern = fontManager.getTimeFormatPattern()
             bsTimeFormatGroup.setOnCheckedChangeListener(null)
             when (timePattern) {
@@ -818,5 +831,63 @@ class CustomizationSheetManager(
                 }
             }
         )
+    }
+
+    private fun setupClockStyleAdapter() {
+        clockStyleAdapter = ClockStyleAdapter(
+            styles = ClockStyle.values().toList(),
+            onStyleSelected = { selectedStyle ->
+                animateClockStyleChange(selectedStyle)
+            }
+        )
+        bsClockStyleRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsClockStyleRecyclerView.adapter = clockStyleAdapter
+        preventSheetDragForRecyclerView(bsClockStyleRecyclerView)
+    }
+
+    private fun animateClockStyleChange(newStyle: ClockStyle) {
+        if (fontManager.getClockStyle() == newStyle) return
+
+        val view = focusedView ?: run {
+            fontManager.setClockStyle(newStyle)
+            clockManager.updateTimeText()
+            return
+        }
+
+        view.animate().cancel()
+        val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
+
+        view.animate()
+            .scaleX(0.82f)
+            .scaleY(0.82f)
+            .alpha(0.2f)
+            .setDuration(130)
+            .setInterpolator(AccelerateInterpolator())
+            .withEndAction {
+                if (view.parent is ViewGroup) {
+                    try {
+                        TransitionManager.beginDelayedTransition(
+                            view.parent as ViewGroup,
+                            AutoTransition().apply {
+                                duration = 220
+                                interpolator = DecelerateInterpolator(1.5f)
+                            }
+                        )
+                    } catch (e: Exception) {}
+                }
+
+                fontManager.setClockStyle(newStyle)
+                clockManager.updateTimeText()
+                applyRealTimeFocusUpdate(true)
+
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .alpha(targetAlpha)
+                    .setDuration(240)
+                    .setInterpolator(OvershootInterpolator(1.2f))
+                    .start()
+            }
+            .start()
     }
 }

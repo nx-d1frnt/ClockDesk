@@ -66,8 +66,25 @@ class ClockManager(
 
     fun updateTimeText() {
         val currentTime = getCurrentTime()
+        val clockStyle = fontManager.getClockStyle()
         val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
-        timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
+
+        if (timeText is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
+            timeText.isAnalogMode = clockStyle.isAnalog
+            timeText.setTime(currentTime)
+        }
+
+        if (clockStyle.isAnalog) {
+            timeText.text = " "
+        } else if (clockStyle.isTwoLine) {
+            val hourPattern = if (timePattern.contains("h")) "hh" else "HH"
+            val minPattern = "mm"
+            val hourStr = SimpleDateFormat(hourPattern, Locale.getDefault()).format(currentTime)
+            val minStr = SimpleDateFormat(minPattern, Locale.getDefault()).format(currentTime)
+            timeText.text = "$hourStr\n$minStr"
+        } else {
+            timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
+        }
     }
 
     fun updateDateText() {

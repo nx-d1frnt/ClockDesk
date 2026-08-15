@@ -35,6 +35,14 @@
     <string name="date_format_short">МММ дд</string>
     <string name="date_format_medium">ЕЕЕ, МММ дд</string>
     <string name="date_format_long">ЕЕЕЕ, ММММ дд, рррр</string>
+    <!-- Clock Widget Styles -->
+    <string name="clock_style">Стиль віджета годинника</string>
+    <string name="clock_style_standard">Стандартний</string>
+    <string name="clock_style_two_line">Дворядковий</string>
+    <string name="clock_style_two_line_bold">Жирний дворядковий</string>
+    <string name="clock_style_two_line_outline">Контурний дворядковий</string>
+    <string name="clock_style_analog">Аналоговий циферблат</string>
+    <string name="clock_style_analog_minimal">Мінімалістичний аналоговий</string>
 
     <!-- New strings for background selection -->
     <string name="choose_background">Обрати фон</string>

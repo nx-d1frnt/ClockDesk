@@ -181,7 +181,7 @@
                 android:textSize="24sp" />
         </LinearLayout>
 
-        <TextView
+        <com.nxd1frnt.clockdesk2.ui.view.ClockTextView
             android:id="@+id/time_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

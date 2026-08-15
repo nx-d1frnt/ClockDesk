@@ -1165,23 +1165,27 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     lastfmLayout.animate().cancel()
                     updateSourceIcon(track)
 
+                    val isFree = widgetMover.isFreeMovementEnabled(lastfmLayout)
+                    val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                    val baseX = if (isFree) prefs.getFloat("lastfm_layout_x", lastfmLayout.translationX) else 0f
+
                     if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
                         lastfmLayout.visibility = View.VISIBLE
                         lastfmLayout.alpha = 0f
-                        lastfmLayout.translationX = 10f
+                        lastfmLayout.translationX = baseX + 10f
                         nowPlayingTextView.text = trackInfoText
                         nowPlayingTextView.isSelected = true
 
                         lastfmLayout.animate()
                             .alpha(1f)
-                            .translationX(0f)
+                            .translationX(baseX)
                             .setDuration(500)
                             .setListener(null)
                             .start()
                     } else {
                         lastfmLayout.animate()
                             .alpha(0f)
-                            .translationX(-10f)
+                            .translationX(baseX - 10f)
                             .setDuration(500)
                             .setListener(object : AnimatorListenerAdapter() {
                                 override fun onAnimationEnd(animation: Animator) {
@@ -1190,7 +1194,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                         nowPlayingTextView.isSelected = true
                                         lastfmLayout.animate()
                                             .alpha(1f)
-                                            .translationX(0f)
+                                            .translationX(baseX)
                                             .setDuration(500)
                                             .setListener(null)
                                             .start()
@@ -1221,15 +1225,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         lastfmLayout.animate().cancel()
 
+        val isFree = widgetMover.isFreeMovementEnabled(lastfmLayout)
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val baseX = if (isFree) prefs.getFloat("lastfm_layout_x", lastfmLayout.translationX) else 0f
+
         if (lastfmLayout.visibility == View.VISIBLE) {
             lastfmLayout.animate()
                 .alpha(0f)
-                .translationX(10f)
+                .translationX(baseX + 10f)
                 .setDuration(500)
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         if (!isEditMode) {
                             lastfmLayout.visibility = View.GONE
+                            lastfmLayout.translationX = baseX
                         }
                     }
                 })
