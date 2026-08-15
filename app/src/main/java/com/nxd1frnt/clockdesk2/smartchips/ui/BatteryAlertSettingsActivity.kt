@@ -16,7 +16,7 @@ class BatteryAlertSettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        setContentView(R.layout.activity_settings)
+        setContentView(R.layout.activity_sub_settings)
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         val collapsingToolbar = findViewById<CollapsingToolbarLayout>(R.id.collapsingToolbar)
