@@ -81,7 +81,9 @@ class ClockManager(
             val minPattern = "mm"
             val hourStr = SimpleDateFormat(hourPattern, Locale.getDefault()).format(currentTime)
             val minStr = SimpleDateFormat(minPattern, Locale.getDefault()).format(currentTime)
-            timeText.text = "$hourStr\n$minStr"
+            val safeHour = hourStr.toCharArray().joinToString("\u2060")
+            val safeMin = minStr.toCharArray().joinToString("\u2060")
+            timeText.text = "$safeHour\n$safeMin"
         } else {
             timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
         }

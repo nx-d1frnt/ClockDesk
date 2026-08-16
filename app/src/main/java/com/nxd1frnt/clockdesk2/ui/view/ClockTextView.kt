@@ -24,6 +24,15 @@ class ClockTextView @JvmOverloads constructor(
             invalidate()
         }
 
+    var isTwoLineMode: Boolean = false
+        set(value) {
+            field = value
+            if (!isAnalogMode) {
+                requestLayout()
+                invalidate()
+            }
+        }
+
     var showBackdrop: Boolean = true
         set(value) {
             field = value
@@ -73,11 +82,60 @@ class ClockTextView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         if (isAnalogMode) {
-            val desiredSize = (textSize * 2.2f).toInt().coerceAtLeast(200)
-            val width = resolveSize(desiredSize, widthMeasureSpec)
-            val height = resolveSize(desiredSize, heightMeasureSpec)
-            val size = minOf(width, height)
-            setMeasuredDimension(size, size)
+            val widthSize = MeasureSpec.getSize(widthMeasureSpec)
+            val heightSize = MeasureSpec.getSize(heightMeasureSpec)
+            val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+            val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+
+            val desiredSize = (textSize * 2.2f).toInt().coerceAtLeast(60)
+
+            val size = when {
+                widthMode == MeasureSpec.EXACTLY && heightMode == MeasureSpec.EXACTLY -> {
+                    minOf(widthSize, heightSize)
+                }
+                widthMode == MeasureSpec.EXACTLY -> {
+                    minOf(desiredSize, widthSize)
+                }
+                heightMode == MeasureSpec.EXACTLY -> {
+                    minOf(desiredSize, heightSize)
+                }
+                widthMode == MeasureSpec.AT_MOST && heightMode == MeasureSpec.AT_MOST -> {
+                    minOf(desiredSize, minOf(widthSize, heightSize))
+                }
+                widthMode == MeasureSpec.AT_MOST -> {
+                    minOf(desiredSize, widthSize)
+                }
+                heightMode == MeasureSpec.AT_MOST -> {
+                    minOf(desiredSize, heightSize)
+                }
+                else -> desiredSize
+            }
+
+            val finalSize = size.coerceAtLeast(40)
+            setMeasuredDimension(finalSize, finalSize)
+        } else if (isTwoLineMode) {
+            val rawText = text?.toString() ?: ""
+            val parts = rawText.split('\n')
+            val line1 = if (parts.isNotEmpty()) parts[0].replace("\u2060", "") else ""
+            val line2 = if (parts.size > 1) parts[1].replace("\u2060", "") else ""
+
+            val line1Width = paint.measureText(line1)
+            val line2Width = paint.measureText(line2)
+            val maxTextWidth = maxOf(line1Width, line2Width)
+            val neededWidth = (maxTextWidth + compoundPaddingLeft + compoundPaddingRight + 16).toInt()
+
+            val widthSize = MeasureSpec.getSize(widthMeasureSpec)
+            val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+
+            val targetWidth = if (widthMode == MeasureSpec.EXACTLY) {
+                maxOf(widthSize, neededWidth)
+            } else {
+                neededWidth
+            }
+
+            val overrideWidthSpec = MeasureSpec.makeMeasureSpec(targetWidth, MeasureSpec.EXACTLY)
+            super.onMeasure(overrideWidthSpec, heightMeasureSpec)
+            setMeasuredDimension(maxOf(measuredWidth, targetWidth), measuredHeight)
         } else {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         }

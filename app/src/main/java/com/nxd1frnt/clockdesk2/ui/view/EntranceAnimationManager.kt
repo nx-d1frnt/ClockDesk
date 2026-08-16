@@ -97,7 +97,12 @@ class EntranceAnimationManager(
                 .setDuration(animationDuration)
                 .setStartDelay(delay)
                 .setInterpolator(expressiveInterpolator)
-                .withEndAction { view.animate().setListener(null) }
+                .withEndAction {
+                    view.scaleX = 1f
+                    view.scaleY = 1f
+                    view.alpha = 1f
+                    view.animate().setListener(null)
+                }
                 .start()
 
             delay += staggerDelay
