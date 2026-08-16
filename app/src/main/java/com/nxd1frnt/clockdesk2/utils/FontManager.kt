@@ -723,6 +723,13 @@ class FontManager(
             textView.textSize = settings.size
             textView.alpha = settings.alpha
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    textView.breakStrategy = android.graphics.text.LineBreaker.BREAK_STRATEGY_SIMPLE
+                    textView.hyphenationFrequency = android.text.Layout.HYPHENATION_FREQUENCY_NONE
+                } catch (e: Exception) {}
+            }
+
             if (settings.maxWidthPercent >= 100) {
                 textView.maxWidth = Int.MAX_VALUE
             } else {
@@ -768,18 +775,22 @@ class FontManager(
             timeText.showBackdrop = clockStyle.hasBackdrop
         }
 
-        when (clockStyle) {
-            ClockStyle.TWO_LINE -> {
-                timeText.setLineSpacing(0f, 0.80f)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    timeText.letterSpacing = -0.02f
-                }
+        if (clockStyle.isTwoLine) {
+            timeText.setHorizontallyScrolling(true)
+            timeText.maxLines = 2
+            timeText.setLineSpacing(0f, 0.80f)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                timeText.letterSpacing = -0.02f
             }
-            else -> {
-                timeText.setLineSpacing(0f, 1.0f)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    timeText.letterSpacing = 0.0f
-                }
+        } else if (clockStyle.isAnalog) {
+            timeText.setHorizontallyScrolling(false)
+            timeText.maxLines = 1
+        } else {
+            timeText.setHorizontallyScrolling(true)
+            timeText.maxLines = 1
+            timeText.setLineSpacing(0f, 1.0f)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                timeText.letterSpacing = 0.0f
             }
         }
     }

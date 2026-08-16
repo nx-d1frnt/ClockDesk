@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Clock Style / Font Carousel Card Colors (Monet Dynamic System Colors for API 31+) -->
+    <color name="clock_style_card_selected_bg">@android:color/system_accent1_300</color>
+    <color name="clock_style_card_unselected_bg">@android:color/system_neutral1_800</color>
+    <color name="clock_style_card_selected_text">@android:color/system_neutral1_900</color>
+    <color name="clock_style_card_unselected_text">@android:color/system_neutral1_100</color>
+</resources>

@@ -351,6 +351,9 @@ class WidgetMover(
             stackedViews.forEach { view ->
                 if (isEditMode) {
                     view.visibility = View.VISIBLE
+                } else {
+                    view.scaleX = 1f
+                    view.scaleY = 1f
                 }
                 if (view.visibility == View.VISIBLE && view.alpha < 1f) {
                     view.alpha = 1f
@@ -385,6 +388,9 @@ class WidgetMover(
             freeViews.forEach { view ->
                 if (isEditMode) {
                     view.visibility = View.VISIBLE
+                } else {
+                    view.scaleX = 1f
+                    view.scaleY = 1f
                 }
                 if (view.visibility == View.VISIBLE && view.alpha < 1f) {
                     view.alpha = 1f
