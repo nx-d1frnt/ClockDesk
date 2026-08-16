@@ -112,7 +112,7 @@ class GradientManager(
         lastRealTimeDay = currentDay
     }
 
-    fun updateGradient() {
+    fun updateGradient(duration: Long = 0L) {
         if (isCustomBackgroundActive()) return
         val currentTime = when {
             isDemoMode && currentSimulatedTime != null -> currentSimulatedTime!!
@@ -134,7 +134,6 @@ class GradientManager(
             }
         }
         val (topColor, bottomColor) = getSkyGradientColors(currentTime)
-        val duration = if (isDemoMode) 0L else 2000L
         dynamicBackgroundView.transitionToGradient(topColor, bottomColor, duration)
         Log.d("GradientUpdate", "Colors: top=$topColor, bottom=$bottomColor at time=$currentTime")
     }
