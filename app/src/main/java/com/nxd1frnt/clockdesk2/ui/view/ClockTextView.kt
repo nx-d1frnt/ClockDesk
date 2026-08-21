@@ -174,7 +174,7 @@ class ClockTextView @JvmOverloads constructor(
                 if (!varSettings.isNullOrEmpty()) {
                     numberPaint.fontVariationSettings = varSettings
                 }
-            } catch (e: Exception) {}
+            } catch (e: Throwable) {}
         }
 
         val fontMetrics = numberPaint.fontMetrics

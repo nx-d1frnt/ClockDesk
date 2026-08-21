@@ -740,14 +740,18 @@ class FontManager(
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                textView.fontVariationSettings = null
-                val variationSettings = if (settings.variationAxes.isNotEmpty()) {
-                    settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
-                } else null
+                try {
+                    textView.fontVariationSettings = null
+                    val variationSettings = if (settings.variationAxes.isNotEmpty()) {
+                        settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
+                    } else null
 
-                textView.fontVariationSettings = variationSettings
-                if (textView is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
-                    textView.customFontVariationSettings = variationSettings
+                    textView.fontVariationSettings = variationSettings
+                    if (textView is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
+                        textView.customFontVariationSettings = variationSettings
+                    }
+                } catch (e: Throwable) {
+                    // Ignore UnsupportedOperationException or other framework/device-specific exceptions
                 }
             }
         }
