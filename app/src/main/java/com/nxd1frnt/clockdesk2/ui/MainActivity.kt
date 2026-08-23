@@ -1164,11 +1164,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     lastTrackInfo = trackInfoText
 
                     lastfmLayout.animate().cancel()
+                    lastfmLayout.animate().setListener(null)
                     updateSourceIcon(track)
 
-                    val isFree = widgetMover.isFreeMovementEnabled(lastfmLayout)
-                    val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-                    val baseX = if (isFree) prefs.getFloat("lastfm_layout_x", lastfmLayout.translationX) else 0f
+                    val baseX = widgetMover.getRestTranslationX(lastfmLayout)
 
                     if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
                         val needsFadeIn = lastfmLayout.visibility != View.VISIBLE
@@ -1182,29 +1181,55 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                             lastfmLayout.animate()
                                 .alpha(1f)
                                 .translationX(baseX)
-                                .setDuration(500)
-                                .setListener(null)
+                                .setDuration(300)
+                                .setListener(object : AnimatorListenerAdapter() {
+                                    override fun onAnimationCancel(animation: Animator) {
+                                        lastfmLayout.translationX = baseX
+                                    }
+                                    override fun onAnimationEnd(animation: Animator) {
+                                        lastfmLayout.animate().setListener(null)
+                                        lastfmLayout.translationX = baseX
+                                    }
+                                })
                                 .start()
                         } else {
                             lastfmLayout.alpha = 1f
                             lastfmLayout.translationX = baseX
                         }
                     } else {
+                        var isTransitionCanceled = false
                         lastfmLayout.animate()
                             .alpha(0f)
                             .translationX(baseX - 10f)
-                            .setDuration(500)
+                            .setDuration(250)
                             .setListener(object : AnimatorListenerAdapter() {
+                                override fun onAnimationCancel(animation: Animator) {
+                                    isTransitionCanceled = true
+                                    lastfmLayout.translationX = baseX
+                                }
+
                                 override fun onAnimationEnd(animation: Animator) {
-                                    if (!isEditMode) {
+                                    lastfmLayout.animate().setListener(null)
+                                    if (!isTransitionCanceled && !isEditMode) {
                                         nowPlayingTextView.text = trackInfoText
                                         nowPlayingTextView.isSelected = true
+                                        lastfmLayout.translationX = baseX + 10f
                                         lastfmLayout.animate()
                                             .alpha(1f)
                                             .translationX(baseX)
-                                            .setDuration(500)
-                                            .setListener(null)
+                                            .setDuration(250)
+                                            .setListener(object : AnimatorListenerAdapter() {
+                                                override fun onAnimationCancel(animation: Animator) {
+                                                    lastfmLayout.translationX = baseX
+                                                }
+                                                override fun onAnimationEnd(animation: Animator) {
+                                                    lastfmLayout.animate().setListener(null)
+                                                    lastfmLayout.translationX = baseX
+                                                }
+                                            })
                                             .start()
+                                    } else {
+                                        lastfmLayout.translationX = baseX
                                     }
                                 }
                             })
@@ -1231,25 +1256,33 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         pendingBackgroundRestoreRunnable = null
 
         lastfmLayout.animate().cancel()
+        lastfmLayout.animate().setListener(null)
 
-        val isFree = widgetMover.isFreeMovementEnabled(lastfmLayout)
-        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-        val baseX = if (isFree) prefs.getFloat("lastfm_layout_x", lastfmLayout.translationX) else 0f
+        val baseX = widgetMover.getRestTranslationX(lastfmLayout)
 
         if (lastfmLayout.visibility == View.VISIBLE) {
+            var isIdleCanceled = false
             lastfmLayout.animate()
                 .alpha(0f)
                 .translationX(baseX + 10f)
-                .setDuration(500)
+                .setDuration(300)
                 .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationCancel(animation: Animator) {
+                        isIdleCanceled = true
+                        lastfmLayout.translationX = baseX
+                    }
+
                     override fun onAnimationEnd(animation: Animator) {
-                        if (!isEditMode) {
+                        lastfmLayout.animate().setListener(null)
+                        lastfmLayout.translationX = baseX
+                        if (!isIdleCanceled && !isEditMode) {
                             lastfmLayout.visibility = View.GONE
-                            lastfmLayout.translationX = baseX
                         }
                     }
                 })
                 .start()
+        } else {
+            lastfmLayout.translationX = baseX
         }
 
         if (wasMusicBackgroundApplied) {

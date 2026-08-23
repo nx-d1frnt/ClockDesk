@@ -169,6 +169,24 @@ class WidgetMover(
         return prefs.getBoolean("${idName}_individual_free_mode", false)
     }
 
+    fun getRestTranslationX(view: View): Float {
+        return if (isFreeMovementEnabled(view)) {
+            val idName = getResourceName(view.id)
+            prefs.getFloat("${idName}_x", view.translationX)
+        } else {
+            burnInProtectionManager?.currentShiftX ?: 0f
+        }
+    }
+
+    fun getRestTranslationY(view: View): Float {
+        return if (isFreeMovementEnabled(view)) {
+            val idName = getResourceName(view.id)
+            prefs.getFloat("${idName}_y", view.translationY)
+        } else {
+            burnInProtectionManager?.currentShiftY ?: 0f
+        }
+    }
+
     private fun checkSavedPositions(): Boolean {
         return views.any { view ->
             val idName = getResourceName(view.id)
