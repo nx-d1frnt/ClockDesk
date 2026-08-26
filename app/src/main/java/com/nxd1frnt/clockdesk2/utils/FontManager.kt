@@ -51,7 +51,7 @@ sealed class ColorItem {
         val name: String
     ) : ColorItem()
 
-    data class Solid(val color: Int) : ColorItem()
+    data class Solid(val color: Int, val isCustom: Boolean = false) : ColorItem()
     object AddNew : ColorItem()
 }
 
@@ -77,6 +77,7 @@ class FontManager(
 
     private val settingsMap = mutableMapOf<Int, FontSettings>()
     private val fonts: MutableList<FontItem> = mutableListOf()
+    private val customColors: MutableList<Int> = mutableListOf()
     @SuppressLint("RestrictedApi")
     private var currentScheme: Scheme? = null
     private val resourceFontIds = listOf(
@@ -132,6 +133,7 @@ class FontManager(
     )
 
     init {
+        loadCustomColors()
         rebuildFontList()
         //initialize settings map with defaults
         keyPrefixMap.keys.forEach { id ->
@@ -139,10 +141,55 @@ class FontManager(
         }
     }
 
+    private fun loadCustomColors() {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val saved = prefs.getString("custom_saved_colors", null)
+        customColors.clear()
+        if (!saved.isNullOrBlank()) {
+            saved.split(",").forEach { hex ->
+                try {
+                    val parsed = Color.parseColor(hex.trim())
+                    if (!customColors.contains(parsed)) {
+                        customColors.add(parsed)
+                    }
+                } catch (e: Exception) {}
+            }
+        }
+    }
+
+    private fun saveCustomColors() {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val hexList = customColors.joinToString(",") { String.format("#%08X", it) }
+        prefs.edit().putString("custom_saved_colors", hexList).apply()
+    }
+
+    fun addCustomColor(color: Int): Boolean {
+        if (!customColors.contains(color)) {
+            customColors.add(0, color)
+            saveCustomColors()
+            return true
+        }
+        return false
+    }
+
+    fun deleteCustomColor(color: Int): Boolean {
+        if (customColors.remove(color)) {
+            saveCustomColors()
+            return true
+        }
+        return false
+    }
+
+    fun getCustomColors(): List<Int> = customColors
+
     @SuppressLint("RestrictedApi")
     fun getColorsList(): List<ColorItem> {
         val list = mutableListOf<ColorItem>()
 
+        // 1. Add New Color option
+        list.add(ColorItem.AddNew)
+
+        // 2. Dynamic Colors from Theme Scheme
         currentScheme?.let { scheme ->
             list.add(ColorItem.Dynamic(scheme.primary, "primary", "Primary"))
             list.add(ColorItem.Dynamic(scheme.primaryContainer, "primary_container", "Primary Cont."))
@@ -158,7 +205,11 @@ class FontManager(
             list.add(ColorItem.Dynamic(scheme.primaryContainer, "primary_container", "Pri. Cont."))
         }
 
-        list.addAll(defaultColors.map { ColorItem.Solid(it) })
+        // 3. User Saved Custom Colors
+        list.addAll(customColors.map { ColorItem.Solid(it, isCustom = true) })
+
+        // 4. Default Preset Solid Colors
+        list.addAll(defaultColors.map { ColorItem.Solid(it, isCustom = false) })
         return list
     }
 
@@ -367,6 +418,7 @@ class FontManager(
     fun loadFont() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
+        loadCustomColors()
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
         timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"

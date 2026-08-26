@@ -455,4 +455,14 @@
     <string name="pref_temperature_unit_title">Temperature Unit</string>
     <string name="pref_wind_speed_unit_title">Wind Speed Unit</string>
     <string name="pref_precipitation_unit_title">Precipitation Unit</string>
+
+    <!-- Custom Color Picker Strings -->
+    <string name="custom_color">Custom Color</string>
+    <string name="add_color">Add Color</string>
+    <string name="delete_color_title">Delete Color?</string>
+    <string name="delete_color_msg">This custom color will be removed from your saved colors.</string>
+    <string name="color_red">Red</string>
+    <string name="color_green">Green</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_hex">HEX</string>
 </resources>

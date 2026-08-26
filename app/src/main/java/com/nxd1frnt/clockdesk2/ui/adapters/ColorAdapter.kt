@@ -14,11 +14,12 @@ import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.R
 
 class ColorAdapter(
-    private val items: List<ColorItem>,
+    private var items: List<ColorItem>,
     private var selectedColor: Int,
     private var useDynamic: Boolean,
     private var selectedRole: String?,
-    private val onColorSelected: (ColorItem) -> Unit
+    private val onColorSelected: (ColorItem) -> Unit,
+    private val onColorLongClick: ((ColorItem.Solid) -> Unit)? = null
 ) : RecyclerView.Adapter<ColorAdapter.ColorViewHolder>() {
 
     class ColorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -28,6 +29,14 @@ class ColorAdapter(
     }
 
     fun updateSelection(newColor: Int, newUseDynamic: Boolean, newRole: String?) {
+        this.selectedColor = newColor
+        this.useDynamic = newUseDynamic
+        this.selectedRole = newRole
+        notifyDataSetChanged()
+    }
+
+    fun updateData(newItems: List<ColorItem>, newColor: Int, newUseDynamic: Boolean, newRole: String?) {
+        this.items = newItems
         this.selectedColor = newColor
         this.useDynamic = newUseDynamic
         this.selectedRole = newRole
@@ -74,7 +83,14 @@ class ColorAdapter(
                 isSelected = (!useDynamic && selectedColor == item.color)
             }
             is ColorItem.AddNew -> {
-                // Логика пикера
+                val surfaceVariantColor = ContextCompat.getColor(context, R.color.md_theme_surfaceVariant)
+                drawable?.setColor(surfaceVariantColor)
+
+                holder.icon.visibility = View.VISIBLE
+                holder.icon.setImageResource(R.drawable.ic_palette_swatch)
+                holder.icon.setColorFilter(ContextCompat.getColor(context, R.color.md_theme_onSurfaceVariant))
+
+                isSelected = false
             }
         }
 
@@ -90,6 +106,15 @@ class ColorAdapter(
 
         holder.itemView.setOnClickListener {
             onColorSelected(item)
+        }
+
+        if (item is ColorItem.Solid && item.isCustom && onColorLongClick != null) {
+            holder.itemView.setOnLongClickListener {
+                onColorLongClick.invoke(item)
+                true
+            }
+        } else {
+            holder.itemView.setOnLongClickListener(null)
         }
     }
 

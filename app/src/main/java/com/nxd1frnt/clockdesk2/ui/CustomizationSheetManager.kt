@@ -1,10 +1,12 @@
 package com.nxd1frnt.clockdesk2.ui
 
+import android.graphics.Color
 import android.os.Build
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +24,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.skydoves.colorpickerview.ColorPickerDialog
+import com.skydoves.colorpickerview.listeners.ColorEnvelopeListener
 import com.google.android.material.sidesheet.SideSheetBehavior
 import com.google.android.material.sidesheet.SideSheetCallback
 import com.google.android.material.slider.Slider
@@ -816,7 +820,7 @@ class CustomizationSheetManager(
     }
 
     private fun createColorAdapter(view: View): ColorAdapter {
-        val settings = fontManager.getSettings(view) ?: return ColorAdapter(emptyList(), 0, false, null) {}
+        val settings = fontManager.getSettings(view) ?: return ColorAdapter(emptyList(), 0, false, null, {})
         val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
         val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
         val currentRole = if (isEditingBackground) settings.dynamicBackgroundColorRole else settings.dynamicColorRole
@@ -827,29 +831,136 @@ class CustomizationSheetManager(
             useDynamic = useDynamic,
             selectedRole = currentRole,
             onColorSelected = { item ->
-                if (isEditingBackground) {
-                    when (item) {
-                        is ColorItem.Dynamic -> fontManager.setSmartChipDynamicBackgroundColor(view, item.roleKey)
-                        is ColorItem.Solid -> fontManager.setSmartChipBackgroundColor(view, item.color)
-                        else -> {}
+                when (item) {
+                    is ColorItem.AddNew -> {
+                        showColorPickerDialog(view)
                     }
-                } else {
-                    when (item) {
-                        is ColorItem.Dynamic -> fontManager.setDynamicColorForWidget(view, item.roleKey)
-                        is ColorItem.Solid -> fontManager.setFontColor(view, item.color)
-                        else -> {}
+                    is ColorItem.Dynamic -> {
+                        if (isEditingBackground) {
+                            fontManager.setSmartChipDynamicBackgroundColor(view, item.roleKey)
+                        } else {
+                            fontManager.setDynamicColorForWidget(view, item.roleKey)
+                        }
+                        fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+                        refreshColorAdapterSelection(view)
+                    }
+                    is ColorItem.Solid -> {
+                        if (isEditingBackground) {
+                            fontManager.setSmartChipBackgroundColor(view, item.color)
+                        } else {
+                            fontManager.setFontColor(view, item.color)
+                        }
+                        fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+                        refreshColorAdapterSelection(view)
                     }
                 }
-                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
-                val updSettings = fontManager.getSettings(view)
-                if (updSettings != null) {
-                    val nextColor = if (isEditingBackground) updSettings.backgroundColor else updSettings.color
-                    val nextDynamic = if (isEditingBackground) updSettings.useDynamicBackgroundColor else updSettings.useDynamicColor
-                    val nextRole = if (isEditingBackground) updSettings.dynamicBackgroundColorRole else updSettings.dynamicColorRole
-                    (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(nextColor, nextDynamic, nextRole)
-                }
+            },
+            onColorLongClick = { item ->
+                val context = sideSheetView.context
+                MaterialAlertDialogBuilder(context)
+                    .setTitle(context.getString(R.string.delete_color_title))
+                    .setMessage(context.getString(R.string.delete_color_msg))
+                    .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
+                        if (fontManager.deleteCustomColor(item.color)) {
+                            refreshColorAdapter(view)
+                        }
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
+                    .show()
             }
         )
+    }
+
+    private fun refreshColorAdapter(view: View) {
+        val settings = fontManager.getSettings(view) ?: return
+        val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
+        val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
+        val currentRole = if (isEditingBackground) settings.dynamicBackgroundColorRole else settings.dynamicColorRole
+        (bsColorRecyclerView.adapter as? ColorAdapter)?.updateData(
+            fontManager.getColorsList(),
+            currentColor,
+            useDynamic,
+            currentRole
+        )
+    }
+
+    private fun refreshColorAdapterSelection(view: View) {
+        val settings = fontManager.getSettings(view) ?: return
+        val currentColor = if (isEditingBackground) settings.backgroundColor else settings.color
+        val useDynamic = if (isEditingBackground) settings.useDynamicBackgroundColor else settings.useDynamicColor
+        val currentRole = if (isEditingBackground) settings.dynamicBackgroundColorRole else settings.dynamicColorRole
+        (bsColorRecyclerView.adapter as? ColorAdapter)?.updateSelection(
+            currentColor,
+            useDynamic,
+            currentRole
+        )
+    }
+
+    private fun showColorPickerDialog(view: View) {
+        val context = sideSheetView.context
+        val settings = fontManager.getSettings(view)
+        val initialColor = if (isEditingBackground) {
+            if (settings?.useDynamicBackgroundColor == true) {
+                fontManager.getColorfromRole(settings.dynamicBackgroundColorRole)
+            } else {
+                settings?.backgroundColor ?: Color.DKGRAY
+            }
+        } else {
+            if (settings?.useDynamicColor == true) {
+                fontManager.getColorfromRole(settings.dynamicColorRole)
+            } else {
+                settings?.color ?: Color.WHITE
+            }
+        }
+
+        val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_color_picker, null)
+        val colorPickerView = dialogView.findViewById<com.skydoves.colorpickerview.ColorPickerView>(R.id.color_picker_view)
+        val brightnessSlideBar = dialogView.findViewById<com.skydoves.colorpickerview.sliders.BrightnessSlideBar>(R.id.brightness_slide_bar)
+        val previewBox = dialogView.findViewById<View>(R.id.color_preview_box)
+        val hexText = dialogView.findViewById<TextView>(R.id.hex_text)
+
+        colorPickerView.attachBrightnessSlider(brightnessSlideBar)
+        colorPickerView.setInitialColor(initialColor)
+
+        val preventDisallowIntercept: (View) -> Unit = { v ->
+            v.setOnTouchListener { target, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> target.parent?.requestDisallowInterceptTouchEvent(true)
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> target.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+                false
+            }
+        }
+        preventDisallowIntercept(colorPickerView)
+        preventDisallowIntercept(brightnessSlideBar)
+
+        var selectedColor = initialColor
+        previewBox.setBackgroundColor(selectedColor)
+        hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
+
+        colorPickerView.setColorListener(ColorEnvelopeListener { envelope, _ ->
+            selectedColor = envelope.color
+            previewBox.setBackgroundColor(selectedColor)
+            hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
+        })
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(context.getString(R.string.custom_color))
+            .setView(dialogView)
+            .setPositiveButton(context.getString(R.string.apply)) { dialog, _ ->
+                fontManager.addCustomColor(selectedColor)
+                if (isEditingBackground) {
+                    fontManager.setSmartChipBackgroundColor(view, selectedColor)
+                } else {
+                    fontManager.setFontColor(view, selectedColor)
+                }
+                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+                refreshColorAdapter(view)
+                dialog.dismiss()
+            }
+            .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
+            .show()
     }
 
     private fun setupClockStyleAdapter() {

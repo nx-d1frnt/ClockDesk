@@ -454,4 +454,14 @@
     <string name="weight_default">400</string>
     <string name="width_default">100</string>
     <string name="roundness_default">0</string>
+
+    <!-- Custom Color Picker Strings -->
+    <string name="custom_color">Користувацький колір</string>
+    <string name="add_color">Додати колір</string>
+    <string name="delete_color_title">Видалити колір?</string>
+    <string name="delete_color_msg">Цей колір буде видалено зі збережених.</string>
+    <string name="color_red">Червоний</string>
+    <string name="color_green">Зелений</string>
+    <string name="color_blue">Синій</string>
+    <string name="color_hex">HEX</string>
 </resources>

@@ -12,8 +12,8 @@ android {
         applicationId = "com.nxd1frnt.clockdesk2"
         minSdk = 23
         targetSdk = 35
-        versionCode = 200010
-        versionName = "2.0.0-rc1"
+        versionCode = 200020
+        versionName = "2.0.0-rc2"
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -98,4 +98,5 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
     kapt("com.github.bumptech.glide:compiler:4.15.1")
+    implementation("com.github.skydoves:colorpickerview:2.3.0")
 }

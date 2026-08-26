@@ -454,4 +454,14 @@
     <string name="weight_default">400</string>
     <string name="width_default">100</string>
     <string name="roundness_default">0</string>
+
+    <!-- Custom Color Picker Strings -->
+    <string name="custom_color">Пользовательский цвет</string>
+    <string name="add_color">Добавить цвет</string>
+    <string name="delete_color_title">Удалить цвет?</string>
+    <string name="delete_color_msg">Этот цвет будет удален из сохраненных.</string>
+    <string name="color_red">Красный</string>
+    <string name="color_green">Зеленый</string>
+    <string name="color_blue">Синий</string>
+    <string name="color_hex">HEX</string>
 </resources>
