@@ -338,7 +338,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             rootView = mainLayout,
             widgets = listOf(timeText, dateText, chipContainer, lastfmLayout),
             turbulenceOverlay = turbulenceOverlay,
-            isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled
+            isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled,
+            dynamicBackgroundView = dynamicBackgroundView
         )
         entranceAnimationManager.prepareViews()
     }
@@ -1706,7 +1707,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 val noiseColor = fontManager.getDynamicScheme().primary
 
                                 if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
-                                    turbulenceOverlay.playAnimation(noiseColor) {}
+                                    dynamicBackgroundView.playTurbulence(noiseColor)
                                 }
 
                                 val bgOffsetX = backgroundManager.getBgOffsetX()

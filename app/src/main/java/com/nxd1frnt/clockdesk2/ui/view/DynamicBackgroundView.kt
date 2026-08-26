@@ -34,6 +34,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     enum class WeatherType { NONE, RAIN, SNOW, FOG, THUNDERSTORM, CLOUDY, CLEAR }
+    enum class TurbulencePhase { IDLE, EASE_IN, MAIN, EASE_OUT }
 
     val performanceTracker = PerformanceTracker()
 
@@ -285,6 +286,78 @@ class DynamicBackgroundView @JvmOverloads constructor(
             renderer.loadFogTextures(fog, clouds)
         }
     }
+
+    /**
+     * Запуск OpenGL анимации турбулентности (3D Simplex noise).
+     */
+    fun playTurbulence(
+        color: Int? = null,
+        durationMs: Long = 5000L,
+        easeInDurationMs: Long = 400L,
+        easeOutDurationMs: Long = 750L,
+        onReadyCallback: (() -> Unit)? = null,
+        onEndCallback: (() -> Unit)? = null
+    ) {
+        val targetColor = color ?: android.graphics.Color.parseColor("#5A7184")
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
+        val speedScale = prefs.getInt("graphics_turbulence_speed", 10) / 10f
+        val isTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
+
+        if (!isTurbulenceEnabled) {
+            onReadyCallback?.invoke()
+            onEndCallback?.invoke()
+            return
+        }
+
+        val config = TurbulenceNoiseAnimationConfig(
+            color = targetColor,
+            gridCount = 1.0f * gridScale,
+            noiseMoveSpeedZ = 0.45f * speedScale,
+            luminosityMultiplier = 0.6f,
+            easeInDuration = easeInDurationMs.toFloat(),
+            maxDuration = durationMs.toFloat(),
+            easeOutDuration = easeOutDurationMs.toFloat()
+        )
+        playTurbulence(config, onReadyCallback, onEndCallback)
+    }
+
+    /**
+     * Запуск OpenGL анимации турбулентности с кастомной конфигурацией.
+     */
+    fun playTurbulence(
+        config: TurbulenceNoiseAnimationConfig,
+        onReadyCallback: (() -> Unit)? = null,
+        onEndCallback: (() -> Unit)? = null
+    ) {
+        queueEvent {
+            renderer.startTurbulence(config, onReadyCallback, onEndCallback)
+            requestRender()
+        }
+    }
+
+    /**
+     * Плавное завершение текущей анимации турбулентности.
+     */
+    fun finishTurbulence(easeOutDurationMs: Long = 750L) {
+        queueEvent {
+            renderer.finishTurbulence(easeOutDurationMs)
+            requestRender()
+        }
+    }
+
+    /**
+     * Немедленная отмена анимации турбулентности.
+     */
+    fun cancelTurbulence() {
+        queueEvent {
+            renderer.cancelTurbulence()
+            requestRender()
+        }
+    }
+
+    val isTurbulencePlaying: Boolean
+        get() = renderer.isTurbulencePlaying()
 
     private var currentRenderScale: Float = 1.0f
 
@@ -538,6 +611,41 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var fogTextureId = -1
         private var cloudsTextureId = -1
 
+        // --- Turbulence System Variables ---
+        private var turbulenceProgram = 0
+        private var turbAPos = -1
+        private var uTurbGridNumLoc = 0
+        private var uTurbNoiseMoveLoc = 0
+        private var uTurbScreenSizeLoc = 0
+        private var uTurbAspectRatioLoc = 0
+        private var uTurbOpacityLoc = 0
+        private var uTurbInverseLumaLoc = 0
+        private var uTurbColorLoc = 0
+        private var uTurbGlobalAlphaLoc = 0
+
+        @Volatile private var turbulencePhase = TurbulencePhase.IDLE
+        private var turbColorR = 1f
+        private var turbColorG = 1f
+        private var turbColorB = 1f
+        private var turbColorA = 1f
+        private var turbGridCount = 1.0f
+        private var turbSpeedX = 0f
+        private var turbSpeedY = 0f
+        private var turbSpeedZ = 0.45f
+        private var turbLuminosity = 1.0f
+        private var turbInverseLuma = false
+        private var turbEaseInDurationMs = 400L
+        private var turbMainDurationMs = 5000L
+        private var turbEaseOutDurationMs = 750L
+        private var turbOffsetX = 0f
+        private var turbOffsetY = 0f
+        private var turbOffsetZ = 0f
+        private var turbPhaseStartTime = 0L
+        private var turbCurrentOpacity = 0f
+        private var onTurbReadyCallback: (() -> Unit)? = null
+        private var onTurbEndCallback: (() -> Unit)? = null
+        private var turbReadyNotified = false
+
         private val startTime = System.currentTimeMillis()
 
         private val quadVertices = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
@@ -579,6 +687,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             weatherFboTexId = 0
             screenProgram = 0
             screenAlphaHandle = 0
+            turbulenceProgram = 0
 
             // --- Background Shader ---
             val vertexShader = """
@@ -792,6 +901,18 @@ class DynamicBackgroundView @JvmOverloads constructor(
             screenTextureHandle = GLES20.glGetUniformLocation(screenProgram, "u_Texture")
             screenAlphaHandle = GLES20.glGetUniformLocation(screenProgram, "u_Alpha")
 
+            // --- TURBULENCE ---
+            turbulenceProgram = createProgram(TURBULENCE_VERTEX_SHADER, TURBULENCE_FRAGMENT_SHADER)
+            turbAPos = GLES20.glGetAttribLocation(turbulenceProgram, "a_Position")
+            uTurbGridNumLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_gridNum")
+            uTurbNoiseMoveLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_noiseMove")
+            uTurbScreenSizeLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_screenSize")
+            uTurbAspectRatioLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_aspectRatio")
+            uTurbOpacityLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_opacity")
+            uTurbInverseLumaLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_inverseLuma")
+            uTurbColorLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_color")
+            uTurbGlobalAlphaLoc = GLES20.glGetUniformLocation(turbulenceProgram, "u_globalAlpha")
+
             isSurfaceCreated = true
 
             // Reload current background texture from cache if present
@@ -904,6 +1025,53 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 } else {
                     currentState.intensity = currentState.targetIntensity
                     currentState.windFactor = currentState.targetWindFactor
+                }
+            }
+
+            if (turbulencePhase != TurbulencePhase.IDLE) {
+                needsContinuousRender = true
+                turbOffsetX += dt * turbSpeedX
+                turbOffsetY += dt * turbSpeedY
+                turbOffsetZ += dt * turbSpeedZ
+
+                val elapsed = now - turbPhaseStartTime
+                when (turbulencePhase) {
+                    TurbulencePhase.EASE_IN -> {
+                        val progress = if (turbEaseInDurationMs > 0) (elapsed / turbEaseInDurationMs.toFloat()).coerceIn(0f, 1f) else 1f
+                        turbCurrentOpacity = progress * turbLuminosity
+                        if (!turbReadyNotified && (elapsed >= minOf(300L, turbEaseInDurationMs) || elapsed >= turbEaseInDurationMs)) {
+                            turbReadyNotified = true
+                            val cb = onTurbReadyCallback
+                            if (cb != null) post { cb() }
+                        }
+                        if (elapsed >= turbEaseInDurationMs) {
+                            turbulencePhase = TurbulencePhase.MAIN
+                            turbPhaseStartTime = now
+                        }
+                    }
+                    TurbulencePhase.MAIN -> {
+                        turbCurrentOpacity = turbLuminosity
+                        if (!turbReadyNotified) {
+                            turbReadyNotified = true
+                            val cb = onTurbReadyCallback
+                            if (cb != null) post { cb() }
+                        }
+                        if (turbMainDurationMs > 0 && elapsed >= turbMainDurationMs) {
+                            turbulencePhase = TurbulencePhase.EASE_OUT
+                            turbPhaseStartTime = now
+                        }
+                    }
+                    TurbulencePhase.EASE_OUT -> {
+                        val progress = if (turbEaseOutDurationMs > 0) (elapsed / turbEaseOutDurationMs.toFloat()).coerceIn(0f, 1f) else 1f
+                        turbCurrentOpacity = (1f - progress) * turbLuminosity
+                        if (elapsed >= turbEaseOutDurationMs) {
+                            turbulencePhase = TurbulencePhase.IDLE
+                            turbCurrentOpacity = 0f
+                            val cb = onTurbEndCallback
+                            if (cb != null) post { cb() }
+                        }
+                    }
+                    TurbulencePhase.IDLE -> {}
                 }
             }
 
@@ -1021,15 +1189,17 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 }
             }
 
+            // 3. Draw turbulence overlay if active
+            if (turbCurrentOpacity > 0.001f) {
+                drawTurbulence(viewWidth, viewHeight)
+            }
+
             // Update renderMode based on active simulation, transition, or interpolation
+            val hasActiveAnimation = needsContinuousRender || isTransitioning || currentState.type != WeatherType.NONE || turbulencePhase != TurbulencePhase.IDLE
             if (areAnimationsPaused) {
                 renderMode = RENDERMODE_WHEN_DIRTY
-            } else if (hasWeather) {
-                if (needsContinuousRender || isTransitioning || currentState.type != WeatherType.NONE) {
-                    renderMode = RENDERMODE_CONTINUOUSLY
-                } else {
-                    renderMode = RENDERMODE_WHEN_DIRTY
-                }
+            } else if (hasActiveAnimation) {
+                renderMode = RENDERMODE_CONTINUOUSLY
             } else {
                 renderMode = RENDERMODE_WHEN_DIRTY
             }
@@ -1566,7 +1736,9 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 currentState.targetIntensity = intens
                 currentState.targetWindFactor = wind
                 currentState.dayFactor = targetDayFactor
-                renderMode = RENDERMODE_CONTINUOUSLY
+                if (currentState.type != WeatherType.NONE) {
+                    renderMode = RENDERMODE_CONTINUOUSLY
+                }
                 requestRender()
                 return
             }
@@ -1593,11 +1765,15 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             currentState.particles.forEach { it.active = false }
 
-            if (previousState.type != WeatherType.NONE || currentState.type != WeatherType.NONE || previousState.isNight != currentState.isNight || kotlin.math.abs(previousState.dayFactor - currentState.dayFactor) > 0.01f) {
+            if (currentState.type == WeatherType.NONE && previousState.type == WeatherType.NONE) {
+                isTransitioning = false
+                renderMode = RENDERMODE_WHEN_DIRTY
+            } else if (previousState.type != WeatherType.NONE || currentState.type != WeatherType.NONE) {
                 isTransitioning = true
                 transitionStartTime = System.currentTimeMillis()
                 renderMode = RENDERMODE_CONTINUOUSLY
             } else {
+                isTransitioning = false
                 renderMode = RENDERMODE_WHEN_DIRTY
             }
             requestRender()
@@ -1739,6 +1915,86 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             transitionProgress = 0f
             requestRender()
+        }
+
+        fun startTurbulence(
+            config: TurbulenceNoiseAnimationConfig,
+            onReady: (() -> Unit)?,
+            onEnd: (() -> Unit)?
+        ) {
+            val c = config.color
+            turbColorR = android.graphics.Color.red(c) / 255f
+            turbColorG = android.graphics.Color.green(c) / 255f
+            turbColorB = android.graphics.Color.blue(c) / 255f
+            turbColorA = android.graphics.Color.alpha(c) / 255f
+            turbGridCount = config.gridCount
+            turbSpeedX = config.noiseMoveSpeedX
+            turbSpeedY = config.noiseMoveSpeedY
+            turbSpeedZ = config.noiseMoveSpeedZ
+            turbLuminosity = config.luminosityMultiplier
+            turbInverseLuma = config.shouldInverseNoiseLuminosity
+            turbEaseInDurationMs = config.easeInDuration.toLong()
+            turbMainDurationMs = config.maxDuration.toLong()
+            turbEaseOutDurationMs = config.easeOutDuration.toLong()
+
+            turbOffsetX = config.noiseOffsetX
+            turbOffsetY = config.noiseOffsetY
+            turbOffsetZ = config.noiseOffsetZ
+
+            turbPhaseStartTime = System.currentTimeMillis()
+            turbulencePhase = TurbulencePhase.EASE_IN
+            turbCurrentOpacity = 0f
+            turbReadyNotified = false
+            onTurbReadyCallback = onReady
+            onTurbEndCallback = onEnd
+        }
+
+        fun finishTurbulence(easeOutDurationMs: Long = 750L) {
+            if (turbulencePhase == TurbulencePhase.EASE_IN || turbulencePhase == TurbulencePhase.MAIN) {
+                turbEaseOutDurationMs = easeOutDurationMs
+                turbPhaseStartTime = System.currentTimeMillis()
+                turbulencePhase = TurbulencePhase.EASE_OUT
+            }
+        }
+
+        fun cancelTurbulence() {
+            turbulencePhase = TurbulencePhase.IDLE
+            turbCurrentOpacity = 0f
+            val endCb = onTurbEndCallback
+            onTurbReadyCallback = null
+            onTurbEndCallback = null
+            if (endCb != null) {
+                post { endCb() }
+            }
+        }
+
+        fun isTurbulencePlaying(): Boolean = turbulencePhase != TurbulencePhase.IDLE
+
+        private fun drawTurbulence(w: Int, h: Int) {
+            if (turbulenceProgram == 0 || w <= 0 || h <= 0) return
+
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glViewport(0, 0, w, h)
+
+            GLES20.glEnable(GLES20.GL_BLEND)
+            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+            GLES20.glUseProgram(turbulenceProgram)
+
+            GLES20.glUniform1f(uTurbGridNumLoc, turbGridCount)
+            GLES20.glUniform3f(uTurbNoiseMoveLoc, turbOffsetX, turbOffsetY, turbOffsetZ)
+            GLES20.glUniform2f(uTurbScreenSizeLoc, w.toFloat(), h.toFloat())
+            GLES20.glUniform1f(uTurbAspectRatioLoc, w.toFloat() / maxOf(h.toFloat(), 1f))
+            GLES20.glUniform1f(uTurbOpacityLoc, turbCurrentOpacity)
+            GLES20.glUniform1f(uTurbInverseLumaLoc, if (turbInverseLuma) -1f else 1f)
+            GLES20.glUniform4f(uTurbColorLoc, turbColorR, turbColorG, turbColorB, turbColorA)
+            GLES20.glUniform1f(uTurbGlobalAlphaLoc, globalAlpha)
+
+            quadBuffer.position(0)
+            GLES20.glVertexAttribPointer(turbAPos, 2, GLES20.GL_FLOAT, false, 0, quadBuffer)
+            GLES20.glEnableVertexAttribArray(turbAPos)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            GLES20.glDisableVertexAttribArray(turbAPos)
         }
 
         private fun calculateCenterCrop(
@@ -2555,5 +2811,108 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private const val SUN_VERTEX_SHADER = "attribute vec4 a_Position; void main() { gl_Position = a_Position; }"
         private const val FOG_VERTEX_SHADER = "attribute vec4 a_Position; void main() { gl_Position = a_Position; }"
         private const val GLASS_RAIN_VERTEX_SHADER = "attribute vec4 a_Position; void main() { gl_Position = a_Position; }"
+
+        private const val GLSL_SIMPLEX_NOISE = """
+            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
+            vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+            float simplex3d(vec3 v) {
+                const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+                vec3 i = floor(v + dot(v, C.yyy));
+                vec3 x0 = v - i + dot(i, C.xxx);
+
+                vec3 g = step(x0.yzx, x0.xyz);
+                vec3 l = 1.0 - g;
+                vec3 i1 = min(g.xyz, l.zxy);
+                vec3 i2 = max(g.xyz, l.zxy);
+
+                vec3 x1 = x0 - i1 + C.xxx;
+                vec3 x2 = x0 - i2 + C.yyy;
+                vec3 x3 = x0 - D.yyy;
+
+                i = mod289(i);
+                vec4 p = permute(permute(permute(
+                            i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                          + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                          + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+                float n_ = 0.142857142857;
+                vec3 ns = n_ * D.wyz - D.xzx;
+
+                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+                vec4 x_ = floor(j * ns.z);
+                vec4 y_ = floor(j - 7.0 * x_);
+
+                vec4 x = x_ * ns.x + ns.yyyy;
+                vec4 y = y_ * ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y);
+
+                vec4 b0 = vec4(x.xy, y.xy);
+                vec4 b1 = vec4(x.zw, y.zw);
+
+                vec4 s0 = floor(b0) * 2.0 + 1.0;
+                vec4 s1 = floor(b1) * 2.0 + 1.0;
+                vec4 sh = -step(h, vec4(0.0));
+
+                vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+                vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+                vec3 p0 = vec3(a0.xy, h.x);
+                vec3 p1 = vec3(a0.zw, h.y);
+                vec3 p2 = vec3(a1.xy, h.z);
+                vec3 p3 = vec3(a1.zw, h.w);
+
+                vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+                p0 *= norm.x;
+                p1 *= norm.y;
+                p2 *= norm.z;
+                p3 *= norm.w;
+
+                vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+                m = m * m;
+                return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
+            }
+        """
+
+        private const val TURBULENCE_VERTEX_SHADER = "attribute vec4 a_Position; void main() { gl_Position = a_Position; }"
+
+        private const val TURBULENCE_FRAGMENT_SHADER = """
+            #ifdef GL_FRAGMENT_PRECISION_HIGH
+            precision highp float;
+            #else
+            precision mediump float;
+            #endif
+
+        """ + GLSL_SIMPLEX_NOISE + """
+            uniform float u_gridNum;
+            uniform vec3  u_noiseMove;
+            uniform vec2  u_screenSize;
+            uniform float u_aspectRatio;
+            uniform float u_opacity;
+            uniform float u_inverseLuma;
+            uniform vec4  u_color;
+            uniform float u_globalAlpha;
+
+            void main() {
+                vec2 uv = gl_FragCoord.xy / u_screenSize;
+                uv.y = 1.0 - uv.y;
+                uv.x *= u_aspectRatio;
+
+                vec3 noiseP = vec3(uv + u_noiseMove.xy, u_noiseMove.z) * u_gridNum;
+                float noiseVal = simplex3d(noiseP);
+
+                float noiseAlpha = noiseVal * 0.5 + 0.5;
+                if (u_inverseLuma < 0.0) noiseAlpha = 1.0 - noiseAlpha;
+                noiseAlpha = smoothstep(0.2, 0.8, noiseAlpha);
+
+                float finalAlpha = noiseAlpha * u_opacity * u_color.a * u_globalAlpha;
+                gl_FragColor = vec4(u_color.rgb * finalAlpha, finalAlpha);
+            }
+        """
     }
 }

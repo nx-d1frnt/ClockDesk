@@ -512,6 +512,13 @@ class BackgroundSheetManager(
     fun applyWeatherPreview() {
         val isNight = !dayTimeGetter.isDay()
         val dayFactor = dayTimeGetter.getDayFactor()
+
+        if (!bgWeatherSwitch.isChecked) {
+            weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight, dayFactor)
+            onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+            return
+        }
+
         if (bgManualWeatherSwitch.isChecked) {
             val typeOrdinal = when (bgWeatherToggleGroup.checkedButtonId) {
                 R.id.btn_weather_clear -> DynamicBackgroundView.WeatherType.CLEAR.ordinal

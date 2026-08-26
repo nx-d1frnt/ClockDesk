@@ -6,13 +6,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.PathInterpolator
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
 
 class EntranceAnimationManager(
     private val rootView: ViewGroup,
     private val widgets: List<View>,
     private val turbulenceOverlay: TurbulenceView? = null,
-    private val isTurbulenceEnabled: Boolean = true
+    private val isTurbulenceEnabled: Boolean = true,
+    private val dynamicBackgroundView: DynamicBackgroundView? = null
 ) {
     private var hasAnimationPlayed = false
 
@@ -26,7 +28,11 @@ class EntranceAnimationManager(
         if (hasAnimationPlayed) return
 
         if (isTurbulenceEnabled) {
-            turbulenceOverlay?.playAnimation(Color.parseColor("#5A7184")) {}
+            if (dynamicBackgroundView != null) {
+                dynamicBackgroundView.playTurbulence(Color.parseColor("#5A7184")) {}
+            } else {
+                turbulenceOverlay?.playAnimation(Color.parseColor("#5A7184")) {}
+            }
         }
 
         widgets.forEach { view ->
