@@ -201,6 +201,8 @@
     <string name="graphics_turbulence_grid_summary">Adjust the scale of the chromatic turbulence liquid distortion noise</string>
     <string name="graphics_turbulence_speed_title">Turbulence animation speed</string>
     <string name="graphics_turbulence_speed_summary">Adjust the movement speed of the chromatic turbulence transitions</string>
+    <string name="graphics_turbulence_music_continuous_title">Continuous music turbulence</string>
+    <string name="graphics_turbulence_music_continuous_summary">Keep a subtle, gentle turbulence animation playing continuously while music is active</string>
     <string name="graphics_enable_edit_blur_title">Edit Mode Blur</string>
     <string name="graphics_enable_edit_blur_summary">Apply high-quality blur effect to the background when editing widgets</string>
     <string name="graphics_render_scale_title">Render resolution scale</string>

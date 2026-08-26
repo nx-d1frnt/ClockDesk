@@ -574,9 +574,20 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
                 lastfmLayout.visibility = View.VISIBLE
                 nowPlayingText.text = state.track?.let { "${it.artist} — ${it.title}" }
                     ?: ""
+                val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+                val isAdv = prefs.getBoolean("advanced_graphics", false)
+                val isTurb = prefs.getBoolean("graphics_enable_turbulence", true)
+                val isContinuous = prefs.getBoolean("graphics_turbulence_music_continuous", false)
+                if (isAdv && isTurb && isContinuous && ::dynamicBackgroundView.isInitialized) {
+                    val color = fontManager.getDynamicScheme().primary
+                    dynamicBackgroundView.playTurbulence(color, continuous = true)
+                }
             }
             else -> {
                 lastfmLayout.visibility = View.GONE
+                if (::dynamicBackgroundView.isInitialized) {
+                    dynamicBackgroundView.finishTurbulence(1000L)
+                }
             }
         }
     }

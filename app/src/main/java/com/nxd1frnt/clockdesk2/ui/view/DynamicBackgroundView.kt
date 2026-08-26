@@ -34,7 +34,14 @@ class DynamicBackgroundView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     enum class WeatherType { NONE, RAIN, SNOW, FOG, THUNDERSTORM, CLOUDY, CLEAR }
-    enum class TurbulencePhase { IDLE, EASE_IN, MAIN, EASE_OUT }
+    enum class TurbulencePhase {
+        IDLE,
+        EASE_IN,
+        MAIN,
+        TRANSITION_TO_CONTINUOUS,
+        CONTINUOUS,
+        EASE_OUT
+    }
 
     val performanceTracker = PerformanceTracker()
 
@@ -295,6 +302,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         durationMs: Long = 5000L,
         easeInDurationMs: Long = 400L,
         easeOutDurationMs: Long = 750L,
+        continuous: Boolean = false,
         onReadyCallback: (() -> Unit)? = null,
         onEndCallback: (() -> Unit)? = null
     ) {
@@ -319,7 +327,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             maxDuration = durationMs.toFloat(),
             easeOutDuration = easeOutDurationMs.toFloat()
         )
-        playTurbulence(config, onReadyCallback, onEndCallback)
+        playTurbulence(config, continuous, onReadyCallback, onEndCallback)
     }
 
     /**
@@ -327,11 +335,12 @@ class DynamicBackgroundView @JvmOverloads constructor(
      */
     fun playTurbulence(
         config: TurbulenceNoiseAnimationConfig,
+        continuous: Boolean = false,
         onReadyCallback: (() -> Unit)? = null,
         onEndCallback: (() -> Unit)? = null
     ) {
         queueEvent {
-            renderer.startTurbulence(config, onReadyCallback, onEndCallback)
+            renderer.startTurbulence(config, continuous, onReadyCallback, onEndCallback)
             requestRender()
         }
     }
@@ -633,6 +642,12 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var turbSpeedY = 0f
         private var turbSpeedZ = 0.45f
         private var turbLuminosity = 1.0f
+        private var turbContinuousOpacity = 0.65f
+        private var turbContinuousSpeedFactor = 0.35f
+        private var turbTransitionDurationMs = 1500L
+        private var turbEaseOutStartOpacity = 0f
+        private var turbCurrentSpeedFactor = 1.0f
+        private var turbIsContinuous = false
         private var turbInverseLuma = false
         private var turbEaseInDurationMs = 400L
         private var turbMainDurationMs = 5000L
@@ -659,6 +674,12 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private var weatherFboTexId = 0
         private var fboWidth = 0
         private var fboHeight = 0
+
+        // --- Turbulence FBO (low-resolution offscreen render) ---
+        private var turbFboId = 0
+        private var turbFboTexId = 0
+        private var turbFboW = 0
+        private var turbFboH = 0
 
         init {
             updateColorMatrix(ColorMatrix())
@@ -688,6 +709,10 @@ class DynamicBackgroundView @JvmOverloads constructor(
             screenProgram = 0
             screenAlphaHandle = 0
             turbulenceProgram = 0
+            turbFboId = 0
+            turbFboTexId = 0
+            turbFboW = 0
+            turbFboH = 0
 
             // --- Background Shader ---
             val vertexShader = """
@@ -1030,13 +1055,11 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
             if (turbulencePhase != TurbulencePhase.IDLE) {
                 needsContinuousRender = true
-                turbOffsetX += dt * turbSpeedX
-                turbOffsetY += dt * turbSpeedY
-                turbOffsetZ += dt * turbSpeedZ
 
                 val elapsed = now - turbPhaseStartTime
                 when (turbulencePhase) {
                     TurbulencePhase.EASE_IN -> {
+                        turbCurrentSpeedFactor = 1.0f
                         val progress = if (turbEaseInDurationMs > 0) (elapsed / turbEaseInDurationMs.toFloat()).coerceIn(0f, 1f) else 1f
                         turbCurrentOpacity = progress * turbLuminosity
                         if (!turbReadyNotified && (elapsed >= minOf(300L, turbEaseInDurationMs) || elapsed >= turbEaseInDurationMs)) {
@@ -1050,6 +1073,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
                         }
                     }
                     TurbulencePhase.MAIN -> {
+                        turbCurrentSpeedFactor = 1.0f
                         turbCurrentOpacity = turbLuminosity
                         if (!turbReadyNotified) {
                             turbReadyNotified = true
@@ -1057,22 +1081,48 @@ class DynamicBackgroundView @JvmOverloads constructor(
                             if (cb != null) post { cb() }
                         }
                         if (turbMainDurationMs > 0 && elapsed >= turbMainDurationMs) {
-                            turbulencePhase = TurbulencePhase.EASE_OUT
+                            if (turbIsContinuous) {
+                                turbulencePhase = TurbulencePhase.TRANSITION_TO_CONTINUOUS
+                                turbPhaseStartTime = now
+                            } else {
+                                turbEaseOutStartOpacity = turbCurrentOpacity
+                                turbulencePhase = TurbulencePhase.EASE_OUT
+                                turbPhaseStartTime = now
+                            }
+                        }
+                    }
+                    TurbulencePhase.TRANSITION_TO_CONTINUOUS -> {
+                        val progress = if (turbTransitionDurationMs > 0) (elapsed / turbTransitionDurationMs.toFloat()).coerceIn(0f, 1f) else 1f
+                        turbCurrentOpacity = turbLuminosity + (turbContinuousOpacity - turbLuminosity) * progress
+                        turbCurrentSpeedFactor = 1.0f + (turbContinuousSpeedFactor - 1.0f) * progress
+                        if (elapsed >= turbTransitionDurationMs) {
+                            turbulencePhase = TurbulencePhase.CONTINUOUS
+                            turbCurrentOpacity = turbContinuousOpacity
+                            turbCurrentSpeedFactor = turbContinuousSpeedFactor
                             turbPhaseStartTime = now
                         }
                     }
+                    TurbulencePhase.CONTINUOUS -> {
+                        turbCurrentOpacity = turbContinuousOpacity
+                        turbCurrentSpeedFactor = turbContinuousSpeedFactor
+                    }
                     TurbulencePhase.EASE_OUT -> {
                         val progress = if (turbEaseOutDurationMs > 0) (elapsed / turbEaseOutDurationMs.toFloat()).coerceIn(0f, 1f) else 1f
-                        turbCurrentOpacity = (1f - progress) * turbLuminosity
+                        turbCurrentOpacity = (1f - progress) * turbEaseOutStartOpacity
                         if (elapsed >= turbEaseOutDurationMs) {
                             turbulencePhase = TurbulencePhase.IDLE
                             turbCurrentOpacity = 0f
+                            deleteTurbFBO()
                             val cb = onTurbEndCallback
                             if (cb != null) post { cb() }
                         }
                     }
                     TurbulencePhase.IDLE -> {}
                 }
+
+                turbOffsetX += dt * turbSpeedX * turbCurrentSpeedFactor
+                turbOffsetY += dt * turbSpeedY * turbCurrentSpeedFactor
+                turbOffsetZ += dt * turbSpeedZ * turbCurrentSpeedFactor
             }
 
             val hasWeather = currentState.type != WeatherType.NONE || isTransitioning
@@ -1919,6 +1969,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
         fun startTurbulence(
             config: TurbulenceNoiseAnimationConfig,
+            continuous: Boolean = false,
             onReady: (() -> Unit)?,
             onEnd: (() -> Unit)?
         ) {
@@ -1932,25 +1983,32 @@ class DynamicBackgroundView @JvmOverloads constructor(
             turbSpeedY = config.noiseMoveSpeedY
             turbSpeedZ = config.noiseMoveSpeedZ
             turbLuminosity = config.luminosityMultiplier
+            turbContinuousOpacity = 0.65f * turbLuminosity
+            turbContinuousSpeedFactor = 0.35f
+            turbTransitionDurationMs = 1500L
             turbInverseLuma = config.shouldInverseNoiseLuminosity
             turbEaseInDurationMs = config.easeInDuration.toLong()
             turbMainDurationMs = config.maxDuration.toLong()
             turbEaseOutDurationMs = config.easeOutDuration.toLong()
+            turbIsContinuous = continuous
 
-            turbOffsetX = config.noiseOffsetX
-            turbOffsetY = config.noiseOffsetY
-            turbOffsetZ = config.noiseOffsetZ
+            if (turbulencePhase == TurbulencePhase.IDLE) {
+                turbOffsetX = config.noiseOffsetX
+                turbOffsetY = config.noiseOffsetY
+                turbOffsetZ = config.noiseOffsetZ
+                turbCurrentOpacity = 0f
+            }
 
             turbPhaseStartTime = System.currentTimeMillis()
             turbulencePhase = TurbulencePhase.EASE_IN
-            turbCurrentOpacity = 0f
             turbReadyNotified = false
             onTurbReadyCallback = onReady
             onTurbEndCallback = onEnd
         }
 
         fun finishTurbulence(easeOutDurationMs: Long = 750L) {
-            if (turbulencePhase == TurbulencePhase.EASE_IN || turbulencePhase == TurbulencePhase.MAIN) {
+            if (turbulencePhase != TurbulencePhase.IDLE && turbulencePhase != TurbulencePhase.EASE_OUT) {
+                turbEaseOutStartOpacity = turbCurrentOpacity
                 turbEaseOutDurationMs = easeOutDurationMs
                 turbPhaseStartTime = System.currentTimeMillis()
                 turbulencePhase = TurbulencePhase.EASE_OUT
@@ -1960,6 +2018,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
         fun cancelTurbulence() {
             turbulencePhase = TurbulencePhase.IDLE
             turbCurrentOpacity = 0f
+            deleteTurbFBO()
             val endCb = onTurbEndCallback
             onTurbReadyCallback = null
             onTurbEndCallback = null
@@ -1973,17 +2032,59 @@ class DynamicBackgroundView @JvmOverloads constructor(
         private fun drawTurbulence(w: Int, h: Int) {
             if (turbulenceProgram == 0 || w <= 0 || h <= 0) return
 
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
-            GLES20.glViewport(0, 0, w, h)
+            // Dynamically scale with user's Render Scale and Weather Scale settings
+            val turbScale = minOf(currentRenderScale, weatherResolutionScale).coerceIn(0.1f, 1.0f)
+            val tw = (w * turbScale).toInt().coerceAtLeast(64)
+            val th = (h * turbScale).toInt().coerceAtLeast(64)
 
-            GLES20.glEnable(GLES20.GL_BLEND)
-            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            // Create / resize turbulence FBO if needed
+            if (turbFboId == 0 || turbFboW != tw || turbFboH != th) {
+                deleteTurbFBO()
+                val fbs = IntArray(1)
+                GLES20.glGenFramebuffers(1, fbs, 0)
+                turbFboId = fbs[0]
 
+                val texs = IntArray(1)
+                GLES20.glGenTextures(1, texs, 0)
+                turbFboTexId = texs[0]
+
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, turbFboTexId)
+                GLES20.glTexImage2D(
+                    GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, tw, th, 0,
+                    GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null
+                )
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, turbFboId)
+                GLES20.glFramebufferTexture2D(
+                    GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
+                    GLES20.GL_TEXTURE_2D, turbFboTexId, 0
+                )
+
+                if (GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+                    deleteTurbFBO()
+                    return
+                }
+                turbFboW = tw
+                turbFboH = th
+            }
+
+            // --- Pass 1: render noise into low-res FBO ---
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, turbFboId)
+            GLES20.glViewport(0, 0, tw, th)
+            GLES20.glClearColor(0f, 0f, 0f, 0f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
+            GLES20.glDisable(GLES20.GL_BLEND)
             GLES20.glUseProgram(turbulenceProgram)
 
+            // Pass the *full* screen aspect ratio so the noise pattern matches regardless of FBO size
             GLES20.glUniform1f(uTurbGridNumLoc, turbGridCount)
             GLES20.glUniform3f(uTurbNoiseMoveLoc, turbOffsetX, turbOffsetY, turbOffsetZ)
-            GLES20.glUniform2f(uTurbScreenSizeLoc, w.toFloat(), h.toFloat())
+            GLES20.glUniform2f(uTurbScreenSizeLoc, tw.toFloat(), th.toFloat())
             GLES20.glUniform1f(uTurbAspectRatioLoc, w.toFloat() / maxOf(h.toFloat(), 1f))
             GLES20.glUniform1f(uTurbOpacityLoc, turbCurrentOpacity)
             GLES20.glUniform1f(uTurbInverseLumaLoc, if (turbInverseLuma) -1f else 1f)
@@ -1995,6 +2096,43 @@ class DynamicBackgroundView @JvmOverloads constructor(
             GLES20.glEnableVertexAttribArray(turbAPos)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
             GLES20.glDisableVertexAttribArray(turbAPos)
+
+            // --- Pass 2: upscale FBO texture to screen with premultiplied alpha blend ---
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glViewport(0, 0, w, h)
+
+            GLES20.glEnable(GLES20.GL_BLEND)
+            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+            GLES20.glUseProgram(screenProgram)
+
+            vertexBuffer.position(0)
+            GLES20.glVertexAttribPointer(screenPositionHandle, 3, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
+            GLES20.glEnableVertexAttribArray(screenPositionHandle)
+
+            vertexBuffer.position(3)
+            GLES20.glVertexAttribPointer(screenTexCoordHandle, 2, GLES20.GL_FLOAT, false, 5 * 4, vertexBuffer)
+            GLES20.glEnableVertexAttribArray(screenTexCoordHandle)
+
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, turbFboTexId)
+            GLES20.glUniform1i(screenTextureHandle, 0)
+            GLES20.glUniform1f(screenAlphaHandle, 1.0f)
+
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        }
+
+        private fun deleteTurbFBO() {
+            if (turbFboId != 0) {
+                GLES20.glDeleteFramebuffers(1, intArrayOf(turbFboId), 0)
+                turbFboId = 0
+            }
+            if (turbFboTexId != 0) {
+                GLES20.glDeleteTextures(1, intArrayOf(turbFboTexId), 0)
+                turbFboTexId = 0
+            }
+            turbFboW = 0
+            turbFboH = 0
         }
 
         private fun calculateCenterCrop(

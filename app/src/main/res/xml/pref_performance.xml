@@ -57,6 +57,13 @@
             app:dependency="graphics_enable_turbulence" />
 
         <androidx.preference.SwitchPreferenceCompat
+            app:key="graphics_turbulence_music_continuous"
+            app:title="@string/graphics_turbulence_music_continuous_title"
+            app:summary="@string/graphics_turbulence_music_continuous_summary"
+            android:defaultValue="false"
+            app:dependency="graphics_enable_turbulence" />
+
+        <androidx.preference.SwitchPreferenceCompat
             app:key="graphics_enable_edit_blur"
             app:title="@string/graphics_enable_edit_blur_title"
             app:summary="@string/graphics_enable_edit_blur_summary"

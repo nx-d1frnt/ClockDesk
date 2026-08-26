@@ -200,6 +200,8 @@
     <string name="graphics_turbulence_grid_summary">Настройка масштаба шума искажения жидкой хроматической турбулентности</string>
     <string name="graphics_turbulence_speed_title">Скорость анимации турбулентности</string>
     <string name="graphics_turbulence_speed_summary">Настройка скорости движения переходов хроматической турбулентности</string>
+    <string name="graphics_turbulence_music_continuous_title">Непрерывная анимация при музыке</string>
+    <string name="graphics_turbulence_music_continuous_summary">Мягкая плавная анимация турбулентности на фоне во время воспроизведения музыки</string>
     <string name="graphics_enable_edit_blur_title">Размытие в режиме редактирования</string>
     <string name="graphics_enable_edit_blur_summary">Размывать фоновое изображение при редактировании виджетов</string>
     <string name="graphics_render_scale_title">Масштаб разрешения рендеринга</string>

@@ -169,6 +169,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var isAdvancedGraphicsEnabled = false
     private var isGraphicsTransitionsEnabled = true
     private var isGraphicsTurbulenceEnabled = true
+    private var isGraphicsTurbulenceContinuousMusicEnabled = false
     private var isGraphicsEditBlurEnabled = true
     private var graphicsRenderScale = 100
     private var graphicsWeatherScale = 40
@@ -407,6 +408,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
         isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
         isGraphicsTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
+        isGraphicsTurbulenceContinuousMusicEnabled = prefs.getBoolean("graphics_turbulence_music_continuous", false)
         isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
         graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
         graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
@@ -1159,6 +1161,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
                 if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
                     handleBackgroundUpdate(track)
+                } else if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isGraphicsTurbulenceContinuousMusicEnabled) {
+                    if (!dynamicBackgroundView.isTurbulencePlaying) {
+                        val noiseColor = fontManager.getDynamicScheme().primary
+                        dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
+                    }
                 }
 
                 if (isTextDifferent) {
@@ -1290,6 +1297,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             restoreUserBackground(backgroundManager.getSavedBackgroundUri())
             wasMusicBackgroundApplied = false
             currentAppliedArtworkSource = null
+        }
+
+        if (isGraphicsTurbulenceContinuousMusicEnabled) {
+            dynamicBackgroundView.finishTurbulence(1000L)
         }
         lastTrackInfo = null
     }
@@ -1707,7 +1718,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                                 val noiseColor = fontManager.getDynamicScheme().primary
 
                                 if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
-                                    dynamicBackgroundView.playTurbulence(noiseColor)
+                                    val isContinuous = isGraphicsTurbulenceContinuousMusicEnabled && currentMusicState is PluginState.Playing
+                                    dynamicBackgroundView.playTurbulence(noiseColor, continuous = isContinuous)
                                 }
 
                                 val bgOffsetX = backgroundManager.getBgOffsetX()
@@ -2263,6 +2275,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
         isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
         isGraphicsTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
+        isGraphicsTurbulenceContinuousMusicEnabled = prefs.getBoolean("graphics_turbulence_music_continuous", false)
         isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
         graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
         graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
