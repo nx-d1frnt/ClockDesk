@@ -1255,7 +1255,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             }
 
             if (performanceTracker.isEnabled) {
-                GLES20.glFinish()
+                //GLES20.glFinish()
                 val endTime = System.nanoTime()
                 performanceTracker.trackFrame(endTime - startTime)
             }
