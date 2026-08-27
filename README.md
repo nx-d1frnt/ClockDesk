@@ -44,7 +44,6 @@
   - ⛅ **Weather Chip:** Live conditions, temperature, and detailed forecast dialogs.
   - ⚠️ **Weather & Battery Alerts:** Severe weather notifications and high-temperature / battery-state warnings.
   - ⏰ **Alarm Chip:** Next scheduled alarm time and countdown.
-  - ⏳ **Background Progress:** Track day, month, or year progress at a glance.
   - 🔄 **Update Chip:** Direct notification and changelog when new updates are available.
 - **Extensible Plugin Architecture:** Third-party applications can supply custom chips via standard Android intents (`com.nxd1frnt.clockdesk2.ACTION_QUERY_SMART_CHIPS`).
 
