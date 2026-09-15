@@ -7,6 +7,8 @@ import android.net.Uri
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
+import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
+import com.nxd1frnt.clockdesk2.connect.model.DeskConnectPacket
 import com.nxd1frnt.clockdesk2.music.IMusicPlugin
 import com.nxd1frnt.clockdesk2.music.MusicTrack
 import com.nxd1frnt.clockdesk2.music.PluginState
@@ -34,22 +36,72 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
         var isPlaying: Boolean,
         var artworkUrl: String? = null,
         var artworkBitmap: Bitmap? = null,
+        var isFetchingArtwork: Boolean = false,
+        var failedArtworkFetch: Boolean = false,
         var lastUpdated: Long = System.currentTimeMillis()
     )
 
     private val activePlayers = ConcurrentHashMap<String, PlayerInfo>()
     private var currentlyDispatchedKey: String? = null
 
+    private val deviceListener = object : DeskConnectManager.DeviceListener {
+        override fun onDeviceDiscovered(device: DeskConnectDevice) {}
+
+        override fun onDeviceConnected(device: DeskConnectDevice) {
+            if (device.isPaired) {
+                deskConnectManager.activeConnections[device.deviceId]?.sendPacket(
+                    DeskConnectPacket.createMprisPlayerListRequest()
+                )
+            }
+        }
+
+        override fun onDeviceDisconnected(device: DeskConnectDevice) {
+            // Immediately purge any player belonging to the disconnected device to prevent stuck playback
+            activePlayers.keys.forEach { key ->
+                if (key.startsWith("${device.deviceId}:")) {
+                    activePlayers.remove(key)
+                }
+            }
+            evaluateCurrentPlayback()
+        }
+
+        override fun onPairingRequested(device: DeskConnectDevice, verificationKey: String) {}
+
+        override fun onPairingStateChanged(device: DeskConnectDevice, isPaired: Boolean) {
+            if (!isPaired) {
+                activePlayers.keys.forEach { key ->
+                    if (key.startsWith("${device.deviceId}:")) {
+                        activePlayers.remove(key)
+                    }
+                }
+                evaluateCurrentPlayback()
+            }
+        }
+    }
+
     private val mprisListener = object : DeskConnectManager.MprisListener {
+        override fun onPlayerListReceived(deviceId: String, playerList: List<String>) {
+            // Remove players for this device that are no longer running
+            activePlayers.keys.forEach { key ->
+                if (key.startsWith("$deviceId:")) {
+                    val playerName = key.substringAfter("$deviceId:")
+                    if (!playerList.contains(playerName)) {
+                        activePlayers.remove(key)
+                    }
+                }
+            }
+            evaluateCurrentPlayback()
+        }
+
         override fun onMprisUpdated(
             deviceId: String,
             player: String,
-            title: String,
-            artist: String,
-            album: String,
-            isPlaying: Boolean,
-            positionMs: Long,
-            lengthMs: Long,
+            title: String?,
+            artist: String?,
+            album: String?,
+            isPlaying: Boolean?,
+            positionMs: Long?,
+            lengthMs: Long?,
             artworkBytes: ByteArray?,
             artworkUrl: String?
         ) {
@@ -64,14 +116,36 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
                 }
             }
 
-            val isHttpArt = !artworkUrl.isNullOrEmpty() && (artworkUrl.startsWith("http://") || artworkUrl.startsWith("https://"))
+            val isHttpArt = !artworkUrl.isNullOrEmpty() &&
+                    (artworkUrl.startsWith("http://") || artworkUrl.startsWith("https://"))
 
             val existing = activePlayers[key]
             if (existing != null) {
-                if (title.isNotEmpty()) existing.title = title
-                if (artist.isNotEmpty()) existing.artist = artist
-                if (album.isNotEmpty()) existing.album = album
-                existing.isPlaying = isPlaying
+                var trackChanged = false
+                if (!title.isNullOrEmpty() && existing.title != title) {
+                    existing.title = title
+                    trackChanged = true
+                }
+                if (!artist.isNullOrEmpty() && existing.artist != artist) {
+                    existing.artist = artist
+                    trackChanged = true
+                }
+                if (!album.isNullOrEmpty()) {
+                    existing.album = album
+                }
+
+                // If track changed, invalidate previous artwork caches so the new song gets its own art
+                if (trackChanged) {
+                    existing.artworkBitmap = null
+                    existing.artworkUrl = null
+                    existing.isFetchingArtwork = false
+                    existing.failedArtworkFetch = false
+                }
+
+                // If isPlaying is explicitly provided, update it; otherwise preserve existing state
+                if (isPlaying != null) {
+                    existing.isPlaying = isPlaying
+                }
                 existing.lastUpdated = System.currentTimeMillis()
 
                 if (decodedBitmap != null) {
@@ -81,18 +155,32 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
                     existing.artworkUrl = artworkUrl
                     existing.artworkBitmap = null
                 }
+
+                // If player is playing but title and artist are still missing, ask for status
+                if (existing.isPlaying && existing.title.isEmpty() && existing.artist.isEmpty()) {
+                    deskConnectManager.activeConnections[deviceId]?.sendPacket(
+                        DeskConnectPacket.createMprisPlayerStatusRequest(player)
+                    )
+                }
             } else {
-                activePlayers[key] = PlayerInfo(
+                val newPlayer = PlayerInfo(
                     deviceId = deviceId,
                     playerName = player,
-                    title = title,
-                    artist = artist,
-                    album = album,
-                    isPlaying = isPlaying,
+                    title = title ?: "",
+                    artist = artist ?: "",
+                    album = album ?: "",
+                    isPlaying = isPlaying ?: false,
                     artworkUrl = if (isHttpArt) artworkUrl else null,
                     artworkBitmap = decodedBitmap,
                     lastUpdated = System.currentTimeMillis()
                 )
+                activePlayers[key] = newPlayer
+
+                if (newPlayer.isPlaying && newPlayer.title.isEmpty() && newPlayer.artist.isEmpty()) {
+                    deskConnectManager.activeConnections[deviceId]?.sendPacket(
+                        DeskConnectPacket.createMprisPlayerStatusRequest(player)
+                    )
+                }
             }
 
             evaluateCurrentPlayback()
@@ -101,9 +189,12 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
 
     @Synchronized
     private fun evaluateCurrentPlayback() {
-        // Find any player currently playing with a valid title or artist
+        // Only select players from actively connected devices that are playing with a valid title/artist
         val candidate = activePlayers.values
-            .filter { it.isPlaying && (it.title.isNotEmpty() || it.artist.isNotEmpty()) }
+            .filter { info ->
+                val isConnected = deskConnectManager.activeConnections.containsKey(info.deviceId)
+                isConnected && info.isPlaying && (info.title.isNotEmpty() || info.artist.isNotEmpty())
+            }
             .maxByOrNull { it.lastUpdated }
 
         if (candidate != null) {
@@ -113,14 +204,23 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
             val playerTitle = candidate.title
             val playerArtist = candidate.artist
 
-            // Check if we need to query iTunes for album art
-            if (candidate.artworkBitmap == null && candidate.artworkUrl.isNullOrEmpty()) {
+            // Query iTunes for album art fallback if missing and not already requested
+            if (candidate.artworkBitmap == null && candidate.artworkUrl.isNullOrEmpty() &&
+                !candidate.isFetchingArtwork && !candidate.failedArtworkFetch) {
+                candidate.isFetchingArtwork = true
                 fetchAlbumArtFallback(playerArtist, playerTitle) { fallbackUrl ->
-                    val currentCandidate = activePlayers[key]
-                    if (currentCandidate != null && currentCandidate.title == playerTitle && currentCandidate.artist == playerArtist) {
-                        currentCandidate.artworkUrl = fallbackUrl
-                        if (currentlyDispatchedKey == key) {
-                            dispatchTrack(currentCandidate)
+                    candidate.isFetchingArtwork = false
+                    if (fallbackUrl.isNullOrEmpty()) {
+                        candidate.failedArtworkFetch = true
+                    } else {
+                        val currentCandidate = activePlayers[key]
+                        if (currentCandidate != null &&
+                            currentCandidate.title == playerTitle &&
+                            currentCandidate.artist == playerArtist) {
+                            currentCandidate.artworkUrl = fallbackUrl
+                            if (currentlyDispatchedKey == key) {
+                                dispatchTrack(currentCandidate)
+                            }
                         }
                     }
                 }
@@ -134,22 +234,30 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
     }
 
     private fun dispatchTrack(info: PlayerInfo) {
+        val dev = deskConnectManager.discoveredDevices[info.deviceId]
+        val iconRes = dev?.getDeviceTypeIconRes() ?: com.nxd1frnt.clockdesk2.R.drawable.ic_devices
         val track = MusicTrack(
             title = info.title,
             artist = info.artist,
             album = info.album.ifEmpty { null },
             artworkUrl = info.artworkUrl,
             artworkBitmap = info.artworkBitmap,
-            sourcePackageName = info.playerName
+            sourcePackageName = info.playerName,
+            sourceIconResId = iconRes
         )
         callback?.invoke(PluginState.Playing(track))
     }
 
     private fun fetchAlbumArtFallback(artist: String, songName: String, onResult: (String?) -> Unit) {
-        val searchTerm = if (artist.isNotEmpty() && songName.isNotEmpty()) {
-            "$artist - $songName"
+        val cleanSong = songName
+            .replace(Regex("(?i)\\(official (audio|video|music video|lyric video)\\)"), "")
+            .replace(Regex("(?i)\\[official (audio|video|music video|lyric video)\\]"), "")
+            .trim()
+
+        val searchTerm = if (artist.isNotEmpty() && cleanSong.isNotEmpty()) {
+            "$artist - $cleanSong"
         } else {
-            songName.ifEmpty { artist }
+            cleanSong.ifEmpty { artist }
         }
 
         if (searchTerm.isBlank()) {
@@ -197,11 +305,20 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
 
     override fun init() {
         deskConnectManager.mprisListeners.add(mprisListener)
+        deskConnectManager.deviceListeners.add(deviceListener)
+
+        // Request player list from all currently active paired connections
+        deskConnectManager.activeConnections.values.forEach { conn ->
+            if (conn.device.isPaired) {
+                conn.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+            }
+        }
         Logger.d("KdeConnectMusicPlugin") { "Initialized DeskConnect music plugin" }
     }
 
     override fun destroy() {
         deskConnectManager.mprisListeners.remove(mprisListener)
+        deskConnectManager.deviceListeners.remove(deviceListener)
         activePlayers.clear()
         currentlyDispatchedKey = null
         callback?.invoke(PluginState.Idle)

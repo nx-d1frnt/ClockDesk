@@ -1148,7 +1148,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     lastfmIcon.clipToOutline = false
                 }
 
-                if (track.sourceIconBitmap != null) {
+                if (track.sourceIconResId != null) {
+                    lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, track.sourceIconResId))
+
+                    val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
+                    lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        lastfmIcon.imageAlpha = 255
+                    }
+                    iconApplied = true
+                } else if (track.sourceIconBitmap != null) {
                     lastfmIcon.setImageBitmap(track.sourceIconBitmap)
 
                     val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)

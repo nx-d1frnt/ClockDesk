@@ -112,15 +112,20 @@ class DeskConnectManager private constructor(private val context: Context) {
         fun onMprisUpdated(
             deviceId: String,
             player: String,
-            title: String,
-            artist: String,
-            album: String,
-            isPlaying: Boolean,
-            positionMs: Long,
-            lengthMs: Long,
+            title: String?,
+            artist: String?,
+            album: String?,
+            isPlaying: Boolean?,
+            positionMs: Long?,
+            lengthMs: Long?,
             artworkBytes: ByteArray?,
             artworkUrl: String?
         )
+
+        fun onPlayerListReceived(
+            deviceId: String,
+            playerList: List<String>
+        ) {}
     }
 
     val deviceListeners = CopyOnWriteArrayList<DeviceListener>()
@@ -199,9 +204,11 @@ class DeskConnectManager private constructor(private val context: Context) {
         val pairedIds = security.getPairedDeviceIds()
         for (id in pairedIds) {
             val name = sharedPrefs.getString("deskconnect_paired_name_$id", id) ?: id
+            val type = sharedPrefs.getString("deskconnect_paired_type_$id", "phone") ?: "phone"
             val device = DeskConnectDevice(
                 deviceId = id,
                 deviceName = name,
+                deviceType = type,
                 isPaired = true
             )
             discoveredDevices[id] = device
@@ -230,7 +237,10 @@ class DeskConnectManager private constructor(private val context: Context) {
         val target = discoveredDevices[device.deviceId] ?: device
 
         if (target.isPaired) {
-            sharedPrefs.edit().putString("deskconnect_paired_name_${target.deviceId}", target.deviceName).apply()
+            sharedPrefs.edit()
+                .putString("deskconnect_paired_name_${target.deviceId}", target.deviceName)
+                .putString("deskconnect_paired_type_${target.deviceId}", target.deviceType)
+                .apply()
         }
 
         mainHandler.post {
@@ -505,38 +515,48 @@ class DeskConnectManager private constructor(private val context: Context) {
 
                 val playerListArray = body.optJSONArray("playerList")
                 if (playerListArray != null) {
+                    val players = mutableListOf<String>()
                     for (i in 0 until playerListArray.length()) {
                         val playerName = playerListArray.optString(i)
                         if (playerName.isNotEmpty()) {
+                            players.add(playerName)
                             conn.sendPacket(DeskConnectPacket.createMprisPlayerStatusRequest(playerName))
+                        }
+                    }
+                    mainHandler.post {
+                        mprisListeners.forEach {
+                            it.onPlayerListReceived(conn.device.deviceId, players)
                         }
                     }
                 }
 
                 if (body.has("player")) {
                     val player = body.optString("player", "Media Player")
-                    val rawTitle = body.optString("title", "")
-                    val rawArtist = body.optString("artist", "")
-                    val nowPlaying = body.optString("nowPlaying", "")
-                    val album = body.optString("album", "")
-                    val isPlaying = body.optBoolean("isPlaying", false)
-                    val pos = body.optLong("pos", 0L)
-                    val len = body.optLong("length", 0L)
-                    val albumArtUrl = body.optString("albumArtUrl", "").takeIf { it.isNotEmpty() }
+                    val rawTitle = if (body.has("title")) body.optString("title").trim() else null
+                    val rawArtist = if (body.has("artist")) body.optString("artist").trim() else null
+                    val nowPlaying = if (body.has("nowPlaying")) body.optString("nowPlaying").trim() else null
+                    val album = if (body.has("album")) body.optString("album").trim() else null
+                    val isPlaying = if (body.has("isPlaying")) body.optBoolean("isPlaying") else null
+                    val pos = if (body.has("pos")) body.optLong("pos") else null
+                    val len = if (body.has("length")) body.optLong("length") else null
+                    val albumArtUrl = if (body.has("albumArtUrl")) body.optString("albumArtUrl").takeIf { it.isNotEmpty() } else null
 
-                    var trackTitle = rawTitle.trim()
-                    var trackArtist = rawArtist.trim()
+                    var trackTitle = rawTitle
+                    var trackArtist = rawArtist
 
-                    if (trackTitle.isEmpty() && nowPlaying.isNotEmpty()) {
+                    if (trackTitle.isNullOrEmpty() && !nowPlaying.isNullOrEmpty()) {
                         if (nowPlaying.contains(" - ")) {
                             trackArtist = nowPlaying.substringBefore(" - ").trim()
                             trackTitle = nowPlaying.substringAfter(" - ").trim()
                         } else {
                             trackTitle = nowPlaying.trim()
                         }
+                    } else if (trackArtist.isNullOrEmpty() && !trackTitle.isNullOrEmpty() && trackTitle.contains(" - ")) {
+                        trackArtist = trackTitle.substringBefore(" - ").trim()
+                        trackTitle = trackTitle.substringAfter(" - ").trim()
                     }
 
-                    if (trackTitle.isEmpty() && trackArtist.isEmpty() && !body.has("isPlaying")) {
+                    if (trackTitle.isNullOrEmpty() && trackArtist.isNullOrEmpty() && isPlaying == true) {
                         conn.sendPacket(DeskConnectPacket.createMprisPlayerStatusRequest(player))
                     }
 
@@ -607,7 +627,10 @@ class DeskConnectManager private constructor(private val context: Context) {
             security.trustDevice(device.deviceId, security.certificate)
         }
         device.isPaired = true
-        sharedPrefs.edit().putString("deskconnect_paired_name_${device.deviceId}", device.deviceName).apply()
+        sharedPrefs.edit()
+            .putString("deskconnect_paired_name_${device.deviceId}", device.deviceName)
+            .putString("deskconnect_paired_type_${device.deviceId}", device.deviceType)
+            .apply()
 
         val conn = activeConnections[device.deviceId]
         conn?.sendPacket(DeskConnectPacket.createPair(true))
@@ -630,7 +653,10 @@ class DeskConnectManager private constructor(private val context: Context) {
         pendingOutgoingPairRequests.remove(deviceId)
         pendingIncomingPairRequests.remove(deviceId)
         security.unpairDevice(deviceId)
-        sharedPrefs.edit().remove("deskconnect_paired_name_$deviceId").apply()
+        sharedPrefs.edit()
+            .remove("deskconnect_paired_name_$deviceId")
+            .remove("deskconnect_paired_type_$deviceId")
+            .apply()
 
         val dev = discoveredDevices[deviceId]
         if (dev != null) {

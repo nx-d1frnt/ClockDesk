@@ -118,13 +118,17 @@ class DeskConnectSettingsFragment : Fragment() {
 
         for (dev in pairedDevices) {
             val itemView = inflater.inflate(R.layout.item_connected_device, layoutPaired, false)
+            val iconView = itemView.findViewById<ImageView>(R.id.device_icon)
             val nameView = itemView.findViewById<TextView>(R.id.device_name)
             val statusView = itemView.findViewById<TextView>(R.id.device_status)
             val btnAction = itemView.findViewById<MaterialButton>(R.id.btn_action)
 
+            iconView.setImageResource(dev.getDeviceTypeIconRes())
             nameView.text = dev.getDisplayName()
+            val typeText = dev.getDeviceTypeDisplayName()
             val statusText = if (dev.isConnected) "Connected" else "Paired (Offline)"
-            statusView.text = if (dev.ipAddress != null) "$statusText • ${dev.ipAddress?.hostAddress}" else statusText
+            val ipText = dev.ipAddress?.hostAddress
+            statusView.text = if (ipText != null) "$typeText • $statusText • $ipText" else "$typeText • $statusText"
 
             itemView.setOnClickListener {
                 if (dev.isConnected) {
@@ -156,12 +160,16 @@ class DeskConnectSettingsFragment : Fragment() {
 
         for (dev in availableDevices) {
             val itemView = inflater.inflate(R.layout.item_connected_device, layoutAvailable, false)
+            val iconView = itemView.findViewById<ImageView>(R.id.device_icon)
             val nameView = itemView.findViewById<TextView>(R.id.device_name)
             val statusView = itemView.findViewById<TextView>(R.id.device_status)
             val btnAction = itemView.findViewById<MaterialButton>(R.id.btn_action)
 
+            iconView.setImageResource(dev.getDeviceTypeIconRes())
             nameView.text = dev.getDisplayName()
-            statusView.text = dev.ipAddress?.hostAddress ?: "Available"
+            val typeText = dev.getDeviceTypeDisplayName()
+            val ipText = dev.ipAddress?.hostAddress
+            statusView.text = if (ipText != null) "$typeText • $ipText" else typeText
 
             btnAction.text = getString(R.string.deskconnect_pair)
             btnAction.setOnClickListener {

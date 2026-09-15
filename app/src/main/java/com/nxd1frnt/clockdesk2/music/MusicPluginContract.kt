@@ -10,7 +10,8 @@ data class MusicTrack(
     val artworkBitmap: Bitmap? = null,
     val sourcePackageName: String? = null,
     val sourceIconBitmap: Bitmap? = null,
-    val sourceIconUri: String? = null
+    val sourceIconUri: String? = null,
+    val sourceIconResId: Int? = null
 )
 
 sealed class PluginState {
