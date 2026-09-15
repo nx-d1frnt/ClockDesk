@@ -305,9 +305,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
     private fun hideUIControls() {
         listOf(
-            R.id.settings_button,
-            R.id.demo_button,
-            R.id.background_button,
+            R.id.edit_mode_action_bar,
             R.id.background_customization_fab,
             R.id.tutorial_overlay_root,
             R.id.side_sheet_container,

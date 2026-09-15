@@ -12,63 +12,62 @@
     app:strokeColor="?attr/colorOutlineVariant"
     app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:padding="16dp">
 
-        <ImageView
-            android:id="@+id/widget_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="8dp"
-            android:background="@drawable/color_selection_ring"
-            app:tint="?attr/colorPrimary"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            tools:src="@drawable/ic_clock" />
-
-        <TextView
-            android:id="@+id/widget_title"
-            android:layout_width="0dp"
+        <!-- Header: Icon & Title -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="8dp"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold"
-            app:layout_constraintStart_toEndOf="@id/widget_icon"
-            app:layout_constraintEnd_toStartOf="@id/add_widget_button"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:text="Clock Widget" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
+            <ImageView
+                android:id="@+id/widget_icon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/color_selection_ring"
+                android:padding="6dp"
+                app:tint="?attr/colorPrimary"
+                tools:src="@drawable/ic_clock" />
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                tools:text="Clock" />
+
+        </LinearLayout>
+
+        <!-- Description -->
         <TextView
             android:id="@+id/widget_description"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="8dp"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?attr/colorOnSurfaceVariant"
-            app:layout_constraintStart_toEndOf="@id/widget_icon"
-            app:layout_constraintEnd_toStartOf="@id/add_widget_button"
-            app:layout_constraintTop_toBottomOf="@id/widget_title"
-            app:layout_constraintBottom_toBottomOf="parent"
             tools:text="Main time display with customizable typography" />
 
+        <!-- Add / Added Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/add_widget_button"
             style="@style/Widget.Material3.Button.TonalButton"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
             android:text="@string/add_widget"
             app:icon="@drawable/ic_add"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" />
+            app:iconGravity="textStart" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

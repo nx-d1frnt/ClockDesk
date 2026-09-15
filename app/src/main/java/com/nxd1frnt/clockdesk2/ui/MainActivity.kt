@@ -109,7 +109,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
-    private lateinit var backgroundButton: Button
     private lateinit var backgroundCustomizationTab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var editModeBlurLayer: ImageView
@@ -388,7 +387,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         performanceOverlay = findViewById(R.id.performance_overlay)
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
-        backgroundButton = findViewById(R.id.background_button)
         backgroundCustomizationTab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
         sideSheet = findViewById(R.id.side_sheet)
@@ -407,10 +405,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
 
-        settingsButton.alpha = 0f
-        settingsButton.visibility = View.GONE
-        debugButton.alpha = 0f
-        debugButton.visibility = View.GONE
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
         editModeActionBar.visibility = View.GONE
@@ -2208,8 +2202,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         widgetMover.setEditMode(isEditMode)
         val targetRadius = dpToPx(36f)
         if (isEditMode) {
-            settingsButton.visibility = View.VISIBLE
-            debugButton.visibility = View.VISIBLE
             backgroundCustomizationTab.visibility = View.VISIBLE
             mainLayout.animate()
                 .scaleX(0.90f)
@@ -2223,14 +2215,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 editModeBlurLayer.alpha = 1.0f
                 updateBackgroundFilters()
             }
-            settingsButton.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
-            debugButton.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
             backgroundCustomizationTab.animate()
                 .alpha(1f)
                 .setDuration(animationDuration)
@@ -2304,14 +2288,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 })
                 .start()
         }
-        settingsButton.animate()
-            .alpha(0f)
-            .setDuration(animationDuration)
-            .start()
-        debugButton.animate()
-            .alpha(0f)
-            .setDuration(animationDuration)
-            .start()
         backgroundCustomizationTab.animate()
             .alpha(0f)
             .setDuration(animationDuration)
@@ -2373,8 +2349,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .start()
         }
 
-        settingsButton.visibility = View.GONE
-        debugButton.visibility = View.GONE
         backgroundCustomizationTab.visibility = View.GONE
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
