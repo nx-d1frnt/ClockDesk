@@ -1099,6 +1099,29 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- БЛОК: REMOVE WIDGET -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_remove_widget"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorErrorContainer"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.ClockDesk.Single">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/remove_widget_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnErrorContainer"
+                    app:iconTint="?attr/colorOnErrorContainer"
+                    app:icon="@drawable/ic_close"
+                    android:text="@string/remove_widget" />
+            </com.google.android.material.card.MaterialCardView>
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 

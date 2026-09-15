@@ -18,6 +18,7 @@
     <string name="font_size">Size</string>
     <string name="transparency">Transparency</string>
     <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
     <string name="apply">Apply</string>
     <string name="customize_time">Customize Time</string>
     <string name="customize_date">Customize Date</string>
@@ -167,6 +168,8 @@
     <string name="smart_chips_settings_title">Smart Chips Settings</string>
     <string name="show_battery_alert_chip">Battery Alert Chip</string>
     <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
+    <string name="show_companion_battery_chip">Connected Device Battery</string>
+    <string name="show_companion_battery_chip_summary">Show alert when paired phone or PC battery is low</string>
     <string name="battery_low">Battery Low</string>
     <string name="battery_saver_on">Saver On</string>
     <string name="battery_alert_settings_title">Battery Alert Settings</string>
@@ -236,8 +239,10 @@
     <string name="burn_in_protection_summary">Prevent burn-in on OLED screens by moving UI elements periodically</string>
     <string name="system_media_plugin_name">System Media</string>
     <string name="lastfm_plugin_name">Last.fm</string>
+    <string name="deskconnect_plugin_name">DeskConnect</string>
     <string name="system_media_plugin_description">Android MediaSession</string>
     <string name="lastfm_plugin_description">Scrobble API</string>
+    <string name="deskconnect_plugin_description">Remote media from paired device</string>
     <string name="music_settings_title">Music settings</string>
     <string name="permission_required_title">Permission Required</string>
     <string name="permission_notification_explanation">ClockDesk needs access to notifications to read currently playing music from apps like Spotify or YouTube.\n\nPlease find ClockDesk in the list and enable it.</string>
@@ -467,4 +472,47 @@
     <string name="color_green">Green</string>
     <string name="color_blue">Blue</string>
     <string name="color_hex">HEX</string>
+
+    <!-- Desktop Widgets -->
+    <string name="add_widget">Add Widget</string>
+    <string name="remove_widget">Remove Widget</string>
+    <string name="reset_layout">Reset Layout</string>
+    <string name="done">Done</string>
+    <string name="widget_clock_title">Clock</string>
+    <string name="widget_clock_desc">Main time display with customizable fonts and styles</string>
+    <string name="widget_date_title">Date</string>
+    <string name="widget_date_desc">Calendar date with customizable formats and typography</string>
+    <string name="widget_media_title">Now Playing</string>
+    <string name="widget_media_desc">Current media track title and artist from active music players</string>
+    <string name="widget_smart_chips_title">Smart Chips</string>
+    <string name="widget_smart_chips_desc">Contextual badges for battery, weather, alarms, and notifications</string>
+    <string name="widget_weather_title">Weather</string>
+    <string name="widget_weather_desc">Live temperature and condition icon</string>
+    <string name="widget_gallery_title">Widget Gallery</string>
+    <string name="widget_gallery_subtitle">Choose a widget to add to your desk</string>
+    <string name="widget_already_added">Already added to desk</string>
+    <string name="empty_desk_prompt">Your desk is empty. Tap + to add a widget.</string>
+    <string name="confirm_reset_layout_title">Reset Layout?</string>
+    <string name="confirm_reset_layout_msg">This will restore the default widgets and positions.</string>
+
+    <!-- DeskConnect -->
+    <string name="deskconnect_settings_title">DeskConnect</string>
+    <string name="deskconnect_settings_subtitle">Connect phones &amp; PCs via KDE Connect protocol</string>
+    <string name="deskconnect_enable_title">Enable DeskConnect</string>
+    <string name="deskconnect_enable_summary">Allow nearby paired devices to stream notifications, music, and battery status</string>
+    <string name="deskconnect_device_name_title">Device Name</string>
+    <string name="deskconnect_device_name_summary">Name broadcasted to other devices on the local network</string>
+    <string name="deskconnect_paired_devices_title">Paired Devices</string>
+    <string name="deskconnect_discovered_devices_title">Available Devices</string>
+    <string name="deskconnect_no_devices_found">Looking for devices on the same Wi-Fi…</string>
+    <string name="deskconnect_no_paired_devices">No paired devices yet</string>
+    <string name="deskconnect_pair">Pair</string>
+    <string name="deskconnect_unpair">Unpair</string>
+    <string name="deskconnect_pairing_request_title">Pairing Request</string>
+    <string name="deskconnect_pairing_request_message">Device \"%1$s\" wants to pair with ClockDesk.\nVerification key: %2$s</string>
+    <string name="deskconnect_accept">Accept</string>
+    <string name="deskconnect_reject">Reject</string>
+    <string name="incoming_call">Incoming Call</string>
+    <string name="show_companion_battery_title">Companion Phone Battery</string>
+    <string name="show_companion_battery_summary">Show battery level of connected DeskConnect companion</string>
 </resources>

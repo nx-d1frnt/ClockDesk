@@ -36,9 +36,47 @@ import kotlin.math.roundToInt
  */
 class WidgetMover(
     private val context: Context,
-    private val views: List<View>,
+    initialViews: List<View>,
     private val parentView: View
 ) {
+    private val views = initialViews.toMutableList()
+
+    fun setViews(newViews: List<View>) {
+        views.clear()
+        views.addAll(newViews)
+        if (isEditMode) {
+            views.forEach { view ->
+                view.setOnTouchListener(dragListener)
+                view.setBackgroundResource(R.drawable.editable_border)
+            }
+        }
+        restoreOrderAndPositions()
+    }
+
+    fun addView(view: View) {
+        if (!views.contains(view)) {
+            views.add(view)
+            if (isEditMode) {
+                view.setOnTouchListener(dragListener)
+                view.setBackgroundResource(R.drawable.editable_border)
+            }
+            restoreOrderAndPositions()
+        }
+    }
+
+    fun removeView(view: View) {
+        if (views.remove(view)) {
+            view.setOnTouchListener(null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                view.background = null
+            } else {
+                @Suppress("DEPRECATION")
+                view.setBackgroundDrawable(null)
+            }
+            restoreOrderAndPositions()
+        }
+    }
+
     private val TAG = "WidgetMover"
     private val prefs: SharedPreferences =
         context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)

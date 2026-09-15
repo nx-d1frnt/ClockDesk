@@ -7,10 +7,16 @@ import android.view.View
 import java.util.Random
 
 class BurnInProtectionManager(
-    private val views: List<View>,
+    initialViews: List<View>,
     private val maxShiftPx: Int = 10,
     private val intervalMs: Long = 60000L //1 minute
 ) {
+    private val views = initialViews.toMutableList()
+
+    fun updateViews(newViews: List<View>) {
+        views.clear()
+        views.addAll(newViews)
+    }
     private val handler = Handler(Looper.getMainLooper())
     private val random = Random()
     private var isRunning = false

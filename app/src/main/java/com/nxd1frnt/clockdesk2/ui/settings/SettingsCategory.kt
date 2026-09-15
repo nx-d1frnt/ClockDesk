@@ -58,6 +58,13 @@ object SettingsCategoryProvider {
                 fragmentClass = com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment::class.java
             ),
             SettingsCategory(
+                id = "deskconnect",
+                title = context.getString(R.string.deskconnect_settings_title),
+                subtitle = context.getString(R.string.deskconnect_settings_subtitle),
+                iconResId = R.drawable.ic_desk_connect,
+                fragmentClass = com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment::class.java
+            ),
+            SettingsCategory(
                 id = "backup",
                 title = context.getString(R.string.backup_restore_title),
                 subtitle = context.getString(R.string.backup_restore_subtitle),

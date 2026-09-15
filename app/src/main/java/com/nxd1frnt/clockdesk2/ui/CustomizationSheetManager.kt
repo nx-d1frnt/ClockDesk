@@ -118,6 +118,10 @@ class CustomizationSheetManager(
 
     private val bsMoveUpBtn by lazy { sideSheetView.findViewById<Button>(R.id.move_up_button) }
     private val bsMoveDownBtn by lazy { sideSheetView.findViewById<Button>(R.id.move_down_button) }
+    private val bsRemoveWidgetBtn by lazy { sideSheetView.findViewById<Button>(R.id.remove_widget_button) }
+    private val bsRemoveWidgetCard by lazy { sideSheetView.findViewById<View>(R.id.card_remove_widget) }
+
+    var onRemoveWidgetRequested: ((View) -> Unit)? = null
 
     private val bsVarTitle by lazy { sideSheetView.findViewById<TextView>(R.id.variable_properties_title) }
 
@@ -424,7 +428,8 @@ class CustomizationSheetManager(
         val isDate = view.id == R.id.date_text
         val isLastFm = view.id == R.id.lastfm_layout
         val isSmartChip = view.id == R.id.smart_chip_container
-        val showLayoutControls = isTime || isDate || isLastFm
+        val isWeather = view.id == R.id.weather_layout
+        val showLayoutControls = isTime || isDate || isLastFm || isWeather
 
         bsTitle.text = sideSheetView.context.getString(
             when {
@@ -432,6 +437,7 @@ class CustomizationSheetManager(
                 isDate -> R.string.customize_date
                 isLastFm -> R.string.customize_now_playing
                 isSmartChip -> R.string.customize_smart_chips
+                isWeather -> R.string.widget_weather_title
                 else -> R.string.app_name
             }
         )
@@ -470,6 +476,7 @@ class CustomizationSheetManager(
         bsDateFormatCard.visibility = if (isDate) View.VISIBLE else View.GONE
         bsTimeFormatCard.visibility = if (isTime) View.VISIBLE else View.GONE
         bsEditBackgroundSwitch.visibility = if (isSmartChip) View.VISIBLE else View.GONE
+        bsRemoveWidgetCard.visibility = View.VISIBLE
     }
 
     private fun loadSettingsForView(view: View) {
@@ -784,6 +791,12 @@ class CustomizationSheetManager(
     private fun setupButtons() {
         bsMoveUpBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, true); applyRealTimeFocusUpdate(true) } }
         bsMoveDownBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, false); applyRealTimeFocusUpdate(true) } }
+        bsRemoveWidgetBtn.setOnClickListener {
+            focusedView?.let { v ->
+                onRemoveWidgetRequested?.invoke(v)
+                hide()
+            }
+        }
 
         bsApplyButton.setOnClickListener { fontManager.saveSettings(); hide() }
         bsCancelButton.setOnClickListener { fontManager.loadFont(); widgetMover.restoreOrderAndPositions(); hide() }

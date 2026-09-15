@@ -33,8 +33,6 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.widget.Button
-import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -43,8 +41,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
-import java.util.Calendar
-import java.util.Date
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -54,6 +50,7 @@ import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -82,7 +79,6 @@ import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.EntranceAnimationManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
-import com.nxd1frnt.clockdesk2.utils.GeocodingHelper
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
@@ -92,6 +88,10 @@ import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
+import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
+import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetType
+import java.util.Calendar
+import java.util.Date
 
 class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var timeText: TextView
@@ -113,6 +113,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var backgroundCustomizationTab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var editModeBlurLayer: ImageView
+    private lateinit var editModeActionBar: MaterialCardView
+    private lateinit var btnAddWidget: Button
+    private lateinit var btnResetLayout: Button
+    private lateinit var btnDoneEdit: Button
+    private lateinit var emptyDeskPrompt: TextView
 
     // UI Elements
     private lateinit var sideSheet: LinearLayout
@@ -125,10 +130,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var smartPixelManager: SmartPixelManager
     private lateinit var smartPixelOverlay: View
     private lateinit var customizationSheetManager: CustomizationSheetManager
+    private lateinit var widgetGallerySideSheetManager: WidgetGallerySideSheetManager
     private lateinit var backgroundSheetManager: BackgroundSheetManager
     private lateinit var tutorialManager: TutorialManager
 
     // Core Managers
+    private lateinit var desktopWidgetManager: DesktopWidgetManager
     private lateinit var clockManager: ClockManager
     private lateinit var gradientManager: GradientManager
     private lateinit var fontManager: FontManager
@@ -141,6 +148,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var smartChipManager: SmartChipManager
     private lateinit var chipContainer: ConstraintLayout
     private lateinit var widgetMover: WidgetMover
+    private lateinit var deskNotificationManager: com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager
+    private lateinit var deskCallOverlay: com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var powerStateManager: PowerStateManager
     private lateinit var sensorManager: SensorManager
@@ -218,6 +227,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private val editModeTimeoutRunnable = Runnable {
         if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN ||
+            (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) ||
             (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing)
         ) {
             return@Runnable
@@ -389,6 +399,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         chipContainer = findViewById(R.id.smart_chip_container)
         smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
+        editModeActionBar = findViewById(R.id.edit_mode_action_bar)
+        btnAddWidget = findViewById(R.id.btn_add_widget)
+        btnResetLayout = findViewById(R.id.btn_reset_layout)
+        btnDoneEdit = findViewById(R.id.btn_done_edit)
+        emptyDeskPrompt = findViewById(R.id.empty_desk_prompt)
 
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
 
@@ -398,6 +413,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         debugButton.visibility = View.GONE
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
+        editModeActionBar.visibility = View.GONE
+        emptyDeskPrompt.visibility = View.GONE
     }
 
     private fun initCoreManagers() {
@@ -433,10 +450,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         weatherGetter = OpenMeteoAPI(this, locationManager) {
             runOnUiThread {
-//                if (weatherGetter.temperature != null) {
-//                    weatherText.text = "${weatherGetter.temperature}°C"
-//                }
-
                 val code = weatherGetter.weatherCode ?: 0
                 val wind = weatherGetter.windSpeed ?: 0.0
                 val isNight = !dayTimeGetter.isDay()
@@ -495,6 +508,36 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         )
         lifecycle.addObserver(smartChipManager)
 
+        val deskConnectManager = com.nxd1frnt.clockdesk2.connect.DeskConnectManager.getInstance(this)
+        val notificationContainer = findViewById<android.view.ViewGroup>(R.id.desk_notification_container)
+        val callContainer = findViewById<android.view.ViewGroup>(R.id.desk_call_container)
+        deskNotificationManager = com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager(this, notificationContainer, deskConnectManager)
+        deskCallOverlay = com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay(this, callContainer, deskConnectManager)
+
+        deskConnectManager.deviceListeners.add(object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
+            override fun onDeviceDiscovered(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onDeviceConnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onDeviceDisconnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onPairingRequested(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, verificationKey: String) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this@MainActivity)
+                            .setTitle(R.string.deskconnect_pairing_request_title)
+                            .setMessage(getString(R.string.deskconnect_pairing_request_message, device.getDisplayName(), verificationKey))
+                            .setPositiveButton(R.string.deskconnect_accept) { _, _ ->
+                                deskConnectManager.acceptPair(device)
+                            }
+                            .setNegativeButton(R.string.deskconnect_reject) { _, _ ->
+                                deskConnectManager.rejectPair(device)
+                            }
+                            .setCancelable(false)
+                            .show()
+                    }
+                }
+            }
+            override fun onPairingStateChanged(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, isPaired: Boolean) {}
+        })
+
         clockManager = ClockManager(
             timeText,
             dateText,
@@ -547,10 +590,37 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             enableAdditionalLogging
         )
 
-        burnInProtectionManager = BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
+        desktopWidgetManager = DesktopWidgetManager(this, mainLayout)
+        desktopWidgetManager.bindExistingViews(
+            timeView = timeText,
+            dateView = dateText,
+            mediaView = lastfmLayout,
+            chipsView = chipContainer,
+            weatherView = weatherLayout
+        )
 
-        widgetMover = WidgetMover(this, listOf(lastfmLayout, dateText, timeText), mainLayout)
+        val activeViews = desktopWidgetManager.getViews()
+        val movableViews = activeViews.filter { it !== chipContainer }
+
+        burnInProtectionManager = BurnInProtectionManager(activeViews)
+
+        widgetMover = WidgetMover(this, movableViews, mainLayout)
         widgetMover.burnInProtectionManager = burnInProtectionManager
+
+        desktopWidgetManager.onWidgetsChanged = {
+            desktopWidgetManager.bindExistingViews(
+                timeView = timeText,
+                dateView = dateText,
+                mediaView = lastfmLayout,
+                chipsView = chipContainer,
+                weatherView = weatherLayout
+            )
+            val currentActiveViews = desktopWidgetManager.getViews()
+            widgetMover.setViews(currentActiveViews.filter { it !== chipContainer })
+            burnInProtectionManager.updateViews(currentActiveViews)
+            fontManager.loadFont()
+            updateEmptyDeskPromptVisibility()
+        }
 
         widgetMover.onInitialLayoutComplete = {
             isWidgetLayoutComplete = true
@@ -608,7 +678,29 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         )
 
-        // 2. Background Sheet
+        customizationSheetManager.onRemoveWidgetRequested = { viewToRemove ->
+            removeWidget(viewToRemove)
+        }
+
+        // 2. Widget Gallery Side Sheet
+        widgetGallerySideSheetManager = WidgetGallerySideSheetManager(
+            sideSheetView = findViewById(R.id.widget_gallery_side_sheet),
+            mainLayout = mainLayout,
+            backgroundCustomizationTab = backgroundCustomizationTab,
+            widgetManager = desktopWidgetManager,
+            onWidgetAdded = { type ->
+                onWidgetAdded(type)
+            },
+            onSheetStateChanged = { isHidden ->
+                if (isHidden) {
+                    resetEditModeTimeout()
+                } else {
+                    stopHideUiTimer()
+                }
+            }
+        )
+
+        // 3. Background Sheet
         backgroundSheetManager = BackgroundSheetManager(
             floatingMenuView = backgroundBottomSheet,
             mainLayout = mainLayout,
@@ -863,10 +955,40 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             exitEditMode()
         }
 
+        btnAddWidget.setOnClickListener {
+            if (customizationSheetManager.isShowing) {
+                customizationSheetManager.hide()
+            }
+            widgetGallerySideSheetManager.show()
+            stopHideUiTimer()
+        }
+
+        btnResetLayout.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.confirm_reset_layout_title)
+                .setMessage(R.string.confirm_reset_layout_msg)
+                .setPositiveButton(R.string.reset_layout) { _, _ ->
+                    desktopWidgetManager.resetToDefaults()
+                    Toast.makeText(this, R.string.reset_layout, Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+            resetEditModeTimeout()
+        }
+
+        btnDoneEdit.setOnClickListener {
+            exitEditMode()
+        }
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
                     backgroundSheetManager.cancelAndHide()
+                    return
+                }
+
+                if (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) {
+                    widgetGallerySideSheetManager.hide()
                     return
                 }
 
@@ -993,6 +1115,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         super.onDestroy()
         weatherGetter.stopUpdates()
         musicManager?.destroy()
+        if (::deskNotificationManager.isInitialized) deskNotificationManager.destroy()
+        if (::deskCallOverlay.isInitialized) deskCallOverlay.destroy()
         pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
         if (::backgroundSheetManager.isInitialized) backgroundSheetManager.onDestroy()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
@@ -2111,10 +2235,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .alpha(1f)
                 .setDuration(animationDuration)
                 .start()
+            editModeActionBar.visibility = View.VISIBLE
+            editModeActionBar.alpha = 0f
+            editModeActionBar.animate()
+                .alpha(1f)
+                .setDuration(animationDuration)
+                .start()
+            updateEmptyDeskPromptVisibility()
             timeText.setBackgroundResource(R.drawable.editable_border)
             dateText.setBackgroundResource(R.drawable.editable_border)
             lastfmLayout.setBackgroundResource(R.drawable.editable_border)
             chipContainer.setBackgroundResource(R.drawable.editable_border)
+            weatherLayout.setBackgroundResource(R.drawable.editable_border)
             lastfmLayout.animate().cancel()
             lastfmLayout.clearAnimation()
             lastfmLayout.post {
@@ -2184,6 +2316,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             .alpha(0f)
             .setDuration(animationDuration)
             .start()
+        editModeActionBar.animate()
+            .alpha(0f)
+            .setDuration(animationDuration)
+            .withEndAction {
+                if (!isEditMode) {
+                    editModeActionBar.visibility = View.GONE
+                }
+            }
+            .start()
+        emptyDeskPrompt.visibility = View.GONE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             timeText.background = null
         } else
@@ -2201,6 +2343,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             chipContainer.background = null
         } else {
             chipContainer.setBackgroundDrawable(null)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            weatherLayout.background = null
+        } else {
+            weatherLayout.setBackgroundDrawable(null)
         }
         val isMusicPlaying = !nowPlayingTextView.text.isNullOrEmpty() &&
                 lastTrackInfo != null &&
@@ -2230,6 +2377,39 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         debugButton.visibility = View.GONE
         backgroundCustomizationTab.visibility = View.GONE
         handler.removeCallbacks(editModeTimeoutRunnable)
+    }
+
+    private fun updateEmptyDeskPromptVisibility() {
+        val hasVisibleWidgets = desktopWidgetManager.getActiveInstances().isNotEmpty()
+        emptyDeskPrompt.visibility = if (isEditMode && !hasVisibleWidgets) View.VISIBLE else View.GONE
+    }
+
+    private fun removeWidget(view: View) {
+        val instance = desktopWidgetManager.getInstanceForView(view)
+        if (instance != null) {
+            desktopWidgetManager.removeWidget(instance)
+            widgetMover.removeView(view)
+            burnInProtectionManager.updateViews(desktopWidgetManager.getViews())
+            updateEmptyDeskPromptVisibility()
+            Toast.makeText(this, R.string.remove_widget, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun onWidgetAdded(type: DesktopWidgetType) {
+        val view = when (type) {
+            DesktopWidgetType.TIME -> timeText
+            DesktopWidgetType.DATE -> dateText
+            DesktopWidgetType.MEDIA -> lastfmLayout
+            DesktopWidgetType.SMART_CHIPS -> chipContainer
+            DesktopWidgetType.WEATHER -> weatherLayout
+        }
+        view.visibility = View.VISIBLE
+        desktopWidgetManager.bindExistingViews(timeText, dateText, lastfmLayout, chipContainer, weatherLayout)
+        val activeViews = desktopWidgetManager.getViews()
+        widgetMover.setViews(activeViews.filter { it !== chipContainer })
+        burnInProtectionManager.updateViews(activeViews)
+        fontManager.loadFont()
+        updateEmptyDeskPromptVisibility()
     }
 
     override fun onResume() {

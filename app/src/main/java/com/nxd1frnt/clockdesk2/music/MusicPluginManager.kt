@@ -28,6 +28,7 @@ class MusicPluginManager(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             add(SystemSessionPlugin(context))
         }
+        add(com.nxd1frnt.clockdesk2.music.plugins.KdeConnectMusicPlugin(context))
         add(LastFmPlugin(context))
     }
 
@@ -50,8 +51,8 @@ class MusicPluginManager(
     }
 
     private fun reloadPriorities() {
-        val rawOrder = sharedPreferences.getString("music_provider_order", "system_media,lastfm")
-            ?: "system_media,lastfm"
+        val rawOrder = sharedPreferences.getString("music_provider_order", "system_media,deskconnect_mpris,lastfm")
+            ?: "system_media,deskconnect_mpris,lastfm"
         priorityList = rawOrder.split(",").map { it.trim() }
         recalculateOutput()
     }

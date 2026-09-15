@@ -95,6 +95,7 @@ class SmartChipManager(
 
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.CompanionBatteryChipPlugin(context),
         UpdatePlugin(context),
         BackgroundProgressPlugin(context),
         AlarmChipPlugin(context),
@@ -718,7 +719,7 @@ class SmartChipManager(
 
     private fun executeSortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
-        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_companion_battery,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
         val orderList = orderString.split(",").map { it.trim() }
 
         // Фильтруем видимые чипы и сортируем их по индексу в orderList
