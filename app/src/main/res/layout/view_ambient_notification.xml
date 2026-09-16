@@ -33,7 +33,6 @@
             android:layout_height="32dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_widgets_outline"
-            app:tint="#FFFFFF"
             android:contentDescription="@null" />
 
         <LinearLayout

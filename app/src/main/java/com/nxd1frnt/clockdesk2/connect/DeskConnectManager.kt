@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.LruCache
 import android.widget.Toast
 import androidx.preference.PreferenceManager
 import com.nxd1frnt.clockdesk2.connect.discovery.DeskConnectDiscovery
@@ -70,6 +71,9 @@ class DeskConnectManager private constructor(private val context: Context) {
 
     private var server: DeskConnectServer? = null
     private var discovery: DeskConnectDiscovery? = null
+
+    private val iconCacheByHash = object : LruCache<String, ByteArray>(64) {}
+    private val iconCacheByApp = object : LruCache<String, ByteArray>(64) {}
 
     // Listeners
     interface DeviceListener {
@@ -283,6 +287,7 @@ class DeskConnectManager private constructor(private val context: Context) {
         val connection = DeskConnectConnection(
             socket = sslSocket,
             device = device,
+            security = security,
             onPacketReceived = { conn, packet, payload ->
                 handlePacket(conn, packet, payload)
             },
@@ -323,6 +328,7 @@ class DeskConnectManager private constructor(private val context: Context) {
             val connection = DeskConnectConnection(
                 socket = sslSocket,
                 device = device,
+                security = security,
                 onPacketReceived = { conn, packet, payload ->
                     handlePacket(conn, packet, payload)
                 },
@@ -446,6 +452,24 @@ class DeskConnectManager private constructor(private val context: Context) {
                 val time = body.optLong("time", System.currentTimeMillis())
                 val isClearable = body.optBoolean("isClearable", true)
                 val isSilent = body.optBoolean("silent", false)
+                val payloadHash = body.optString("payloadHash", "").takeIf { it.isNotEmpty() }
+
+                var iconBytes = payload
+                if (iconBytes != null && iconBytes.isNotEmpty()) {
+                    if (payloadHash != null) {
+                        iconCacheByHash.put(payloadHash, iconBytes)
+                    }
+                    if (appName.isNotEmpty()) {
+                        iconCacheByApp.put(appName.lowercase(), iconBytes)
+                    }
+                } else {
+                    if (payloadHash != null) {
+                        iconBytes = iconCacheByHash.get(payloadHash)
+                    }
+                    if (iconBytes == null && appName.isNotEmpty()) {
+                        iconBytes = iconCacheByApp.get(appName.lowercase())
+                    }
+                }
 
                 if (nId.isNotEmpty() && !isSilent && (title.isNotEmpty() || text.isNotEmpty())) {
                     mainHandler.post {
@@ -457,7 +481,7 @@ class DeskConnectManager private constructor(private val context: Context) {
                                 title = title,
                                 text = text,
                                 timestamp = time,
-                                iconBytes = payload,
+                                iconBytes = iconBytes,
                                 isClearable = isClearable
                             )
                         }
