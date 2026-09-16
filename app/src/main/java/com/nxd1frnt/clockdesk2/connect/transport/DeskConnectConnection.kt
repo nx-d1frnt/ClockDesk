@@ -22,6 +22,11 @@ class DeskConnectConnection(
     private val onDisconnected: (DeskConnectConnection) -> Unit
 ) {
     private val isRunning = AtomicBoolean(true)
+    @Volatile
+    var isReplaced: Boolean = false
+
+    fun isAlive(): Boolean = isRunning.get() && !socket.isClosed
+
     private var readerThread: Thread? = null
     private var outputStream: OutputStream? = null
     private val sendExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -64,7 +69,7 @@ class DeskConnectConnection(
             }
         } catch (e: Exception) {
             if (isRunning.get()) {
-                Logger.d("DeskConnectConnection") { "Connection terminated for ${device.deviceId}: ${e.message}" }
+                Logger.i("DeskConnect/Connection") { "Connection to ${device.deviceName} (${device.deviceId}) terminated: ${e.message ?: e.javaClass.simpleName}" }
             }
         } finally {
             close()
@@ -142,6 +147,7 @@ class DeskConnectConnection(
 
     fun close() {
         if (!isRunning.getAndSet(false)) return
+        Logger.d("DeskConnect/Connection") { "Closing socket for ${device.deviceName} (${device.deviceId}) [replaced=$isReplaced]" }
         try {
             sendExecutor.shutdownNow()
         } catch (e: Exception) {

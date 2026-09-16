@@ -13,7 +13,7 @@ object Logger {
     }
 
     inline fun w(tag: String, message: () -> String) {
-        if (isLoggingEnabled) {
+        if (isLoggingEnabled || tag.startsWith("DeskConnect") || tag == "KdeConnectMusicPlugin") {
             Log.w(tag, message())
         }
     }
@@ -23,7 +23,7 @@ object Logger {
     }
 
     inline fun i(tag: String, message: () -> String) {
-        if (isLoggingEnabled) {
+        if (isLoggingEnabled || tag.startsWith("DeskConnect") || tag == "KdeConnectMusicPlugin") {
             Log.i(tag, message())
         }
     }

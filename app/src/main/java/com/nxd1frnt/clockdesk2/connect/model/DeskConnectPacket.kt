@@ -110,6 +110,7 @@ data class DeskConnectPacket(
         fun createMprisPlayerListRequest(): DeskConnectPacket {
             val body = JSONObject().apply {
                 put("requestPlayerList", true)
+                put("supportAlbumArtPayload", true)
             }
             return DeskConnectPacket(id = 0, type = TYPE_MPRIS_REQUEST, body = body)
         }
@@ -119,6 +120,15 @@ data class DeskConnectPacket(
                 put("player", player)
                 put("requestNowPlaying", true)
                 put("requestVolume", true)
+                put("supportAlbumArtPayload", true)
+            }
+            return DeskConnectPacket(id = 0, type = TYPE_MPRIS_REQUEST, body = body)
+        }
+
+        fun createMprisAlbumArtRequest(player: String, albumArtUrl: String): DeskConnectPacket {
+            val body = JSONObject().apply {
+                put("player", player)
+                put("albumArtUrl", albumArtUrl)
             }
             return DeskConnectPacket(id = 0, type = TYPE_MPRIS_REQUEST, body = body)
         }

@@ -130,6 +130,12 @@ class DeskConnectManager private constructor(private val context: Context) {
             deviceId: String,
             playerList: List<String>
         ) {}
+
+        fun onAlbumArtTransferred(
+            deviceId: String,
+            albumArtUrl: String,
+            artworkBytes: ByteArray
+        ) {}
     }
 
     val deviceListeners = CopyOnWriteArrayList<DeviceListener>()
@@ -168,10 +174,18 @@ class DeskConnectManager private constructor(private val context: Context) {
             context = context,
             security = security,
             deviceName = customDeviceName,
-            tcpPort = portToAdvertise
-        ) { discoveredDevice ->
-            handleDiscoveredDevice(discoveredDevice)
-        }.apply {
+            tcpPort = portToAdvertise,
+            shouldBroadcast = {
+                val paired = discoveredDevices.values.filter { it.isPaired }
+                paired.isEmpty() || paired.any { !it.isConnected }
+            },
+            isDeviceConnected = { devId ->
+                activeConnections[devId]?.isAlive() == true
+            },
+            onDeviceDiscovered = { discoveredDevice ->
+                handleDiscoveredDevice(discoveredDevice)
+            }
+        ).apply {
             start()
         }
 
@@ -280,6 +294,7 @@ class DeskConnectManager private constructor(private val context: Context) {
         }
         device.deviceName = remoteName
         device.deviceType = deviceType
+        device.ipAddress = sslSocket.inetAddress
         device.certificate = cert
         device.isConnected = true
         device.isPaired = security.isDevicePaired(remoteDeviceId)
@@ -298,11 +313,16 @@ class DeskConnectManager private constructor(private val context: Context) {
 
         val oldConn = activeConnections.put(remoteDeviceId, connection)
         if (oldConn != null && oldConn != connection) {
+            oldConn.isReplaced = true
             oldConn.close()
         }
 
         if (device.isPaired) {
             connection.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+        }
+
+        Logger.i("DeskConnect/Connection") {
+            "Incoming connection established with ${device.deviceName} (${device.deviceId}) from ${sslSocket.inetAddress?.hostAddress} [type=${device.deviceType}, paired=${device.isPaired}]"
         }
 
         mainHandler.post {
@@ -322,6 +342,7 @@ class DeskConnectManager private constructor(private val context: Context) {
         s.connectToDevice(device, onConnected = { sslSocket, cert ->
             connectingDevices.remove(device.deviceId)
             device.certificate = cert
+            device.ipAddress = sslSocket.inetAddress
             device.isConnected = true
             device.isPaired = security.isDevicePaired(device.deviceId)
 
@@ -339,11 +360,16 @@ class DeskConnectManager private constructor(private val context: Context) {
 
             val oldConn = activeConnections.put(device.deviceId, connection)
             if (oldConn != null && oldConn != connection) {
+                oldConn.isReplaced = true
                 oldConn.close()
             }
 
             if (device.isPaired) {
                 connection.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+            }
+
+            Logger.i("DeskConnect/Connection") {
+                "Outgoing connection established to ${device.deviceName} (${device.deviceId}) at ${device.ipAddress?.hostAddress}:${device.tcpPort} [type=${device.deviceType}, paired=${device.isPaired}]"
             }
 
             mainHandler.post {
@@ -352,6 +378,9 @@ class DeskConnectManager private constructor(private val context: Context) {
         }, onError = {
             connectingDevices.remove(device.deviceId)
             device.isConnected = false
+            Logger.w("DeskConnect/Connection") {
+                "Failed outgoing connection to ${device.deviceName} (${device.deviceId}) at ${device.ipAddress?.hostAddress}:${device.tcpPort}: ${it.message}"
+            }
         })
     }
 
@@ -377,17 +406,23 @@ class DeskConnectManager private constructor(private val context: Context) {
                 }
                 device.deviceName = remoteName
                 device.deviceType = deviceType
+                device.ipAddress = conn.socket.inetAddress
                 device.isConnected = true
                 device.isPaired = security.isDevicePaired(remoteId)
                 conn.device = device
 
                 val oldConn = activeConnections.put(remoteId, conn)
                 if (oldConn != null && oldConn != conn) {
+                    oldConn.isReplaced = true
                     oldConn.close()
                 }
 
                 if (device.isPaired) {
                     conn.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                }
+
+                Logger.i("DeskConnect/Connection") {
+                    "Identity packet confirmed for ${device.deviceName} (${device.deviceId}) [type=${device.deviceType}, paired=${device.isPaired}]"
                 }
 
                 mainHandler.post {
@@ -536,6 +571,44 @@ class DeskConnectManager private constructor(private val context: Context) {
             DeskConnectPacket.TYPE_MPRIS -> {
                 if (!conn.device.isPaired) return
                 val body = packet.body
+                val devName = conn.device.getDisplayName()
+
+                Logger.i("DeskConnect/MPRIS") {
+                    "MPRIS packet from '$devName' (${conn.device.deviceId}): " +
+                    "body=$body, hasPayload=${payload != null} (${payload?.size ?: 0} bytes)"
+                }
+
+                if (body.optBoolean("transferringAlbumArt", false)) {
+                    val player = body.optString("player", "")
+                    val artUrl = body.optString("albumArtUrl", "")
+                    Logger.i("DeskConnect/MPRIS") {
+                        "Received transferringAlbumArt payload for player '$player' from '$devName': " +
+                        "url='$artUrl', payloadSize=${payload?.size ?: 0} bytes"
+                    }
+                    if (payload != null && artUrl.isNotEmpty()) {
+                        DeskConnectArtCache.getInstance(context).put(artUrl, payload)
+                        mainHandler.post {
+                            mprisListeners.forEach {
+                                it.onAlbumArtTransferred(conn.device.deviceId, artUrl, payload)
+                                if (player.isNotEmpty()) {
+                                    it.onMprisUpdated(
+                                        deviceId = conn.device.deviceId,
+                                        player = player,
+                                        title = null,
+                                        artist = null,
+                                        album = null,
+                                        isPlaying = null,
+                                        positionMs = null,
+                                        lengthMs = null,
+                                        artworkBytes = payload,
+                                        artworkUrl = artUrl
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    return
+                }
 
                 val playerListArray = body.optJSONArray("playerList")
                 if (playerListArray != null) {
@@ -544,9 +617,11 @@ class DeskConnectManager private constructor(private val context: Context) {
                         val playerName = playerListArray.optString(i)
                         if (playerName.isNotEmpty()) {
                             players.add(playerName)
+                            Logger.d("DeskConnect/MPRIS") { "Requesting player status for '$playerName' from '$devName'" }
                             conn.sendPacket(DeskConnectPacket.createMprisPlayerStatusRequest(playerName))
                         }
                     }
+                    Logger.i("DeskConnect/MPRIS") { "Discovered players on '$devName': $players" }
                     mainHandler.post {
                         mprisListeners.forEach {
                             it.onPlayerListReceived(conn.device.deviceId, players)
@@ -568,19 +643,59 @@ class DeskConnectManager private constructor(private val context: Context) {
                     var trackTitle = rawTitle
                     var trackArtist = rawArtist
 
+                    val webSuffixes = listOf(" - YouTube Music", " - YouTube", " - SoundCloud", " - Twitch")
+                    for (suffix in webSuffixes) {
+                        if (trackTitle != null && trackTitle.endsWith(suffix, ignoreCase = true)) {
+                            trackTitle = trackTitle.substring(0, trackTitle.length - suffix.length).trim()
+                            break
+                        }
+                    }
+
                     if (trackTitle.isNullOrEmpty() && !nowPlaying.isNullOrEmpty()) {
-                        if (nowPlaying.contains(" - ")) {
-                            trackArtist = nowPlaying.substringBefore(" - ").trim()
-                            trackTitle = nowPlaying.substringAfter(" - ").trim()
+                        var np: String = nowPlaying
+                        for (suffix in webSuffixes) {
+                            if (np.endsWith(suffix, ignoreCase = true)) {
+                                np = np.substring(0, np.length - suffix.length).trim()
+                                break
+                            }
+                        }
+                        if (np.contains(" - ")) {
+                            trackArtist = np.substringBefore(" - ").trim()
+                            trackTitle = np.substringAfter(" - ").trim()
                         } else {
-                            trackTitle = nowPlaying.trim()
+                            trackTitle = np.trim()
                         }
                     } else if (trackArtist.isNullOrEmpty() && !trackTitle.isNullOrEmpty() && trackTitle.contains(" - ")) {
                         trackArtist = trackTitle.substringBefore(" - ").trim()
                         trackTitle = trackTitle.substringAfter(" - ").trim()
                     }
 
+                    Logger.i("DeskConnect/MPRIS") {
+                        "MPRIS update from '$devName' [player: $player]: " +
+                        "title='$trackTitle', artist='$trackArtist', album='$album', isPlaying=$isPlaying, " +
+                        "albumArtUrl='$albumArtUrl', payload=${payload?.size ?: 0} bytes"
+                    }
+
+                    if (albumArtUrl != null) {
+                        val cachedBitmap = DeskConnectArtCache.getInstance(context).get(albumArtUrl)
+                        if (cachedBitmap != null) {
+                            Logger.d("DeskConnect/MPRIS") { "albumArtUrl for '$player' already cached in memory: $albumArtUrl" }
+                        } else if (albumArtUrl.startsWith("http://") || albumArtUrl.startsWith("https://")) {
+                            Logger.d("DeskConnect/MPRIS") { "albumArtUrl for '$player' is direct HTTP(S) URL: $albumArtUrl, prefetching..." }
+                            DeskConnectArtCache.getInstance(context).fetchHttpArt(albumArtUrl)
+                        } else {
+                            Logger.i("DeskConnect/MPRIS") {
+                                "albumArtUrl for '$player' is remote/local URI ('$albumArtUrl'). " +
+                                "Requesting album art payload transfer from '$devName'..."
+                            }
+                            conn.sendPacket(DeskConnectPacket.createMprisAlbumArtRequest(player, albumArtUrl))
+                        }
+                    } else {
+                        Logger.d("DeskConnect/MPRIS") { "Device '$devName' did not provide any albumArtUrl for '$player'" }
+                    }
+
                     if (trackTitle.isNullOrEmpty() && trackArtist.isNullOrEmpty() && isPlaying == true) {
+                        Logger.d("DeskConnect/MPRIS") { "Player '$player' is playing but has no metadata, requesting status..." }
                         conn.sendPacket(DeskConnectPacket.createMprisPlayerStatusRequest(player))
                     }
 
@@ -614,12 +729,31 @@ class DeskConnectManager private constructor(private val context: Context) {
 
     private fun handleDisconnected(conn: DeskConnectConnection) {
         val dev = conn.device
+        if (conn.isReplaced) {
+            Logger.d("DeskConnect/Connection") {
+                "Old connection socket closed (superseded by new link) for ${dev.deviceName} (${dev.deviceId})"
+            }
+            return
+        }
+
         if (activeConnections[dev.deviceId] == conn) {
             activeConnections.remove(dev.deviceId)
-            dev.isConnected = false
-            mainHandler.post {
-                deviceListeners.forEach { it.onDeviceDisconnected(dev) }
-            }
+            // Wait 1000ms grace period: if the peer reconnected with a new socket during renegotiation,
+            // don't drop media player state or broadcast false disconnects
+            mainHandler.postDelayed({
+                val currentConn = activeConnections[dev.deviceId]
+                if (currentConn == null || !currentConn.isAlive()) {
+                    dev.isConnected = false
+                    Logger.i("DeskConnect/Connection") {
+                        "Device disconnected: ${dev.deviceName} (${dev.deviceId}) [ip=${dev.ipAddress?.hostAddress ?: "unknown"}]"
+                    }
+                    deviceListeners.forEach { it.onDeviceDisconnected(dev) }
+                } else {
+                    Logger.d("DeskConnect/Connection") {
+                        "Device ${dev.deviceName} (${dev.deviceId}) connection gracefully maintained by newer socket"
+                    }
+                }
+            }, 1000L)
         }
     }
 

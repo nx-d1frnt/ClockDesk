@@ -22,6 +22,8 @@ class DeskConnectDiscovery(
     private val security: DeskConnectSecurity,
     private val deviceName: String,
     private val tcpPort: Int = 1716,
+    private val shouldBroadcast: (() -> Boolean)? = null,
+    private val isDeviceConnected: ((String) -> Boolean)? = null,
     private val onDeviceDiscovered: (DeskConnectDevice) -> Unit
 ) {
     companion object {
@@ -170,12 +172,15 @@ class DeskConnectDiscovery(
             lastSeenTimestamp = System.currentTimeMillis()
         )
 
-        // Throttle unicast UDP replies to avoid continuous flood
-        val now = System.currentTimeMillis()
-        val lastReplied = lastRepliedTime[remoteDeviceId] ?: 0L
-        if (now - lastReplied > UNICAST_REPLY_THROTTLE_MS) {
-            lastRepliedTime[remoteDeviceId] = now
-            sendUnicastIdentity(remoteAddress, UDP_PORT)
+        // Do not send unicast reply if already connected over TCP (prevents connection thrashing)
+        val isConnected = isDeviceConnected?.invoke(remoteDeviceId) ?: false
+        if (!isConnected) {
+            val now = System.currentTimeMillis()
+            val lastReplied = lastRepliedTime[remoteDeviceId] ?: 0L
+            if (now - lastReplied > UNICAST_REPLY_THROTTLE_MS) {
+                lastRepliedTime[remoteDeviceId] = now
+                sendUnicastIdentity(remoteAddress, UDP_PORT)
+            }
         }
 
         onDeviceDiscovered(device)
@@ -204,12 +209,29 @@ class DeskConnectDiscovery(
     }
 
     private fun runBroadcaster() {
+        // Initial burst: announce ourselves immediately on startup
+        sendBroadcastPacket()
+        try {
+            Thread.sleep(2000)
+        } catch (e: InterruptedException) {
+            return
+        }
+        if (!isRunning.get()) return
+        // Send a 2nd packet to ensure initial discovery even with Wi-Fi packet drops
+        sendBroadcastPacket()
+
+        // Background maintenance loop: ONLY broadcast if we have disconnected/unpaired peers,
+        // and do it at a conservative 60-second interval to avoid resetting active connections.
         while (isRunning.get()) {
-            sendBroadcastPacket()
             try {
-                Thread.sleep(10000) // Broadcast identity every 10 seconds (standard)
+                Thread.sleep(60000)
             } catch (e: InterruptedException) {
                 break
+            }
+            if (!isRunning.get()) break
+
+            if (shouldBroadcast?.invoke() != false) {
+                sendBroadcastPacket()
             }
         }
     }

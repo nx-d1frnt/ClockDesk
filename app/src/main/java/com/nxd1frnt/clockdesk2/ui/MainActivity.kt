@@ -1287,6 +1287,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
                 val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
 
+                Logger.d("MainActivity") {
+                    "handleMusicStateUpdate: '${track.artist} - ${track.title}', isTextDiff=$isTextDifferent, isArtChanged=$isArtChanged, wasBgApplied=$wasMusicBackgroundApplied, hasBitmap=$validBitmap"
+                }
+
                 if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
                     handleBackgroundUpdate(track)
                 } else if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isGraphicsTurbulenceContinuousMusicEnabled) {
@@ -1454,28 +1458,32 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
             pendingBackgroundRestoreRunnable = null
 
-            Logger.d("MainActivity") { "Applying bitmap album art background" }
-            applyBitmapBackground(track.artworkBitmap!!, blurIntensity)
-            wasMusicBackgroundApplied = true
-            currentAppliedArtworkSource = track.artworkBitmap
+            if (!wasMusicBackgroundApplied || currentAppliedArtworkSource !== track.artworkBitmap) {
+                Logger.d("MainActivity") { "Applying bitmap album art background" }
+                applyBitmapBackground(track.artworkBitmap!!, blurIntensity)
+                wasMusicBackgroundApplied = true
+                currentAppliedArtworkSource = track.artworkBitmap
+            }
         } else if (!track.artworkUrl.isNullOrEmpty()) {
             pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
             pendingBackgroundRestoreRunnable = null
 
-            Logger.d("MainActivity") { "Applying URL album art background: ${track.artworkUrl}" }
-            applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
-            wasMusicBackgroundApplied = true
-            currentAppliedArtworkSource = track.artworkUrl
+            if (!wasMusicBackgroundApplied || currentAppliedArtworkSource != track.artworkUrl) {
+                Logger.d("MainActivity") { "Applying URL album art background: ${track.artworkUrl}" }
+                applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
+                wasMusicBackgroundApplied = true
+                currentAppliedArtworkSource = track.artworkUrl
+            }
         } else {
             if (wasMusicBackgroundApplied && pendingBackgroundRestoreRunnable == null) {
-                Logger.d("MainActivity") { "No artwork on track, scheduling background restore in 400ms" }
+                Logger.d("MainActivity") { "No artwork on track, scheduling background restore in 4000ms" }
                 val runnable = Runnable {
                     pendingBackgroundRestoreRunnable = null
                     if (wasMusicBackgroundApplied && currentMusicState is PluginState.Playing) {
                         val currentTrack = (currentMusicState as PluginState.Playing).track
                         val isStillMissing = currentTrack.artworkBitmap == null && currentTrack.artworkUrl.isNullOrEmpty()
                         if (isStillMissing) {
-                            Logger.d("MainActivity") { "Restoring user default background after 400ms grace period" }
+                            Logger.d("MainActivity") { "Restoring user default background after 4000ms grace period" }
                             restoreUserBackground(backgroundManager.getSavedBackgroundUri())
                             wasMusicBackgroundApplied = false
                             currentAppliedArtworkSource = null
@@ -1483,7 +1491,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
                 pendingBackgroundRestoreRunnable = runnable
-                handler.postDelayed(runnable, 400)
+                handler.postDelayed(runnable, 4000)
             }
         }
     }
@@ -1753,7 +1761,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (isFinishing) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
         
-        if (areArtworkSourcesEqual(lastBackgroundSource, model) && lastBlurIntensity == blurIntensity) {
+        if (wasMusicBackgroundApplied && areArtworkSourcesEqual(lastBackgroundSource, model) && lastBlurIntensity == blurIntensity) {
             onComplete?.invoke()
             return
         }
@@ -1816,7 +1824,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             var req = RequestOptions()
                 .override(targetW, targetH)
                 .downsample(DownsampleStrategy.CENTER_INSIDE)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(if (model is Bitmap) DiskCacheStrategy.NONE else DiskCacheStrategy.AUTOMATIC)
+                .skipMemoryCache(model is Bitmap)
 
             if (blurIntensity > 0) {
                 req = req.transform(
@@ -2471,6 +2480,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun restoreGradientBackground() {
+        lastBackgroundSource = null
+        currentAppliedArtworkSource = null
+        wasMusicBackgroundApplied = false
         dynamicBackgroundView.visibility = View.VISIBLE
         backgroundImageView.visibility = View.GONE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -2486,6 +2498,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     fun restoreUserBackground(savedUriStr: String?) {
+        lastBackgroundSource = null
+        currentAppliedArtworkSource = null
+        wasMusicBackgroundApplied = false
         if (savedUriStr != null) {
             try {
                 val uri = Uri.parse(savedUriStr)

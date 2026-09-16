@@ -61,7 +61,7 @@ object SettingsCategoryProvider {
                 id = "deskconnect",
                 title = context.getString(R.string.deskconnect_settings_title),
                 subtitle = context.getString(R.string.deskconnect_settings_subtitle),
-                iconResId = R.drawable.ic_desk_connect,
+                iconResId = R.drawable.ic_devices,
                 fragmentClass = com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment::class.java
             ),
             SettingsCategory(
