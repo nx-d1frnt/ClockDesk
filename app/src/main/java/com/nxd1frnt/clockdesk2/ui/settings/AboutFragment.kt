@@ -59,6 +59,11 @@ class AboutFragment : Fragment() {
         view.findViewById<View>(R.id.about_row_license).setOnClickListener {
             openUrl(getString(R.string.about_license_url))
         }
+
+        // KDE Connect credits row tappable
+        view.findViewById<View>(R.id.about_row_kde_connect)?.setOnClickListener {
+            openUrl(getString(R.string.about_kde_connect_url))
+        }
     }
 
     private fun openUrl(url: String) {

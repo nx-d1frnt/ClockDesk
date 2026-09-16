@@ -1,6 +1,8 @@
 package com.nxd1frnt.clockdesk2.connect.ui
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -85,6 +87,12 @@ class DeskConnectSettingsFragment : Fragment() {
         txtDeviceName.text = deskConnectManager.customDeviceName
         val fp = deskConnectManager.security.getCertificateFingerprint()
         txtFingerprint.text = "Fingerprint: $fp"
+
+        view.findViewById<View>(R.id.card_kde_credits)?.setOnClickListener {
+            runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.about_kde_connect_url))))
+            }
+        }
 
         return view
     }
