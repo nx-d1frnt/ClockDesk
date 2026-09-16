@@ -466,4 +466,54 @@
     <string name="color_green">Зеленый</string>
     <string name="color_blue">Синий</string>
     <string name="color_hex">HEX</string>
+
+    <!-- Desktop Widgets -->
+    <string name="add_widget">Добавить виджет</string>
+    <string name="remove_widget">Удалить виджет</string>
+    <string name="reset_layout">Сбросить макет</string>
+    <string name="done">Готово</string>
+    <string name="widget_clock_title">Часы</string>
+    <string name="widget_clock_desc">Основное отображение времени с настраиваемыми шрифтами и стилями</string>
+    <string name="widget_date_title">Дата</string>
+    <string name="widget_date_desc">Дата календаря с настраиваемыми форматами и типографикой</string>
+    <string name="widget_media_title">Сейчас играет</string>
+    <string name="widget_media_desc">Название трека и исполнитель из активных медиаплееров</string>
+    <string name="widget_smart_chips_title">Умные чипы</string>
+    <string name="widget_smart_chips_desc">Контекстные бейджи для батареи, погоды, будильников и уведомлений</string>
+    <string name="widget_weather_title">Погода</string>
+    <string name="widget_weather_desc">Текущая температура и значок погоды</string>
+    <string name="widget_gallery_title">Галерея виджетов</string>
+    <string name="widget_gallery_subtitle">Выберите виджет для добавления на стол</string>
+    <string name="widget_already_added">Уже добавлен на стол</string>
+    <string name="empty_desk_prompt">Ваш стол пуст. Нажмите +, чтобы добавить виджет.</string>
+    <string name="confirm_reset_layout_title">Сбросить макет?</string>
+    <string name="confirm_reset_layout_msg">Это восстановит виджеты и их позиции по умолчанию.</string>
+
+    <!-- DeskConnect -->
+    <string name="deskconnect_settings_title">DeskConnect</string>
+    <string name="deskconnect_settings_subtitle">Подключение телефонов и ПК по протоколу KDE Connect</string>
+    <string name="deskconnect_enable_title">Включить DeskConnect</string>
+    <string name="deskconnect_enable_summary">Разрешить сопряженным устройствам передавать уведомления, музыку и статус батареи</string>
+    <string name="deskconnect_device_name_title">Имя устройства</string>
+    <string name="deskconnect_device_name_summary">Имя, отображаемое другим устройствам в локальной сети</string>
+    <string name="deskconnect_paired_devices_title">Сопряженные устройства</string>
+    <string name="deskconnect_discovered_devices_title">Доступные устройства</string>
+    <string name="deskconnect_no_devices_found">Поиск устройств в той же сети Wi-Fi…</string>
+    <string name="deskconnect_no_paired_devices">Нет сопряженных устройств</string>
+    <string name="deskconnect_pair">Сопряжение</string>
+    <string name="deskconnect_unpair">Отключить</string>
+    <string name="deskconnect_pairing_request_title">Запрос на сопряжение</string>
+    <string name="deskconnect_pairing_request_message">Устройство \"%1$s\" запрашивает сопряжение с ClockDesk.\nКлюч проверки: %2$s</string>
+    <string name="deskconnect_accept">Принять</string>
+    <string name="deskconnect_reject">Отклонить</string>
+    <string name="incoming_call">Входящий вызов</string>
+    <string name="show_companion_battery_title">Батарея телефона-компаньона</string>
+    <string name="show_companion_battery_summary">Показывать уровень заряда подключенного компаньона DeskConnect</string>
+
+    <!-- Credits & Open Source Acknowledgments -->
+    <string name="about_credits_title">Благодарности и авторы</string>
+    <string name="about_kde_connect_title">KDE Connect</string>
+    <string name="about_kde_connect_desc">Протокол синхронизации устройств и MPRIS от KDE Community</string>
+    <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
+    <string name="deskconnect_credits_text">DeskConnect использует протокол с открытым исходным кодом, созданный проектом KDE Connect. Огромная благодарность сообществу KDE!</string>
 </resources>

@@ -515,4 +515,11 @@
     <string name="incoming_call">Incoming Call</string>
     <string name="show_companion_battery_title">Companion Phone Battery</string>
     <string name="show_companion_battery_summary">Show battery level of connected DeskConnect companion</string>
+
+    <!-- Credits & Open Source Acknowledgments -->
+    <string name="about_credits_title">Credits &amp; Acknowledgments</string>
+    <string name="about_kde_connect_title">KDE Connect</string>
+    <string name="about_kde_connect_desc">Cross-device communication &amp; MPRIS protocol by the KDE Community</string>
+    <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
+    <string name="deskconnect_credits_text">DeskConnect uses the open-source protocol developed by the KDE Connect project. Special thanks to the KDE community!</string>
 </resources>

@@ -162,6 +162,67 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
+        <!-- KDE Connect Acknowledgment Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_kde_credits"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            app:cardBackgroundColor="@color/md_theme_surfaceVariant"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/md_theme_outlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="?attr/selectableItemBackground">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_devices"
+                    app:tint="@color/md_theme_primary"
+                    android:contentDescription="@null" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/about_kde_connect_title"
+                        android:textColor="@color/md_theme_onSurface"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/deskconnect_credits_text"
+                        android:textColor="@color/md_theme_outline"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_arrow_left"
+                    app:tint="@color/md_theme_outline"
+                    android:rotation="180"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
     </LinearLayout>
 
 </androidx.core.widget.NestedScrollView>
