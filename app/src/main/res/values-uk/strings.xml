@@ -516,4 +516,74 @@
     <string name="about_kde_connect_desc">Протокол синхронізації пристроїв та MPRIS від KDE Community</string>
     <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
     <string name="deskconnect_credits_text">DeskConnect використовує протокол із відкритим вихідним кодом, розроблений проєктом KDE Connect. Щира подяка спільноті KDE!</string>
+
+    <!-- Notification Smart Chip & Shade -->
+    <string name="show_notifications_chip">Сповіщення</string>
+    <string name="show_notifications_chip_summary">Значок з іконками сповіщень та шторка швидкого доступу</string>
+    <string name="notification_shade_title">Сповіщення</string>
+    <string name="notification_shade_clear_all">Очистити все</string>
+    <string name="no_notifications">Немає сповіщень</string>
+    <string name="no_notifications_subtitle">Усе прочитано</string>
+    <string name="notification_time_just_now">Щойно</string>
+
+    <!-- Notification Settings & Chip Settings -->
+    <string name="notifications_settings_title">Сповіщення</string>
+    <string name="notifications_settings_subtitle">Банери, дзвінки та розумний чип</string>
+    <string name="pref_cat_floating_banners">Спливаючі банери</string>
+    <string name="desk_notification_popup_title">Спливаючі сповіщення</string>
+    <string name="desk_notification_popup_summary">Показувати спливаючий банер при надходженні сповіщень</string>
+    <string name="desk_notification_duration_title">Тривалість показу</string>
+    <string name="desk_notification_duration_summary">Скільки секунд банер залишається на екрані</string>
+    <string name="desk_notification_hide_sensitive_title">Приховувати приватні дані</string>
+    <string name="desk_notification_hide_sensitive_summary">Приховувати текст повідомлення на спливаючих банерах</string>
+    <string name="notification_hidden_content">Нове сповіщення</string>
+
+    <string name="pref_cat_phone_calls">Телефонні виклики</string>
+    <string name="desk_call_overlay_title">Екран вхідного дзвінка</string>
+    <string name="desk_call_overlay_summary">Показувати екран вхідного дзвінка при виклику на пристрій</string>
+    <string name="desk_call_missed_notification_title">Сповіщення про пропущені</string>
+    <string name="desk_call_missed_notification_summary">Додавати пропущені дзвінки до сповіщень та розумного чипа</string>
+    <string name="missed_call">Пропущений виклик</string>
+
+    <string name="pref_cat_smart_chip">Розумний чип</string>
+    <string name="pref_notification_chip_settings_title">Налаштування розумного чипа</string>
+    <string name="pref_notification_chip_settings_summary">Формат тексту, іконки та дії при натисканні</string>
+    <string name="pref_notification_shade_shortcut_title">Відкрити шторку сповіщень</string>
+    <string name="pref_notification_shade_shortcut_summary">Перегляд усіх активних сповіщень</string>
+
+    <string name="notification_chip_settings_title">Чип сповіщень</string>
+    <string name="notification_chip_behavior_category">Поведінка та взаємодія</string>
+    <string name="notification_chip_display_category">Відображення та формат</string>
+    <string name="notification_chip_tap_action_title">Дія при натисканні</string>
+    <string name="notification_chip_tap_action_summary">Дія при натисканні на чип</string>
+    <string name="notification_chip_single_format_title">Формат одного сповіщення</string>
+    <string name="notification_chip_single_format_summary">Текст, що відображається при одному сповіщенні</string>
+    <string name="notification_chip_multi_format_title">Формат кількох сповіщень</string>
+    <string name="notification_chip_multi_format_summary">Текст, що відображається при кількох сповіщеннях</string>
+    <string name="notification_chip_use_app_icon_title">Використовувати іконку додатка</string>
+    <string name="notification_chip_use_app_icon_summary">Показувати значок додатка замість стандартного дзвіночка</string>
+    <string name="notifications_cleared">Сповіщення очищено</string>
+
+    <string-array name="notification_chip_single_format_entries">
+        <item>Відправник / Заголовок</item>
+        <item>Назва додатка</item>
+        <item>Лічильник (1)</item>
+    </string-array>
+
+    <string-array name="notification_chip_multi_format_entries">
+        <item>Компактний лічильник (+N)</item>
+        <item>Лічильник з текстом</item>
+    </string-array>
+
+    <string-array name="notification_chip_tap_action_entries">
+        <item>Відкрити шторку сповіщень</item>
+        <item>Очистити всі сповіщення</item>
+    </string-array>
+
+    <plurals name="notification_count">
+        <item quantity="one">%d сповіщення</item>
+        <item quantity="few">%d сповіщення</item>
+        <item quantity="many">%d сповіщень</item>
+        <item quantity="other">%d сповіщення</item>
+    </plurals>
 </resources>

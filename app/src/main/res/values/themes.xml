@@ -61,4 +61,17 @@
         <item name="android:fontFamily">@font/googlesansflex</item>
         <item name="android:letterSpacing">-0.01</item>
     </style>
+
+    <style name="ClockDesk.Shape.Circle" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerSize">50%</item>
+        <item name="cornerFamily">rounded</item>
+    </style>
+
+    <style name="ClockDesk.Shape.RoundedSmall" parent="">
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <style name="ClockDesk.Shape.RoundedMedium" parent="">
+        <item name="cornerSize">20dp</item>
+    </style>
 </resources>

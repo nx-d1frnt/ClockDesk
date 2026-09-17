@@ -2,39 +2,36 @@
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/notification_card"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_gravity="top|center_horizontal"
-    android:layout_marginTop="16dp"
-    android:layout_marginStart="24dp"
-    android:layout_marginEnd="24dp"
-    app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-    app:cardCornerRadius="28dp"
-    app:cardElevation="6dp"
-    app:strokeColor="?attr/colorOutlineVariant"
-    app:strokeWidth="1dp">
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    app:cardCornerRadius="20dp"
+    app:cardBackgroundColor="?attr/colorSurfaceContainer"
+    app:cardElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="?attr/colorOutlineVariant">
 
     <LinearLayout
-        android:layout_width="wrap_content"
-        android:minWidth="280dp"
-        android:maxWidth="420dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
+        android:paddingStart="14dp"
         android:paddingTop="12dp"
-        android:paddingEnd="12dp"
+        android:paddingEnd="10dp"
         android:paddingBottom="12dp"
         android:gravity="center_vertical">
 
         <com.google.android.material.imageview.ShapeableImageView
-            android:id="@+id/notification_app_icon"
+            android:id="@+id/shade_item_app_icon"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:scaleType="centerCrop"
             app:shapeAppearanceOverlay="@style/ClockDesk.Shape.RoundedSmall"
-            android:src="@drawable/ic_notifications"
-            android:contentDescription="@null" />
+            android:contentDescription="@null"
+            tools:src="@drawable/ic_notifications" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -44,8 +41,9 @@
             android:layout_marginEnd="8dp"
             android:orientation="vertical">
 
+            <!-- Subtitle line: APP NAME • DEVICE • TIME -->
             <TextView
-                android:id="@+id/notification_app_name"
+                android:id="@+id/shade_item_header"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="?attr/colorPrimary"
@@ -54,10 +52,11 @@
                 android:fontFamily="@font/googlesansflex"
                 android:letterSpacing="0.04"
                 android:textAllCaps="true"
-                tools:text="WHATSAPP • PIXEL 8" />
+                tools:text="WHATSAPP • PIXEL 8 • JUST NOW" />
 
+            <!-- Title -->
             <TextView
-                android:id="@+id/notification_title"
+                android:id="@+id/shade_item_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -69,23 +68,24 @@
                 android:ellipsize="end"
                 tools:text="Alice Smith" />
 
+            <!-- Body -->
             <TextView
-                android:id="@+id/notification_body"
+                android:id="@+id/shade_item_body"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp"
                 android:fontFamily="@font/googlesansflex"
-                android:maxLines="2"
+                android:maxLines="3"
                 android:ellipsize="end"
                 tools:text="Hey, are we still meeting today at 4?" />
         </LinearLayout>
 
         <ImageButton
-            android:id="@+id/btn_dismiss_notification"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:id="@+id/btn_dismiss_shade_item"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_close"
             app:tint="?attr/colorOnSurfaceVariant"

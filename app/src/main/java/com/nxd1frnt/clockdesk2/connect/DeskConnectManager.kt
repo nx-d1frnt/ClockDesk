@@ -481,6 +481,18 @@ class DeskConnectManager private constructor(private val context: Context) {
                 if (!conn.device.isPaired) return
                 val body = packet.body
                 val nId = body.optString("id", "")
+                val isCancel = body.optBoolean("isCancel", false)
+
+                if (isCancel && nId.isNotEmpty()) {
+                    Logger.d("DeskConnectManager") { "Received notification isCancel for id='$nId' from ${conn.device.getDisplayName()}" }
+                    mainHandler.post {
+                        notificationListeners.forEach {
+                            it.onNotificationDismissed(conn.device.deviceId, nId)
+                        }
+                    }
+                    return
+                }
+
                 val appName = body.optString("appName", "App")
                 val title = body.optString("title", "")
                 val text = body.optString("text", body.optString("ticker", ""))
@@ -840,6 +852,11 @@ class DeskConnectManager private constructor(private val context: Context) {
         val conn = activeConnections[deviceId]
         if (conn != null && conn.device.isPaired) {
             conn.sendPacket(DeskConnectPacket.createNotificationCancel(notificationId))
+        }
+        mainHandler.post {
+            notificationListeners.forEach {
+                it.onNotificationDismissed(deviceId, notificationId)
+            }
         }
     }
 }

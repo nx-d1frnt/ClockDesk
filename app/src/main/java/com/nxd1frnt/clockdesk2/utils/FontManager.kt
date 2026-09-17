@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
+import android.graphics.PorterDuff
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -706,7 +707,7 @@ class FontManager(
         }
 
         if (iconView != null) {
-            iconView.setColorFilter(color)
+            iconView.setColorFilter(color, PorterDuff.Mode.SRC_IN)
             if (!colorOnly) {
                 iconView.alpha = 1.0f
 
@@ -714,7 +715,7 @@ class FontManager(
                 val newIconSize = (baseIconSize * scaleFactor).toInt()
 
                 val params = iconView.layoutParams
-                if (params.width != newIconSize) {
+                if (params != null && (params.width != newIconSize || params.height != newIconSize)) {
                     params.width = newIconSize
                     params.height = newIconSize
                     iconView.layoutParams = params

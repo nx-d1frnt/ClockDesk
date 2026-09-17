@@ -98,6 +98,7 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
             is PerformanceSettingsFragment -> getString(R.string.performance_settings)
             is BackupSettingsFragment -> getString(R.string.backup_restore_title)
             is SmartChipsPluginsFragment -> getString(R.string.smart_chips_plugins_title)
+            is com.nxd1frnt.clockdesk2.notifications.ui.NotificationsSettingsFragment -> getString(R.string.notifications_settings_title)
             is MusicSourcesFragment -> getString(R.string.music_sources_title)
             is LastFmSettingsFragment -> getString(R.string.lastfm_plugin_name)
             is AboutFragment -> getString(R.string.about_title)

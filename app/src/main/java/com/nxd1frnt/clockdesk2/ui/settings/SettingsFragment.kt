@@ -82,14 +82,6 @@ class MusicSettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
         setPreferencesFromResource(R.xml.pref_music, rootKey)
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-            val albumArtBackgroundPref =
-                findPreference<SwitchPreferenceCompat>("lastfm_albumart_background")
-            albumArtBackgroundPref?.isEnabled = false
-            albumArtBackgroundPref?.isChecked = false
-            albumArtBackgroundPref?.summary = getString(R.string.feature_not_supported)
-        }
     }
 }
 

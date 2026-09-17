@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/notification_chip_display_category">
+
+        <androidx.preference.ListPreference
+            app:key="notification_chip_single_format"
+            app:title="@string/notification_chip_single_format_title"
+            app:summary="%s"
+            app:entries="@array/notification_chip_single_format_entries"
+            app:entryValues="@array/notification_chip_single_format_values"
+            android:defaultValue="title" />
+
+        <androidx.preference.ListPreference
+            app:key="notification_chip_multi_format"
+            app:title="@string/notification_chip_multi_format_title"
+            app:summary="%s"
+            app:entries="@array/notification_chip_multi_format_entries"
+            app:entryValues="@array/notification_chip_multi_format_values"
+            android:defaultValue="compact" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="notification_chip_use_app_icon"
+            app:title="@string/notification_chip_use_app_icon_title"
+            app:summary="@string/notification_chip_use_app_icon_summary"
+            android:defaultValue="true" />
+
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/notification_chip_behavior_category">
+
+        <androidx.preference.ListPreference
+            app:key="notification_chip_tap_action"
+            app:title="@string/notification_chip_tap_action_title"
+            app:summary="%s"
+            app:entries="@array/notification_chip_tap_action_entries"
+            app:entryValues="@array/notification_chip_tap_action_values"
+            android:defaultValue="shade" />
+
+    </androidx.preference.PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

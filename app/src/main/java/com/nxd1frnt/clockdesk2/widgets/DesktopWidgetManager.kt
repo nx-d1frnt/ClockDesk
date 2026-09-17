@@ -88,7 +88,11 @@ class DesktopWidgetManager(
         }
 
         if (activeInstances.isEmpty()) {
-            migrateOrInitDefaults()
+            val hasConfigured = prefs.getBoolean("has_configured_desktop", false)
+            if (!hasConfigured) {
+                migrateOrInitDefaults()
+                prefs.edit().putBoolean("has_configured_desktop", true).apply()
+            }
         }
     }
 
@@ -141,10 +145,10 @@ class DesktopWidgetManager(
             )
         )
 
-        // 4. Smart chips
+        // 4. Smart Chips
         activeInstances.add(
             WidgetInstance(
-                instanceId = "widget_smart_chips_main",
+                instanceId = "widget_chips_main",
                 type = DesktopWidgetType.SMART_CHIPS,
                 orderIndex = 3,
                 isFreeMode = false
@@ -171,7 +175,10 @@ class DesktopWidgetManager(
             }
             array.put(obj)
         }
-        prefs.edit().putString("active_widgets_json", array.toString()).apply()
+        prefs.edit()
+            .putString("active_widgets_json", array.toString())
+            .putBoolean("has_configured_desktop", true)
+            .apply()
         Logger.d(TAG) { "Desktop layout saved with ${activeInstances.size} widgets" }
     }
 
@@ -183,17 +190,22 @@ class DesktopWidgetManager(
         weatherView: View?
     ) {
         instanceViewMap.clear()
-        for (instance in activeInstances) {
-            val view = when (instance.type) {
-                DesktopWidgetType.TIME -> timeView
-                DesktopWidgetType.DATE -> dateView
-                DesktopWidgetType.MEDIA -> mediaView
-                DesktopWidgetType.SMART_CHIPS -> chipsView
-                DesktopWidgetType.WEATHER -> weatherView
-            }
-            if (view != null) {
+        val allTypesWithViews = listOf(
+            DesktopWidgetType.TIME to timeView,
+            DesktopWidgetType.DATE to dateView,
+            DesktopWidgetType.MEDIA to mediaView,
+            DesktopWidgetType.SMART_CHIPS to chipsView,
+            DesktopWidgetType.WEATHER to weatherView
+        )
+
+        for ((type, view) in allTypesWithViews) {
+            if (view == null) continue
+            val instance = activeInstances.firstOrNull { it.type == type }
+            if (instance != null) {
                 instanceViewMap[instance.instanceId] = view
                 view.visibility = if (instance.isVisible) View.VISIBLE else View.GONE
+            } else {
+                view.visibility = View.GONE
             }
         }
     }

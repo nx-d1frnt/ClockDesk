@@ -67,6 +67,12 @@
             android:theme="@style/Theme.ClockDesk.Settings"
             android:screenOrientation="sensorLandscape"
             android:exported="false" />
+        <activity
+            android:name=".smartchips.ui.NotificationChipSettingsActivity"
+            android:label="@string/notification_chip_settings_title"
+            android:theme="@style/Theme.ClockDesk.Settings"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
         <service
             android:name=".music.ClockDeskMediaService"
             android:label="@string/app_name"

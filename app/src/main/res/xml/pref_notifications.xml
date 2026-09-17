@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/pref_cat_floating_banners">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="desk_notification_popup_enabled"
+            app:title="@string/desk_notification_popup_title"
+            app:summary="@string/desk_notification_popup_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="desk_notification_duration"
+            app:title="@string/desk_notification_duration_title"
+            app:summary="@string/desk_notification_duration_summary"
+            android:min="2"
+            android:max="15"
+            android:defaultValue="5"
+            app:showSeekBarValue="true"
+            app:dependency="desk_notification_popup_enabled" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="desk_notification_hide_sensitive"
+            app:title="@string/desk_notification_hide_sensitive_title"
+            app:summary="@string/desk_notification_hide_sensitive_summary"
+            android:defaultValue="false"
+            app:dependency="desk_notification_popup_enabled" />
+
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/pref_cat_phone_calls">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="desk_call_overlay_enabled"
+            app:title="@string/desk_call_overlay_title"
+            app:summary="@string/desk_call_overlay_summary"
+            android:defaultValue="true" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="desk_call_missed_notification"
+            app:title="@string/desk_call_missed_notification_title"
+            app:summary="@string/desk_call_missed_notification_summary"
+            android:defaultValue="true" />
+
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:title="@string/pref_cat_smart_chip">
+
+        <androidx.preference.Preference
+            app:key="pref_key_notification_chip_settings"
+            app:title="@string/pref_notification_chip_settings_title"
+            app:summary="@string/pref_notification_chip_settings_summary" />
+
+        <androidx.preference.Preference
+            app:key="pref_key_open_notification_shade"
+            app:title="@string/pref_notification_shade_shortcut_title"
+            app:summary="@string/pref_notification_shade_shortcut_summary" />
+
+    </androidx.preference.PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

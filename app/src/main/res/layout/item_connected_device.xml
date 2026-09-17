@@ -5,10 +5,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="@color/md_theme_surfaceVariant"
+    app:cardBackgroundColor="?attr/colorSurfaceContainer"
     app:cardCornerRadius="16dp"
     app:cardElevation="0dp"
-    app:strokeColor="@color/md_theme_outlineVariant"
+    app:strokeColor="?attr/colorOutlineVariant"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -23,7 +23,7 @@
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:src="@drawable/ic_phone_incoming"
-            app:tint="@color/md_theme_onSurfaceVariant"
+            app:tint="?attr/colorPrimary"
             android:contentDescription="@null" />
 
         <LinearLayout
@@ -37,7 +37,7 @@
                 android:id="@+id/device_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/md_theme_onSurface"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 tools:text="Pixel 9 Pro" />
@@ -47,7 +47,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:textColor="@color/md_theme_outline"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp"
                 tools:text="Connected • 192.168.1.45" />
         </LinearLayout>

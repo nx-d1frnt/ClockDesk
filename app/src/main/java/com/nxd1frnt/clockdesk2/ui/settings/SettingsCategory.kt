@@ -58,6 +58,13 @@ object SettingsCategoryProvider {
                 fragmentClass = com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment::class.java
             ),
             SettingsCategory(
+                id = "notifications",
+                title = context.getString(R.string.notifications_settings_title),
+                subtitle = context.getString(R.string.notifications_settings_subtitle),
+                iconResId = R.drawable.ic_notifications,
+                fragmentClass = com.nxd1frnt.clockdesk2.notifications.ui.NotificationsSettingsFragment::class.java
+            ),
+            SettingsCategory(
                 id = "deskconnect",
                 title = context.getString(R.string.deskconnect_settings_title),
                 subtitle = context.getString(R.string.deskconnect_settings_subtitle),

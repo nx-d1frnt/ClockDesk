@@ -96,6 +96,7 @@ class SmartChipManager(
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
         com.nxd1frnt.clockdesk2.smartchips.plugins.CompanionBatteryChipPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.NotificationSmartChipPlugin(context),
         UpdatePlugin(context),
         BackgroundProgressPlugin(context),
         AlarmChipPlugin(context),
@@ -719,7 +720,7 @@ class SmartChipManager(
 
     private fun executeSortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
-        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_companion_battery,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
         val orderList = orderString.split(",").map { it.trim() }
 
         // Фильтруем видимые чипы и сортируем их по индексу в orderList
@@ -753,11 +754,27 @@ class SmartChipManager(
         if (currentTags == newTags) {
             visibleChips.forEach { chipInfo ->
                 val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
-                if (!textView.isSelected) textView.isSelected = true
+                if (textView != null && !textView.isSelected) textView.isSelected = true
             }
-            
+
             if (contentChanged) {
                 TransitionManager.beginDelayedTransition(container, transition)
+                val constraintSet = ConstraintSet().apply {
+                    clone(container)
+                    visibleChips.forEachIndexed { index, chipInfo ->
+                        val id = chipInfo.view.id
+                        constrainWidth(id, ConstraintSet.WRAP_CONTENT)
+                        constrainHeight(id, ConstraintSet.WRAP_CONTENT)
+                        connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                        if (index == 0) {
+                            connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                        } else {
+                            val prevId = visibleChips[index - 1].view.id
+                            connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, 8)
+                        }
+                    }
+                }
+                constraintSet.applyTo(container)
             }
             return
         }

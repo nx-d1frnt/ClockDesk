@@ -365,6 +365,30 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Немедленное обновление параметров турбулентности на лету.
+     */
+    fun updateTurbulenceLiveConfig(
+        gridScale: Float? = null,
+        speedScale: Float? = null,
+        continuous: Boolean? = null
+    ) {
+        queueEvent {
+            renderer.updateTurbulenceLiveConfig(gridScale, speedScale, continuous)
+        }
+    }
+
+    /**
+     * Перезагрузка параметров турбулентности из SharedPreferences на лету.
+     */
+    fun reloadTurbulencePreferences() {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
+        val speedScale = prefs.getInt("graphics_turbulence_speed", 10) / 10f
+        val continuous = prefs.getBoolean("graphics_turbulence_music_continuous", false)
+        updateTurbulenceLiveConfig(gridScale, speedScale, continuous)
+    }
+
     val isTurbulencePlaying: Boolean
         get() = renderer.isTurbulencePlaying()
 
@@ -2025,6 +2049,26 @@ class DynamicBackgroundView @JvmOverloads constructor(
             if (endCb != null) {
                 post { endCb() }
             }
+        }
+
+        fun updateTurbulenceLiveConfig(
+            gridScale: Float? = null,
+            speedScale: Float? = null,
+            continuous: Boolean? = null
+        ) {
+            if (gridScale != null) {
+                turbGridCount = 1.0f * gridScale
+            }
+            if (speedScale != null) {
+                turbSpeedZ = 0.45f * speedScale
+            }
+            if (continuous != null) {
+                turbIsContinuous = continuous
+                if (!continuous && (turbulencePhase == TurbulencePhase.CONTINUOUS || turbulencePhase == TurbulencePhase.TRANSITION_TO_CONTINUOUS)) {
+                    finishTurbulence(750L)
+                }
+            }
+            requestRender()
         }
 
         fun isTurbulencePlaying(): Boolean = turbulencePhase != TurbulencePhase.IDLE

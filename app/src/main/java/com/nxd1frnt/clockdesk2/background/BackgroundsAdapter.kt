@@ -63,7 +63,9 @@ class BackgroundsAdapter(
     holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
         holder.itemView.setOnClickListener {
             onClick(id)
-            updateSelection(id)
+            if (id != "__ADD__") {
+                updateSelection(id)
+            }
         }
     }
 

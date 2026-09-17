@@ -26,6 +26,7 @@ import android.widget.TextView
 import androidx.core.widget.ImageViewCompat
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
+import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
 import com.nxd1frnt.clockdesk2.utils.Logger
 import java.util.LinkedList
 import kotlin.math.abs
@@ -52,6 +53,32 @@ class DeskNotificationManager(
     private var currentView: View? = null
     private var currentItem: NotificationItem? = null
     private var dismissRunnable: Runnable? = null
+    private var safetyWatchdogRunnable: Runnable? = null
+    private var isDismissing = false
+
+    private val deviceListener = object : DeskConnectManager.DeviceListener {
+        override fun onDeviceDiscovered(device: DeskConnectDevice) {}
+        override fun onDeviceConnected(device: DeskConnectDevice) {}
+        override fun onDeviceDisconnected(device: DeskConnectDevice) {
+            mainHandler.post {
+                queue.removeAll { it.deviceId == device.deviceId }
+                if (currentItem?.deviceId == device.deviceId) {
+                    dismissCurrent(notifyManager = false)
+                }
+            }
+        }
+        override fun onPairingRequested(device: DeskConnectDevice, verificationKey: String) {}
+        override fun onPairingStateChanged(device: DeskConnectDevice, isPaired: Boolean) {
+            if (!isPaired) {
+                mainHandler.post {
+                    queue.removeAll { it.deviceId == device.deviceId }
+                    if (currentItem?.deviceId == device.deviceId) {
+                        dismissCurrent(notifyManager = false)
+                    }
+                }
+            }
+        }
+    }
 
     private val notificationListener = object : DeskConnectManager.NotificationListener {
         override fun onNotificationReceived(
@@ -88,32 +115,48 @@ class DeskNotificationManager(
 
     init {
         deskConnectManager.notificationListeners.add(notificationListener)
+        deskConnectManager.deviceListeners.add(deviceListener)
     }
 
+    private fun getPrefs() = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
     private fun enqueueNotification(item: NotificationItem) {
+        if (!getPrefs().getBoolean("desk_notification_popup_enabled", true)) {
+            return
+        }
+
+        // If this notification is currently displayed, update it in-place instead of queueing duplicate
+        if (currentItem?.deviceId == item.deviceId && currentItem?.notificationId == item.notificationId) {
+            currentItem = item
+            currentView?.let { view ->
+                updateViewContent(view, item)
+                // Refresh auto dismiss timer
+                val baseDurationSec = getPrefs().getInt("desk_notification_duration", 5)
+                val defaultDisplayMs = (baseDurationSec * 1000L).coerceAtLeast(2000L)
+                scheduleAutoDismiss(if (queue.isNotEmpty()) 3000L else defaultDisplayMs)
+            }
+            return
+        }
+
         // Replace existing notification in queue if same id
         queue.removeAll { it.deviceId == item.deviceId && it.notificationId == item.notificationId }
+
+        // Cap queue to 3 notifications max to prevent backlog
+        while (queue.size >= 3) {
+            queue.poll()
+        }
         queue.add(item)
 
-        if (currentView == null) {
+        if (currentView == null && !isDismissing) {
             showNext()
         }
     }
 
-    private fun showNext() {
-        if (queue.isEmpty()) return
-
-        val item = queue.poll() ?: return
-        currentItem = item
-
-        val view = LayoutInflater.from(context).inflate(R.layout.view_ambient_notification, container, false)
-        currentView = view
-
-        val iconView = view.findViewById<ImageView>(R.id.notification_app_icon)
+    private fun updateViewContent(view: View, item: NotificationItem) {
         val appNameView = view.findViewById<TextView>(R.id.notification_app_name)
         val titleView = view.findViewById<TextView>(R.id.notification_title)
         val bodyView = view.findViewById<TextView>(R.id.notification_body)
-        val dismissBtn = view.findViewById<ImageButton>(R.id.btn_dismiss_notification)
+        val iconView = view.findViewById<ImageView>(R.id.notification_app_icon)
 
         val dev = deskConnectManager.discoveredDevices[item.deviceId]
         val deviceName = dev?.getDisplayName()
@@ -123,55 +166,56 @@ class DeskNotificationManager(
         } else {
             item.appName.uppercase()
         }
-        titleView.text = item.title
-        bodyView.text = item.text
+
+        val hideSensitive = getPrefs().getBoolean("desk_notification_hide_sensitive", false)
+        if (hideSensitive) {
+            titleView.text = item.appName
+            bodyView.text = context.getString(R.string.notification_hidden_content)
+        } else {
+            titleView.text = item.title
+            bodyView.text = item.text
+        }
+
+        applyIcon(iconView, item)
+    }
+
+    private fun applyIcon(iconView: ImageView, item: NotificationItem) {
+        DeskNotificationHelper.applyIcon(context, iconView, item.iconBytes, item.notificationId)
+    }
+
+    private fun showNext() {
+        if (isDismissing) return
+
+        if (queue.isEmpty()) {
+            currentView = null
+            currentItem = null
+            container.removeAllViews()
+            return
+        }
+
+        val item = queue.poll() ?: return
+        currentItem = item
+
+        // Clean up any residual views in container before adding new notification
+        container.removeAllViews()
+
+        val view = LayoutInflater.from(context).inflate(R.layout.view_ambient_notification, container, false)
+        currentView = view
+
+        val iconView = view.findViewById<ImageView>(R.id.notification_app_icon)
+        val dismissBtn = view.findViewById<ImageButton>(R.id.btn_dismiss_notification)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             iconView.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    val radius = view.context.resources.displayMetrics.density * 8f
-                    outline.setRoundRect(0, 0, view.width, view.height, radius)
+                override fun getOutline(v: View, outline: Outline) {
+                    val radius = v.context.resources.displayMetrics.density * 8f
+                    outline.setRoundRect(0, 0, v.width, v.height, radius)
                 }
             }
             iconView.clipToOutline = true
         }
 
-        var iconApplied = false
-        if (item.iconBytes != null && item.iconBytes.isNotEmpty()) {
-            try {
-                val bitmap = BitmapFactory.decodeByteArray(item.iconBytes, 0, item.iconBytes.size)
-                if (bitmap != null) {
-                    iconView.clearColorFilter()
-                    ImageViewCompat.setImageTintList(iconView, null)
-                    iconView.setImageBitmap(bitmap)
-                    iconApplied = true
-                }
-            } catch (e: Exception) {
-                Logger.w("DeskNotificationManager") { "Failed to decode notification icon: ${e.message}" }
-            }
-        }
-
-        if (!iconApplied) {
-            val pkg = if (item.notificationId.contains("|")) {
-                item.notificationId.split("|").getOrNull(1)
-            } else null
-
-            if (!pkg.isNullOrEmpty()) {
-                try {
-                    val appIcon = context.packageManager.getApplicationIcon(pkg)
-                    iconView.clearColorFilter()
-                    ImageViewCompat.setImageTintList(iconView, null)
-                    iconView.setImageDrawable(appIcon)
-                    iconApplied = true
-                } catch (ignored: Exception) {
-                }
-            }
-        }
-
-        if (!iconApplied) {
-            iconView.setImageResource(R.drawable.ic_widgets_outline)
-            iconView.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN)
-        }
+        updateViewContent(view, item)
 
         dismissBtn.visibility = if (item.isClearable) View.VISIBLE else View.GONE
         dismissBtn.setOnClickListener {
@@ -181,6 +225,7 @@ class DeskNotificationManager(
         setupSwipeToDismiss(view)
 
         // Animate entrance: slide down from top + fade in
+        view.translationX = 0f
         view.translationY = -120f
         view.alpha = 0f
         container.addView(view)
@@ -192,11 +237,25 @@ class DeskNotificationManager(
             .setInterpolator(OvershootInterpolator(0.8f))
             .start()
 
-        // Auto dismiss after 6 seconds
-        scheduleAutoDismiss(6000)
+        // Auto dismiss based on user preference: duration if single, 3 seconds if backlog exists
+        val baseDurationSec = getPrefs().getInt("desk_notification_duration", 5)
+        val defaultDisplayMs = (baseDurationSec * 1000L).coerceAtLeast(2000L)
+        val displayTimeMs = if (queue.isNotEmpty()) 3000L else defaultDisplayMs
+        scheduleAutoDismiss(displayTimeMs)
+
+        // Absolute safety watchdog: force-dismiss after timeout no matter what
+        safetyWatchdogRunnable?.let { mainHandler.removeCallbacks(it) }
+        safetyWatchdogRunnable = Runnable {
+            if (currentView != null) {
+                Logger.w("DeskNotificationManager") { "Safety watchdog fired for stuck notification, force clearing" }
+                dismissCurrent(notifyManager = false)
+            }
+        }
+        val watchdogDelayMs = (displayTimeMs + 5000L).coerceAtLeast(10000L)
+        mainHandler.postDelayed(safetyWatchdogRunnable!!, watchdogDelayMs)
     }
 
-    private fun scheduleAutoDismiss(delayMs: Long = 6000) {
+    private fun scheduleAutoDismiss(delayMs: Long = 5000L) {
         dismissRunnable?.let { mainHandler.removeCallbacks(it) }
         dismissRunnable = Runnable {
             dismissCurrent(notifyManager = false)
@@ -296,14 +355,14 @@ class DeskNotificationManager(
                                 .setInterpolator(DecelerateInterpolator())
                                 .start()
 
-                            scheduleAutoDismiss(delayMs = 4000)
+                            scheduleAutoDismiss(delayMs = 4000L)
                         }
                         true
                     } else {
                         if (event.actionMasked == MotionEvent.ACTION_UP) {
                             v.performClick()
                         }
-                        scheduleAutoDismiss(delayMs = 4000)
+                        scheduleAutoDismiss(delayMs = 4000L)
                         false
                     }
                 }
@@ -317,18 +376,27 @@ class DeskNotificationManager(
         exitTranslationX: Float = 0f,
         exitTranslationY: Float = -100f
     ) {
+        if (isDismissing) return
+
         dismissRunnable?.let { mainHandler.removeCallbacks(it) }
         dismissRunnable = null
+        safetyWatchdogRunnable?.let { mainHandler.removeCallbacks(it) }
+        safetyWatchdogRunnable = null
 
-        val viewToDismiss = currentView ?: return
+        val viewToDismiss = currentView
         val itemToDismiss = currentItem
+
+        if (viewToDismiss == null) {
+            container.removeAllViews()
+            showNext()
+            return
+        }
+
+        isDismissing = true
 
         if (notifyManager && itemToDismiss != null && itemToDismiss.isClearable) {
             deskConnectManager.dismissNotification(itemToDismiss.deviceId, itemToDismiss.notificationId)
         }
-
-        currentView = null
-        currentItem = null
 
         viewToDismiss.animate()
             .translationX(exitTranslationX)
@@ -337,8 +405,23 @@ class DeskNotificationManager(
             .setDuration(250)
             .setInterpolator(DecelerateInterpolator())
             .setListener(object : AnimatorListenerAdapter() {
+                private var finished = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    finish()
+                }
+
                 override fun onAnimationEnd(animation: Animator) {
+                    finish()
+                }
+
+                private fun finish() {
+                    if (finished) return
+                    finished = true
                     container.removeView(viewToDismiss)
+                    currentView = null
+                    currentItem = null
+                    isDismissing = false
                     showNext()
                 }
             })
@@ -347,10 +430,15 @@ class DeskNotificationManager(
 
     fun destroy() {
         deskConnectManager.notificationListeners.remove(notificationListener)
+        deskConnectManager.deviceListeners.remove(deviceListener)
         dismissRunnable?.let { mainHandler.removeCallbacks(it) }
-        currentView?.let { container.removeView(it) }
+        safetyWatchdogRunnable?.let { mainHandler.removeCallbacks(it) }
+        dismissRunnable = null
+        safetyWatchdogRunnable = null
+        container.removeAllViews()
         currentView = null
         currentItem = null
         queue.clear()
+        isDismissing = false
     }
 }

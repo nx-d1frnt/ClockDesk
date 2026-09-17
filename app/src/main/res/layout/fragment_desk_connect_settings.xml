@@ -19,10 +19,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/md_theme_surfaceVariant"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
-            app:strokeColor="@color/md_theme_outlineVariant"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -42,7 +42,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/deskconnect_enable_title"
-                        android:textColor="@color/md_theme_onSurface"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -51,7 +51,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="@string/deskconnect_enable_summary"
-                        android:textColor="@color/md_theme_outline"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -68,10 +68,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/md_theme_surfaceVariant"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
-            app:strokeColor="@color/md_theme_outlineVariant"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -84,7 +84,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/deskconnect_device_name_title"
-                    android:textColor="@color/md_theme_onSurface"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
@@ -93,8 +93,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:textColor="@color/md_theme_primary"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
+                    android:textStyle="bold"
                     tools:text="ClockDesk (Lenovo Tab M10)" />
 
                 <TextView
@@ -102,7 +103,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:textColor="@color/md_theme_outline"
+                    android:textColor="?attr/colorOutline"
                     android:textSize="12sp"
                     tools:text="SHA-256: 3a:f2:8c:..." />
             </LinearLayout>
@@ -115,7 +116,7 @@
             android:layout_marginTop="24dp"
             android:layout_marginBottom="8dp"
             android:text="@string/deskconnect_paired_devices_title"
-            android:textColor="@color/md_theme_onSurface"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -126,7 +127,7 @@
             android:layout_marginTop="4dp"
             android:layout_marginBottom="8dp"
             android:text="@string/deskconnect_no_paired_devices"
-            android:textColor="@color/md_theme_outline"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
 
         <LinearLayout
@@ -142,7 +143,7 @@
             android:layout_marginTop="20dp"
             android:layout_marginBottom="8dp"
             android:text="@string/deskconnect_discovered_devices_title"
-            android:textColor="@color/md_theme_onSurface"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -153,7 +154,7 @@
             android:layout_marginTop="4dp"
             android:layout_marginBottom="8dp"
             android:text="@string/deskconnect_no_devices_found"
-            android:textColor="@color/md_theme_outline"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
 
         <LinearLayout
@@ -168,10 +169,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
-            app:cardBackgroundColor="@color/md_theme_surfaceVariant"
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:strokeColor="@color/md_theme_outlineVariant"
+            app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -186,7 +187,7 @@
                     android:layout_width="28dp"
                     android:layout_height="28dp"
                     android:src="@drawable/ic_devices"
-                    app:tint="@color/md_theme_primary"
+                    app:tint="?attr/colorPrimary"
                     android:contentDescription="@null" />
 
                 <LinearLayout
@@ -200,7 +201,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/about_kde_connect_title"
-                        android:textColor="@color/md_theme_onSurface"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -209,7 +210,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="@string/deskconnect_credits_text"
-                        android:textColor="@color/md_theme_outline"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -217,7 +218,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_arrow_left"
-                    app:tint="@color/md_theme_outline"
+                    app:tint="?attr/colorOutline"
                     android:rotation="180"
                     android:contentDescription="@null" />
             </LinearLayout>

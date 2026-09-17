@@ -166,6 +166,14 @@
                             app:trackHeight="12dp" />
                     </LinearLayout>
 
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/music_albumart_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/set_album_art_as_background"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
                 </LinearLayout>
 
                 <!-- ВКЛАДКА 2: ПОГОДА -->

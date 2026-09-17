@@ -522,4 +522,85 @@
     <string name="about_kde_connect_desc">Cross-device communication &amp; MPRIS protocol by the KDE Community</string>
     <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
     <string name="deskconnect_credits_text">DeskConnect uses the open-source protocol developed by the KDE Connect project. Special thanks to the KDE community!</string>
+
+    <!-- Notification Smart Chip & Shade -->
+    <string name="show_notifications_chip">Notifications</string>
+    <string name="show_notifications_chip_summary">Show notification count and quick access shade</string>
+    <string name="notification_shade_title">Notifications</string>
+    <string name="notification_shade_clear_all">Clear all</string>
+    <string name="no_notifications">No notifications</string>
+    <string name="no_notifications_subtitle">All caught up</string>
+    <string name="notification_time_just_now">Just now</string>
+
+    <!-- Notification Settings & Chip Settings -->
+    <string name="notifications_settings_title">Notifications</string>
+    <string name="notifications_settings_subtitle">Banners, calls, and smart chip</string>
+    <string name="pref_cat_floating_banners">Floating Banners</string>
+    <string name="desk_notification_popup_title">Notification Popups</string>
+    <string name="desk_notification_popup_summary">Show floating notification banner when notifications arrive</string>
+    <string name="desk_notification_duration_title">Popup Duration</string>
+    <string name="desk_notification_duration_summary">How long the banner stays on screen (seconds)</string>
+    <string name="desk_notification_hide_sensitive_title">Hide Sensitive Content</string>
+    <string name="desk_notification_hide_sensitive_summary">Mask message content and sender on floating banners</string>
+    <string name="notification_hidden_content">New notification</string>
+
+    <string name="pref_cat_phone_calls">Phone Calls</string>
+    <string name="desk_call_overlay_title">Incoming Call Overlay</string>
+    <string name="desk_call_overlay_summary">Show incoming call card when a paired device rings</string>
+    <string name="desk_call_missed_notification_title">Missed Call Notifications</string>
+    <string name="desk_call_missed_notification_summary">Add missed calls to notifications and smart chip</string>
+    <string name="missed_call">Missed call</string>
+
+    <string name="pref_cat_smart_chip">Smart Chip</string>
+    <string name="pref_notification_chip_settings_title">Smart Chip Settings</string>
+    <string name="pref_notification_chip_settings_summary">Configure chip format, icons, and tap actions</string>
+    <string name="pref_notification_shade_shortcut_title">Open Notification Shade</string>
+    <string name="pref_notification_shade_shortcut_summary">View all active notifications and alerts</string>
+
+    <string name="notification_chip_settings_title">Notification Chip</string>
+    <string name="notification_chip_behavior_category">Behavior &amp; Interaction</string>
+    <string name="notification_chip_display_category">Display &amp; Formatting</string>
+    <string name="notification_chip_tap_action_title">Tap Action</string>
+    <string name="notification_chip_tap_action_summary">Action triggered when tapping the chip</string>
+    <string name="notification_chip_single_format_title">Single Notification Format</string>
+    <string name="notification_chip_single_format_summary">Text to display when one notification is active</string>
+    <string name="notification_chip_multi_format_title">Multiple Notifications Format</string>
+    <string name="notification_chip_multi_format_summary">Text to display when multiple notifications are active</string>
+    <string name="notification_chip_use_app_icon_title">Use App Icon</string>
+    <string name="notification_chip_use_app_icon_summary">Show source application icon instead of generic bell icon</string>
+    <string name="notifications_cleared">Notifications cleared</string>
+
+    <string-array name="notification_chip_single_format_entries">
+        <item>Sender / Title</item>
+        <item>App Name</item>
+        <item>Counter (1)</item>
+    </string-array>
+    <string-array name="notification_chip_single_format_values">
+        <item>title</item>
+        <item>app</item>
+        <item>count</item>
+    </string-array>
+
+    <string-array name="notification_chip_multi_format_entries">
+        <item>Compact Counter (+N)</item>
+        <item>Count with Label</item>
+    </string-array>
+    <string-array name="notification_chip_multi_format_values">
+        <item>compact</item>
+        <item>label</item>
+    </string-array>
+
+    <string-array name="notification_chip_tap_action_entries">
+        <item>Open Notification Shade</item>
+        <item>Clear All Notifications</item>
+    </string-array>
+    <string-array name="notification_chip_tap_action_values">
+        <item>shade</item>
+        <item>clear</item>
+    </string-array>
+
+    <plurals name="notification_count">
+        <item quantity="one">%d notification</item>
+        <item quantity="other">%d notifications</item>
+    </plurals>
 </resources>

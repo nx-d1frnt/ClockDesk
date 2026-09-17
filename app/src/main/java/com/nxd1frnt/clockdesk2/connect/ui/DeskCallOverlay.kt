@@ -62,16 +62,36 @@ class DeskCallOverlay(
                     }
                 }
 
+                val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
                 when (event.lowercase()) {
                     "ringing" -> {
-                        showIncomingCall(
-                            deviceName = deviceName,
-                            displayName = contactName ?: phoneNumber,
-                            subtitle = if (contactName != null) phoneNumber else "",
-                            contactPhoto = photoBitmap
-                        )
+                        if (prefs.getBoolean("desk_call_overlay_enabled", true)) {
+                            showIncomingCall(
+                                deviceName = deviceName,
+                                displayName = contactName ?: phoneNumber,
+                                subtitle = if (contactName != null) phoneNumber else "",
+                                contactPhoto = photoBitmap
+                            )
+                        }
                     }
-                    "missedcall", "talking", "idle", "canceled" -> {
+                    "missedcall" -> {
+                        hideCallOverlay()
+                        if (prefs.getBoolean("desk_call_missed_notification", true)) {
+                            val missedNotification = com.nxd1frnt.clockdesk2.connect.model.DeskNotification(
+                                deviceId = deviceId,
+                                notificationId = "call_missed_${System.currentTimeMillis()}",
+                                appName = context.getString(R.string.pref_cat_phone_calls),
+                                title = contactName ?: phoneNumber,
+                                text = context.getString(R.string.missed_call),
+                                timestamp = System.currentTimeMillis(),
+                                iconBytes = null,
+                                isClearable = true
+                            )
+                            com.nxd1frnt.clockdesk2.connect.repo.DeskNotificationRepository.getInstance(context).postNotification(missedNotification)
+                        }
+                    }
+                    "talking", "idle", "canceled" -> {
                         hideCallOverlay()
                     }
                 }

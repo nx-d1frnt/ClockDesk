@@ -516,4 +516,74 @@
     <string name="about_kde_connect_desc">Протокол синхронизации устройств и MPRIS от KDE Community</string>
     <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
     <string name="deskconnect_credits_text">DeskConnect использует протокол с открытым исходным кодом, созданный проектом KDE Connect. Огромная благодарность сообществу KDE!</string>
+
+    <!-- Notification Smart Chip & Shade -->
+    <string name="show_notifications_chip">Уведомления</string>
+    <string name="show_notifications_chip_summary">Значок с иконками уведомлений и шторка быстрого доступа</string>
+    <string name="notification_shade_title">Уведомления</string>
+    <string name="notification_shade_clear_all">Очистить все</string>
+    <string name="no_notifications">Нет уведомлений</string>
+    <string name="no_notifications_subtitle">Все прочитано</string>
+    <string name="notification_time_just_now">Только что</string>
+
+    <!-- Notification Settings & Chip Settings -->
+    <string name="notifications_settings_title">Уведомления</string>
+    <string name="notifications_settings_subtitle">Баннеры, звонки и умный чип</string>
+    <string name="pref_cat_floating_banners">Всплывающие баннеры</string>
+    <string name="desk_notification_popup_title">Всплывающие уведомления</string>
+    <string name="desk_notification_popup_summary">Показывать всплывающий баннер при поступлении уведомлений</string>
+    <string name="desk_notification_duration_title">Длительность показа</string>
+    <string name="desk_notification_duration_summary">Сколько секунд баннер остается на экране</string>
+    <string name="desk_notification_hide_sensitive_title">Скрывать личные данные</string>
+    <string name="desk_notification_hide_sensitive_summary">Скрывать текст сообщения на всплывающих баннерах</string>
+    <string name="notification_hidden_content">Новое уведомление</string>
+
+    <string name="pref_cat_phone_calls">Телефонные вызовы</string>
+    <string name="desk_call_overlay_title">Экран входящего вызова</string>
+    <string name="desk_call_overlay_summary">Показывать экран входящего вызова при звонке на устройство</string>
+    <string name="desk_call_missed_notification_title">Уведомления о пропущенных</string>
+    <string name="desk_call_missed_notification_summary">Добавлять пропущенные вызовы в уведомления и умный чип</string>
+    <string name="missed_call">Пропущенный вызов</string>
+
+    <string name="pref_cat_smart_chip">Умный чип</string>
+    <string name="pref_notification_chip_settings_title">Настройки умного чипа</string>
+    <string name="pref_notification_chip_settings_summary">Формат текста, иконки и действия при нажатии</string>
+    <string name="pref_notification_shade_shortcut_title">Открыть шторку уведомлений</string>
+    <string name="pref_notification_shade_shortcut_summary">Просмотр всех активных уведомлений</string>
+
+    <string name="notification_chip_settings_title">Чип уведомлений</string>
+    <string name="notification_chip_behavior_category">Поведение и взаимодействие</string>
+    <string name="notification_chip_display_category">Отображение и формат</string>
+    <string name="notification_chip_tap_action_title">Действие при нажатии</string>
+    <string name="notification_chip_tap_action_summary">Действие при нажатии на чип</string>
+    <string name="notification_chip_single_format_title">Формат одного уведомления</string>
+    <string name="notification_chip_single_format_summary">Отображаемый текст при одном уведомлении</string>
+    <string name="notification_chip_multi_format_title">Формат нескольких уведомлений</string>
+    <string name="notification_chip_multi_format_summary">Отображаемый текст при нескольких уведомлениях</string>
+    <string name="notification_chip_use_app_icon_title">Использовать иконку приложения</string>
+    <string name="notification_chip_use_app_icon_summary">Показывать значок приложения вместо стандартного колокольчика</string>
+    <string name="notifications_cleared">Уведомления очищены</string>
+
+    <string-array name="notification_chip_single_format_entries">
+        <item>Отправитель / Заголовок</item>
+        <item>Имя приложения</item>
+        <item>Счётчик (1)</item>
+    </string-array>
+
+    <string-array name="notification_chip_multi_format_entries">
+        <item>Компактный счётчик (+N)</item>
+        <item>Счётчик с текстом</item>
+    </string-array>
+
+    <string-array name="notification_chip_tap_action_entries">
+        <item>Открыть шторку уведомлений</item>
+        <item>Очистить все уведомления</item>
+    </string-array>
+
+    <plurals name="notification_count">
+        <item quantity="one">%d уведомление</item>
+        <item quantity="few">%d уведомления</item>
+        <item quantity="many">%d уведомлений</item>
+        <item quantity="other">%d уведомления</item>
+    </plurals>
 </resources>

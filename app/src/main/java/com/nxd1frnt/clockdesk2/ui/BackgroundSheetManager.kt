@@ -34,10 +34,12 @@ class BackgroundSheetManager(
     private val isMusicBackgroundApplied: () -> Boolean,
     private val onAddBackgroundRequested: () -> Unit,
     private val onPreviewImage: (Uri, blur: Int) -> Unit,
-    private val onRestoreGradient: () -> Unit,
-    private val onRestoreSavedBackground: () -> Unit,
-    private val onUpdateFilters: (Int?, Int?, Int?, Int?) -> Unit,
-    private val onApplyCompleted: (previewUri: String?) -> Unit,
+    private val onPreviewBlur: (blur: Int) -> Unit,
+    private val onPreviewGradient: () -> Unit,
+    private val onPreviewMusicAlbumArt: (enabled: Boolean, blur: Int) -> Unit,
+    private val onRestoreOriginalState: () -> Unit,
+    private val onUpdateFilters: (Int?, Int?, Int?, Int?, Boolean?, Boolean?) -> Unit,
+    private val onApplyCompleted: (previewUri: String?, blur: Int) -> Unit,
     private val onClearBackground: () -> Unit,
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit,
     private val onCropRequested: () -> Unit,
@@ -47,14 +49,17 @@ class BackgroundSheetManager(
         private set
     private var isUpdatingBackgroundUi = false
     private var isApplying = false
+    private var initialMusicAlbumArtEnabled = true
     private val animationDuration = 350L
     private var backgroundsAdapter: BackgroundsAdapter? = null
 
     private var previewTask: Runnable? = null
     private var filterTask: Runnable? = null
+    private var blurTask: Runnable? = null
 
     private val bgRecycler by lazy { floatingMenuView.findViewById<RecyclerView>(R.id.background_recycler_view) }
     private val bgBlurSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
+    private val bgMusicAlbumArtSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.music_albumart_switch) }
     private val bgDimToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
     private val bgDimSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.dimming_intensity_seekbar) }
     private val bgDimRangeSeek by lazy { floatingMenuView.findViewById<RangeSlider>(R.id.dimming_intensity_range_slider) }
@@ -105,24 +110,21 @@ class BackgroundSheetManager(
                 }
                 previewBackgroundUri = id
 
-                if (isMusicBackgroundApplied()) return@BackgroundsAdapter
-
                 when (id) {
                     "__DEFAULT_GRADIENT__" -> {
                         previewTask?.let { floatingMenuView.removeCallbacks(it) }
-                        onRestoreGradient()
+                        onPreviewGradient()
                         updateCropButtonVisibility(false)
                     }
                     else -> {
-                        debouncePreview {
-                            try {
-                                val uri = Uri.parse(id)
-                                val intensity = bgBlurSeek.value.toInt()
-                                onPreviewImage(uri, intensity)
-                                updateCropButtonVisibility(true)
-                            } catch (e: Exception) {
-                                Logger.e("BackgroundSheetManager") { "Error selecting background: $id - ${e.message}" }
-                            }
+                        previewTask?.let { floatingMenuView.removeCallbacks(it) }
+                        try {
+                            val uri = Uri.parse(id)
+                            val intensity = bgBlurSeek.value.toInt()
+                            onPreviewImage(uri, intensity)
+                            updateCropButtonVisibility(true)
+                        } catch (e: Exception) {
+                            Logger.e("BackgroundSheetManager") { "Error selecting background: $id - ${e.message}" }
                         }
                     }
                 }
@@ -150,16 +152,35 @@ class BackgroundSheetManager(
         bgRecycler.adapter = backgroundsAdapter
     }
 
+    private fun triggerFilterUpdate() {
+        debounceFilterUpdate {
+            onUpdateFilters(
+                getPreviewDimMode(),
+                getPreviewDimIntensity(),
+                getPreviewDimMin(),
+                getPreviewDimMax(),
+                bgNightShiftSwitch?.isChecked,
+                bgZoomSwitch?.isChecked
+            )
+        }
+    }
+
     private fun setupListeners() {
+        bgBlurSeek.addOnChangeListener { _, value, fromUser ->
+            if (fromUser && !isUpdatingBackgroundUi) {
+                debounceBlur {
+                    onPreviewBlur(value.toInt())
+                }
+            }
+        }
+
         bgBlurSeek.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
-                previewBackgroundUri?.let { id ->
-                    if (id != "__DEFAULT_GRADIENT__" && !isMusicBackgroundApplied()) {
-                        debouncePreview {
-                            onPreviewImage(Uri.parse(id), slider.value.toInt())
-                        }
-                    }
+                blurTask?.let {
+                    floatingMenuView.removeCallbacks(it)
+                    it.run()
+                    blurTask = null
                 }
             }
         })
@@ -178,35 +199,30 @@ class BackgroundSheetManager(
                 bgDimRangeSeek.visibility = View.GONE
                 bgDimSeek.isEnabled = (mode != BackgroundManager.DIM_MODE_OFF)
             }
-            debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+            triggerFilterUpdate()
         }
 
         bgDimSeek.addOnChangeListener { _, _, fromUser ->
-            if (fromUser) debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+            if (fromUser) triggerFilterUpdate()
         }
 
         bgDimRangeSeek.addOnChangeListener { _, _, fromUser ->
-            if (fromUser) debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+            if (fromUser) triggerFilterUpdate()
         }
 
         bgNightShiftSwitch?.setOnCheckedChangeListener { _, _ ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            val wasEnabledBefore = backgroundManager.isNightShiftEnabled()
-            backgroundManager.setNightShiftEnabled(bgNightShiftSwitch?.isChecked == true)
-            debounceFilterUpdate {
-                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
-                backgroundManager.setNightShiftEnabled(wasEnabledBefore)
-            }
+            triggerFilterUpdate()
         }
 
         bgZoomSwitch?.setOnCheckedChangeListener { _, _ ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            val wasEnabledBefore = backgroundManager.getZoomEnabled()
-            backgroundManager.setZoomEnabled(bgZoomSwitch?.isChecked == true)
-            debounceFilterUpdate {
-                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
-                backgroundManager.setZoomEnabled(wasEnabledBefore)
-            }
+            triggerFilterUpdate()
+        }
+
+        bgMusicAlbumArtSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
+            onPreviewMusicAlbumArt(isChecked, bgBlurSeek.value.toInt())
         }
 
         bgIntensitySeek.addOnChangeListener { _, _, fromUser ->
@@ -226,7 +242,7 @@ class BackgroundSheetManager(
 
             if (!isChecked) {
                 weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, !dayTimeGetter.isDay(), dayTimeGetter.getDayFactor())
-                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+                triggerFilterUpdate()
             } else {
                 applyWeatherPreview()
             }
@@ -242,10 +258,8 @@ class BackgroundSheetManager(
         }
 
         bgCropBtn?.setOnClickListener {
-            val uri = previewBackgroundUri
+            val uri = previewBackgroundUri ?: if (!isMusicBackgroundApplied()) backgroundManager.getSavedBackgroundUri() else null
             if (uri != null && uri != "__DEFAULT_GRADIENT__") {
-                // Фикс: Если мы пытаемся кропнуть новую (еще не примененную) картинку,
-                // нужно сбросить старый сдвиг, чтобы не переносить его на новое изображение.
                 if (uri != backgroundManager.getSavedBackgroundUri()) {
                     backgroundManager.resetBgTransform()
                 }
@@ -278,6 +292,12 @@ class BackgroundSheetManager(
         }
     }
 
+    private fun debounceBlur(action: () -> Unit) {
+        blurTask?.let { floatingMenuView.removeCallbacks(it) }
+        blurTask = Runnable { action() }
+        floatingMenuView.postDelayed(blurTask, 60)
+    }
+
     private fun debouncePreview(action: () -> Unit) {
         previewTask?.let { floatingMenuView.removeCallbacks(it) }
         previewTask = Runnable { action() }
@@ -292,6 +312,7 @@ class BackgroundSheetManager(
 
     fun show() {
         isApplying = false
+        initialMusicAlbumArtEnabled = backgroundManager.isMusicAlbumArtEnabled()
         loadCurrentSettings()
         scaleDownMainLayout()
         hideBackgroundTab()
@@ -350,14 +371,8 @@ class BackgroundSheetManager(
 
     fun cancelAndHide() {
         if (!isApplying) {
-            if (!isMusicBackgroundApplied()) {
-                val savedUri = backgroundManager.getSavedBackgroundUri()
-                if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
-                    onRestoreSavedBackground()
-                } else {
-                    onRestoreGradient()
-                }
-            }
+            backgroundManager.setMusicAlbumArtEnabled(initialMusicAlbumArtEnabled)
+            onRestoreOriginalState()
         }
         previewBackgroundUri = null
         isApplying = false
@@ -367,8 +382,12 @@ class BackgroundSheetManager(
     fun onImageAdded(uriStr: String) {
         updateAdapterItems()
         previewBackgroundUri = uriStr
-        if (!isMusicBackgroundApplied()) {
+        backgroundsAdapter?.updateSelection(uriStr)
+        try {
             onPreviewImage(Uri.parse(uriStr), bgBlurSeek.value.toInt())
+            updateCropButtonVisibility(true)
+        } catch (e: Exception) {
+            Logger.e("BackgroundSheetManager") { "Error previewing added image: $uriStr - ${e.message}" }
         }
     }
 
@@ -379,17 +398,23 @@ class BackgroundSheetManager(
         isUpdatingBackgroundUi = true
         updateAdapterItems()
 
+        val isMusic = isMusicBackgroundApplied()
         val savedUri = backgroundManager.getSavedBackgroundUri()
 
-        // Фикс: Обновляем previewBackgroundUri при загрузке UI,
-        // чтобы кнопка кропа понимала, что изображение уже выбрано
-        previewBackgroundUri = savedUri
+        val currentPreview = previewBackgroundUri
+        if (currentPreview != null) {
+            backgroundsAdapter?.selectedId = currentPreview
+            updateCropButtonVisibility(currentPreview != "__DEFAULT_GRADIENT__")
+        } else if (isMusic) {
+            backgroundsAdapter?.selectedId = null
+            updateCropButtonVisibility(false)
+        } else {
+            backgroundsAdapter?.selectedId = savedUri ?: "__DEFAULT_GRADIENT__"
+            val hasCustom = savedUri != null && savedUri != "__DEFAULT_GRADIENT__"
+            updateCropButtonVisibility(hasCustom)
+        }
 
-        backgroundsAdapter?.selectedId = savedUri ?: "__DEFAULT_GRADIENT__"
         bgRecycler.scrollToPosition(0)
-
-        val hasCustom = savedUri != null && savedUri != "__DEFAULT_GRADIENT__"
-        updateCropButtonVisibility(hasCustom)
 
         val blurInt = backgroundManager.getBlurIntensity()
         bgBlurSeek.value = blurInt.toFloat()
@@ -418,6 +443,7 @@ class BackgroundSheetManager(
 
         bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
         bgZoomSwitch?.isChecked = backgroundManager.getZoomEnabled()
+        bgMusicAlbumArtSwitch?.isChecked = backgroundManager.isMusicAlbumArtEnabled()
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isManual = backgroundManager.isManualWeatherEnabled()
@@ -446,7 +472,8 @@ class BackgroundSheetManager(
     }
 
     private fun applyBackgroundSettings() {
-        backgroundManager.setBlurIntensity(bgBlurSeek.value.toInt())
+        val blur = bgBlurSeek.value.toInt()
+        backgroundManager.setBlurIntensity(blur)
 
         val dimMode = when (bgDimToggleGroup.checkedButtonId) {
             R.id.off_button -> BackgroundManager.DIM_MODE_OFF
@@ -458,6 +485,7 @@ class BackgroundSheetManager(
 
         bgNightShiftSwitch?.let { backgroundManager.setNightShiftEnabled(it.isChecked) }
         bgZoomSwitch?.let { backgroundManager.setZoomEnabled(it.isChecked) }
+        bgMusicAlbumArtSwitch?.let { backgroundManager.setMusicAlbumArtEnabled(it.isChecked) }
 
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
@@ -476,7 +504,7 @@ class BackgroundSheetManager(
             else -> DynamicBackgroundView.WeatherType.RAIN.ordinal
         })
 
-        onApplyCompleted(previewBackgroundUri)
+        onApplyCompleted(previewBackgroundUri, blur)
         hide()
     }
 
@@ -515,7 +543,7 @@ class BackgroundSheetManager(
 
         if (!bgWeatherSwitch.isChecked) {
             weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight, dayFactor)
-            onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+            triggerFilterUpdate()
             return
         }
 
@@ -548,7 +576,7 @@ class BackgroundSheetManager(
                 dayFactor
             )
         }
-        onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+        triggerFilterUpdate()
     }
 
     private fun updateAutoWeatherCard() {
@@ -636,6 +664,7 @@ class BackgroundSheetManager(
     fun onDestroy() {
         previewTask?.let { floatingMenuView.removeCallbacks(it) }
         filterTask?.let { floatingMenuView.removeCallbacks(it) }
+        blurTask?.let { floatingMenuView.removeCallbacks(it) }
 
         bgRecycler.adapter = null
         backgroundsAdapter = null
