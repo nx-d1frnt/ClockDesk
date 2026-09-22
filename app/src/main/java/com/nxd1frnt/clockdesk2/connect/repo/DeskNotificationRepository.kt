@@ -33,6 +33,20 @@ class DeskNotificationRepository private constructor(private val context: Contex
             iconBytes: ByteArray?,
             isClearable: Boolean
         ) {
+            val k = key(deviceId, notificationId)
+            val old = activeNotifications[k]
+            if (old != null &&
+                old.appName == appName &&
+                old.title == title &&
+                old.text == text &&
+                old.isClearable == isClearable &&
+                (if (old.iconBytes == null && iconBytes == null) true
+                 else if (old.iconBytes != null && iconBytes != null) old.iconBytes.contentEquals(iconBytes)
+                 else false)
+            ) {
+                return // Exact duplicate, do not trigger redundant re-layout or reset marquee
+            }
+
             val item = DeskNotification(
                 deviceId = deviceId,
                 notificationId = notificationId,
@@ -43,7 +57,7 @@ class DeskNotificationRepository private constructor(private val context: Contex
                 iconBytes = iconBytes,
                 isClearable = isClearable
             )
-            activeNotifications[key(deviceId, notificationId)] = item
+            activeNotifications[k] = item
             notifyListeners()
         }
 

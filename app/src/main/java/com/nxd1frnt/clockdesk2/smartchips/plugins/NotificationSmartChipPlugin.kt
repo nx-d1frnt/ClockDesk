@@ -76,16 +76,24 @@ class NotificationSmartChipPlugin(private val context: Context) : ISmartChip {
 
         val useAppIcon = sharedPreferences.getBoolean("notification_chip_use_app_icon", true)
         if (useAppIcon) {
-            DeskNotificationHelper.applyIcon(
-                context,
-                iconView,
-                firstItem.iconBytes,
-                firstItem.notificationId,
-                textColor
-            )
+            val iconTag = "${firstItem.deviceId}:${firstItem.notificationId}:${firstItem.iconBytes?.size ?: 0}:$textColor"
+            if (iconView.tag != iconTag) {
+                DeskNotificationHelper.applyIcon(
+                    context,
+                    iconView,
+                    firstItem.iconBytes,
+                    firstItem.notificationId,
+                    textColor
+                )
+                iconView.tag = iconTag
+            }
         } else {
-            iconView.setImageResource(R.drawable.ic_notifications)
-            iconView.setColorFilter(textColor, android.graphics.PorterDuff.Mode.SRC_IN)
+            val iconTag = "default_notifications_icon:$textColor"
+            if (iconView.tag != iconTag) {
+                iconView.setImageResource(R.drawable.ic_notifications)
+                iconView.setColorFilter(textColor, android.graphics.PorterDuff.Mode.SRC_IN)
+                iconView.tag = iconTag
+            }
         }
 
         val singleFormat = sharedPreferences.getString("notification_chip_single_format", "title")
@@ -112,8 +120,12 @@ class NotificationSmartChipPlugin(private val context: Context) : ISmartChip {
             }
         }
 
-        chipText.text = label
-        chipText.isSelected = true
+        if (chipText.text.toString() != label) {
+            chipText.text = label
+        }
+        if (!chipText.isSelected) {
+            chipText.isSelected = true
+        }
 
         return true
     }

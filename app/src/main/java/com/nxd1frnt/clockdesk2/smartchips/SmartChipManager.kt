@@ -96,6 +96,7 @@ class SmartChipManager(
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
         com.nxd1frnt.clockdesk2.smartchips.plugins.CompanionBatteryChipPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.DeviceConnectionNoticeChipPlugin(context),
         com.nxd1frnt.clockdesk2.smartchips.plugins.NotificationSmartChipPlugin(context),
         UpdatePlugin(context),
         BackgroundProgressPlugin(context),
@@ -309,12 +310,17 @@ class SmartChipManager(
     }
 
     init {
+        chipContainer.viewTreeObserver.addOnScrollChangedListener {
+            resetAllChipsScale()
+        }
         internalPlugins.forEach { plugin ->
-            val view = plugin.createView(context).apply {
-                visibility = View.GONE
-                tag = plugin.preferenceKey
+            if (plugin !is IMultiSmartChip) {
+                val view = plugin.createView(context).apply {
+                    visibility = View.GONE
+                    tag = plugin.preferenceKey
+                }
+                allChips.add(ChipInfo(plugin.preferenceKey, plugin.preferenceKey, view))
             }
-            allChips.add(ChipInfo(plugin.preferenceKey, plugin.preferenceKey, view))
             plugin.setOnStateChangeListener {
                 updateAllChips()
             }
@@ -380,16 +386,20 @@ class SmartChipManager(
 
         // Обновляем внутренние плагины (они читают статус мгновенно)
         internalPlugins.forEach { plugin ->
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
-
-            if (!isEnabled) {
-                if (chipInfo.isVisible) isContentChanged = true
-                chipInfo.isVisible = false
+            if (plugin is IMultiSmartChip) {
+                if (updateMultiChipPlugin(plugin)) isContentChanged = true
             } else {
-                val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
-                if (chipInfo.isVisible != newIsVisible) isContentChanged = true
-                chipInfo.isVisible = newIsVisible
+                val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
+                val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
+
+                if (!isEnabled) {
+                    if (chipInfo.isVisible) isContentChanged = true
+                    chipInfo.isVisible = false
+                } else {
+                    val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+                    if (chipInfo.isVisible != newIsVisible) isContentChanged = true
+                    chipInfo.isVisible = newIsVisible
+                }
             }
         }
 
@@ -637,45 +647,107 @@ class SmartChipManager(
         return false
     }
 
+    private fun updateMultiChipPlugin(plugin: IMultiSmartChip): Boolean {
+        var isContentChanged = false
+        val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
+
+        if (!isEnabled) {
+            allChips.filter { it.channelId == plugin.preferenceKey }.forEach { chipInfo ->
+                if (chipInfo.isVisible) isContentChanged = true
+                chipInfo.isVisible = false
+            }
+            return isContentChanged
+        }
+
+        val items = plugin.getChips(sharedPreferences)
+        val activeIds = items.filter { it.isVisible }.map { it.chipId }.toSet()
+
+        // Hide any chips that are no longer active
+        allChips.filter { it.channelId == plugin.preferenceKey }.forEach { chipInfo ->
+            if (chipInfo.id !in activeIds) {
+                if (chipInfo.isVisible) isContentChanged = true
+                chipInfo.isVisible = false
+            }
+        }
+
+        // Add or update active chips
+        items.forEach { item ->
+            var chipInfo = allChips.find { it.id == item.chipId }
+            if (chipInfo == null && item.isVisible) {
+                val view = LayoutInflater.from(context)
+                    .inflate(R.layout.smart_chip_layout, chipContainer, false)
+                    .apply {
+                        visibility = View.GONE
+                        tag = item.chipId
+                    }
+                chipInfo = ChipInfo(item.chipId, plugin.preferenceKey, view)
+                allChips.add(chipInfo)
+                isContentChanged = true
+            }
+
+            if (chipInfo != null) {
+                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                val iconView = chipInfo.view.findViewById<ImageView>(R.id.chip_icon)
+                val oldText = textView?.text?.toString()
+
+                if (item.iconRes != null && iconView != null && iconView.tag != item.iconRes) {
+                    iconView.setImageResource(item.iconRes)
+                    iconView.tag = item.iconRes
+                }
+                if (textView != null && oldText != item.text) {
+                    textView.text = item.text
+                }
+                if (textView != null && !textView.isSelected) {
+                    textView.isSelected = true
+                }
+
+                if (chipInfo.isVisible != item.isVisible) isContentChanged = true
+                if (item.isVisible && oldText != item.text) isContentChanged = true
+                chipInfo.isVisible = item.isVisible
+                chipInfo.currentText = item.text
+            }
+        }
+
+        val allPluginChipIds = items.map { it.chipId }.toSet()
+        val toRemove = allChips.filter { it.channelId == plugin.preferenceKey && it.id !in allPluginChipIds && !it.isVisible }
+        toRemove.forEach { deadChip ->
+            (deadChip.view.parent as? ViewGroup)?.removeView(deadChip.view)
+        }
+        allChips.removeAll(toRemove.toSet())
+
+        return isContentChanged
+    }
+
     fun updateAllChips() {
         var isContentChanged = false
 
-        val container = chipContainer as? ViewGroup
-        if (container != null) {
-            val boundsTransition = TransitionSet().apply {
-                ordering = TransitionSet.ORDERING_TOGETHER
-                duration = 350L
-                interpolator = springInterpolator
-                addTransition(ChangeBounds().apply {
-                    resizeClip = false
-                })
-            }
-            TransitionManager.beginDelayedTransition(container, boundsTransition)
-        }
-
         // Internal chips
         internalPlugins.forEach { plugin ->
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-            val isSystemChip = plugin.preferenceKey == "system_bg_progress"
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
-            if (!isEnabled) {
-                if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
-                chipInfo.isVisible = false
+            if (plugin is IMultiSmartChip) {
+                if (updateMultiChipPlugin(plugin)) isContentChanged = true
             } else {
-                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
-                val oldText = textView.text.toString()
+                val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
+                val isSystemChip = plugin.preferenceKey == "system_bg_progress"
+                val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
+                if (!isEnabled) {
+                    if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
+                    chipInfo.isVisible = false
+                } else {
+                    val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                    val oldText = textView.text.toString()
 
-                val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
-                
-                val newText = textView.text.toString()
+                    val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+                    
+                    val newText = textView.text.toString()
 
-                if (chipInfo.isVisible != newIsVisible) {
-                    isContentChanged = true
-                } else if (newIsVisible && oldText != newText) {
-                    isContentChanged = true
+                    if (chipInfo.isVisible != newIsVisible) {
+                        isContentChanged = true
+                    } else if (newIsVisible && oldText != newText) {
+                        isContentChanged = true
+                    }
+                    
+                    chipInfo.isVisible = newIsVisible
                 }
-                
-                chipInfo.isVisible = newIsVisible
             }
         }
 
@@ -720,7 +792,7 @@ class SmartChipManager(
 
     private fun executeSortAndRedrawChips(contentChanged: Boolean = false) {
         // Читаем порядок, заданный пользователем в настройках
-        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
         val orderList = orderString.split(",").map { it.trim() }
 
         // Фильтруем видимые чипы и сортируем их по индексу в orderList
@@ -755,6 +827,12 @@ class SmartChipManager(
             visibleChips.forEach { chipInfo ->
                 val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
                 if (textView != null && !textView.isSelected) textView.isSelected = true
+                if (!isEditMode && chipInfo.view.getTag(R.id.tag_pulse_animator) == null) {
+                    if (chipInfo.view.scaleX != 1.0f || chipInfo.view.scaleY != 1.0f) {
+                        chipInfo.view.scaleX = 1.0f
+                        chipInfo.view.scaleY = 1.0f
+                    }
+                }
             }
 
             if (contentChanged) {
@@ -844,13 +922,47 @@ class SmartChipManager(
         }
     }
 
+    private fun resetAllChipsScale() {
+        for (i in 0 until chipContainer.childCount) {
+            val child = chipContainer.getChildAt(i)
+            if (child.scaleX != 1.0f || child.scaleY != 1.0f) {
+                child.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(150)
+                    .setInterpolator(OvershootInterpolator(1.4f))
+                    .start()
+            }
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun setupChipTouchFeedback(view: View) {
         if (view.getTag(R.id.tag_touch_listener_set) == true) return
         view.setTag(R.id.tag_touch_listener_set, true)
 
+        view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {
+                if (v.scaleX != 1.0f || v.scaleY != 1.0f) {
+                    v.scaleX = 1.0f
+                    v.scaleY = 1.0f
+                }
+            }
+
+            override fun onViewDetachedFromWindow(v: View) {
+                v.animate().cancel()
+                v.scaleX = 1.0f
+                v.scaleY = 1.0f
+            }
+        })
+
         view.setOnTouchListener { v, event ->
-            when (event.action) {
+            // Only perform pressed scale feedback if the view is actually clickable or in edit mode
+            if (!v.isClickable && !isEditMode) {
+                return@setOnTouchListener false
+            }
+
+            when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.animate()
                         .scaleX(0.95f)
@@ -858,6 +970,19 @@ class SmartChipManager(
                         .setDuration(120)
                         .setInterpolator(FastOutSlowInInterpolator())
                         .start()
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val x = event.x
+                    val y = event.y
+                    val isInside = x >= 0 && x <= v.width && y >= 0 && y <= v.height
+                    if (!isInside && (v.scaleX < 1.0f || v.scaleY < 1.0f)) {
+                        v.animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .setDuration(150)
+                            .setInterpolator(OvershootInterpolator(1.4f))
+                            .start()
+                    }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.animate()

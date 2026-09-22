@@ -2,16 +2,14 @@ package com.nxd1frnt.clockdesk2.smartchips.plugins
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.view.LayoutInflater
-import android.view.View
-import android.widget.ImageView
-import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
-import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
+import com.nxd1frnt.clockdesk2.smartchips.IMultiSmartChip
+import com.nxd1frnt.clockdesk2.smartchips.MultiChipItem
 import java.util.concurrent.ConcurrentHashMap
 
-class CompanionBatteryChipPlugin(private val context: Context) : ISmartChip {
+class CompanionBatteryChipPlugin(private val context: Context) : IMultiSmartChip {
 
     override val preferenceKey: String = "show_companion_battery"
 
@@ -31,6 +29,10 @@ class CompanionBatteryChipPlugin(private val context: Context) : ISmartChip {
 
     private val batteryListener = object : DeskConnectManager.BatteryListener {
         override fun onBatteryUpdated(deviceId: String, currentCharge: Int, isCharging: Boolean, thresholdEvent: Int) {
+            val old = deviceBatteries[deviceId]
+            if (old != null && old.charge == currentCharge && old.isCharging == isCharging && old.thresholdEvent == thresholdEvent) {
+                return // Exact duplicate, do not trigger redundant chip updates or marquee stutter
+            }
             deviceBatteries[deviceId] = DeviceBattery(
                 deviceId = deviceId,
                 charge = currentCharge,
@@ -42,6 +44,22 @@ class CompanionBatteryChipPlugin(private val context: Context) : ISmartChip {
         }
     }
 
+    private val deviceListener = object : DeskConnectManager.DeviceListener {
+        override fun onDeviceDiscovered(device: DeskConnectDevice) {}
+        override fun onDeviceConnected(device: DeskConnectDevice) {}
+        override fun onDeviceDisconnected(device: DeskConnectDevice) {
+            if (deviceBatteries.remove(device.deviceId) != null) {
+                stateChangeListener?.invoke()
+            }
+        }
+        override fun onPairingRequested(device: DeskConnectDevice, verificationKey: String) {}
+        override fun onPairingStateChanged(device: DeskConnectDevice, isPaired: Boolean) {
+            if (!isPaired && deviceBatteries.remove(device.deviceId) != null) {
+                stateChangeListener?.invoke()
+            }
+        }
+    }
+
     override fun setOnStateChangeListener(listener: () -> Unit) {
         this.stateChangeListener = listener
     }
@@ -49,40 +67,43 @@ class CompanionBatteryChipPlugin(private val context: Context) : ISmartChip {
     override fun startListening() {
         if (isListening) return
         deskConnectManager.batteryListeners.add(batteryListener)
+        deskConnectManager.deviceListeners.add(deviceListener)
         isListening = true
     }
 
     override fun stopListening() {
         if (!isListening) return
         deskConnectManager.batteryListeners.remove(batteryListener)
+        deskConnectManager.deviceListeners.remove(deviceListener)
         isListening = false
     }
 
-    override fun createView(context: Context): View {
-        return LayoutInflater.from(context).inflate(R.layout.smart_chip_layout, null, false)
-    }
-
-    override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {
+    override fun getChips(sharedPreferences: SharedPreferences): List<MultiChipItem> {
         val isEnabled = sharedPreferences.getBoolean(preferenceKey, true)
-        if (!isEnabled) return false
+        if (!isEnabled) return emptyList()
 
-        // Only show if a paired device has low battery (<= 20% and not charging, or thresholdEvent == 1)
-        val lowBatteryEntry = deviceBatteries.values
-            .filter { it.charge in 0..20 && !it.isCharging }
-            .minByOrNull { it.charge }
+        // Filter all paired devices with low battery (<= 20% and not charging, or threshold event active)
+        val lowBatteries = deviceBatteries.values
+            .filter { entry ->
+                ((entry.charge in 0..30) || entry.thresholdEvent == 1 || entry.thresholdEvent == 2) && !entry.isCharging
+            }
+            .sortedBy { it.charge }
 
-        if (lowBatteryEntry == null) {
-            return false
+        return lowBatteries.mapNotNull { entry ->
+            val dev = deskConnectManager.discoveredDevices[entry.deviceId]
+            val isPaired = dev?.isPaired == true || deskConnectManager.security.isDevicePaired(entry.deviceId)
+            if (!isPaired) return@mapNotNull null
+            if (dev != null && !dev.isConnected) return@mapNotNull null
+
+            val deviceName = dev?.getDisplayName() ?: "Remote"
+            val iconRes = dev?.getDeviceTypeIconRes() ?: R.drawable.ic_devices
+
+            MultiChipItem(
+                chipId = "companion_battery_${entry.deviceId}",
+                text = "$deviceName ${entry.charge}%",
+                iconRes = iconRes,
+                isVisible = true
+            )
         }
-
-        val dev = deskConnectManager.discoveredDevices[lowBatteryEntry.deviceId]
-        val deviceName = dev?.getDisplayName() ?: "Remote"
-
-        val iconView = view.findViewById<ImageView>(R.id.chip_icon)
-        val textView = view.findViewById<TextView>(R.id.chip_text)
-
-        iconView.setImageResource(R.drawable.ic_battery_alert)
-        textView.text = "$deviceName ${lowBatteryEntry.charge}%"
-        return true
     }
 }

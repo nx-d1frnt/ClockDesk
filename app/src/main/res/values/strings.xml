@@ -170,6 +170,10 @@
     <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
     <string name="show_companion_battery_chip">Connected Device Battery</string>
     <string name="show_companion_battery_chip_summary">Show alert when paired phone or PC battery is low</string>
+    <string name="show_device_connection_chip">Device connection status</string>
+    <string name="show_device_connection_chip_summary">Show short notice when paired devices connect or disconnect</string>
+    <string name="device_connected_notice">%1$s connected</string>
+    <string name="device_disconnected_notice">%1$s disconnected</string>
     <string name="battery_low">Battery Low</string>
     <string name="battery_saver_on">Saver On</string>
     <string name="battery_alert_settings_title">Battery Alert Settings</string>

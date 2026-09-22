@@ -166,6 +166,12 @@
     <string name="smart_chips_settings_title">Настройки умных чипов</string>
     <string name="show_battery_alert_chip">Показывать чип оповещения о батарее</string>
     <string name="show_battery_alert_chip_summary">Показывает чип, когда батарея разряжена или включена экономия батареи приложения</string>
+    <string name="show_companion_battery_chip">Батарея подключенного устройства</string>
+    <string name="show_companion_battery_chip_summary">Оповещение о низком заряде батареи телефона или ПК</string>
+    <string name="show_device_connection_chip">Статус подключения устройств</string>
+    <string name="show_device_connection_chip_summary">Краткое уведомление при подключении или отключении сопряженных устройств</string>
+    <string name="device_connected_notice">%1$s: подключено</string>
+    <string name="device_disconnected_notice">%1$s: отключено</string>
     <string name="battery_low">Низкий заряд</string>
     <string name="battery_saver_on">Экономия вкл</string>
     <string name="battery_alert_settings_title">Настройки оповещений о батарее</string>
