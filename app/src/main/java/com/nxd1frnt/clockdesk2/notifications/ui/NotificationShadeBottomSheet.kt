@@ -458,8 +458,9 @@ object NotificationShadeBottomSheet {
                         view.animate().setListener(null)
                         view.translationX = 0f
                         view.alpha = 1f
-                        animatingHolders.remove(holder)
-                        dispatchRemoveFinished(holder)
+                        if (animatingHolders.remove(holder)) {
+                            dispatchRemoveFinished(holder)
+                        }
                     }
                 })
                 .start()
@@ -468,7 +469,7 @@ object NotificationShadeBottomSheet {
 
         override fun endAnimation(holder: RecyclerView.ViewHolder) {
             if (animatingHolders.remove(holder)) {
-                holder.itemView.animate().cancel()
+                holder.itemView.animate().setListener(null).cancel()
                 holder.itemView.translationX = 0f
                 holder.itemView.alpha = 1f
                 dispatchRemoveFinished(holder)
@@ -477,13 +478,14 @@ object NotificationShadeBottomSheet {
         }
 
         override fun endAnimations() {
-            animatingHolders.forEach { holder ->
-                holder.itemView.animate().cancel()
+            val toEnd = ArrayList(animatingHolders)
+            animatingHolders.clear()
+            for (holder in toEnd) {
+                holder.itemView.animate().setListener(null).cancel()
                 holder.itemView.translationX = 0f
                 holder.itemView.alpha = 1f
                 dispatchRemoveFinished(holder)
             }
-            animatingHolders.clear()
             super.endAnimations()
         }
 

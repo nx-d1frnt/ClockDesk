@@ -126,7 +126,8 @@ class BackupSettingsFragment : PreferenceFragmentCompat() {
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let {
-            val success = SettingsBackupManager.exportSettings(requireContext(), it)
+            val includeDevices = preferenceManager.sharedPreferences?.getBoolean("backup_connected_devices", true) ?: true
+            val success = SettingsBackupManager.exportSettings(requireContext(), it, includeDevices)
             if (success) {
                 Toast.makeText(requireContext(), R.string.export_success, Toast.LENGTH_SHORT).show()
             } else {

@@ -279,6 +279,8 @@
     <string name="error_opening_settings">Ошибка открытия настроек</string>
 
     <string name="backup_restore_title">Бекап и восстановление</string>
+    <string name="backup_connected_devices_title">Включать подключенные устройства</string>
+    <string name="backup_connected_devices_summary">Сохранять сопряженные устройства DeskConnect и данные подключения</string>
     <string name="export_settings">Бекап настроек</string>
     <string name="import_settings">Импорт настроек</string>
     <string name="export_success">Бекап успешно сохранен</string>

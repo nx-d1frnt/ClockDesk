@@ -41,6 +41,8 @@ import com.nxd1frnt.clockdesk2.utils.ClockStyle
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
+import com.nxd1frnt.clockdesk2.widgets.WidgetFeature
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -52,6 +54,7 @@ class CustomizationSheetManager(
     private val widgetMover: WidgetMover,
     private val clockManager: ClockManager,
     private val dayTimeGetter: DayTimeGetter,
+    private val widgetManager: DesktopWidgetManager? = null,
     private val onAddFontRequested: () -> Unit,
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit
 ) {
@@ -424,25 +427,33 @@ class CustomizationSheetManager(
     }
 
     private fun configureVisibilityForView(view: View) {
-        val isTime = view.id == R.id.time_text
-        val isDate = view.id == R.id.date_text
-        val isLastFm = view.id == R.id.lastfm_layout
-        val isSmartChip = view.id == R.id.smart_chip_container
+        val controller = widgetManager?.getControllerForView(view)
+        val features = controller?.definition?.supportedFeatures
+
+        val isTime = if (features != null) features.contains(WidgetFeature.TIME_FORMAT) else view.id == R.id.time_text
+        val isDate = if (features != null) features.contains(WidgetFeature.DATE_FORMAT) else view.id == R.id.date_text
+        val isLastFm = if (features != null) features.contains(WidgetFeature.MEDIA_ICON) else view.id == R.id.lastfm_layout
+        val isSmartChip = if (features != null) features.contains(WidgetFeature.BACKGROUND_COLOR) else view.id == R.id.smart_chip_container
         val isWeather = view.id == R.id.weather_layout
-        val showLayoutControls = isTime || isDate || isLastFm || isWeather
+        val showLayoutControls = if (features != null) {
+            features.contains(WidgetFeature.HORIZONTAL_ALIGNMENT) || features.contains(WidgetFeature.VERTICAL_ALIGNMENT)
+        } else {
+            isTime || isDate || isLastFm || isWeather
+        }
 
-        bsTitle.text = sideSheetView.context.getString(
-            when {
-                isTime -> R.string.customize_time
-                isDate -> R.string.customize_date
-                isLastFm -> R.string.customize_now_playing
-                isSmartChip -> R.string.customize_smart_chips
-                isWeather -> R.string.widget_weather_title
-                else -> R.string.app_name
-            }
-        )
+        bsTitle.text = controller?.definition?.titleRes?.let { sideSheetView.context.getString(it) }
+            ?: sideSheetView.context.getString(
+                when {
+                    isTime -> R.string.customize_time
+                    isDate -> R.string.customize_date
+                    isLastFm -> R.string.customize_now_playing
+                    isSmartChip -> R.string.customize_smart_chips
+                    isWeather -> R.string.widget_weather_title
+                    else -> R.string.app_name
+                }
+            )
 
-        bsClockStyleCard.visibility = if (isTime) View.VISIBLE else View.GONE
+        bsClockStyleCard.visibility = if (features?.contains(WidgetFeature.CLOCK_STYLE) ?: isTime) View.VISIBLE else View.GONE
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatLabel.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
@@ -469,13 +480,13 @@ class CustomizationSheetManager(
         sideSheetView.findViewById<View>(R.id.card_grid_snap)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
         sideSheetView.findViewById<View>(R.id.card_ignore_collision)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
 
-        // Last.fm Specific
-        sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (isLastFm) View.VISIBLE else View.GONE
-        bsMaxWidthContainer.visibility = if (isLastFm) View.VISIBLE else View.GONE
+        // Last.fm / Media Specific
+        sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (features?.contains(WidgetFeature.MEDIA_ICON) ?: isLastFm) View.VISIBLE else View.GONE
+        bsMaxWidthContainer.visibility = if (features?.contains(WidgetFeature.MAX_WIDTH) ?: isLastFm) View.VISIBLE else View.GONE
         bsBlockFormatsTitle.visibility = if (isTime || isDate) View.VISIBLE else View.GONE
         bsDateFormatCard.visibility = if (isDate) View.VISIBLE else View.GONE
         bsTimeFormatCard.visibility = if (isTime) View.VISIBLE else View.GONE
-        bsEditBackgroundSwitch.visibility = if (isSmartChip) View.VISIBLE else View.GONE
+        bsEditBackgroundSwitch.visibility = if (features?.contains(WidgetFeature.BACKGROUND_COLOR) ?: isSmartChip) View.VISIBLE else View.GONE
         bsRemoveWidgetCard.visibility = View.VISIBLE
     }
 

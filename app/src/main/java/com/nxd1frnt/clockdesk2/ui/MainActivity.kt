@@ -5,6 +5,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -90,10 +91,13 @@ import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetType
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetController
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetHost
+import com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget
 import java.util.Calendar
 import java.util.Date
 
-class MainActivity : AppCompatActivity(), PowerSaveObserver {
+class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var timeText: TextView
     private lateinit var dateText: TextView
     private lateinit var weatherText: TextView
@@ -137,7 +141,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var desktopWidgetManager: DesktopWidgetManager
     private lateinit var clockManager: ClockManager
     private lateinit var gradientManager: GradientManager
-    private lateinit var fontManager: FontManager
+    override lateinit var fontManager: FontManager
     private lateinit var locationManager: LocationManager
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
@@ -160,7 +164,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var wasMusicBackgroundApplied = false
     private var currentAppliedArtworkSource: Any? = null
     private var isUpdatingBackgroundUi = false
-    private var isEditMode = false
+    override var isEditMode: Boolean = false
+    override val hostContext: Context get() = this
+    override fun getRestTranslationX(view: View): Float = if (::widgetMover.isInitialized) widgetMover.getRestTranslationX(view) else 0f
+    override fun onMusicArtworkChanged(artworkSource: Any?) {}
+    override fun onWidgetClicked(widget: DesktopWidgetController) {
+        widget.rootView?.let {
+            customizationSheetManager.showForView(it)
+            resetEditModeTimeout()
+        }
+    }
+    override fun getPreferences(): SharedPreferences = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
     private var isCropModeActive = false
     private var isScaleAnimating = false
     private var isLaunchingFilePicker = false
@@ -584,7 +598,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             enableAdditionalLogging
         )
 
-        desktopWidgetManager = DesktopWidgetManager(this, mainLayout)
+        desktopWidgetManager = DesktopWidgetManager(this, mainLayout, host = this)
         desktopWidgetManager.bindExistingViews(
             timeView = timeText,
             dateView = dateText,
@@ -648,6 +662,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             widgetMover = widgetMover,
             clockManager = clockManager,
             dayTimeGetter = dayTimeGetter,
+            widgetManager = desktopWidgetManager,
             onAddFontRequested = {
                 val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -1267,166 +1282,53 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         currentMusicState = state
         val isMediaActive = ::desktopWidgetManager.isInitialized && desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.MEDIA)
 
-        if (!isMediaActive) {
-            lastfmLayout.visibility = View.GONE
-            lastfmLayout.alpha = 0f
-            if (state is PluginState.Playing) {
-                val track = state.track
-                val trackInfoText = "${track.artist} - ${track.title}"
-                val isTextDifferent = trackInfoText != lastTrackInfo
-                lastTrackInfo = trackInfoText
+        if (state is PluginState.Playing) {
+            val track = state.track
+            val trackInfoText = "${track.artist} - ${track.title}"
+            val isTextDifferent = trackInfoText != lastTrackInfo
+            lastTrackInfo = trackInfoText
 
-                val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
-                val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
-                val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
+            val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
+            val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
+            val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
 
-                if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
-                    handleBackgroundUpdate(track)
-                }
-            } else {
-                lastTrackInfo = null
+            Logger.d("MainActivity") {
+                "handleMusicStateUpdate: '${track.artist} - ${track.title}', isTextDiff=$isTextDifferent, isArtChanged=$isArtChanged, wasBgApplied=$wasMusicBackgroundApplied, hasBitmap=$validBitmap"
             }
-            return
+
+            if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
+                handleBackgroundUpdate(track)
+            } else if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isGraphicsTurbulenceContinuousMusicEnabled) {
+                if (!dynamicBackgroundView.isTurbulencePlaying) {
+                    val noiseColor = fontManager.getDynamicScheme().primary
+                    dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
+                }
+            }
+        } else {
+            lastTrackInfo = null
         }
 
-        if (isEditMode) {
+        if (isMediaActive) {
             if (state is PluginState.Playing) {
-                val track = state.track
-                val trackInfoText = "${track.artist} - ${track.title}"
-                nowPlayingTextView.text = trackInfoText
-                val isTextDifferent = trackInfoText != lastTrackInfo
-                lastTrackInfo = trackInfoText
-
-                val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
-                val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
-                val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
-
-                if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
-                    handleBackgroundUpdate(track)
-                }
-                if (isTextDifferent) {
-                    updateSourceIcon(track)
-                }
-            } else {
-                nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
-                lastTrackInfo = null
-            }
-            return
-        }
-
-        when (state) {
-            is PluginState.Playing -> {
                 pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
                 pendingRestoreRunnable = null
-
-                val track = state.track
-                val trackInfoText = "${track.artist} - ${track.title}"
-                val isTextDifferent = trackInfoText != lastTrackInfo
-
-                val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
-                val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
-                val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
-
-                Logger.d("MainActivity") {
-                    "handleMusicStateUpdate: '${track.artist} - ${track.title}', isTextDiff=$isTextDifferent, isArtChanged=$isArtChanged, wasBgApplied=$wasMusicBackgroundApplied, hasBitmap=$validBitmap"
-                }
-
-                if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
-                    handleBackgroundUpdate(track)
-                } else if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isGraphicsTurbulenceContinuousMusicEnabled) {
-                    if (!dynamicBackgroundView.isTurbulencePlaying) {
-                        val noiseColor = fontManager.getDynamicScheme().primary
-                        dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
-                    }
-                }
-
-                if (isTextDifferent) {
-                    lastTrackInfo = trackInfoText
-
-                    lastfmLayout.animate().cancel()
-                    lastfmLayout.animate().setListener(null)
-                    updateSourceIcon(track)
-
-                    val baseX = widgetMover.getRestTranslationX(lastfmLayout)
-
-                    if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
-                        val needsFadeIn = lastfmLayout.visibility != View.VISIBLE
-                        lastfmLayout.visibility = View.VISIBLE
-                        nowPlayingTextView.text = trackInfoText
-                        nowPlayingTextView.isSelected = true
-
-                        if (needsFadeIn) {
-                            lastfmLayout.alpha = 0f
-                            lastfmLayout.translationX = baseX + 10f
-                            lastfmLayout.animate()
-                                .alpha(1f)
-                                .translationX(baseX)
-                                .setDuration(300)
-                                .setListener(object : AnimatorListenerAdapter() {
-                                    override fun onAnimationCancel(animation: Animator) {
-                                        lastfmLayout.translationX = baseX
-                                    }
-                                    override fun onAnimationEnd(animation: Animator) {
-                                        lastfmLayout.animate().setListener(null)
-                                        lastfmLayout.translationX = baseX
-                                    }
-                                })
-                                .start()
-                        } else {
-                            lastfmLayout.alpha = 1f
-                            lastfmLayout.translationX = baseX
-                        }
-                    } else {
-                        var isTransitionCanceled = false
-                        lastfmLayout.animate()
-                            .alpha(0f)
-                            .translationX(baseX - 10f)
-                            .setDuration(250)
-                            .setListener(object : AnimatorListenerAdapter() {
-                                override fun onAnimationCancel(animation: Animator) {
-                                    isTransitionCanceled = true
-                                    lastfmLayout.translationX = baseX
-                                }
-
-                                override fun onAnimationEnd(animation: Animator) {
-                                    lastfmLayout.animate().setListener(null)
-                                    if (!isTransitionCanceled && !isEditMode) {
-                                        nowPlayingTextView.text = trackInfoText
-                                        nowPlayingTextView.isSelected = true
-                                        lastfmLayout.translationX = baseX + 10f
-                                        lastfmLayout.animate()
-                                            .alpha(1f)
-                                            .translationX(baseX)
-                                            .setDuration(250)
-                                            .setListener(object : AnimatorListenerAdapter() {
-                                                override fun onAnimationCancel(animation: Animator) {
-                                                    lastfmLayout.translationX = baseX
-                                                }
-                                                override fun onAnimationEnd(animation: Animator) {
-                                                    lastfmLayout.animate().setListener(null)
-                                                    lastfmLayout.translationX = baseX
-                                                }
-                                            })
-                                            .start()
-                                    } else {
-                                        lastfmLayout.translationX = baseX
-                                    }
-                                }
-                            })
-                            .start()
-                    }
-                }
             }
+            desktopWidgetManager.getController<MediaDesktopWidget>()?.handleMusicStateUpdate(state)
+        } else {
+            lastfmLayout.animate().cancel()
+            lastfmLayout.clearAnimation()
+            lastfmLayout.visibility = View.GONE
+            lastfmLayout.alpha = 0f
+        }
 
-            is PluginState.Idle, is PluginState.Disabled -> {
-                if (pendingRestoreRunnable == null) {
-                    val runnable = Runnable {
-                        performMusicIdleState()
-                        pendingRestoreRunnable = null
-                    }
-                    pendingRestoreRunnable = runnable
-                    handler.postDelayed(runnable, 800) // 800ms delay
+        if (state is PluginState.Idle || state is PluginState.Disabled) {
+            if (pendingRestoreRunnable == null) {
+                val runnable = Runnable {
+                    performMusicIdleState()
+                    pendingRestoreRunnable = null
                 }
+                pendingRestoreRunnable = runnable
+                handler.postDelayed(runnable, 800) // 800ms delay
             }
         }
     }
@@ -1435,35 +1337,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
         pendingBackgroundRestoreRunnable = null
 
-        lastfmLayout.animate().cancel()
-        lastfmLayout.animate().setListener(null)
-
-        val baseX = widgetMover.getRestTranslationX(lastfmLayout)
-
-        if (lastfmLayout.visibility == View.VISIBLE) {
-            var isIdleCanceled = false
-            lastfmLayout.animate()
-                .alpha(0f)
-                .translationX(baseX + 10f)
-                .setDuration(300)
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationCancel(animation: Animator) {
-                        isIdleCanceled = true
-                        lastfmLayout.translationX = baseX
-                    }
-
-                    override fun onAnimationEnd(animation: Animator) {
-                        lastfmLayout.animate().setListener(null)
-                        lastfmLayout.translationX = baseX
-                        if (!isIdleCanceled && !isEditMode) {
-                            lastfmLayout.visibility = View.GONE
-                        }
-                    }
-                })
-                .start()
-        } else {
-            lastfmLayout.translationX = baseX
-        }
+        desktopWidgetManager.getController<MediaDesktopWidget>()?.performIdleTransition()
 
         if (wasMusicBackgroundApplied) {
             restoreUserBackground(backgroundManager.getSavedBackgroundUri())
@@ -1474,7 +1348,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (isGraphicsTurbulenceContinuousMusicEnabled) {
             dynamicBackgroundView.finishTurbulence(1000L)
         }
-        lastTrackInfo = null
     }
 
     private fun handleBackgroundUpdate(track: MusicTrack) {
@@ -2303,53 +2176,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 .start()
             updateEmptyDeskPromptVisibility()
 
-            val isTimeActive = desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.TIME)
-            val isDateActive = desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.DATE)
-            val isMediaActive = desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.MEDIA)
-            val isChipsActive = desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.SMART_CHIPS)
-            val isWeatherActive = desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.WEATHER)
-
-            if (isTimeActive) {
-                timeText.visibility = View.VISIBLE
-                timeText.setBackgroundResource(R.drawable.editable_border)
-            } else {
-                timeText.visibility = View.GONE
-            }
-
-            if (isDateActive) {
-                dateText.visibility = View.VISIBLE
-                dateText.setBackgroundResource(R.drawable.editable_border)
-            } else {
-                dateText.visibility = View.GONE
-            }
-
-            if (isChipsActive) {
-                chipContainer.visibility = View.VISIBLE
-                chipContainer.setBackgroundResource(R.drawable.editable_border)
-            } else {
-                chipContainer.visibility = View.GONE
-            }
-
-            if (isWeatherActive) {
-                weatherLayout.visibility = View.VISIBLE
-                weatherLayout.setBackgroundResource(R.drawable.editable_border)
-            } else {
-                weatherLayout.visibility = View.GONE
-            }
-
-            if (isMediaActive) {
-                lastfmLayout.animate().cancel()
-                lastfmLayout.clearAnimation()
-                lastfmLayout.visibility = View.VISIBLE
-                lastfmLayout.alpha = 1f
-                lastfmLayout.setBackgroundResource(R.drawable.editable_border)
-                if (nowPlayingTextView.text.isNullOrEmpty()) {
-                    nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
-                }
-            } else {
-                lastfmLayout.visibility = View.GONE
-                lastfmLayout.alpha = 0f
-            }
+            desktopWidgetManager.setEditMode(true)
             if (!isDemoMode) {
                 handler.removeCallbacks(editModeTimeoutRunnable)
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
@@ -2411,61 +2238,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
             .start()
         emptyDeskPrompt.visibility = View.GONE
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            timeText.background = null
-        } else
-            timeText.setBackgroundDrawable(null)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            dateText.background = null
-        } else
-            dateText.setBackgroundDrawable(null)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            lastfmLayout.background = null
-        } else
-            lastfmLayout.setBackgroundDrawable(null)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            chipContainer.background = null
-        } else {
-            chipContainer.setBackgroundDrawable(null)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            weatherLayout.background = null
-        } else {
-            weatherLayout.setBackgroundDrawable(null)
-        }
-
-        val isMediaActive = desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.MEDIA)
-        if (!isMediaActive) {
-            lastfmLayout.animate().cancel()
-            lastfmLayout.clearAnimation()
-            lastfmLayout.visibility = View.GONE
-            lastfmLayout.alpha = 0f
-        } else {
-            val isMusicPlaying = !nowPlayingTextView.text.isNullOrEmpty() &&
-                    lastTrackInfo != null &&
-                    lastfmLayout.alpha > 0
-
-            if (!isMusicPlaying) {
-                lastfmLayout.animate()
-                    .alpha(0f)
-                    .setDuration(400)
-                    .setListener(object : AnimatorListenerAdapter() {
-                        override fun onAnimationEnd(animation: Animator) {
-                            if (!isEditMode) {
-                                lastfmLayout.visibility = View.GONE
-                            }
-                        }
-                    })
-                    .start()
-            } else {
-                lastfmLayout.animate()
-                    .alpha(1f)
-                    .setDuration(200)
-                    .setListener(null)
-                    .start()
-            }
-        }
+        desktopWidgetManager.setEditMode(false)
 
         backgroundCustomizationTab.visibility = View.GONE
         handler.removeCallbacks(editModeTimeoutRunnable)

@@ -7,12 +7,20 @@ import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.Logger
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetController
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetHost
+import com.nxd1frnt.clockdesk2.widgets.impl.DateDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.SmartChipsDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.TimeDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.WeatherDesktopWidget
 import org.json.JSONArray
 import org.json.JSONObject
 
 class DesktopWidgetManager(
     private val context: Context,
-    private val mainLayout: ConstraintLayout
+    private val mainLayout: ConstraintLayout,
+    var host: DesktopWidgetHost? = null
 ) {
     private val TAG = "DesktopWidgetManager"
     private val prefs: SharedPreferences =
@@ -22,6 +30,8 @@ class DesktopWidgetManager(
 
     private val activeInstances = mutableListOf<WidgetInstance>()
     private val instanceViewMap = mutableMapOf<String, View>()
+    @PublishedApi
+    internal val activeControllers = mutableMapOf<String, DesktopWidgetController>()
 
     var onWidgetsChanged: (() -> Unit)? = null
 
@@ -30,6 +40,16 @@ class DesktopWidgetManager(
     }
 
     fun getActiveInstances(): List<WidgetInstance> = activeInstances.toList()
+
+    fun getControllers(): List<DesktopWidgetController> = activeControllers.values.toList()
+
+    inline fun <reified T : DesktopWidgetController> getController(): T? {
+        return activeControllers.values.filterIsInstance<T>().firstOrNull()
+    }
+
+    fun getControllerForView(view: View): DesktopWidgetController? {
+        return activeControllers.values.firstOrNull { it.rootView === view }
+    }
 
     fun getViewForInstance(instanceId: String): View? = instanceViewMap[instanceId]
 
@@ -46,6 +66,10 @@ class DesktopWidgetManager(
 
     fun isWidgetTypeActive(type: DesktopWidgetType): Boolean {
         return activeInstances.any { it.type == type }
+    }
+
+    fun setEditMode(isEditMode: Boolean) {
+        activeControllers.values.forEach { it.setEditMode(isEditMode) }
     }
 
     private fun loadLayout() {
@@ -182,6 +206,17 @@ class DesktopWidgetManager(
         Logger.d(TAG) { "Desktop layout saved with ${activeInstances.size} widgets" }
     }
 
+    private fun createController(instance: WidgetInstance, currentHost: DesktopWidgetHost): DesktopWidgetController {
+        val definition = DesktopWidgetRegistry.get(instance.type) ?: throw IllegalArgumentException("Unknown type: ${instance.type}")
+        return when (instance.type) {
+            DesktopWidgetType.TIME -> TimeDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.DATE -> DateDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.MEDIA -> MediaDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.SMART_CHIPS -> SmartChipsDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.WEATHER -> WeatherDesktopWidget(instance, definition, currentHost)
+        }
+    }
+
     fun bindExistingViews(
         timeView: View?,
         dateView: View?,
@@ -198,14 +233,24 @@ class DesktopWidgetManager(
             DesktopWidgetType.WEATHER to weatherView
         )
 
+        val currentHost = host
         for ((type, view) in allTypesWithViews) {
             if (view == null) continue
             val instance = activeInstances.firstOrNull { it.type == type }
             if (instance != null) {
                 instanceViewMap[instance.instanceId] = view
                 view.visibility = if (instance.isVisible) View.VISIBLE else View.GONE
+                if (currentHost != null) {
+                    val controller = activeControllers.getOrPut(instance.instanceId) {
+                        createController(instance, currentHost)
+                    }
+                    controller.bindView(view)
+                }
             } else {
+                view.animate()?.cancel()
+                view.clearAnimation()
                 view.visibility = View.GONE
+                view.alpha = 0f
             }
         }
     }
@@ -231,6 +276,10 @@ class DesktopWidgetManager(
         )
 
         activeInstances.add(newInstance)
+        host?.let {
+            val controller = createController(newInstance, it)
+            activeControllers[newInstance.instanceId] = controller
+        }
         saveLayout()
         onWidgetsChanged?.invoke()
         return newInstance
@@ -244,9 +293,14 @@ class DesktopWidgetManager(
     fun removeWidget(instance: WidgetInstance): Boolean {
         val removed = activeInstances.remove(instance)
         if (removed) {
+            val controller = activeControllers.remove(instance.instanceId)
+            controller?.onDestroy()
             val view = instanceViewMap.remove(instance.instanceId)
             view?.let {
+                it.animate()?.cancel()
+                it.clearAnimation()
                 it.visibility = View.GONE
+                it.alpha = 0f
             }
             saveLayout()
             onWidgetsChanged?.invoke()
@@ -255,6 +309,8 @@ class DesktopWidgetManager(
     }
 
     fun resetToDefaults() {
+        activeControllers.values.forEach { it.onDestroy() }
+        activeControllers.clear()
         migrateOrInitDefaults()
         onWidgetsChanged?.invoke()
     }

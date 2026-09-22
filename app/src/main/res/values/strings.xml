@@ -289,6 +289,8 @@
 
     <!-- Backup & Restore Strings -->
     <string name="backup_restore_title">Backup and Restore</string>
+    <string name="backup_connected_devices_title">Include connected devices</string>
+    <string name="backup_connected_devices_summary">Include paired DeskConnect devices and identity in backup</string>
     <string name="export_settings">Backup settings</string>
     <string name="import_settings">Restore settings</string>
     <string name="export_success">Backup saved successfully</string>

@@ -279,6 +279,8 @@
     <string name="error_opening_settings">Не вдалося відкрити налаштування</string>
 
     <string name="backup_restore_title">Бекап та відновлення</string>
+    <string name="backup_connected_devices_title">Включати підключені пристрої</string>
+    <string name="backup_connected_devices_summary">Зберігати спарені пристрої DeskConnect та дані підключення</string>
     <string name="export_settings">Бекап налаштувань</string>
     <string name="import_settings">Імпорт налаштувань</string>
     <string name="export_success">Бекап успішно збережено</string>
