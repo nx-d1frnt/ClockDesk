@@ -255,6 +255,9 @@
     <string name="show_updates_chip">Показывать обновления приложения</string>
     <string name="show_updates_chip_summary">Показывать уведомления об обновлениях приложения</string>
     <string name="customize_smart_chips">Настроить умные чипы</string>
+    <string name="chip_stack_overflow_title">Сворачивать при переполнении</string>
+    <string name="chip_stack_overflow_desc">Складывать лишние чипы в раскрываемую стопку</string>
+    <string name="chip_stack_badge_format">+%d</string>
     <string name="edit_background">Изменить цвет фона</string>
     <string name="ignore_collision">Проверять столкновения</string>
     <string name="music_sources_title">Источники музыки</string>

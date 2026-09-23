@@ -50,5 +50,19 @@
             android:freezesText="true"
             tools:text="3" />
 
+        <TextView
+            android:id="@+id/chip_stack_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_material_badge"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="1dp"
+            android:textColor="?attr/colorOnPrimaryContainer"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="+3" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

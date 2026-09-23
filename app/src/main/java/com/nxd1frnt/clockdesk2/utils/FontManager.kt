@@ -5,10 +5,11 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.PorterDuff
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
-import android.graphics.PorterDuff
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -720,6 +721,26 @@ class FontManager(
                     params.height = newIconSize
                     iconView.layoutParams = params
                 }
+            }
+        }
+
+        val badgeView = view.findViewById<TextView>(R.id.chip_stack_badge)
+        if (badgeView != null) {
+            val density = context.resources.displayMetrics.density
+            val badgeBg = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 12f * density
+                val bgAlpha = (0.24f * 255).toInt()
+                setColor(Color.argb(bgAlpha, Color.red(color), Color.green(color), Color.blue(color)))
+            }
+            badgeView.background = badgeBg
+            badgeView.setTextColor(color)
+            if (!colorOnly) {
+                badgeView.typeface = typeface
+                badgeView.textSize = (11f * scaleFactor).coerceAtLeast(8f)
+                val padH = (6 * density * scaleFactor).toInt().coerceAtLeast(4)
+                val padV = (1 * density * scaleFactor).toInt().coerceAtLeast(1)
+                badgeView.setPadding(padH, padV, padH, padV)
             }
         }
 

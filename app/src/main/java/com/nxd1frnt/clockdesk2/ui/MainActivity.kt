@@ -998,7 +998,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 "battery_alert_show_full", "battery_alert_show_saver",
                 "weather_alert_enable_storms", "weather_alert_enable_wind", "weather_alert_enable_worsening",
                 "weather_alert_enable_uv", "weather_alert_wind_threshold", "weather_alert_uv_threshold",
-                "weather_alert_forecast_hours" -> smartChipManager.onPreferencesChanged()
+                "weather_alert_forecast_hours", "smart_chips_stack_overflow" -> smartChipManager.onPreferencesChanged()
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging
@@ -1120,6 +1120,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         if (::smartPixelManager.isInitialized) {
             smartPixelManager.onUserInteraction()
+        }
+        if (ev?.action == MotionEvent.ACTION_DOWN && ::smartChipManager.isInitialized && smartChipManager.isStackExpanded) {
+            val rect = android.graphics.Rect()
+            chipContainer.getGlobalVisibleRect(rect)
+            if (!rect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                smartChipManager.collapseStack()
+            }
         }
         return super.dispatchTouchEvent(ev)
     }

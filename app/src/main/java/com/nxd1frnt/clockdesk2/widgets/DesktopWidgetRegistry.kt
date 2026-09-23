@@ -121,7 +121,8 @@ object SmartChipsWidgetDefinition : DesktopWidgetDefinition {
         WidgetFeature.FONT_COLOR,
         WidgetFeature.FONT_ALPHA,
         WidgetFeature.BACKGROUND_COLOR,
-        WidgetFeature.NIGHT_SHIFT
+        WidgetFeature.NIGHT_SHIFT,
+        WidgetFeature.CHIP_STACK_OVERFLOW
     )
 
     override fun createView(context: Context, parent: ViewGroup): View {

@@ -255,6 +255,9 @@
     <string name="show_updates_chip">Показувати оновлення додатку</string>
     <string name="show_updates_chip_summary">Показувати сповіщення про оновлення додатку</string>
     <string name="customize_smart_chips">Налаштувати розумні чіпи</string>
+    <string name="chip_stack_overflow_title">Згортати при переповненні</string>
+    <string name="chip_stack_overflow_desc">Складати зайві чіпи в розкривний стос</string>
+    <string name="chip_stack_badge_format">+%d</string>
     <string name="edit_background">Змінити колір фону</string>
     <string name="ignore_collision">Перевіряти зіткнення</string>
     <string name="music_sources_title">Джерела музики</string>

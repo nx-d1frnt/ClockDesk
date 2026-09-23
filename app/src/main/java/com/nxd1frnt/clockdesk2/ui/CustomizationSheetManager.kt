@@ -95,6 +95,8 @@ class CustomizationSheetManager(
     private val bsGridSnapSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.grid_snap_switch) }
     private val bsIgnoreCollisionSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.ignore_collision_switch) }
     private val bsShowMediaIconSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_media_icon) }
+    private val bsChipStackOverflowCard by lazy { sideSheetView.findViewById<View>(R.id.card_chip_stack_overflow) }
+    private val bsChipStackOverflowSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.chip_stack_overflow_switch) }
 
     private val bsTimeFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.time_format_radio_group) }
     private val bsShowAMPMSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_am_pm_switch) }
@@ -482,6 +484,7 @@ class CustomizationSheetManager(
 
         // Last.fm / Media Specific
         sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (features?.contains(WidgetFeature.MEDIA_ICON) ?: isLastFm) View.VISIBLE else View.GONE
+        bsChipStackOverflowCard.visibility = if (features?.contains(WidgetFeature.CHIP_STACK_OVERFLOW) ?: isSmartChip) View.VISIBLE else View.GONE
         bsMaxWidthContainer.visibility = if (features?.contains(WidgetFeature.MAX_WIDTH) ?: isLastFm) View.VISIBLE else View.GONE
         bsBlockFormatsTitle.visibility = if (isTime || isDate) View.VISIBLE else View.GONE
         bsDateFormatCard.visibility = if (isDate) View.VISIBLE else View.GONE
@@ -616,6 +619,15 @@ class CustomizationSheetManager(
         bsShowMediaIconSwitch.isChecked = prefs.getBoolean("show_media_icon", true)
         bsShowMediaIconSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("show_media_icon", isChecked).apply()
+        }
+
+        bsChipStackOverflowSwitch.setOnCheckedChangeListener(null)
+        bsChipStackOverflowSwitch.isChecked = prefs.getBoolean("smart_chips_stack_overflow", false)
+        bsChipStackOverflowSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("smart_chips_stack_overflow", isChecked).apply()
+        }
+        bsChipStackOverflowCard.setOnClickListener {
+            bsChipStackOverflowSwitch.toggle()
         }
 
         isUpdatingUIFromSettings = true
