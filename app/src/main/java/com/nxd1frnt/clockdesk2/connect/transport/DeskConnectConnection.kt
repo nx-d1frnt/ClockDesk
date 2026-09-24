@@ -10,6 +10,7 @@ import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,6 +41,8 @@ class DeskConnectConnection(
         try {
             socket.keepAlive = true
             socket.tcpNoDelay = true
+            socket.soTimeout = 0 // Wait indefinitely for packets or kernel keepalive disconnect
+            SocketKeepAliveHelper.configureFastKeepAlive(socket)
             outputStream = socket.getOutputStream()
         } catch (e: Exception) {
             Logger.e("DeskConnectConnection") { "Error initializing socket options: ${e.message}" }
@@ -59,12 +62,23 @@ class DeskConnectConnection(
             val reader = BufferedReader(InputStreamReader(inputStream, StandardCharsets.UTF_8))
 
             while (isRunning.get() && !socket.isClosed) {
-                val line = reader.readLine() ?: break
-                if (line.isBlank()) continue
+                val line: String?
+                try {
+                    line = reader.readLine()
+                } catch (e: SocketTimeoutException) {
+                    continue
+                }
 
-                val packet = DeskConnectPacket.fromJson(line)
-                if (packet != null) {
-                    processIncomingPacket(packet)
+                if (line == null) {
+                    Logger.d("DeskConnect/Connection") { "Socket stream reached EOF from ${device.deviceName} (${device.deviceId})" }
+                    break
+                }
+
+                if (line.isNotBlank()) {
+                    val packet = DeskConnectPacket.fromJson(line)
+                    if (packet != null) {
+                        processIncomingPacket(packet)
+                    }
                 }
             }
         } catch (e: Exception) {

@@ -100,11 +100,20 @@ data class DeskConnectPacket(
             return DeskConnectPacket(id = 0, type = TYPE_PAIR, body = body)
         }
 
-        fun createPing(message: String = "Ping!"): DeskConnectPacket {
+        fun createPing(message: String = ""): DeskConnectPacket {
             val body = JSONObject().apply {
-                put("message", message)
+                if (message.isNotEmpty()) {
+                    put("message", message)
+                }
             }
             return DeskConnectPacket(id = 0, type = TYPE_PING, body = body)
+        }
+
+        fun createBatteryRequest(): DeskConnectPacket {
+            val body = JSONObject().apply {
+                put("requestBatteryStatus", true)
+            }
+            return DeskConnectPacket(id = 0, type = TYPE_BATTERY_REQUEST, body = body)
         }
 
         fun createMprisPlayerListRequest(): DeskConnectPacket {

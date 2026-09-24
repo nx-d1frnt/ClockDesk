@@ -130,6 +130,8 @@ class DeskConnectServer(
 
             Logger.d("DeskConnectServer") { "Received pre-TLS identity from '$remoteDeviceId', upgrading to SSL (as SSL Client)..." }
 
+            SocketKeepAliveHelper.configureFastKeepAlive(plainSocket)
+
             // 2. Upgrade to SSL (In KDE Connect rules: TCP Server acts as SSL Client)
             var peerCert: X509Certificate? = null
             val sslSocket = security.convertToSslSocket(
@@ -183,6 +185,8 @@ class DeskConnectServer(
                 out.flush()
 
                 Logger.d("DeskConnectServer") { "Sent pre-TLS identity to ${device.deviceId}, upgrading to SSL (as SSL Server)..." }
+
+                SocketKeepAliveHelper.configureFastKeepAlive(plainSocket)
 
                 // 2. Upgrade to SSL (In KDE Connect rules: TCP Client acts as SSL Server)
                 var peerCert: X509Certificate? = null

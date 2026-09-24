@@ -1,7 +1,14 @@
 package com.nxd1frnt.clockdesk2.connect
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +22,7 @@ import com.nxd1frnt.clockdesk2.connect.security.DeskConnectSecurity
 import com.nxd1frnt.clockdesk2.connect.transport.DeskConnectConnection
 import com.nxd1frnt.clockdesk2.connect.transport.DeskConnectServer
 import com.nxd1frnt.clockdesk2.utils.Logger
+import org.json.JSONObject
 import java.security.MessageDigest
 import java.security.cert.Certificate
 import java.security.cert.X509Certificate
@@ -71,6 +79,8 @@ class DeskConnectManager private constructor(private val context: Context) {
 
     private var server: DeskConnectServer? = null
     private var discovery: DeskConnectDiscovery? = null
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     private val iconCacheByHash = object : LruCache<String, ByteArray>(64) {}
     private val iconCacheByApp = object : LruCache<String, ByteArray>(64) {}
@@ -104,7 +114,7 @@ class DeskConnectManager private constructor(private val context: Context) {
             event: String,
             phoneNumber: String,
             contactName: String?,
-            phoneThumbnailBase64: String? = null
+            phoneThumbnail: String?
         )
     }
 
@@ -113,6 +123,8 @@ class DeskConnectManager private constructor(private val context: Context) {
     }
 
     interface MprisListener {
+        fun onPlayerListReceived(deviceId: String, playerList: List<String>) {}
+        fun onAlbumArtTransferred(deviceId: String, albumArtUrl: String, artworkBytes: ByteArray) {}
         fun onMprisUpdated(
             deviceId: String,
             player: String,
@@ -124,28 +136,21 @@ class DeskConnectManager private constructor(private val context: Context) {
             lengthMs: Long?,
             artworkBytes: ByteArray?,
             artworkUrl: String?
-        )
-
-        fun onPlayerListReceived(
-            deviceId: String,
-            playerList: List<String>
-        ) {}
-
-        fun onAlbumArtTransferred(
-            deviceId: String,
-            albumArtUrl: String,
-            artworkBytes: ByteArray
         ) {}
     }
 
     val deviceListeners = CopyOnWriteArrayList<DeviceListener>()
     val notificationListeners = CopyOnWriteArrayList<NotificationListener>()
-    val telephonyListeners = CopyOnWriteArrayList<TelephonyListener>()
     val batteryListeners = CopyOnWriteArrayList<BatteryListener>()
+    val telephonyListeners = CopyOnWriteArrayList<TelephonyListener>()
     val mprisListeners = CopyOnWriteArrayList<MprisListener>()
 
-    val isEnabled: Boolean
+    var isEnabled: Boolean
         get() = sharedPrefs.getBoolean("deskconnect_enabled", true)
+        set(value) {
+            sharedPrefs.edit().putBoolean("deskconnect_enabled", value).apply()
+            if (value) start() else stop()
+        }
 
     val customDeviceName: String
         get() = sharedPrefs.getString("deskconnect_device_name", null)
@@ -160,6 +165,8 @@ class DeskConnectManager private constructor(private val context: Context) {
 
     fun start() {
         if (server != null) return
+
+        registerNetworkCallback()
 
         val s = DeskConnectServer(security, customDeviceName) { sslSocket, cert, remoteDeviceId, initialPacket ->
             handleIncomingSslConnection(sslSocket, cert, remoteDeviceId, initialPacket)
@@ -193,6 +200,8 @@ class DeskConnectManager private constructor(private val context: Context) {
     }
 
     fun stop() {
+        unregisterNetworkCallback()
+
         discovery?.stop()
         discovery = null
 
@@ -205,6 +214,57 @@ class DeskConnectManager private constructor(private val context: Context) {
         pendingIncomingPairRequests.clear()
         connectingDevices.clear()
         Logger.d("DeskConnectManager") { "DeskConnect service stopped" }
+    }
+
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+            connectivityManager = cm
+
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
+
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    Logger.i("DeskConnect/Network") { "Wi-Fi network available, broadcasting discovery" }
+                    mainHandler.postDelayed({
+                        if (isEnabled) {
+                            broadcastDiscovery()
+                        }
+                    }, 1000L)
+                }
+
+                override fun onLost(network: Network) {
+                    Logger.i("DeskConnect/Network") { "Wi-Fi network lost, closing active connections" }
+                    mainHandler.post {
+                        activeConnections.values.forEach { conn ->
+                            conn.close()
+                        }
+                    }
+                }
+            }
+            cm.registerNetworkCallback(request, callback)
+            networkCallback = callback
+            Logger.d("DeskConnect/Network") { "Wi-Fi network monitor registered" }
+        } catch (e: Exception) {
+            Logger.w("DeskConnect/Network") { "Failed to register network callback: ${e.message}" }
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cm = connectivityManager
+        val cb = networkCallback
+        if (cm != null && cb != null) {
+            try {
+                cm.unregisterNetworkCallback(cb)
+            } catch (e: Exception) {
+                // Ignored
+            }
+        }
+        networkCallback = null
+        connectivityManager = null
     }
 
     fun broadcastDiscovery() {
@@ -564,6 +624,23 @@ class DeskConnectManager private constructor(private val context: Context) {
                 }
             }
 
+            DeskConnectPacket.TYPE_BATTERY_REQUEST -> {
+                if (!conn.device.isPaired) return
+                val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+                val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else -1
+
+                val respBody = JSONObject().apply {
+                    put("currentCharge", pct)
+                    put("isCharging", isCharging)
+                    put("thresholdEvent", 0)
+                }
+                conn.sendPacket(DeskConnectPacket(id = 0, type = DeskConnectPacket.TYPE_BATTERY, body = respBody))
+            }
+
             DeskConnectPacket.TYPE_BATTERY -> {
                 if (!conn.device.isPaired) return
                 val body = packet.body
@@ -731,9 +808,11 @@ class DeskConnectManager private constructor(private val context: Context) {
             }
 
             DeskConnectPacket.TYPE_PING -> {
-                val msg = packet.body.optString("message", "Ping!")
-                mainHandler.post {
-                    Toast.makeText(context, "${conn.device.getDisplayName()}: $msg", Toast.LENGTH_SHORT).show()
+                val msg = packet.body.optString("message", "")
+                if (msg.isNotBlank()) {
+                    mainHandler.post {
+                        Toast.makeText(context, "${conn.device.getDisplayName()}: $msg", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -750,6 +829,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
         if (activeConnections[dev.deviceId] == conn) {
             activeConnections.remove(dev.deviceId)
+            discovery?.onDeviceDisconnected(dev.deviceId)
             // Wait 1000ms grace period: if the peer reconnected with a new socket during renegotiation,
             // don't drop media player state or broadcast false disconnects
             mainHandler.postDelayed({

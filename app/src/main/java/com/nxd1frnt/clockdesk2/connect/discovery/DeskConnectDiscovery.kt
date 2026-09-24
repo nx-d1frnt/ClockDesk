@@ -99,6 +99,10 @@ class DeskConnectDiscovery(
         }
     }
 
+    fun onDeviceDisconnected(deviceId: String) {
+        lastRepliedTime.remove(deviceId)
+    }
+
     private fun runUdpListener() {
         try {
             val sock = DatagramSocket(null).apply {
