@@ -75,6 +75,8 @@
     <string name="onboarding_customization_desc">Утримуйте натискання в будь-якому місці екрана для входу в Режим редагування. Змінюйте шрифт, налаштовуйте динамічні фони та розміщуйте модульні інфо-чипи.</string>
     <string name="onboarding_widgets_title">Віджети та музика</string>
     <string name="onboarding_widgets_desc">Відображайте обкладинку альбому треку, що зараз грає, та додавайте розумні чипи для показу заряду батареї, оновлень або прогресу у фоні.</string>
+    <string name="onboarding_deskconnect_title">Завжди на зв\'язку</string>
+    <string name="onboarding_deskconnect_desc">Підключайте телефон або ПК через DeskConnect, щоб відстежувати рівень заряду, синхронізувати сповіщення та бачити виклики прямо на екрані.</string>
     <string name="onboarding_weather_title">Динамічний режим</string>
     <string name="onboarding_weather_desc">Насолоджуйтеся анімованими ефектами дощу, снігу або туману та градієнтами кольорів, які природно змінюються відповідно до сходу й заходу сонця.</string>
     <string name="onboarding_permission_title">Готові почати?</string>

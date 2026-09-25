@@ -77,6 +77,8 @@
     <string name="onboarding_customization_desc">Long-press anywhere to enter Edit Mode. Customize typography, set dynamic background images/colors, and position modular info chips.</string>
     <string name="onboarding_widgets_title">Widgets &amp; Music Sync</string>
     <string name="onboarding_widgets_desc">Display real-time album art from your media player, and add modular info chips for battery status, updates, and background progress.</string>
+    <string name="onboarding_deskconnect_title">Stay Connected</string>
+    <string name="onboarding_deskconnect_desc">Wirelessly pair your phone or PC with DeskConnect to view device battery levels, sync notifications, and see incoming call alerts directly on your desk.</string>
     <string name="onboarding_weather_title">Dynamic Environments</string>
     <string name="onboarding_weather_desc">Enjoy animated rain, snow, or fog effects and color gradients that evolve naturally with your local sunrise and sunset times.</string>
     <string name="onboarding_permission_title">Ready to Start?</string>

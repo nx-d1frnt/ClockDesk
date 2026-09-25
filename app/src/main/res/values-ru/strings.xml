@@ -75,6 +75,8 @@
     <string name="onboarding_customization_desc">Удерживайте нажатие в любом месте экрана для входа в Режим редактирования. Выберите шрифт, настройте фон и разместите информационные виджеты.</string>
     <string name="onboarding_widgets_title">Виджеты и музыка</string>
     <string name="onboarding_widgets_desc">Отображайте обложку альбома воспроизводимого трека и добавляйте умные виджеты для отображения заряда батареи, обновлений или статуса загрузки.</string>
+    <string name="onboarding_deskconnect_title">Всегда на связи</string>
+    <string name="onboarding_deskconnect_desc">Подключайте телефон или ПК через DeskConnect, чтобы отслеживать заряд батареи, синхронизировать уведомления и видеть звонки прямо на экране.</string>
     <string name="onboarding_weather_title">Динамический режим</string>
     <string name="onboarding_weather_desc">Наслаждайтесь плавными градиентами и эффектами дождя, снега или тумана, которые меняются в зависимости от погоды и времени суток.</string>
     <string name="onboarding_permission_title">Готовы начать?</string>

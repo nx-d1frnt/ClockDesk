@@ -4,7 +4,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
@@ -14,24 +13,23 @@
     app:strokeWidth="0dp"
     app:rippleColor="?attr/colorControlHighlight">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/chip_content_layout"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:orientation="horizontal"
+        android:layout_height="wrap_content"
         android:paddingStart="8dp"
         android:paddingEnd="12dp"
         android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:gravity="center_vertical">
+        android:paddingBottom="8dp">
 
         <ImageView
             android:id="@+id/chip_icon"
             android:layout_width="20dp"
             android:layout_height="20dp"
-            android:layout_marginEnd="4dp"
-            android:layout_marginRight="4dp"
             android:contentDescription="@null"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:tint="@color/md_theme_onSurface"
             tools:src="@drawable/ic_notifications" />
 
@@ -39,6 +37,8 @@
             android:id="@+id/chip_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="6dp"
             android:textColor="@color/md_theme_onSurface"
             android:textSize="14sp"
             android:singleLine="true"
@@ -48,13 +48,19 @@
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:freezesText="true"
+            app:layout_constrainedWidth="true"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toEndOf="@id/chip_icon"
+            app:layout_constraintEnd_toStartOf="@id/chip_stack_badge"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_goneMarginEnd="0dp"
             tools:text="3" />
 
         <TextView
             android:id="@+id/chip_stack_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
             android:background="@drawable/bg_material_badge"
             android:paddingHorizontal="6dp"
             android:paddingVertical="1dp"
@@ -62,7 +68,11 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:visibility="gone"
+            android:singleLine="true"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             tools:visibility="visible"
             tools:text="+3" />
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

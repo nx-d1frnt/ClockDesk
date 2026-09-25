@@ -876,7 +876,7 @@ class SmartChipManager(
 
     private fun calculateStackAnchor(visibleChips: List<ChipInfo>, usableHeight: Int): Int {
         if (visibleChips.size <= 1) return -1
-        val chipMargin = (8 * context.resources.displayMetrics.density).toInt()
+        val chipMargin = (6 * context.resources.displayMetrics.density).toInt()
         val peekReserve = (16 * context.resources.displayMetrics.density).toInt()
 
         var totalHeight = 0
@@ -916,6 +916,9 @@ class SmartChipManager(
             autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         }
 
+        val density = context.resources.displayMetrics.density
+        val spacingPx = (6 * density).toInt()
+
         val constraintSet = ConstraintSet().apply {
             clone(container)
             if (hasOverflow && !isStackExpanded) {
@@ -923,31 +926,43 @@ class SmartChipManager(
                     val id = visibleChips[i].view.id
                     constrainWidth(id, ConstraintSet.WRAP_CONTENT)
                     constrainHeight(id, ConstraintSet.WRAP_CONTENT)
+                    constrainedWidth(id, true)
+                    setMargin(id, ConstraintSet.BOTTOM, 0)
+                    connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
                     connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                    setHorizontalBias(id, 1.0f)
                     if (i == 0) {
                         connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
                     } else {
                         val prevId = visibleChips[i - 1].view.id
-                        connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, 8)
+                        connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
                     }
                 }
 
                 val anchorId = visibleChips[anchorIndex].view.id
                 constrainWidth(anchorId, ConstraintSet.WRAP_CONTENT)
                 constrainHeight(anchorId, ConstraintSet.WRAP_CONTENT)
+                constrainedWidth(anchorId, true)
+                setMargin(anchorId, ConstraintSet.BOTTOM, 0)
+                connect(anchorId, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
                 connect(anchorId, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                setHorizontalBias(anchorId, 1.0f)
                 if (anchorIndex == 0) {
                     connect(anchorId, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
                 } else {
                     val prevId = visibleChips[anchorIndex - 1].view.id
-                    connect(anchorId, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, 8)
+                    connect(anchorId, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
                 }
 
                 for (i in (anchorIndex + 1) until visibleChips.size) {
                     val id = visibleChips[i].view.id
                     constrainWidth(id, ConstraintSet.WRAP_CONTENT)
                     constrainHeight(id, ConstraintSet.WRAP_CONTENT)
-                    connect(id, ConstraintSet.END, anchorId, ConstraintSet.END)
+                    constrainedWidth(id, true)
+                    setMargin(id, ConstraintSet.BOTTOM, 0)
+                    connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
+                    connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                    setHorizontalBias(id, 1.0f)
                     connect(id, ConstraintSet.TOP, anchorId, ConstraintSet.TOP)
                 }
             } else {
@@ -955,19 +970,21 @@ class SmartChipManager(
                     val id = chipInfo.view.id
                     constrainWidth(id, ConstraintSet.WRAP_CONTENT)
                     constrainHeight(id, ConstraintSet.WRAP_CONTENT)
+                    constrainedWidth(id, true)
+                    setMargin(id, ConstraintSet.BOTTOM, 0)
+                    connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
                     connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                    setHorizontalBias(id, 1.0f)
                     if (index == 0) {
                         connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
                     } else {
                         val prevId = visibleChips[index - 1].view.id
-                        connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, 8)
+                        connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
                     }
                 }
             }
         }
         constraintSet.applyTo(container)
-
-        val density = context.resources.displayMetrics.density
         if (hasOverflow && !isStackExpanded) {
             for (i in 0 until anchorIndex) {
                 val v = visibleChips[i].view

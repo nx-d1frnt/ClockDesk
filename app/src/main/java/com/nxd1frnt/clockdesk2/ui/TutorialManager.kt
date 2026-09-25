@@ -3,12 +3,16 @@ package com.nxd1frnt.clockdesk2.ui
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
@@ -19,6 +23,7 @@ import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.google.android.material.button.MaterialButton
 import com.nxd1frnt.clockdesk2.R
+import kotlin.math.abs
 
 /**
  * Manages the premium onboarding landing screens and interactive tutorial on first launch.
@@ -80,6 +85,11 @@ class TutorialManager(
             descResId = R.string.onboarding_widgets_desc
         ),
         OnboardingSlide(
+            iconResId = R.drawable.ic_devices,
+            titleResId = R.string.onboarding_deskconnect_title,
+            descResId = R.string.onboarding_deskconnect_desc
+        ),
+        OnboardingSlide(
             iconResId = R.drawable.ic_weather_cloudy_clock,
             titleResId = R.string.onboarding_weather_title,
             descResId = R.string.onboarding_weather_desc
@@ -93,6 +103,42 @@ class TutorialManager(
             actionBtnIconResId = R.drawable.ic_sun_clock_outline
         )
     )
+
+    private val gestureDetector = GestureDetector(tutorialLayout.context, object : GestureDetector.SimpleOnGestureListener() {
+        private val swipeThreshold = 40f * tutorialLayout.resources.displayMetrics.density
+        private val swipeVelocityThreshold = 100f * tutorialLayout.resources.displayMetrics.density
+
+        override fun onDown(e: MotionEvent): Boolean = true
+
+        override fun onFling(
+            e1: MotionEvent?,
+            e2: MotionEvent,
+            velocityX: Float,
+            velocityY: Float
+        ): Boolean {
+            if (e1 == null || isInteractiveGuideRunning) return false
+            val diffX = e2.x - e1.x
+            val diffY = e2.y - e1.y
+            if (abs(diffX) > abs(diffY)) {
+                if (abs(diffX) > swipeThreshold && abs(velocityX) > swipeVelocityThreshold) {
+                    if (diffX < 0) {
+                        // Swipe Left: Next slide
+                        if (currentSlide < slides.size - 1) {
+                            showSlide(currentSlide + 1, 1)
+                            return true
+                        }
+                    } else {
+                        // Swipe Right: Previous slide
+                        if (currentSlide > 0) {
+                            showSlide(currentSlide - 1, -1)
+                            return true
+                        }
+                    }
+                }
+            }
+            return false
+        }
+    })
 
     init {
         // Setup button click listeners
@@ -119,6 +165,19 @@ class TutorialManager(
                 requestLocationPermissionAction()
             }
         }
+
+        val contentContainer = tutorialLayout.findViewById<View>(R.id.onboarding_content_container)
+        @SuppressLint("ClickableViewAccessibility")
+        val touchListener = View.OnTouchListener { v, event ->
+            if (isInteractiveGuideRunning) return@OnTouchListener false
+            val handled = gestureDetector.onTouchEvent(event)
+            if (!handled && event.action == MotionEvent.ACTION_UP) {
+                v.performClick()
+            }
+            true
+        }
+        cardView.setOnTouchListener(touchListener)
+        contentContainer.setOnTouchListener(touchListener)
     }
 
     private var iconFloatingAnimator: ObjectAnimator? = null
@@ -344,24 +403,54 @@ class TutorialManager(
     }
 
     private fun updateIndicators(currentIndex: Int, totalSlides: Int) {
-        indicatorContainer.removeAllViews()
         val context = tutorialLayout.context
         val density = context.resources.displayMetrics.density
+        val activeWidth = (14 * density).toInt()
+        val inactiveWidth = (6 * density).toInt()
+        val dotHeight = (6 * density).toInt()
+        val margin = (5 * density).toInt()
+
+        if (indicatorContainer.childCount != totalSlides) {
+            indicatorContainer.removeAllViews()
+            for (i in 0 until totalSlides) {
+                val dot = ImageView(context).apply {
+                    val w = if (i == currentIndex) activeWidth else inactiveWidth
+                    layoutParams = LinearLayout.LayoutParams(w, dotHeight).apply {
+                        setMargins(margin, 0, margin, 0)
+                    }
+                    setImageResource(
+                        if (i == currentIndex) R.drawable.onboarding_dot_active
+                        else R.drawable.onboarding_dot_inactive
+                    )
+                }
+                indicatorContainer.addView(dot)
+            }
+            return
+        }
 
         for (i in 0 until totalSlides) {
-            val dot = ImageView(context).apply {
-                val dotWidth = if (i == currentIndex) (14 * density).toInt() else (6 * density).toInt()
-                val dotHeight = (6 * density).toInt()
-                val margin = (5 * density).toInt()
-                layoutParams = LinearLayout.LayoutParams(dotWidth, dotHeight).apply {
-                    setMargins(margin, 0, margin, 0)
+            val dot = indicatorContainer.getChildAt(i) as? ImageView ?: continue
+            val isActive = (i == currentIndex)
+            val targetWidth = if (isActive) activeWidth else inactiveWidth
+            val currentWidth = dot.layoutParams.width
+
+            if (currentWidth != targetWidth) {
+                ValueAnimator.ofInt(currentWidth, targetWidth).apply {
+                    duration = 240
+                    interpolator = DecelerateInterpolator()
+                    addUpdateListener { va ->
+                        val animatedVal = va.animatedValue as Int
+                        val lp = dot.layoutParams as LinearLayout.LayoutParams
+                        lp.width = animatedVal
+                        dot.layoutParams = lp
+                    }
+                    start()
                 }
-                setImageResource(
-                    if (i == currentIndex) R.drawable.onboarding_dot_active
-                    else R.drawable.onboarding_dot_inactive
-                )
             }
-            indicatorContainer.addView(dot)
+            dot.setImageResource(
+                if (isActive) R.drawable.onboarding_dot_active
+                else R.drawable.onboarding_dot_inactive
+            )
         }
     }
 
