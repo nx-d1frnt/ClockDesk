@@ -357,13 +357,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun setupEntranceAnimation() {
+        val themeColor = fontManager.getDynamicScheme().primary
         entranceAnimationManager = EntranceAnimationManager(
             rootView = mainLayout,
             widgets = desktopWidgetManager.getViews(),
             turbulenceOverlay = turbulenceOverlay,
             isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled,
             dynamicBackgroundView = dynamicBackgroundView,
-            targetTranslationYProvider = { view -> widgetMover.getRestTranslationY(view) }
+            targetTranslationYProvider = { view -> widgetMover.getRestTranslationY(view) },
+            themeColor = themeColor
         )
         entranceAnimationManager.prepareViews()
     }

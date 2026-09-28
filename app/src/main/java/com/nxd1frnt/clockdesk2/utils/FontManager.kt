@@ -423,6 +423,11 @@ class FontManager(
         loadCustomColors()
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
+        val savedSeed = prefs.getInt("dynamic_seed_color", -1)
+        if (savedSeed != -1) {
+            this.currentScheme = Scheme.dark(savedSeed)
+            this.dynamicColor = this.currentScheme?.secondary
+        }
         timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
         clockStyle = ClockStyle.fromId(prefs.getString("clockStyle", ClockStyle.STANDARD.id))
@@ -664,6 +669,8 @@ class FontManager(
     @SuppressLint("RestrictedApi")
     fun setDynamicScheme(seedColor: Int) {
         this.currentScheme = Scheme.dark(seedColor)
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt("dynamic_seed_color", seedColor).apply()
         applyAll()
     }
 
@@ -933,6 +940,8 @@ class FontManager(
     fun getDynamicColor(): Int? = dynamicColor
 
     fun clearDynamicColors() {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        prefs.edit().remove("dynamic_seed_color").apply()
         currentScheme = null
         dynamicColor = null
         applyAll()

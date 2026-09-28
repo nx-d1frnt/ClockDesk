@@ -13,9 +13,10 @@ class EntranceAnimationManager(
     private val rootView: ViewGroup,
     private val widgets: List<View>,
     private val turbulenceOverlay: TurbulenceView? = null,
-    private val isTurbulenceEnabled: Boolean = true,
-    private val dynamicBackgroundView: DynamicBackgroundView? = null,
-    private val targetTranslationYProvider: ((View) -> Float)? = null
+    isTurbulenceEnabled: Boolean = true,
+    dynamicBackgroundView: DynamicBackgroundView? = null,
+    targetTranslationYProvider: ((View) -> Float)? = null,
+    private val themeColor: Int? = null
 ) {
     private var hasAnimationPlayed = false
 
@@ -25,14 +26,19 @@ class EntranceAnimationManager(
 
     private var loaderView: com.google.android.material.loadingindicator.LoadingIndicator? = null
 
+    private val isTurbulenceEnabled = isTurbulenceEnabled
+    private val dynamicBackgroundView = dynamicBackgroundView
+    private val targetTranslationYProvider = targetTranslationYProvider
+
     fun prepareViews() {
         if (hasAnimationPlayed) return
 
+        val activeTurbulenceColor = themeColor ?: Color.parseColor("#5A7184")
         if (isTurbulenceEnabled) {
             if (dynamicBackgroundView != null) {
-                dynamicBackgroundView.playTurbulence(Color.parseColor("#5A7184")) {}
+                dynamicBackgroundView.playTurbulence(activeTurbulenceColor) {}
             } else {
-                turbulenceOverlay?.playAnimation(Color.parseColor("#5A7184")) {}
+                turbulenceOverlay?.playAnimation(activeTurbulenceColor) {}
             }
         }
 
@@ -50,6 +56,9 @@ class EntranceAnimationManager(
                 topToTop = ConstraintLayout.LayoutParams.PARENT_ID
                 startToStart = ConstraintLayout.LayoutParams.PARENT_ID
                 endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+            }
+            themeColor?.let { color ->
+                setIndicatorColor(color)
             }
             alpha = 0f
             id = View.generateViewId()
