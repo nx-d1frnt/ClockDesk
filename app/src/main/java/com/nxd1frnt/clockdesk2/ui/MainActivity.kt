@@ -167,6 +167,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     override var isEditMode: Boolean = false
     override val hostContext: Context get() = this
     override fun getRestTranslationX(view: View): Float = if (::widgetMover.isInitialized) widgetMover.getRestTranslationX(view) else 0f
+    override fun getRestTranslationY(view: View): Float = if (::widgetMover.isInitialized) widgetMover.getRestTranslationY(view) else 0f
     override fun onMusicArtworkChanged(artworkSource: Any?) {}
     override fun onWidgetClicked(widget: DesktopWidgetController) {
         widget.rootView?.let {
@@ -319,11 +320,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             val delay = if (force) 0L else maxOf(0L, MIN_LOADER_DURATION - timePassed)
 
             mainLayout.postDelayed({
-                entranceAnimationManager.play()
-                handler.postDelayed({
+                entranceAnimationManager.play {
                     setupMusicSystem()
-                    widgetMover.restoreOrderAndPositions()
-                }, 850)
+                }
             }, delay)
         }
     }
@@ -363,7 +362,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             widgets = desktopWidgetManager.getViews(),
             turbulenceOverlay = turbulenceOverlay,
             isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled,
-            dynamicBackgroundView = dynamicBackgroundView
+            dynamicBackgroundView = dynamicBackgroundView,
+            targetTranslationYProvider = { view -> widgetMover.getRestTranslationY(view) }
         )
         entranceAnimationManager.prepareViews()
     }

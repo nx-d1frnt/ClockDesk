@@ -11,6 +11,7 @@ interface DesktopWidgetHost {
     val fontManager: FontManager?
 
     fun getRestTranslationX(view: View): Float
+    fun getRestTranslationY(view: View): Float = 0f
     fun onMusicArtworkChanged(artworkSource: Any?)
     fun onWidgetClicked(widget: DesktopWidgetController)
     fun getPreferences(): SharedPreferences

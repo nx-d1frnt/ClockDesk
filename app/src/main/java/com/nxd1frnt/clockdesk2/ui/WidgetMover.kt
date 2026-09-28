@@ -208,20 +208,22 @@ class WidgetMover(
     }
 
     fun getRestTranslationX(view: View): Float {
+        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
         return if (isFreeMovementEnabled(view)) {
             val idName = getResourceName(view.id)
-            prefs.getFloat("${idName}_x", view.translationX)
+            prefs.getFloat("${idName}_x", 0f) + shiftX
         } else {
-            burnInProtectionManager?.currentShiftX ?: 0f
+            shiftX
         }
     }
 
     fun getRestTranslationY(view: View): Float {
+        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
         return if (isFreeMovementEnabled(view)) {
             val idName = getResourceName(view.id)
-            prefs.getFloat("${idName}_y", view.translationY)
+            prefs.getFloat("${idName}_y", 0f) + shiftY
         } else {
-            burnInProtectionManager?.currentShiftY ?: 0f
+            shiftY
         }
     }
 
@@ -403,6 +405,11 @@ class WidgetMover(
 
         set.applyTo(parentView)
 
+        val isInitialRestore = isFirstRestore
+        if (isFirstRestore) {
+            isFirstRestore = false
+        }
+
         val postRunnable = Runnable {
             stackedViews.forEach { view ->
                 if (isEditMode) {
@@ -414,7 +421,7 @@ class WidgetMover(
                 if (view.visibility == View.VISIBLE && view.alpha < 1f) {
                     view.alpha = 1f
                 }
-                if (isFirstRestore) {
+                if (isInitialRestore) {
                     view.translationX = 0f
                     view.translationY = 0f
                 } else {
@@ -456,17 +463,14 @@ class WidgetMover(
                 val savedY = prefs.getFloat("${idName}_y", 0f)
                 sanitizeAndApplyPosition(view, savedX, savedY)
             }
+
+            if (isInitialRestore) {
+                onInitialLayoutComplete?.invoke()
+            }
         }
 
         pendingPostApplyRunnable = postRunnable
         parentView.post(postRunnable)
-
-        if (isFirstRestore) {
-            isFirstRestore = false
-            parentView.post {
-                onInitialLayoutComplete?.invoke()
-            }
-        }
     }
 
     private fun calculateSmartGap(topView: View, bottomView: View, normalGap: Int, smallGap: Int): Int {
@@ -490,8 +494,30 @@ class WidgetMover(
     // ============================================================================
 
     private fun sanitizeAndApplyPosition(view: View, desiredX: Float, desiredY: Float) {
-        // Чекаємо поки layout буде готовий
+        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
+
+        if (view.visibility == View.GONE) {
+            if (isFreeMovementEnabled(view)) {
+                view.translationX = desiredX + shiftX
+                view.translationY = desiredY + shiftY
+            } else {
+                view.translationX = shiftX
+                view.translationY = shiftY
+            }
+            return
+        }
+
+        // Wait until layout is ready
         if (parentView.width == 0 || parentView.height == 0 || view.width == 0 || view.height == 0) {
+            // Apply desired position directly so translations aren't left at 0f before layout measurement
+            if (isFreeMovementEnabled(view)) {
+                view.translationX = desiredX + shiftX
+                view.translationY = desiredY + shiftY
+            } else {
+                view.translationX = shiftX
+                view.translationY = shiftY
+            }
             parentView.post {
                 sanitizeAndApplyPosition(view, desiredX, desiredY)
             }
@@ -513,9 +539,6 @@ class WidgetMover(
             finalX = 0f
             finalY = 0f
         }
-
-        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
-        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
 
         view.translationX = finalX + shiftX
         view.translationY = finalY + shiftY
