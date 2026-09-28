@@ -19,7 +19,9 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import android.util.TypedValue
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
@@ -27,6 +29,7 @@ class BackgroundSheetManager(
     private val floatingMenuView: View,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
+    private val dockView: View? = null,
     private val backgroundManager: BackgroundManager,
     private val dayTimeGetter: DayTimeGetter,
     private val weatherGetter: WeatherGetter,
@@ -49,6 +52,7 @@ class BackgroundSheetManager(
         private set
     private var isUpdatingBackgroundUi = false
     private var isApplying = false
+    private var isSwitchingToCrop = false
     private var initialMusicAlbumArtEnabled = true
     private val animationDuration = 350L
     private var backgroundsAdapter: BackgroundsAdapter? = null
@@ -263,7 +267,9 @@ class BackgroundSheetManager(
                 if (uri != backgroundManager.getSavedBackgroundUri()) {
                     backgroundManager.resetBgTransform()
                 }
+                isSwitchingToCrop = true
                 onCropRequested()
+                isSwitchingToCrop = false
             }
         }
 
@@ -283,7 +289,7 @@ class BackgroundSheetManager(
 
             val transition = AutoTransition().apply {
                 duration = 250L
-                interpolator = OvershootInterpolator(0.8f)
+                interpolator = com.nxd1frnt.clockdesk2.utils.MotionUtils.EMPHASIZED
             }
             TransitionManager.beginDelayedTransition(contentContainer, transition)
             tabStyle.visibility = if (checkedId == R.id.nav_style) View.VISIBLE else View.GONE
@@ -316,6 +322,7 @@ class BackgroundSheetManager(
         loadCurrentSettings()
         scaleDownMainLayout()
         hideBackgroundTab()
+        hideDock()
 
         floatingMenuView.visibility = View.VISIBLE
         floatingMenuView.alpha = 1f
@@ -323,24 +330,25 @@ class BackgroundSheetManager(
         val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
         val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
 
-        val interpolator = OvershootInterpolator(0.8f)
+        val enterInterpolator = MotionUtils.EMPHASIZED_DECELERATE
+        val springInterpolator = MotionUtils.EXPRESSIVE_SPRING
 
-        bgApplyBtn?.apply { alpha = 0f; translationY = -50f }
-        bgCancelBtn?.apply { alpha = 0f; translationY = -50f }
-        settingsCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
-        navCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
-        bgCropBtn?.apply { alpha = 0f; translationY = -50f }
+        bgApplyBtn?.apply { alpha = 0f; translationY = -30f }
+        bgCancelBtn?.apply { alpha = 0f; translationY = -30f }
+        settingsCard?.apply { alpha = 0f; translationY = 60f; scaleX = 0.94f; scaleY = 0.94f }
+        navCard?.apply { alpha = 0f; translationY = 60f; scaleX = 0.94f; scaleY = 0.94f }
+        bgCropBtn?.apply { alpha = 0f; translationY = -30f }
 
-        bgApplyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
-        bgCancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
+        bgApplyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(enterInterpolator)?.start()
+        bgCancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(enterInterpolator)?.start()
 
         settingsCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
-            ?.setDuration(animationDuration)?.setStartDelay(50)?.setInterpolator(interpolator)?.start()
+            ?.setDuration(animationDuration)?.setStartDelay(40)?.setInterpolator(springInterpolator)?.start()
 
-        bgCropBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setStartDelay(150)?.setInterpolator(interpolator)?.start()
+        bgCropBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setStartDelay(80)?.setInterpolator(enterInterpolator)?.start()
 
         navCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
-            ?.setDuration(animationDuration)?.setStartDelay(100)?.setInterpolator(interpolator)?.start()
+            ?.setDuration(animationDuration)?.setStartDelay(60)?.setInterpolator(springInterpolator)?.start()
 
         onSheetStateChanged(false)
     }
@@ -349,23 +357,24 @@ class BackgroundSheetManager(
         val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
         val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
 
-        val interpolator = android.view.animation.AnticipateInterpolator(0.8f)
+        val exitInterpolator = MotionUtils.EMPHASIZED_ACCELERATE
 
-        bgApplyBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
-        bgCancelBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
+        bgApplyBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(220)?.setInterpolator(exitInterpolator)?.setStartDelay(0)?.start()
+        bgCancelBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(220)?.setInterpolator(exitInterpolator)?.setStartDelay(0)?.start()
 
-        settingsCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
-            ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
+        settingsCard?.animate()?.alpha(0f)?.translationY(60f)?.scaleX(0.94f)?.scaleY(0.94f)
+            ?.setDuration(220)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
 
-        navCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
-            ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.withEndAction {
+        navCard?.animate()?.alpha(0f)?.translationY(60f)?.scaleX(0.94f)?.scaleY(0.94f)
+            ?.setDuration(220)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.withEndAction {
                 floatingMenuView.visibility = View.GONE
                 settingsCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
                 navCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
             }?.start()
-        bgCropBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
+        bgCropBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(220)?.setInterpolator(exitInterpolator)?.setStartDelay(0)?.start()
 
         restoreMainLayoutState()
+        restoreDock()
         onSheetStateChanged(true)
     }
 
@@ -632,25 +641,27 @@ class BackgroundSheetManager(
             .translationY(translationY)
             .translationX(0f)
             .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
+            .setInterpolator(com.nxd1frnt.clockdesk2.utils.MotionUtils.EMPHASIZED)
             .start()
     }
 
     private fun restoreMainLayoutState() {
         mainLayout.animate()
-            .scaleX(0.90f)
-            .scaleY(0.90f)
+            .scaleX(0.92f)
+            .scaleY(0.92f)
             .translationY(0f)
             .translationX(0f)
             .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
+            .setInterpolator(MotionUtils.EMPHASIZED)
             .start()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            backgroundCustomizationTab.visibility = View.VISIBLE
-            backgroundCustomizationTab.animate().alpha(1f).setDuration(200).start()
-        } else {
-            backgroundCustomizationTab.visibility = View.VISIBLE
+        if (!isSwitchingToCrop) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                backgroundCustomizationTab.visibility = View.VISIBLE
+                backgroundCustomizationTab.animate().alpha(1f).setDuration(200).start()
+            } else {
+                backgroundCustomizationTab.visibility = View.VISIBLE
+            }
         }
     }
 
@@ -658,7 +669,49 @@ class BackgroundSheetManager(
         backgroundCustomizationTab.animate().alpha(0f).setDuration(200).withEndAction {
             backgroundCustomizationTab.visibility = View.GONE
         }.start()
+    }
 
+    private fun restoreDock() {
+        if (isSwitchingToCrop) return
+        dockView?.let { dock ->
+            dock.animate().cancel()
+            val dockSlideOffset = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+            )
+            dock.visibility = View.VISIBLE
+            dock.alpha = 0f
+            dock.translationY = dockSlideOffset
+            dock.scaleX = 0.92f
+            dock.scaleY = 0.92f
+            dock.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                .start()
+        }
+    }
+
+    private fun hideDock() {
+        dockView?.let { dock ->
+            dock.animate().cancel()
+            val dockSlideOffset = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+            )
+            dock.animate()
+                .alpha(0f)
+                .translationY(dockSlideOffset)
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .setDuration(220)
+                .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+                .withEndAction {
+                    dock.visibility = View.GONE
+                }
+                .start()
+        }
     }
 
     fun onDestroy() {

@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.ui
 
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +23,7 @@ class WidgetGallerySideSheetManager(
     private val sideSheetView: LinearLayout,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
+    private val dockView: View? = null,
     private val widgetManager: DesktopWidgetManager,
     private val onWidgetAdded: (DesktopWidgetType) -> Unit,
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit
@@ -44,13 +46,23 @@ class WidgetGallerySideSheetManager(
         behavior.addCallback(object : SideSheetCallback() {
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
-                    onSheetStateChanged(true)
-                    mainLayout.scaleX = 0.90f
-                    mainLayout.scaleY = 0.90f
+                    mainLayout.scaleX = 0.92f
+                    mainLayout.scaleY = 0.92f
                     mainLayout.translationX = 0f
                     mainLayout.translationY = 0f
                     backgroundCustomizationTab.alpha = 1f
                     backgroundCustomizationTab.visibility = View.VISIBLE
+                    dockView?.let { dock ->
+                        dock.alpha = 1f
+                        dock.translationY = 0f
+                        dock.scaleX = 1f
+                        dock.scaleY = 1f
+                        dock.visibility = View.VISIBLE
+                    }
+                    onSheetStateChanged(true)
+                } else if (newState == SideSheetBehavior.STATE_EXPANDED) {
+                    dockView?.visibility = View.GONE
+                    onSheetStateChanged(false)
                 } else {
                     onSheetStateChanged(false)
                 }
@@ -58,7 +70,7 @@ class WidgetGallerySideSheetManager(
 
             override fun onSlide(sheet: View, slideOffset: Float) {
                 val safeOffset = slideOffset.coerceIn(0f, 1f)
-                val baseScale = 0.90f
+                val baseScale = 0.92f
 
                 sheet.alpha = safeOffset
                 val sheetScale = 0.95f + (0.05f * safeOffset)
@@ -75,6 +87,22 @@ class WidgetGallerySideSheetManager(
                     backgroundCustomizationTab.visibility = View.VISIBLE
                 } else if (safeOffset == 1f && backgroundCustomizationTab.visibility == View.VISIBLE) {
                     backgroundCustomizationTab.visibility = View.GONE
+                }
+
+                dockView?.let { dock ->
+                    val dockSlideOffset = TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+                    )
+                    dock.alpha = 1f - safeOffset
+                    dock.translationY = dockSlideOffset * safeOffset
+                    val dockScale = 1f - (0.08f * safeOffset)
+                    dock.scaleX = dockScale
+                    dock.scaleY = dockScale
+                    if (safeOffset < 1f && dock.visibility == View.GONE) {
+                        dock.visibility = View.VISIBLE
+                    } else if (safeOffset == 1f && dock.visibility == View.VISIBLE) {
+                        dock.visibility = View.GONE
+                    }
                 }
             }
         })
@@ -102,6 +130,7 @@ class WidgetGallerySideSheetManager(
     }
 
     fun show() {
+        dockView?.animate()?.cancel()
         calculateHorizontalShift()
         recyclerView.adapter = WidgetPickerAdapter(DesktopWidgetRegistry.getAll()) { definition ->
             val added = widgetManager.addWidget(definition.type)

@@ -20,7 +20,7 @@ class EntranceAnimationManager(
 ) {
     private var hasAnimationPlayed = false
 
-    private val expressiveInterpolator = PathInterpolator(0.2f, 0.0f, 0.0f, 1.0f)
+    private val expressiveInterpolator = MotionUtils.EXPRESSIVE_SPRING
 
     private val targetTranslationsY = mutableMapOf<View, Float>()
 
@@ -68,7 +68,10 @@ class EntranceAnimationManager(
 
         loaderView?.animate()
             ?.alpha(1f)
+            ?.scaleX(1f)
+            ?.scaleY(1f)
             ?.setDuration(200L)
+            ?.setInterpolator(MotionUtils.EMPHASIZED_DECELERATE)
             ?.start()
     }
 
@@ -86,7 +89,7 @@ class EntranceAnimationManager(
             return
         }
 
-        val offset = dpToPx(rootView.context, 40f)
+        val offset = dpToPx(rootView.context, 44f)
 
         widgets.forEach { view ->
             val targetY = targetTranslationYProvider?.invoke(view) ?: view.translationY
@@ -99,19 +102,19 @@ class EntranceAnimationManager(
 
         loaderView?.animate()
             ?.alpha(0f)
-            ?.scaleX(0.5f)
-            ?.scaleY(0.5f)
-            ?.setDuration(400L)
-            ?.setInterpolator(PathInterpolator(0.4f, 0.0f, 0.2f, 1.0f))
+            ?.scaleX(0.7f)
+            ?.scaleY(0.7f)
+            ?.setDuration(220L)
+            ?.setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
             ?.withEndAction {
                 rootView.removeView(loaderView)
                 loaderView = null
             }
             ?.start()
 
-        var delay = 200L
-        val staggerDelay = 100L
-        val animationDuration = 900L
+        var delay = 40L
+        val staggerDelay = 70L
+        val animationDuration = 650L
 
         var completedCount = 0
         var hasNotifiedEnd = false
@@ -137,6 +140,7 @@ class EntranceAnimationManager(
                     view.scaleX = 1f
                     view.scaleY = 1f
                     view.alpha = 1f
+                    view.translationY = targetY
                     view.animate().setListener(null)
                     completedCount++
                     if (completedCount >= widgets.size) {
@@ -148,7 +152,7 @@ class EntranceAnimationManager(
             delay += staggerDelay
         }
 
-        val maxDuration = delay + animationDuration + 100L
+        val maxDuration = delay + animationDuration + 80L
         rootView.postDelayed({
             notifyEnd()
         }, maxDuration)

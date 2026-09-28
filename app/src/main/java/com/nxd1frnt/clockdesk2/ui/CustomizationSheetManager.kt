@@ -10,9 +10,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AccelerateInterpolator
-import android.view.animation.DecelerateInterpolator
-import android.view.animation.OvershootInterpolator
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import android.widget.Button
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
@@ -50,6 +48,7 @@ class CustomizationSheetManager(
     private val sideSheetView: LinearLayout,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
+    private val dockView: View? = null,
     private val fontManager: FontManager,
     private val widgetMover: WidgetMover,
     private val clockManager: ClockManager,
@@ -217,7 +216,7 @@ class CustomizationSheetManager(
             mainLayout.animate()
                 .translationX(calculatedTargetTx)
                 .setDuration(350)
-                .setInterpolator(DecelerateInterpolator(1.5f))
+                .setInterpolator(MotionUtils.EMPHASIZED)
                 .start()
         }
     }
@@ -237,16 +236,26 @@ class CustomizationSheetManager(
         behavior.addCallback(object : SideSheetCallback() {
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
-                    onSheetStateChanged(true)
                     sideSheetView.removeCallbacks(focusUpdateRunnable)
-                    mainLayout.scaleX = 0.90f
-                    mainLayout.scaleY = 0.90f
+                    mainLayout.scaleX = 0.92f
+                    mainLayout.scaleY = 0.92f
                     mainLayout.translationX = 0f
                     mainLayout.translationY = 0f
                     backgroundCustomizationTab.alpha = 1f
                     backgroundCustomizationTab.visibility = View.VISIBLE
+                    dockView?.let { dock ->
+                        dock.alpha = 1f
+                        dock.translationY = 0f
+                        dock.scaleX = 1f
+                        dock.scaleY = 1f
+                        dock.visibility = View.VISIBLE
+                    }
                     highlightFocusedView(false)
                     focusedView = null
+                    onSheetStateChanged(true)
+                } else if (newState == SideSheetBehavior.STATE_EXPANDED) {
+                    dockView?.visibility = View.GONE
+                    onSheetStateChanged(false)
                 } else {
                     onSheetStateChanged(false)
                 }
@@ -254,7 +263,7 @@ class CustomizationSheetManager(
 
             override fun onSlide(sheet: View, slideOffset: Float) {
                 val safeOffset = slideOffset.coerceIn(0f, 1f)
-                val baseScale = 0.90f
+                val baseScale = 0.92f
 
                 sheet.alpha = safeOffset
                 val sheetScale = 0.95f + (0.05f * safeOffset)
@@ -272,6 +281,22 @@ class CustomizationSheetManager(
                     backgroundCustomizationTab.visibility = View.VISIBLE
                 } else if (safeOffset == 1f && backgroundCustomizationTab.visibility == View.VISIBLE) {
                     backgroundCustomizationTab.visibility = View.GONE
+                }
+
+                dockView?.let { dock ->
+                    val dockSlideOffset = TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+                    )
+                    dock.alpha = 1f - safeOffset
+                    dock.translationY = dockSlideOffset * safeOffset
+                    val dockScale = 1f - (0.08f * safeOffset)
+                    dock.scaleX = dockScale
+                    dock.scaleY = dockScale
+                    if (safeOffset < 1f && dock.visibility == View.GONE) {
+                        dock.visibility = View.VISIBLE
+                    } else if (safeOffset == 1f && dock.visibility == View.VISIBLE) {
+                        dock.visibility = View.GONE
+                    }
                 }
             }
         })
@@ -297,6 +322,7 @@ class CustomizationSheetManager(
     }
 
     fun showForView(viewToCustomize: View) {
+        dockView?.animate()?.cancel()
         focusedView = viewToCustomize
         isEditingBackground = false
 
@@ -312,8 +338,8 @@ class CustomizationSheetManager(
                 .scaleY(dynamicTargetScale)
                 .translationX(calculatedTargetTx)
                 .translationY(0f)
-                .setDuration(250)
-                .setInterpolator(DecelerateInterpolator(1.2f))
+                .setDuration(300)
+                .setInterpolator(MotionUtils.EMPHASIZED)
                 .start()
         }
 
@@ -1024,11 +1050,11 @@ class CustomizationSheetManager(
         val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
 
         view.animate()
-            .scaleX(0.82f)
-            .scaleY(0.82f)
+            .scaleX(0.88f)
+            .scaleY(0.88f)
             .alpha(0.2f)
-            .setDuration(130)
-            .setInterpolator(AccelerateInterpolator())
+            .setDuration(120)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
             .withEndAction {
                 if (view.parent is ViewGroup) {
                     try {
@@ -1036,7 +1062,7 @@ class CustomizationSheetManager(
                             view.parent as ViewGroup,
                             AutoTransition().apply {
                                 duration = 220
-                                interpolator = DecelerateInterpolator(1.5f)
+                                interpolator = MotionUtils.EMPHASIZED
                             }
                         )
                     } catch (e: Exception) {}
@@ -1050,8 +1076,8 @@ class CustomizationSheetManager(
                     .scaleX(1.0f)
                     .scaleY(1.0f)
                     .alpha(targetAlpha)
-                    .setDuration(240)
-                    .setInterpolator(OvershootInterpolator(1.2f))
+                    .setDuration(280)
+                    .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
                     .start()
             }
             .start()

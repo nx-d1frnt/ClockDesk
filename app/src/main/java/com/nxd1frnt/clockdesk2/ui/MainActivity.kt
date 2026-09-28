@@ -31,8 +31,9 @@ import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.animation.TimeInterpolator
 import android.view.WindowManager
-import android.view.animation.OvershootInterpolator
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -231,7 +232,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private var isBackgroundReady = false
     private var entranceAnimationPlayed = false
     private val ENTRANCE_ANIMATION_TIMEOUT = 2500L
-    private val MIN_LOADER_DURATION = 800L
+    private val MIN_LOADER_DURATION = 200L
     private var activityStartTime = 0L
     private var showMediaIcon = false
 
@@ -240,10 +241,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private val editModeTimeoutRunnable = Runnable {
-        if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN ||
-            (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) ||
-            (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing)
-        ) {
+        if (isAnySheetShowing()) {
             return@Runnable
         }
 
@@ -322,6 +320,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             mainLayout.postDelayed({
                 entranceAnimationManager.play {
                     setupMusicSystem()
+                    setupDeskConnectSystem()
+                    loadFogTextures()
                 }
             }, delay)
         }
@@ -351,7 +351,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val skipAnimation = savedInstanceState != null
         loadSavedBackground(skipAnimation)
         checkForFirstLaunchAnimation()
-        setupSideSheet()
         restoreSavedWeatherState()
         startUpdates()
     }
@@ -407,6 +406,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         mainLayout = findViewById(R.id.main_layout)
         sideSheet = findViewById(R.id.side_sheet)
         backgroundBottomSheet = findViewById(R.id.background_bottom_sheet)
+        backgroundBottomSheet.visibility = View.GONE
+
+        val widgetGallerySheet = findViewById<LinearLayout>(R.id.widget_gallery_side_sheet)
+        SideSheetBehavior.from(widgetGallerySheet).state = SideSheetBehavior.STATE_HIDDEN
+
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
@@ -439,20 +443,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
         graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
         graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
-
-        Thread {
-            val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
-            val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
-            handler.post {
-                if (!isDestroyed && !isFinishing) {
-                    dynamicBackgroundView.setFogTextures(fogBitmap, cloudsBitmap)
-                    val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
-                    dynamicBackgroundView.setRenderScale(targetScale)
-                    val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
-                    dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
-                }
-            }
-        }.start()
 
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
@@ -517,36 +507,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             fontManager
         )
         lifecycle.addObserver(smartChipManager)
-
-        val deskConnectManager = com.nxd1frnt.clockdesk2.connect.DeskConnectManager.getInstance(this)
-        val notificationContainer = findViewById<android.view.ViewGroup>(R.id.desk_notification_container)
-        val callContainer = findViewById<android.view.ViewGroup>(R.id.desk_call_container)
-        deskNotificationManager = com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager(this, notificationContainer, deskConnectManager)
-        deskCallOverlay = com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay(this, callContainer, deskConnectManager)
-
-        deskConnectManager.deviceListeners.add(object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
-            override fun onDeviceDiscovered(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
-            override fun onDeviceConnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
-            override fun onDeviceDisconnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
-            override fun onPairingRequested(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, verificationKey: String) {
-                runOnUiThread {
-                    if (!isFinishing && !isDestroyed) {
-                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this@MainActivity)
-                            .setTitle(R.string.deskconnect_pairing_request_title)
-                            .setMessage(getString(R.string.deskconnect_pairing_request_message, device.getDisplayName(), verificationKey))
-                            .setPositiveButton(R.string.deskconnect_accept) { _, _ ->
-                                deskConnectManager.acceptPair(device)
-                            }
-                            .setNegativeButton(R.string.deskconnect_reject) { _, _ ->
-                                deskConnectManager.rejectPair(device)
-                            }
-                            .setCancelable(false)
-                            .show()
-                    }
-                }
-            }
-            override fun onPairingStateChanged(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, isPaired: Boolean) {}
-        })
 
         clockManager = ClockManager(
             timeText,
@@ -652,188 +612,333 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         setupPreferencesListener(prefs)
     }
 
-    private fun initUIManagers() {
-        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+    private fun setupDeskConnectSystem() {
+        if (::deskNotificationManager.isInitialized) return
+        val deskConnectManager = com.nxd1frnt.clockdesk2.connect.DeskConnectManager.getInstance(this)
+        val notificationContainer = findViewById<android.view.ViewGroup>(R.id.desk_notification_container)
+        val callContainer = findViewById<android.view.ViewGroup>(R.id.desk_call_container)
+        deskNotificationManager = com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager(this, notificationContainer, deskConnectManager)
+        deskCallOverlay = com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay(this, callContainer, deskConnectManager)
 
-        // 1. Customization Sheet
-        customizationSheetManager = CustomizationSheetManager(
-            sideSheetView = sideSheet,
-            mainLayout = mainLayout,
-            backgroundCustomizationTab = backgroundCustomizationTab,
-            fontManager = fontManager,
-            widgetMover = widgetMover,
-            clockManager = clockManager,
-            dayTimeGetter = dayTimeGetter,
-            widgetManager = desktopWidgetManager,
-            onAddFontRequested = {
-                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "*/*"
-                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
+        deskConnectManager.deviceListeners.add(object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
+            override fun onDeviceDiscovered(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onDeviceConnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onDeviceDisconnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onPairingRequested(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, verificationKey: String) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this@MainActivity)
+                            .setTitle(R.string.deskconnect_pairing_request_title)
+                            .setMessage(getString(R.string.deskconnect_pairing_request_message, device.getDisplayName(), verificationKey))
+                            .setPositiveButton(R.string.deskconnect_accept) { _, _ ->
+                                deskConnectManager.acceptPair(device)
+                            }
+                            .setNegativeButton(R.string.deskconnect_reject) { _, _ ->
+                                deskConnectManager.rejectPair(device)
+                            }
+                            .setCancelable(false)
+                            .show()
                     }
-                } else {
-                    Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
-                }
-                try {
-                    isLaunchingFilePicker = true
-                    startActivityForResult(intent, PICK_FONT_REQUEST)
-                } catch (e: ActivityNotFoundException) { /* Handle error */ }
-            },
-            onSheetStateChanged = { isHidden ->
-                if (isHidden) {
-                    resetEditModeTimeout()
-                } else {
-                    stopHideUiTimer()
                 }
             }
-        )
+            override fun onPairingStateChanged(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, isPaired: Boolean) {}
+        })
+    }
 
-        customizationSheetManager.onRemoveWidgetRequested = { viewToRemove ->
-            removeWidget(viewToRemove)
+    private fun loadFogTextures() {
+        Thread {
+            val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
+            val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
+            handler.post {
+                if (!isDestroyed && !isFinishing) {
+                    dynamicBackgroundView.setFogTextures(fogBitmap, cloudsBitmap)
+                    val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+                    dynamicBackgroundView.setRenderScale(targetScale)
+                    val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+                    dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+                }
+            }
+        }.start()
+    }
+
+    private fun isAnySheetShowing(): Boolean {
+        return (::sideSheetBehavior.isInitialized && sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) ||
+               (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) ||
+               (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) ||
+               (::cropController.isInitialized && cropController.isActive())
+    }
+
+    private fun showDock(animate: Boolean = true) {
+        if (!isEditMode || isCropModeActive) return
+        if (isAnySheetShowing()) return
+
+        if (editModeActionBar.visibility == View.VISIBLE &&
+            editModeActionBar.alpha >= 0.99f &&
+            editModeActionBar.translationY == 0f &&
+            editModeActionBar.scaleX >= 0.99f) {
+            return
         }
 
-        // 2. Widget Gallery Side Sheet
-        widgetGallerySideSheetManager = WidgetGallerySideSheetManager(
-            sideSheetView = findViewById(R.id.widget_gallery_side_sheet),
-            mainLayout = mainLayout,
-            backgroundCustomizationTab = backgroundCustomizationTab,
-            widgetManager = desktopWidgetManager,
-            onWidgetAdded = { type ->
-                onWidgetAdded(type)
-            },
-            onSheetStateChanged = { isHidden ->
-                if (isHidden) {
+        editModeActionBar.animate().cancel()
+        val dockSlideOffset = dpToPx(24f)
+        if (animate) {
+            editModeActionBar.visibility = View.VISIBLE
+            editModeActionBar.alpha = 0f
+            editModeActionBar.translationY = dockSlideOffset
+            editModeActionBar.scaleX = 0.92f
+            editModeActionBar.scaleY = 0.92f
+            editModeActionBar.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                .start()
+        } else {
+            editModeActionBar.visibility = View.VISIBLE
+            editModeActionBar.alpha = 1f
+            editModeActionBar.translationY = 0f
+            editModeActionBar.scaleX = 1f
+            editModeActionBar.scaleY = 1f
+        }
+    }
+
+    private fun hideDock(animate: Boolean = true) {
+        editModeActionBar.animate().cancel()
+        val dockSlideOffset = dpToPx(24f)
+        if (animate && editModeActionBar.visibility == View.VISIBLE) {
+            editModeActionBar.animate()
+                .alpha(0f)
+                .translationY(dockSlideOffset)
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+                .withEndAction {
+                    if (!isEditMode || isAnySheetShowing() || isCropModeActive) {
+                        editModeActionBar.visibility = View.GONE
+                    }
+                }
+                .start()
+        } else {
+            editModeActionBar.visibility = View.GONE
+            editModeActionBar.alpha = 0f
+            editModeActionBar.translationY = dockSlideOffset
+        }
+    }
+
+    private fun handleSheetStateChanged(isHidden: Boolean) {
+        if (isHidden) {
+            resetEditModeTimeout()
+            if (isEditMode && !isAnySheetShowing() && !isCropModeActive) {
+                if (editModeActionBar.visibility != View.VISIBLE) {
+                    showDock(animate = true)
+                }
+            }
+        } else {
+            stopHideUiTimer()
+        }
+    }
+
+    private fun ensureCustomizationSheetManager(): CustomizationSheetManager {
+        if (!::customizationSheetManager.isInitialized) {
+            setupSideSheet()
+            customizationSheetManager = CustomizationSheetManager(
+                sideSheetView = sideSheet,
+                mainLayout = mainLayout,
+                backgroundCustomizationTab = backgroundCustomizationTab,
+                dockView = editModeActionBar,
+                fontManager = fontManager,
+                widgetMover = widgetMover,
+                clockManager = clockManager,
+                dayTimeGetter = dayTimeGetter,
+                widgetManager = desktopWidgetManager,
+                onAddFontRequested = {
+                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
+                        }
+                    } else {
+                        Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
+                    }
+                    try {
+                        isLaunchingFilePicker = true
+                        startActivityForResult(intent, PICK_FONT_REQUEST)
+                    } catch (e: ActivityNotFoundException) { /* Handle error */ }
+                },
+                onSheetStateChanged = { isHidden ->
+                    handleSheetStateChanged(isHidden)
+                }
+            )
+            customizationSheetManager.onRemoveWidgetRequested = { viewToRemove ->
+                removeWidget(viewToRemove)
+            }
+        }
+        return customizationSheetManager
+    }
+
+    private fun ensureWidgetGallerySideSheetManager(): WidgetGallerySideSheetManager {
+        if (!::widgetGallerySideSheetManager.isInitialized) {
+            widgetGallerySideSheetManager = WidgetGallerySideSheetManager(
+                sideSheetView = findViewById(R.id.widget_gallery_side_sheet),
+                mainLayout = mainLayout,
+                backgroundCustomizationTab = backgroundCustomizationTab,
+                dockView = editModeActionBar,
+                widgetManager = desktopWidgetManager,
+                onWidgetAdded = { type ->
+                    onWidgetAdded(type)
+                },
+                onSheetStateChanged = { isHidden ->
+                    handleSheetStateChanged(isHidden)
+                }
+            )
+        }
+        return widgetGallerySideSheetManager
+    }
+
+    private fun ensureCropController(): BackgroundCropController {
+        if (!::cropController.isInitialized) {
+            val overlayView = findViewById<View>(R.id.crop_overlay)
+            cropController = BackgroundCropController(
+                dynamicBackgroundView = dynamicBackgroundView,
+                overlayRoot = overlayView,
+                backgroundManager = backgroundManager,
+                onApply = {
+                    isCropModeActive = false
+                    if (dynamicBackgroundView.visibility == View.VISIBLE) {
+                        updateBackgroundFilters()
+                    }
+                    ensureBackgroundSheetManager().show()
                     resetEditModeTimeout()
-                } else {
+                },
+                onCancel = {
+                    isCropModeActive = false
+                    ensureBackgroundSheetManager().show()
+                    resetEditModeTimeout()
+                }
+            )
+        }
+        return cropController
+    }
+
+    private fun ensureBackgroundSheetManager(): BackgroundSheetManager {
+        if (!::backgroundSheetManager.isInitialized) {
+            backgroundSheetManager = BackgroundSheetManager(
+                floatingMenuView = backgroundBottomSheet,
+                mainLayout = mainLayout,
+                backgroundCustomizationTab = backgroundCustomizationTab,
+                dockView = editModeActionBar,
+                backgroundManager = backgroundManager,
+                dayTimeGetter = dayTimeGetter,
+                weatherGetter = weatherGetter,
+                weatherView = dynamicBackgroundView,
+                isMusicBackgroundApplied = { wasMusicBackgroundApplied },
+                onAddBackgroundRequested = {
+                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                        }
+                    } else {
+                        Intent(Intent.ACTION_GET_CONTENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                        }
+                    }
+                    try {
+                        isLaunchingFilePicker = true
+                        startActivityForResult(intent, PICK_BG_REQUEST)
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onPreviewImage = { uri, blur ->
+                    applyImageBackground(uri, blur)
+                },
+                onPreviewBlur = { blur ->
+                    previewBlur(blur)
+                },
+                onPreviewGradient = {
+                    previewGradient()
+                },
+                onPreviewMusicAlbumArt = { enabled, blur ->
+                    previewMusicAlbumArt(enabled, blur)
+                },
+                onRestoreOriginalState = {
+                    restoreInitialBackgroundState()
+                },
+                onUpdateFilters = { previewMode, previewIntensity, previewMin, previewMax, previewNightShift, previewZoom ->
+                    if (dynamicBackgroundView.visibility == View.VISIBLE) {
+                        updateBackgroundFilters(previewMode, previewIntensity, previewMin, previewMax, previewNightShift, previewZoom)
+                    }
+                },
+                onApplyCompleted = { previewUri, blur ->
+                    applyBackgroundSettingsFromSheet(previewUri, blur)
+                },
+                onClearBackground = {
+                    backgroundManager.setSavedBackgroundUri(null)
+                    setCustomBackground(false)
+                    backgroundImageView.setImageDrawable(null)
+                    fontManager.clearDynamicColors()
+                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
+                    }
+                    backgroundImageView.visibility = View.GONE
+                    dynamicBackgroundView.visibility = View.VISIBLE
+                    backgroundManager.clearDim()
+                    gradientManager.startUpdates()
+                    lastBackgroundSource = null
+                    lastBlurIntensity = null
+                    restoreSavedWeatherState()
+                    updateBackgroundFilters()
+                },
+                onSheetStateChanged = { isHidden ->
+                    handleSheetStateChanged(isHidden)
+                },
+                onCropRequested = {
+                    isCropModeActive = true
+                    hideDock(animate = true)
+                    backgroundSheetManager.hide()
+                    ensureCropController().enter()
                     stopHideUiTimer()
                 }
-            }
-        )
+            )
+        }
+        return backgroundSheetManager
+    }
 
-        // 3. Background Sheet
-        backgroundSheetManager = BackgroundSheetManager(
-            floatingMenuView = backgroundBottomSheet,
-            mainLayout = mainLayout,
-            backgroundCustomizationTab = backgroundCustomizationTab,
-            backgroundManager = backgroundManager,
-            dayTimeGetter = dayTimeGetter,
-            weatherGetter = weatherGetter,
-            weatherView = dynamicBackgroundView,
-            isMusicBackgroundApplied = { wasMusicBackgroundApplied },
-            onAddBackgroundRequested = {
-                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "image/*"
-                    }
-                } else {
-                    Intent(Intent.ACTION_GET_CONTENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "image/*"
-                    }
-                }
-                try {
-                    isLaunchingFilePicker = true
-                    startActivityForResult(intent, PICK_BG_REQUEST)
-                } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
-                }
-            },
-            onPreviewImage = { uri, blur ->
-                applyImageBackground(uri, blur)
-            },
-            onPreviewBlur = { blur ->
-                previewBlur(blur)
-            },
-            onPreviewGradient = {
-                previewGradient()
-            },
-            onPreviewMusicAlbumArt = { enabled, blur ->
-                previewMusicAlbumArt(enabled, blur)
-            },
-            onRestoreOriginalState = {
-                restoreInitialBackgroundState()
-            },
-            onUpdateFilters = { previewMode, previewIntensity, previewMin, previewMax, previewNightShift, previewZoom ->
-                if (dynamicBackgroundView.visibility == View.VISIBLE) {
-                    updateBackgroundFilters(previewMode, previewIntensity, previewMin, previewMax, previewNightShift, previewZoom)
-                }
-            },
-            onApplyCompleted = { previewUri, blur ->
-                applyBackgroundSettingsFromSheet(previewUri, blur)
-            },
-            onClearBackground = {
-                backgroundManager.setSavedBackgroundUri(null)
-                setCustomBackground(false)
-                backgroundImageView.setImageDrawable(null)
-                fontManager.clearDynamicColors()
-                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+    private fun initTutorialManager(prefs: SharedPreferences) {
+        if (!::tutorialManager.isInitialized) {
+            tutorialManager = TutorialManager(
+                tutorialLayout = tutorialLayout,
+                tutorialFinger = tutorialFinger,
+                tutorialText = tutorialText,
+                mainLayout = mainLayout,
+                timeText = timeText,
+                prefs = prefs,
+                toggleEditModeAction = { toggleEditMode() },
+                showCustomizationAction = { view -> ensureCustomizationSheetManager().showForView(view) },
+                hideBottomSheetAction = {
+                    if (::customizationSheetManager.isInitialized) customizationSheetManager.hide()
+                },
+                requestLocationPermissionAction = {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                        permissionRequestCode
+                    )
+                },
+                onTutorialFinished = { checkLocationPermissionsAndLoadData() }
+            )
+        }
+    }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
-                }
-                backgroundImageView.visibility = View.GONE
-                dynamicBackgroundView.visibility = View.VISIBLE
-                backgroundManager.clearDim()
-                gradientManager.startUpdates()
-                lastBackgroundSource = null
-                lastBlurIntensity = null
-                restoreSavedWeatherState()
-                updateBackgroundFilters()
-            },
-            onSheetStateChanged = { isHidden ->
-                if (isHidden) resetEditModeTimeout() else stopHideUiTimer()
-            },
-            onCropRequested = {
-                isCropModeActive = true
-                backgroundSheetManager.hide()
-                cropController.enter()
-                stopHideUiTimer()
-            }
-        )
-
-        val overlayView = findViewById<View>(R.id.crop_overlay)
-        cropController = BackgroundCropController(
-            dynamicBackgroundView = dynamicBackgroundView,
-            overlayRoot = overlayView,
-            backgroundManager = backgroundManager,
-            onApply = {
-                isCropModeActive = false
-                if (dynamicBackgroundView.visibility == View.VISIBLE) {
-                    updateBackgroundFilters()
-                }
-                backgroundSheetManager.show()
-                resetEditModeTimeout()
-            },
-            onCancel = {
-                isCropModeActive = false
-                backgroundSheetManager.show()
-                resetEditModeTimeout()
-            }
-        )
-
-    // 3. Tutorial Manager
-        tutorialManager = TutorialManager(
-            tutorialLayout = tutorialLayout,
-            tutorialFinger = tutorialFinger,
-            tutorialText = tutorialText,
-            mainLayout = mainLayout,
-            timeText = timeText,
-            prefs = prefs,
-            toggleEditModeAction = { toggleEditMode() },
-            showCustomizationAction = { view -> customizationSheetManager.showForView(view) },
-            hideBottomSheetAction = { customizationSheetManager.hide() },
-            requestLocationPermissionAction = {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                    permissionRequestCode
-                )
-            },
-            onTutorialFinished = { checkLocationPermissionsAndLoadData() }
-        )
-
+    private fun initUIManagers() {
         sideSheet.bringToFront()
         backgroundBottomSheet.bringToFront()
     }
@@ -853,31 +958,31 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         timeText.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         dateText.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         lastfmLayout.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         chipContainer.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         weatherLayout.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             } else {
                 com.nxd1frnt.clockdesk2.smartchips.ui.WeatherDialog.show(this)
@@ -885,7 +990,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
 
         backgroundCustomizationTab.setOnClickListener {
-            backgroundSheetManager.show()
+            ensureBackgroundSheetManager().show()
             if (!isDemoMode) {
                 handler.removeCallbacks(editModeTimeoutRunnable)
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
@@ -926,10 +1031,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
 
         btnAddWidget.setOnClickListener {
-            if (customizationSheetManager.isShowing) {
+            if (::customizationSheetManager.isInitialized && customizationSheetManager.isShowing) {
                 customizationSheetManager.hide()
             }
-            widgetGallerySideSheetManager.show()
+            ensureWidgetGallerySideSheetManager().show()
             stopHideUiTimer()
         }
 
@@ -962,14 +1067,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     return
                 }
 
-                if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) {
+                if (::customizationSheetManager.isInitialized && sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) {
                     fontManager.loadFont()
                     widgetMover.restoreOrderAndPositions()
                     customizationSheetManager.hide()
                     return
                 }
 
-                if (tutorialManager.handleBackPressed()) {
+                if (::tutorialManager.isInitialized && tutorialManager.handleBackPressed()) {
                     return
                 }
 
@@ -1427,9 +1532,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
 
         if (isFirstLaunch) {
+            initTutorialManager(prefs)
             tutorialManager.start()
-        } else {
-            checkLocationPermissionsAndLoadData()
         }
     }
 
@@ -1608,7 +1712,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (requestCode == PICK_FONT_REQUEST && resultCode == RESULT_OK) {
             data?.data?.let { uri ->
                 val newIndex = fontManager.addCustomFont(uri)
-                customizationSheetManager.onFontAdded(newIndex)
+                ensureCustomizationSheetManager().onFontAdded(newIndex)
             }
         }
         if (requestCode == PICK_BG_REQUEST && resultCode == RESULT_OK) {
@@ -1625,7 +1729,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
             val uriStr = uri.toString()
             backgroundManager.addSavedUri(uriStr)
-            backgroundSheetManager.onImageAdded(uriStr)
+            ensureBackgroundSheetManager().onImageAdded(uriStr)
         }
     }
 
@@ -2090,7 +2194,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
                     resetEditModeTimeout()
-                    customizationSheetManager.hide()
+                    if (::customizationSheetManager.isInitialized) {
+                        customizationSheetManager.hide()
+                    }
                 } else {
                     stopHideUiTimer()
                 }
@@ -2128,10 +2234,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
 
-    private fun animateCornerRadius(view: View, fromRadius: Float, toRadius: Float) {
+    private fun animateCornerRadius(
+        view: View,
+        fromRadius: Float,
+        toRadius: Float,
+        duration: Long = animationDuration,
+        interpolator: TimeInterpolator = MotionUtils.EMPHASIZED
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val animator = ValueAnimator.ofFloat(fromRadius, toRadius)
-            animator.duration = animationDuration-100L
+            animator.duration = duration
+            animator.interpolator = interpolator
 
             animator.addUpdateListener { animation ->
                 val value = animation.animatedValue as Float
@@ -2154,35 +2267,41 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private fun toggleEditMode() {
         isEditMode = !isEditMode
         smartChipManager.setEditMode(isEditMode) { clickedView ->
-            customizationSheetManager.showForView(clickedView)
+            ensureCustomizationSheetManager().showForView(clickedView)
             resetEditModeTimeout()
         }
         widgetMover.setEditMode(isEditMode)
         val targetRadius = dpToPx(36f)
+        val dockSlideOffset = dpToPx(24f)
         if (isEditMode) {
             backgroundCustomizationTab.visibility = View.VISIBLE
-            mainLayout.animate()
-                .scaleX(0.90f)
-                .scaleY(0.90f)
+            backgroundCustomizationTab.alpha = 0f
+            backgroundCustomizationTab.scaleX = 0.8f
+            backgroundCustomizationTab.scaleY = 0.8f
+            backgroundCustomizationTab.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
                 .setDuration(animationDuration)
-                .setInterpolator(OvershootInterpolator())
+                .setInterpolator(MotionUtils.EMPHASIZED_DECELERATE)
                 .start()
-            animateCornerRadius(mainLayout, 0f, targetRadius)
+
+            mainLayout.animate()
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EMPHASIZED)
+                .start()
+            animateCornerRadius(mainLayout, 0f, targetRadius, animationDuration, MotionUtils.EMPHASIZED)
+
             if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
                 editModeBlurLayer.visibility = View.VISIBLE
                 editModeBlurLayer.alpha = 1.0f
                 updateBackgroundFilters()
             }
-            backgroundCustomizationTab.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
-            editModeActionBar.visibility = View.VISIBLE
-            editModeActionBar.alpha = 0f
-            editModeActionBar.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
+
+            showDock(animate = true)
+
             updateEmptyDeskPromptVisibility()
 
             desktopWidgetManager.setEditMode(true)
@@ -2210,20 +2329,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         isEditMode = false
         smartChipManager.setEditMode(false) { }
         widgetMover.setEditMode(false)
+        val startRadius = dpToPx(36f)
+
         mainLayout.animate()
             .scaleX(1f)
             .scaleY(1f)
             .translationX(0f)
             .translationY(0f)
             .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
+            .setInterpolator(MotionUtils.EMPHASIZED)
             .start()
-        val startRadius = dpToPx(36f)
-        animateCornerRadius(mainLayout, startRadius, 0f)
+        animateCornerRadius(mainLayout, startRadius, 0f, animationDuration, MotionUtils.EMPHASIZED)
+
         if (editModeBlurLayer.visibility == View.VISIBLE) {
             editModeBlurLayer.animate()
                 .alpha(0f)
                 .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         if (!isEditMode) {
@@ -2233,23 +2355,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 })
                 .start()
         }
+
         backgroundCustomizationTab.animate()
             .alpha(0f)
+            .scaleX(0.8f)
+            .scaleY(0.8f)
             .setDuration(animationDuration)
-            .start()
-        editModeActionBar.animate()
-            .alpha(0f)
-            .setDuration(animationDuration)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
             .withEndAction {
                 if (!isEditMode) {
-                    editModeActionBar.visibility = View.GONE
+                    backgroundCustomizationTab.visibility = View.GONE
                 }
             }
             .start()
+
+        hideDock(animate = true)
+
         emptyDeskPrompt.visibility = View.GONE
         desktopWidgetManager.setEditMode(false)
 
-        backgroundCustomizationTab.visibility = View.GONE
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
 
