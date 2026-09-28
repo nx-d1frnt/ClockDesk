@@ -108,6 +108,32 @@ class FontManager(
         R.font.googlesans_bold
     )
 
+    private val staticResourceFontNames = mapOf(
+        R.font.googlesansflex to "Google Sans Flex",
+        R.font.anton_regular to "Anton",
+        R.font.kanit_regular to "Kanit",
+        R.font.sigmar_regular to "Sigmar",
+        R.font.monomakh_regular to "Monomakh",
+        R.font.orbitron_regular to "Orbitron",
+        R.font.dancingscript_regular to "Dancing Script",
+        R.font.grapenuts_regular to "Grape Nuts",
+        R.font.madimione_regular to "Madimi One",
+        R.font.montserrat_regular to "Montserrat",
+        R.font.pressstart2p_regular to "Press Start 2P",
+        R.font.shafarik_regular to "Shafarik",
+        R.font.alexandria_bold to "Alexandria",
+        R.font.m_plus_1_bold to "M PLUS 1",
+        R.font.knewave to "Knewave",
+        R.font.chewy to "Chewy",
+        R.font.capriola to "Capriola",
+        R.font.cherry_bomb_one to "Cherry Bomb One",
+        R.font.comfortaa_bold to "Comfortaa",
+        R.font.autour_one to "Autour One",
+        R.font.fascinate to "Fascinate",
+        R.font.instrument_sans_bold to "Instrument Sans",
+        R.font.googlesans_bold to "Google Sans Bold"
+    )
+
     private var isNightShiftEnabled = false
     private var lastNightFactor = 0f
     private val nightTint = Color.rgb(255, 104, 104)
@@ -263,25 +289,34 @@ class FontManager(
 
         val fontDir = File(context.filesDir, "custom_fonts")
         if (fontDir.exists()) {
+            val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
             fontDir.listFiles()
                 ?.filter { it.extension.equals("ttf", ignoreCase = true) || it.extension.equals("otf", ignoreCase = true) }
                 ?.sortedBy { it.name }
                 ?.forEach { file ->
-                    val parsedName = FontNameUtils.getFontName(file)
-                    val displayName = parsedName ?: file.nameWithoutExtension
+                    val cachedName = prefs.getString("custom_font_name_${file.name}", null)
+                    val displayName = if (cachedName != null) {
+                        cachedName
+                    } else {
+                        val parsed = FontNameUtils.getFontName(file) ?: file.nameWithoutExtension
+                        prefs.edit().putString("custom_font_name_${file.name}", parsed).apply()
+                        parsed
+                    }
                     fonts.add(FontItem.CustomFont(file.absolutePath, displayName))
                 }
         }
 
         fonts.addAll(resourceFontIds.map { resId ->
-            val parsedName = FontNameUtils.getFontName {
-                context.resources.openRawResource(resId)
+            val displayName = staticResourceFontNames[resId] ?: run {
+                try {
+                    context.resources.getResourceEntryName(resId)
+                        .replace("_", " ")
+                        .capitalizeWords()
+                } catch (e: Exception) {
+                    "Font"
+                }
             }
-            val fallbackName = context.resources.getResourceEntryName(resId)
-                .replace("_", " ")
-                .capitalizeWords()
-
-            FontItem.ResourceFont(resId, parsedName ?: fallbackName)
+            FontItem.ResourceFont(resId, displayName)
         })
     }
 
