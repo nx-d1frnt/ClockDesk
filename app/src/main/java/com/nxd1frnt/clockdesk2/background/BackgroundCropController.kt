@@ -12,6 +12,7 @@ class BackgroundCropController(
     private val dynamicBackgroundView: DynamicBackgroundView,
     private val overlayRoot: View,
     private val backgroundManager: BackgroundManager,
+    private val widgetViewsProvider: (() -> List<View>)? = null,
     private val onApply: () -> Unit,
     private val onCancel: () -> Unit
 ) {
@@ -21,6 +22,8 @@ class BackgroundCropController(
     private var savedScale = 1f
     private var savedOffsetX = 0f
     private var savedOffsetY = 0f
+
+    private val savedWidgetAlphas = mutableMapOf<View, Float>()
 
     // Ленивые ссылки на дочерние view оверлея
     private val hintCard   by lazy { overlayRoot.findViewById<View>(R.id.crop_hint_card) }
@@ -125,6 +128,19 @@ class BackgroundCropController(
             ?.setInterpolator(springInterpolator)?.start()
 
         overlayRoot.setOnTouchListener(touchListener)
+
+        savedWidgetAlphas.clear()
+        val widgets = widgetViewsProvider?.invoke() ?: emptyList()
+        widgets.forEach { view ->
+            savedWidgetAlphas[view] = view.alpha
+            val targetAlpha = (view.alpha * CROP_WIDGET_ALPHA_FACTOR).coerceIn(0.1f, 0.25f)
+            view.animate()?.cancel()
+            view.animate()
+                .alpha(targetAlpha)
+                .setDuration(DURATION_IN)
+                .setInterpolator(MotionUtils.EMPHASIZED)
+                .start()
+        }
     }
 
     fun isActive(): Boolean = overlayRoot.visibility == View.VISIBLE
@@ -189,7 +205,7 @@ class BackgroundCropController(
         exitOverlay { onApply() }
     }
 
-    private fun cancelAndExit() {
+    fun cancelAndExit() {
         curScale   = savedScale
         curOffsetX = savedOffsetX
         curOffsetY = savedOffsetY
@@ -201,6 +217,16 @@ class BackgroundCropController(
         overlayRoot.setOnTouchListener(null)
 
         val exitInterpolator = MotionUtils.EMPHASIZED_ACCELERATE
+
+        savedWidgetAlphas.forEach { (view, originalAlpha) ->
+            view.animate()?.cancel()
+            view.animate()
+                .alpha(originalAlpha)
+                .setDuration(DURATION_OUT)
+                .setInterpolator(MotionUtils.EMPHASIZED)
+                .start()
+        }
+        savedWidgetAlphas.clear()
 
         applyBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
         cancelBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
@@ -231,5 +257,6 @@ class BackgroundCropController(
     companion object {
         private const val MIN_SCALE = 1f
         private const val MAX_SCALE = 4f
+        private const val CROP_WIDGET_ALPHA_FACTOR = 0.25f
     }
 }

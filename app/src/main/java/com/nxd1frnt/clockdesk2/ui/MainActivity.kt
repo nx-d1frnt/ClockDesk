@@ -806,6 +806,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 dynamicBackgroundView = dynamicBackgroundView,
                 overlayRoot = overlayView,
                 backgroundManager = backgroundManager,
+                widgetViewsProvider = {
+                    val views = desktopWidgetManager.getViews().toMutableList()
+                    if (emptyDeskPrompt.visibility == View.VISIBLE) {
+                        views.add(emptyDeskPrompt)
+                    }
+                    views
+                },
                 onApply = {
                     isCropModeActive = false
                     if (dynamicBackgroundView.visibility == View.VISIBLE) {
@@ -1057,6 +1064,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (::cropController.isInitialized && isCropModeActive) {
+                    cropController.cancelAndExit()
+                    return
+                }
+
                 if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
                     backgroundSheetManager.cancelAndHide()
                     return
@@ -2370,6 +2382,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             .start()
 
         hideDock(animate = true)
+
+        if (::cropController.isInitialized && isCropModeActive) {
+            cropController.cancelAndExit()
+        }
 
         emptyDeskPrompt.visibility = View.GONE
         desktopWidgetManager.setEditMode(false)
