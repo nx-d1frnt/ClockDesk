@@ -12,15 +12,28 @@ android {
         applicationId = "com.nxd1frnt.clockdesk2"
         minSdk = 23
         targetSdk = 35
-        versionCode = 200029
+        versionCode = 2000293
         versionName = "2.0.0-rc2"
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
-        release {
-            isMinifyEnabled = false
+        getByName("debug") {
+            // Fast development builds without minification
+        }
+        create("minifiedDebug") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        getByName("release") {
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -104,7 +117,6 @@ dependencies {
     implementation(libs.volley)
     implementation(libs.androidx.palette.ktx)
     implementation("com.vanniktech:android-image-cropper:4.3.3")
-    implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.github.bumptech.glide:glide:4.15.1")
     kapt("com.github.bumptech.glide:compiler:4.15.1")
     implementation("com.github.skydoves:colorpickerview:2.3.0")

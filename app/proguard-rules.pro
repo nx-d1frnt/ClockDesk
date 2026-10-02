@@ -1,21 +1,44 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ClockDesk ProGuard / R8 Rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve stack traces for CrashActivity & bug reporting
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep all XML-instantiated custom Views and ViewGroups
+-keep public class * extends android.view.View {
+    public <init>(android.content.Context);
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+    public void set*(...);
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+-keep class com.nxd1frnt.clockdesk2.ui.view.** { *; }
+-keep class com.github.skydoves.colorpickerview.** { *; }
+
+# Glide
+-keep public class * implements com.bumptech.glide.module.GlideModule
+-keep class * extends com.bumptech.glide.module.AppGlideModule { <init>(...); }
+-keep class com.nxd1frnt.clockdesk2.network.MyAppGlideModule { *; }
+-keep public enum com.bumptech.glide.load.ImageHeaderParser$** {
+    **[] $VALUES;
+    public *;
+}
+-dontwarn com.bumptech.glide.**
+
+# Bouncy Castle
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+
+# DeskConnect Models and Network Protocol
+-keep class com.nxd1frnt.clockdesk2.connect.model.** { *; }
+-keepclassmembers class com.nxd1frnt.clockdesk2.connect.model.** { *; }
+
+# Plugin contracts and Smart Chips (AIDL / reflection / external intent IPC)
+-keep interface com.nxd1frnt.clockdesk2.smartchips.** { *; }
+-keep class com.nxd1frnt.clockdesk2.smartchips.** { *; }
+-keep interface com.nxd1frnt.clockdesk2.music.** { *; }
+-keep class com.nxd1frnt.clockdesk2.music.** { *; }
+
+# AndroidX Preferences
+-keep class androidx.preference.** { *; }
+-dontwarn androidx.preference.**

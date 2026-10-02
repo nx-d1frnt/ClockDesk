@@ -271,6 +271,13 @@ class DeskConnectManager private constructor(private val context: Context) {
         discovery?.broadcastIdentity()
     }
 
+    fun refreshDiscovery() {
+        if (!isEnabled) return
+        val toRemove = discoveredDevices.filter { (_, dev) -> !dev.isPaired && !dev.isConnected }.keys
+        toRemove.forEach { discoveredDevices.remove(it) }
+        discovery?.forceRefresh()
+    }
+
     fun restart() {
         stop()
         if (isEnabled) {

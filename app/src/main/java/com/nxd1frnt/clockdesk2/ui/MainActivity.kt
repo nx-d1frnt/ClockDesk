@@ -41,6 +41,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -154,6 +158,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var widgetMover: WidgetMover
     private lateinit var deskNotificationManager: com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager
     private lateinit var deskCallOverlay: com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay
+    private var deskConnectDeviceListener: com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener? = null
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var powerStateManager: PowerStateManager
     private lateinit var sensorManager: SensorManager
@@ -199,6 +204,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private var graphicsWeatherScale = 40
     private var enableAdditionalLogging = false
     private var lastIsNight: Boolean? = null
+    private var lastFilterDimFactor: Float = -1f
+    private var lastFilterWmoCode: Int = -1
+    private var lastFilterNightFactor: Float = -1f
+    private var lastFilterIsNight: Boolean? = null
+    private var lastFilterIsWeatherEnabled: Boolean? = null
+    private var lastFilterVisualIntensity: Float = -1f
+    private var lastFilterIsEditMode: Boolean? = null
 
     private var focusedView: View? = null
     private val editModeTimeout = 10000L // 10 seconds
@@ -620,7 +632,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         deskNotificationManager = com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager(this, notificationContainer, deskConnectManager)
         deskCallOverlay = com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay(this, callContainer, deskConnectManager)
 
-        deskConnectManager.deviceListeners.add(object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
+        val listener = object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
             override fun onDeviceDiscovered(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
             override fun onDeviceConnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
             override fun onDeviceDisconnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
@@ -642,15 +654,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 }
             }
             override fun onPairingStateChanged(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, isPaired: Boolean) {}
-        })
+        }
+        deskConnectDeviceListener = listener
+        deskConnectManager.deviceListeners.add(listener)
     }
 
     private fun loadFogTextures() {
-        Thread {
+        lifecycleScope.launch(Dispatchers.IO) {
             val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
             val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
-            handler.post {
-                if (!isDestroyed && !isFinishing) {
+            withContext(Dispatchers.Main) {
+                if (!isDestroyed && !isFinishing && ::dynamicBackgroundView.isInitialized) {
                     dynamicBackgroundView.setFogTextures(fogBitmap, cloudsBitmap)
                     val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
                     dynamicBackgroundView.setRenderScale(targetScale)
@@ -658,7 +672,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
                 }
             }
-        }.start()
+        }
     }
 
     private fun isAnySheetShowing(): Boolean {
@@ -1268,7 +1282,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         musicManager?.destroy()
         if (::deskNotificationManager.isInitialized) deskNotificationManager.destroy()
         if (::deskCallOverlay.isInitialized) deskCallOverlay.destroy()
+        deskConnectDeviceListener?.let {
+            com.nxd1frnt.clockdesk2.connect.DeskConnectManager.getInstance(this).deviceListeners.remove(it)
+            deskConnectDeviceListener = null
+        }
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.unregisterObserver(this)
+            if (::clockManager.isInitialized) {
+                powerStateManager.unregisterObserver(clockManager)
+            }
+            powerStateManager.unregisterObserver(weatherGetter)
+            powerStateManager.destroy()
+        }
+        if (::clockManager.isInitialized) {
+            clockManager.stopUpdates()
+        }
         pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
+        cancelPendingDimTransition()
+        dimDebounceHandler.removeCallbacksAndMessages(null)
+        handler.removeCallbacksAndMessages(null)
         if (::backgroundSheetManager.isInitialized) backgroundSheetManager.onDestroy()
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)
@@ -2114,13 +2146,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isNight = !dayTimeGetter.isDay()
-        val baseWeatherMatrix = ColorMatrix()
+        var wmoCode = 0
+        var rawIntensity = 0f
 
         if (isWeatherEnabled) {
             val isManual = backgroundManager.isManualWeatherEnabled()
-            var wmoCode = 0
-            var rawIntensity = 0f
-
             if (isManual) {
                 val typeOrdinal = backgroundManager.getManualWeatherType()
                 val type = DynamicBackgroundView.WeatherType.values()[typeOrdinal]
@@ -2144,15 +2174,44 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     weatherGetter.visibility
                 )
             }
-
-            val visualIntensity = rawIntensity * 0.2f
-            val weatherMatrix = getWeatherMatrix(wmoCode, isNight, visualIntensity)
-            baseWeatherMatrix.postConcat(weatherMatrix)
         }
+
+        val visualIntensity = rawIntensity * 0.2f
 
         // Night Shift Factor for Background
         val nightShiftEnabled = previewNightShift ?: backgroundManager.isNightShiftEnabled()
         val nightFactor = if (nightShiftEnabled) backgroundManager.computeNightShiftFactor(clockManager.getCurrentTime(), dayTimeGetter) else 0f
+
+        val isPreview = previewDimMode != null || previewDimIntensity != null ||
+            previewDimMinIntensity != null || previewDimMaxIntensity != null ||
+            previewNightShift != null || previewZoom != null
+
+        if (!isPreview &&
+            kotlin.math.abs(lastFilterDimFactor - finalDimFactor) < 0.003f &&
+            kotlin.math.abs(lastFilterNightFactor - nightFactor) < 0.005f &&
+            lastFilterWmoCode == wmoCode &&
+            lastFilterIsNight == isNight &&
+            lastFilterIsWeatherEnabled == isWeatherEnabled &&
+            kotlin.math.abs(lastFilterVisualIntensity - visualIntensity) < 0.005f &&
+            lastFilterIsEditMode == isEditMode
+        ) {
+            return
+        }
+
+        lastFilterDimFactor = finalDimFactor
+        lastFilterNightFactor = nightFactor
+        lastFilterWmoCode = wmoCode
+        lastFilterIsNight = isNight
+        lastFilterIsWeatherEnabled = isWeatherEnabled
+        lastFilterVisualIntensity = visualIntensity
+        lastFilterIsEditMode = isEditMode
+
+        val baseWeatherMatrix = ColorMatrix()
+        if (isWeatherEnabled) {
+            val weatherMatrix = getWeatherMatrix(wmoCode, isNight, visualIntensity)
+            baseWeatherMatrix.postConcat(weatherMatrix)
+        }
+
         if (nightFactor > 0f) {
             val nightShiftMatrix = ColorMatrix()
             val rScale = 1.0f

@@ -7,10 +7,17 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.preference.PreferenceManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -29,6 +36,7 @@ class DeskConnectSettingsFragment : Fragment() {
     private lateinit var txtDiscovering: TextView
     private lateinit var layoutPaired: LinearLayout
     private lateinit var layoutAvailable: LinearLayout
+    private var btnRefreshDevices: MaterialButton? = null
 
     private val deviceListener = object : DeskConnectManager.DeviceListener {
         override fun onDeviceDiscovered(device: DeskConnectDevice) {
@@ -71,11 +79,16 @@ class DeskConnectSettingsFragment : Fragment() {
         txtDiscovering = view.findViewById(R.id.txt_discovering)
         layoutPaired = view.findViewById(R.id.layout_paired_devices)
         layoutAvailable = view.findViewById(R.id.layout_available_devices)
+        btnRefreshDevices = view.findViewById(R.id.btn_refresh_devices)
+
+        btnRefreshDevices?.setOnClickListener { performRefresh() }
+        btnRefreshDevices?.alpha = if (deskConnectManager.isEnabled) 1.0f else 0.4f
 
         val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
         switchDeskConnect.isChecked = deskConnectManager.isEnabled
         switchDeskConnect.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("deskconnect_enabled", isChecked).apply()
+            btnRefreshDevices?.alpha = if (isChecked) 1.0f else 0.4f
             if (isChecked) {
                 deskConnectManager.start()
             } else {
@@ -95,6 +108,43 @@ class DeskConnectSettingsFragment : Fragment() {
         }
 
         return view
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.menu_deskconnect_settings, menu)
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                return when (menuItem.itemId) {
+                    R.id.action_refresh -> {
+                        performRefresh()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
+    }
+
+    private fun performRefresh() {
+        if (!isAdded) return
+
+        if (!deskConnectManager.isEnabled) {
+            Toast.makeText(context, R.string.deskconnect_enable_title, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        btnRefreshDevices?.animate()?.rotationBy(360f)?.setDuration(600L)?.start()
+        activity?.findViewById<View>(R.id.action_refresh)?.animate()?.rotationBy(360f)?.setDuration(600L)?.start()
+
+        Toast.makeText(context, R.string.deskconnect_refreshing, Toast.LENGTH_SHORT).show()
+
+        deskConnectManager.refreshDiscovery()
+        refreshDeviceLists()
     }
 
     override fun onResume() {

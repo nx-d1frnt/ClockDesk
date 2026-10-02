@@ -1008,32 +1008,37 @@ class FontManager(
 
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
-            lastNightFactor = 0f
-            applyAll(colorOnly = true)
+            if (lastNightFactor != 0f) {
+                lastNightFactor = 0f
+                applyAll(colorOnly = true)
+            }
             return
         }
 
-        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
-        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+        val sunriseMs = (sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }).time
+        val sunsetMs = (sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }).time
 
-        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
-        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
-        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
+        val preSunriseMs = sunriseMs - 40 * 60 * 1000L
+        val postSunsetMs = sunsetMs + 30 * 60 * 1000L
+        val fullNightMs = postSunsetMs + 40 * 60 * 1000L
+        val currentMs = currentTime.time
 
         val nightFactor = when {
-            currentTime.before(preSunrise) -> 1.0f
-            currentTime.before(sunrise) -> {
-                1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
+            currentMs < preSunriseMs -> 1.0f
+            currentMs < sunriseMs -> {
+                1.0f - ((currentMs - preSunriseMs).toFloat() / (sunriseMs - preSunriseMs).coerceAtLeast(1L))
             }
-            currentTime.before(postSunset) -> 0.0f
-            currentTime.before(fullNight) -> {
-                (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+            currentMs < postSunsetMs -> 0.0f
+            currentMs < fullNightMs -> {
+                (currentMs - postSunsetMs).toFloat() / (fullNightMs - postSunsetMs).coerceAtLeast(1L)
             }
             else -> 1.0f
         }
 
-        lastNightFactor = nightFactor
-        applyAll(colorOnly = true)
+        if (kotlin.math.abs(lastNightFactor - nightFactor) >= 0.005f) {
+            lastNightFactor = nightFactor
+            applyAll(colorOnly = true)
+        }
     }
 
     private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {

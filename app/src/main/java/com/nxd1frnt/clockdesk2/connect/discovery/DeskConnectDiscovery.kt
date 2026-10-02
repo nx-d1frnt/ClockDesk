@@ -99,6 +99,21 @@ class DeskConnectDiscovery(
         }
     }
 
+    fun forceRefresh() {
+        lastRepliedTime.clear()
+        broadcastIdentity()
+        udpExecutor.execute {
+            try {
+                Thread.sleep(500)
+                if (isRunning.get()) {
+                    sendBroadcastPacket()
+                }
+            } catch (e: InterruptedException) {
+                // Ignored
+            }
+        }
+    }
+
     fun onDeviceDisconnected(deviceId: String) {
         lastRepliedTime.remove(deviceId)
     }

@@ -102,6 +102,7 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
             is MusicSourcesFragment -> getString(R.string.music_sources_title)
             is LastFmSettingsFragment -> getString(R.string.lastfm_plugin_name)
             is AboutFragment -> getString(R.string.about_title)
+            is com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment -> getString(R.string.deskconnect_settings_title)
             else -> getString(R.string.settings_title)
         }
         collapsingToolbar.title = newTitle

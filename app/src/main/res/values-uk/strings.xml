@@ -515,6 +515,8 @@
     <string name="deskconnect_no_paired_devices">Немає з\'єднаних пристроїв</string>
     <string name="deskconnect_pair">З\'єднати</string>
     <string name="deskconnect_unpair">Від\'єднати</string>
+    <string name="deskconnect_refresh">Оновити</string>
+    <string name="deskconnect_refreshing">Пошук пристроїв…</string>
     <string name="deskconnect_pairing_request_title">Запит на з\'єднання</string>
     <string name="deskconnect_pairing_request_message">Пристрій \"%1$s\" запитує з\'єднання з ClockDesk.\nКлюч перевірки: %2$s</string>
     <string name="deskconnect_accept">Прийняти</string>
