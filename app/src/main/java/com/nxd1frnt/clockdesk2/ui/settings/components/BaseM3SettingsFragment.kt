@@ -18,6 +18,12 @@ abstract class BaseM3SettingsFragment : Fragment() {
     protected lateinit var recyclerView: RecyclerView
     protected lateinit var adapter: M3SettingsAdapter
 
+    private val rebuildRunnable = Runnable {
+        if (isAdded && !isDetached) {
+            rebuildSettings()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = requireContext().getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
@@ -42,10 +48,15 @@ abstract class BaseM3SettingsFragment : Fragment() {
             items = buildSettings(),
             onPreferenceChanged = { key, value ->
                 onPreferenceChanged(key, value)
-                rebuildSettings()
+                scheduleRebuild()
             }
         )
         recyclerView.adapter = adapter
+    }
+
+    override fun onDestroyView() {
+        view?.removeCallbacks(rebuildRunnable)
+        super.onDestroyView()
     }
 
     abstract fun buildSettings(): List<SettingsItem>
@@ -56,6 +67,11 @@ abstract class BaseM3SettingsFragment : Fragment() {
         if (::adapter.isInitialized) {
             adapter.submitList(buildSettings())
         }
+    }
+
+    fun scheduleRebuild(delayMs: Long = 250L) {
+        view?.removeCallbacks(rebuildRunnable)
+        view?.postDelayed(rebuildRunnable, delayMs)
     }
 
     fun openSubFragment(fragment: Fragment) {
@@ -74,19 +90,20 @@ abstract class BaseM3SettingsFragment : Fragment() {
 
     class SettingsDslBuilder(private val prefs: SharedPreferences) {
         private val items = mutableListOf<SettingsItem>()
+        private var currentGroupId = 0
 
         fun category(title: String, block: CategoryDslBuilder.() -> Unit) {
             items.add(SettingsItem.Header(title))
-            val categoryBuilder = CategoryDslBuilder(prefs)
+            val categoryBuilder = CategoryDslBuilder(prefs, currentGroupId++)
             categoryBuilder.block()
-            items.add(SettingsItem.CardGroup(categoryBuilder.entries))
+            items.addAll(categoryBuilder.entries)
         }
 
         fun build(): List<SettingsItem> = items
     }
 
-    class CategoryDslBuilder(val prefs: SharedPreferences) {
-        val entries = mutableListOf<SettingEntry>()
+    class CategoryDslBuilder(val prefs: SharedPreferences, val groupId: Int) {
+        val entries = mutableListOf<SettingsItem.Entry>()
 
         fun switch(
             key: String,
@@ -99,12 +116,13 @@ abstract class BaseM3SettingsFragment : Fragment() {
             onCheckedChange: ((Boolean) -> Unit)? = null
         ) {
             entries.add(
-                SettingEntry.Switch(
+                SettingsItem.Switch(
                     key = key,
                     title = title,
                     summary = summary,
                     iconRes = iconRes,
                     defaultValue = defaultValue,
+                    groupId = groupId,
                     isVisible = isVisible,
                     isEnabled = isEnabled,
                     onCheckedChange = onCheckedChange
@@ -126,7 +144,7 @@ abstract class BaseM3SettingsFragment : Fragment() {
             onSelectionChange: ((String) -> Unit)? = null
         ) {
             this.entries.add(
-                SettingEntry.SingleChoice(
+                SettingsItem.SingleChoice(
                     key = key,
                     title = title,
                     summary = summary,
@@ -135,6 +153,7 @@ abstract class BaseM3SettingsFragment : Fragment() {
                     entryValues = entryValues,
                     defaultValue = defaultValue,
                     useSimpleSummary = useSimpleSummary,
+                    groupId = groupId,
                     isVisible = isVisible,
                     isEnabled = isEnabled,
                     onSelectionChange = onSelectionChange
@@ -157,7 +176,7 @@ abstract class BaseM3SettingsFragment : Fragment() {
             onValueChange: ((Float) -> Unit)? = null
         ) {
             entries.add(
-                SettingEntry.Slider(
+                SettingsItem.Slider(
                     key = key,
                     title = title,
                     summary = summary,
@@ -167,6 +186,7 @@ abstract class BaseM3SettingsFragment : Fragment() {
                     step = step,
                     defaultValue = defaultValue,
                     valueFormatter = valueFormatter,
+                    groupId = groupId,
                     isVisible = isVisible,
                     isEnabled = isEnabled,
                     onValueChange = onValueChange
@@ -188,7 +208,7 @@ abstract class BaseM3SettingsFragment : Fragment() {
             onTextChange: ((String) -> Unit)? = null
         ) {
             entries.add(
-                SettingEntry.TextEdit(
+                SettingsItem.TextEdit(
                     key = key,
                     title = title,
                     summary = summary,
@@ -197,6 +217,7 @@ abstract class BaseM3SettingsFragment : Fragment() {
                     inputType = inputType,
                     defaultValue = defaultValue,
                     useSimpleSummary = useSimpleSummary,
+                    groupId = groupId,
                     isVisible = isVisible,
                     isEnabled = isEnabled,
                     onTextChange = onTextChange
@@ -216,13 +237,14 @@ abstract class BaseM3SettingsFragment : Fragment() {
             onClick: () -> Unit
         ) {
             entries.add(
-                SettingEntry.Clickable(
+                SettingsItem.Clickable(
                     key = key,
                     title = title,
                     summary = summary,
                     iconRes = iconRes,
                     statusText = statusText,
                     showChevron = showChevron,
+                    groupId = groupId,
                     isVisible = isVisible,
                     isEnabled = isEnabled,
                     onClick = onClick

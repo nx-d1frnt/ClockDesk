@@ -1,6 +1,5 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
@@ -163,6 +162,7 @@ class DisplaySettingsFragment : BaseM3SettingsFragment() {
                 title = getString(R.string.smart_pixels_title),
                 summary = getString(R.string.smart_pixels_summary),
                 defaultValue = false,
+                iconRes = R.drawable.ic_checkerboard,
                 isEnabled = { prefs.getBoolean("burn_in_protection", false) }
             )
         }

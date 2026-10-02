@@ -2,9 +2,6 @@ package com.nxd1frnt.clockdesk2.ui.settings.components
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.content.res.ColorStateList
-import android.text.InputType
-import android.util.TypedValue
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
@@ -25,49 +22,124 @@ import com.nxd1frnt.clockdesk2.R
 class M3SettingsAdapter(
     private val context: Context,
     private val prefs: SharedPreferences,
-    private var items: List<SettingsItem>,
+    items: List<SettingsItem>,
     private val onPreferenceChanged: (key: String, value: Any) -> Unit = { _, _ -> }
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
         private const val TYPE_HEADER = 0
-        private const val TYPE_CARD_GROUP = 1
+        private const val TYPE_SWITCH = 1
+        private const val TYPE_CLICKABLE = 2
+        private const val TYPE_CHOICE = 3
+        private const val TYPE_SLIDER = 4
+        private const val TYPE_TEXT_EDIT = 5
+    }
+
+    private var displayItems: List<SettingsItem> = emptyList()
+
+    init {
+        updateDisplayList(items)
     }
 
     fun submitList(newItems: List<SettingsItem>) {
-        items = newItems
+        updateDisplayList(newItems)
         notifyDataSetChanged()
     }
 
+    private fun updateDisplayList(rawItems: List<SettingsItem>) {
+        val visibleList = rawItems.filter { item ->
+            when (item) {
+                is SettingsItem.Header -> true
+                is SettingsItem.Entry -> item.isVisible()
+            }
+        }
+
+        val result = mutableListOf<SettingsItem>()
+        for (i in visibleList.indices) {
+            val item = visibleList[i]
+            if (item is SettingsItem.Header) {
+                var hasEntries = false
+                for (j in (i + 1) until visibleList.size) {
+                    if (visibleList[j] is SettingsItem.Header) break
+                    if (visibleList[j] is SettingsItem.Entry) {
+                        hasEntries = true
+                        break
+                    }
+                }
+                if (hasEntries) {
+                    result.add(item)
+                }
+            } else {
+                result.add(item)
+            }
+        }
+        displayItems = result
+    }
+
+    override fun getItemCount(): Int = displayItems.size
+
     override fun getItemViewType(position: Int): Int {
-        return when (items[position]) {
+        return when (displayItems[position]) {
             is SettingsItem.Header -> TYPE_HEADER
-            is SettingsItem.CardGroup -> TYPE_CARD_GROUP
+            is SettingsItem.Switch -> TYPE_SWITCH
+            is SettingsItem.Clickable -> TYPE_CLICKABLE
+            is SettingsItem.SingleChoice -> TYPE_CHOICE
+            is SettingsItem.Slider -> TYPE_SLIDER
+            is SettingsItem.TextEdit -> TYPE_TEXT_EDIT
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
-            TYPE_HEADER -> {
-                val view = inflater.inflate(R.layout.item_settings_header, parent, false)
-                HeaderViewHolder(view)
-            }
-            TYPE_CARD_GROUP -> {
-                val view = inflater.inflate(R.layout.item_settings_card_group, parent, false)
-                CardGroupViewHolder(view)
-            }
+            TYPE_HEADER -> HeaderViewHolder(inflater.inflate(R.layout.item_settings_header, parent, false))
+            TYPE_SWITCH -> SwitchViewHolder(inflater.inflate(R.layout.item_settings_switch, parent, false))
+            TYPE_CLICKABLE -> ClickableViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
+            TYPE_CHOICE -> ChoiceViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
+            TYPE_SLIDER -> SliderViewHolder(inflater.inflate(R.layout.item_settings_slider, parent, false))
+            TYPE_TEXT_EDIT -> TextEditViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
             else -> throw IllegalArgumentException("Unknown view type $viewType")
         }
     }
 
-    override fun getItemCount(): Int = items.size
-
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        when (val item = items[position]) {
+        when (val item = displayItems[position]) {
             is SettingsItem.Header -> (holder as HeaderViewHolder).bind(item)
-            is SettingsItem.CardGroup -> (holder as CardGroupViewHolder).bind(item)
+            is SettingsItem.Switch -> (holder as SwitchViewHolder).bind(item, position)
+            is SettingsItem.Clickable -> (holder as ClickableViewHolder).bind(item, position)
+            is SettingsItem.SingleChoice -> (holder as ChoiceViewHolder).bind(item, position)
+            is SettingsItem.Slider -> (holder as SliderViewHolder).bind(item, position)
+            is SettingsItem.TextEdit -> (holder as TextEditViewHolder).bind(item, position)
         }
+    }
+
+    private fun applyCardShapeAndMargin(cardView: MaterialCardView, position: Int) {
+        val currentItem = displayItems.getOrNull(position) as? SettingsItem.Entry ?: return
+        val currentGroupId = currentItem.groupId
+
+        val prevItem = displayItems.getOrNull(position - 1) as? SettingsItem.Entry
+        val nextItem = displayItems.getOrNull(position + 1) as? SettingsItem.Entry
+
+        val hasPrev = prevItem != null && prevItem.groupId == currentGroupId
+        val hasNext = nextItem != null && nextItem.groupId == currentGroupId
+
+        val shapeStyleRes = when {
+            !hasPrev && !hasNext -> R.style.ShapeAppearance_ClockDesk_Single
+            !hasPrev && hasNext -> R.style.ShapeAppearance_ClockDesk_Top
+            hasPrev && hasNext -> R.style.ShapeAppearance_ClockDesk_Middle
+            else -> R.style.ShapeAppearance_ClockDesk_Bottom
+        }
+
+        cardView.shapeAppearanceModel = ShapeAppearanceModel.builder(context, shapeStyleRes, 0).build()
+
+        val marginBottomDp = if (hasNext) 4 else 16
+        val marginParams = cardView.layoutParams as? ViewGroup.MarginLayoutParams
+            ?: ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        marginParams.bottomMargin = (marginBottomDp * context.resources.displayMetrics.density).toInt()
+        cardView.layoutParams = marginParams
     }
 
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -77,68 +149,15 @@ class M3SettingsAdapter(
         }
     }
 
-    inner class CardGroupViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        private val container: LinearLayout = view.findViewById(R.id.items_container)
+    inner class SwitchViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val titleView: TextView = view.findViewById(R.id.item_title)
+        private val summaryView: TextView = view.findViewById(R.id.item_summary)
+        private val iconView: ImageView = view.findViewById(R.id.item_icon)
+        private val switchView: MaterialSwitch = view.findViewById(R.id.item_switch)
 
-        fun bind(group: SettingsItem.CardGroup) {
-            container.removeAllViews()
-            val inflater = LayoutInflater.from(itemView.context)
-
-            val visibleItems = group.items.filter { it.isVisible() }
-            if (visibleItems.isEmpty()) {
-                itemView.visibility = View.GONE
-                itemView.layoutParams = RecyclerView.LayoutParams(0, 0)
-                return
-            } else {
-                itemView.visibility = View.VISIBLE
-                itemView.layoutParams = RecyclerView.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            visibleItems.forEachIndexed { index, entry ->
-                val rowView = when (entry) {
-                    is SettingEntry.Switch -> createSwitchView(inflater, container, entry)
-                    is SettingEntry.Clickable -> createClickableView(inflater, container, entry)
-                    is SettingEntry.SingleChoice -> createChoiceView(inflater, container, entry)
-                    is SettingEntry.Slider -> createSliderView(inflater, container, entry)
-                    is SettingEntry.TextEdit -> createTextEditView(inflater, container, entry)
-                }
-
-                if (rowView is MaterialCardView) {
-                    val shapeStyleRes = when {
-                        visibleItems.size == 1 -> R.style.ShapeAppearance_ClockDesk_Single
-                        index == 0 -> R.style.ShapeAppearance_ClockDesk_Top
-                        index == visibleItems.lastIndex -> R.style.ShapeAppearance_ClockDesk_Bottom
-                        else -> R.style.ShapeAppearance_ClockDesk_Middle
-                    }
-                    rowView.shapeAppearanceModel = ShapeAppearanceModel.builder(context, shapeStyleRes, 0).build()
-
-                    val marginBottomDp = if (index == visibleItems.lastIndex) 0 else 4
-                    val marginParams = rowView.layoutParams as? ViewGroup.MarginLayoutParams
-                        ?: ViewGroup.MarginLayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        )
-                    marginParams.bottomMargin = (marginBottomDp * context.resources.displayMetrics.density).toInt()
-                    rowView.layoutParams = marginParams
-                }
-
-                container.addView(rowView)
-            }
-        }
-
-        private fun createSwitchView(
-            inflater: LayoutInflater,
-            parent: ViewGroup,
-            entry: SettingEntry.Switch
-        ): View {
-            val view = inflater.inflate(R.layout.item_settings_switch, parent, false)
-            val titleView = view.findViewById<TextView>(R.id.item_title)
-            val summaryView = view.findViewById<TextView>(R.id.item_summary)
-            val iconView = view.findViewById<ImageView>(R.id.item_icon)
-            val switchView = view.findViewById<MaterialSwitch>(R.id.item_switch)
+        fun bind(entry: SettingsItem.Switch, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
 
             titleView.text = entry.title
             if (!entry.summary.isNullOrBlank()) {
@@ -149,7 +168,7 @@ class M3SettingsAdapter(
             }
 
             if (entry.iconRes != null) {
-                iconView.setImageResource(entry.iconRes!!)
+                iconView.setImageResource(entry.iconRes)
                 iconView.visibility = View.VISIBLE
             } else {
                 iconView.visibility = View.GONE
@@ -159,38 +178,35 @@ class M3SettingsAdapter(
             switchView.isChecked = isChecked
 
             val isEnabled = entry.isEnabled()
-            view.isEnabled = isEnabled
+            cardView.isEnabled = isEnabled
             switchView.isEnabled = isEnabled
-            view.alpha = if (isEnabled) 1.0f else 0.38f
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
             if (isEnabled) {
-                view.setOnClickListener {
+                cardView.setOnClickListener {
                     it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     val newChecked = !switchView.isChecked
                     switchView.isChecked = newChecked
                     prefs.edit().putBoolean(entry.key, newChecked).apply()
                     entry.onCheckedChange?.invoke(newChecked)
                     onPreferenceChanged(entry.key, newChecked)
-                    notifyDataSetChanged()
                 }
             } else {
-                view.setOnClickListener(null)
+                cardView.setOnClickListener(null)
             }
-
-            return view
         }
+    }
 
-        private fun createClickableView(
-            inflater: LayoutInflater,
-            parent: ViewGroup,
-            entry: SettingEntry.Clickable
-        ): View {
-            val view = inflater.inflate(R.layout.item_settings_clickable, parent, false)
-            val titleView = view.findViewById<TextView>(R.id.item_title)
-            val summaryView = view.findViewById<TextView>(R.id.item_summary)
-            val iconView = view.findViewById<ImageView>(R.id.item_icon)
-            val statusView = view.findViewById<TextView>(R.id.item_status_text)
-            val chevronView = view.findViewById<ImageView>(R.id.item_chevron)
+    inner class ClickableViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val titleView: TextView = view.findViewById(R.id.item_title)
+        private val summaryView: TextView = view.findViewById(R.id.item_summary)
+        private val iconView: ImageView = view.findViewById(R.id.item_icon)
+        private val statusView: TextView = view.findViewById(R.id.item_status_text)
+        private val chevronView: ImageView = view.findViewById(R.id.item_chevron)
+
+        fun bind(entry: SettingsItem.Clickable, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
 
             titleView.text = entry.title
             if (!entry.summary.isNullOrBlank()) {
@@ -201,7 +217,7 @@ class M3SettingsAdapter(
             }
 
             if (entry.iconRes != null) {
-                iconView.setImageResource(entry.iconRes!!)
+                iconView.setImageResource(entry.iconRes)
                 iconView.visibility = View.VISIBLE
             } else {
                 iconView.visibility = View.GONE
@@ -217,34 +233,32 @@ class M3SettingsAdapter(
             chevronView.visibility = if (entry.showChevron) View.VISIBLE else View.GONE
 
             val isEnabled = entry.isEnabled()
-            view.isEnabled = isEnabled
-            view.alpha = if (isEnabled) 1.0f else 0.38f
+            cardView.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
             if (isEnabled) {
-                view.setOnClickListener {
+                cardView.setOnClickListener {
                     it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     entry.onClick()
                 }
             } else {
-                view.setOnClickListener(null)
+                cardView.setOnClickListener(null)
             }
-
-            return view
         }
+    }
 
-        private fun createChoiceView(
-            inflater: LayoutInflater,
-            parent: ViewGroup,
-            entry: SettingEntry.SingleChoice
-        ): View {
-            val view = inflater.inflate(R.layout.item_settings_clickable, parent, false)
-            val titleView = view.findViewById<TextView>(R.id.item_title)
-            val summaryView = view.findViewById<TextView>(R.id.item_summary)
-            val iconView = view.findViewById<ImageView>(R.id.item_icon)
+    inner class ChoiceViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val titleView: TextView = view.findViewById(R.id.item_title)
+        private val summaryView: TextView = view.findViewById(R.id.item_summary)
+        private val iconView: ImageView = view.findViewById(R.id.item_icon)
+
+        fun bind(entry: SettingsItem.SingleChoice, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
 
             titleView.text = entry.title
             if (entry.iconRes != null) {
-                iconView.setImageResource(entry.iconRes!!)
+                iconView.setImageResource(entry.iconRes)
                 iconView.visibility = View.VISIBLE
             } else {
                 iconView.visibility = View.GONE
@@ -267,22 +281,20 @@ class M3SettingsAdapter(
             }
 
             val isEnabled = entry.isEnabled()
-            view.isEnabled = isEnabled
-            view.alpha = if (isEnabled) 1.0f else 0.38f
+            cardView.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
             if (isEnabled) {
-                view.setOnClickListener {
+                cardView.setOnClickListener {
                     it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     showSingleChoiceDialog(entry)
                 }
             } else {
-                view.setOnClickListener(null)
+                cardView.setOnClickListener(null)
             }
-
-            return view
         }
 
-        private fun showSingleChoiceDialog(entry: SettingEntry.SingleChoice) {
+        private fun showSingleChoiceDialog(entry: SettingsItem.SingleChoice) {
             val currentValue = prefs.getString(entry.key, entry.defaultValue) ?: entry.defaultValue
             val currentIndex = entry.entryValues.indexOf(currentValue).coerceAtLeast(0)
             var tempSelectedIndex = currentIndex
@@ -298,25 +310,24 @@ class M3SettingsAdapter(
                         prefs.edit().putString(entry.key, newValue).apply()
                         entry.onSelectionChange?.invoke(newValue)
                         onPreferenceChanged(entry.key, newValue)
-                        notifyDataSetChanged()
                     }
                     dialog.dismiss()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         }
+    }
 
-        private fun createSliderView(
-            inflater: LayoutInflater,
-            parent: ViewGroup,
-            entry: SettingEntry.Slider
-        ): View {
-            val view = inflater.inflate(R.layout.item_settings_slider, parent, false)
-            val titleView = view.findViewById<TextView>(R.id.item_title)
-            val summaryView = view.findViewById<TextView>(R.id.item_summary)
-            val iconView = view.findViewById<ImageView>(R.id.item_icon)
-            val valueLabel = view.findViewById<TextView>(R.id.item_value_label)
-            val slider = view.findViewById<Slider>(R.id.item_slider)
+    inner class SliderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val titleView: TextView = view.findViewById(R.id.item_title)
+        private val summaryView: TextView = view.findViewById(R.id.item_summary)
+        private val iconView: ImageView = view.findViewById(R.id.item_icon)
+        private val valueLabel: TextView = view.findViewById(R.id.item_value_label)
+        private val slider: Slider = view.findViewById(R.id.item_slider)
+
+        fun bind(entry: SettingsItem.Slider, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
 
             titleView.text = entry.title
             if (!entry.summary.isNullOrBlank()) {
@@ -327,7 +338,7 @@ class M3SettingsAdapter(
             }
 
             if (entry.iconRes != null) {
-                iconView.setImageResource(entry.iconRes!!)
+                iconView.setImageResource(entry.iconRes)
                 iconView.visibility = View.VISIBLE
             } else {
                 iconView.visibility = View.GONE
@@ -352,44 +363,63 @@ class M3SettingsAdapter(
             updateLabel(clampedValue)
 
             val isEnabled = entry.isEnabled()
-            view.isEnabled = isEnabled
+            cardView.isEnabled = isEnabled
             slider.isEnabled = isEnabled
-            view.alpha = if (isEnabled) 1.0f else 0.38f
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
+            slider.clearOnChangeListeners()
             slider.addOnChangeListener { _, value, fromUser ->
                 if (fromUser) {
                     updateLabel(value)
                 }
             }
 
+            slider.clearOnSliderTouchListeners()
             slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
-                override fun onStartTrackingTouch(slider: Slider) {}
-                override fun onStopTrackingTouch(slider: Slider) {
-                    slider.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    val value = slider.value
+                override fun onStartTrackingTouch(s: Slider) {}
+                override fun onStopTrackingTouch(s: Slider) {
+                    s.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    val value = s.value
                     writeSliderPreference(entry.key, value, entry.step)
                     entry.onValueChange?.invoke(value)
                     onPreferenceChanged(entry.key, value)
-                    notifyDataSetChanged()
                 }
             })
-
-            return view
         }
 
-        private fun createTextEditView(
-            inflater: LayoutInflater,
-            parent: ViewGroup,
-            entry: SettingEntry.TextEdit
-        ): View {
-            val view = inflater.inflate(R.layout.item_settings_clickable, parent, false)
-            val titleView = view.findViewById<TextView>(R.id.item_title)
-            val summaryView = view.findViewById<TextView>(R.id.item_summary)
-            val iconView = view.findViewById<ImageView>(R.id.item_icon)
+        private fun readSliderPreference(key: String, defaultValue: Float): Float {
+            return try {
+                prefs.getInt(key, defaultValue.toInt()).toFloat()
+            } catch (e: Exception) {
+                try {
+                    prefs.getFloat(key, defaultValue)
+                } catch (e2: Exception) {
+                    defaultValue
+                }
+            }
+        }
+
+        private fun writeSliderPreference(key: String, value: Float, step: Float) {
+            if (step >= 1.0f) {
+                prefs.edit().putInt(key, value.toInt()).apply()
+            } else {
+                prefs.edit().putFloat(key, value).apply()
+            }
+        }
+    }
+
+    inner class TextEditViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val titleView: TextView = view.findViewById(R.id.item_title)
+        private val summaryView: TextView = view.findViewById(R.id.item_summary)
+        private val iconView: ImageView = view.findViewById(R.id.item_icon)
+
+        fun bind(entry: SettingsItem.TextEdit, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
 
             titleView.text = entry.title
             if (entry.iconRes != null) {
-                iconView.setImageResource(entry.iconRes!!)
+                iconView.setImageResource(entry.iconRes)
                 iconView.visibility = View.VISIBLE
             } else {
                 iconView.visibility = View.GONE
@@ -410,22 +440,20 @@ class M3SettingsAdapter(
             }
 
             val isEnabled = entry.isEnabled()
-            view.isEnabled = isEnabled
-            view.alpha = if (isEnabled) 1.0f else 0.38f
+            cardView.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
             if (isEnabled) {
-                view.setOnClickListener {
+                cardView.setOnClickListener {
                     it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     showTextEditDialog(entry)
                 }
             } else {
-                view.setOnClickListener(null)
+                cardView.setOnClickListener(null)
             }
-
-            return view
         }
 
-        private fun showTextEditDialog(entry: SettingEntry.TextEdit) {
+        private fun showTextEditDialog(entry: SettingsItem.TextEdit) {
             val currentValue = prefs.getString(entry.key, entry.defaultValue) ?: entry.defaultValue
 
             val layout = LinearLayout(context).apply {
@@ -456,31 +484,10 @@ class M3SettingsAdapter(
                     prefs.edit().putString(entry.key, text).apply()
                     entry.onTextChange?.invoke(text)
                     onPreferenceChanged(entry.key, text)
-                    notifyDataSetChanged()
                     dialog.dismiss()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
-        }
-
-        private fun readSliderPreference(key: String, defaultValue: Float): Float {
-            return try {
-                prefs.getInt(key, defaultValue.toInt()).toFloat()
-            } catch (e: Exception) {
-                try {
-                    prefs.getFloat(key, defaultValue)
-                } catch (e2: Exception) {
-                    defaultValue
-                }
-            }
-        }
-
-        private fun writeSliderPreference(key: String, value: Float, step: Float) {
-            if (step >= 1.0f) {
-                prefs.edit().putInt(key, value.toInt()).apply()
-            } else {
-                prefs.edit().putFloat(key, value).apply()
-            }
         }
     }
 }
