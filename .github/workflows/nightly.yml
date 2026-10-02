@@ -17,6 +17,7 @@ concurrency:
 
 env:
   TARGET_BRANCH: ${{ github.event.inputs.branch || 'experimental-clockdesk-connect' }}
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"
 
 jobs:
   check_commits:
