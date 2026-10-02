@@ -601,4 +601,25 @@
         <item quantity="many">%d сповіщень</item>
         <item quantity="other">%d сповіщення</item>
     </plurals>
+
+    <!-- Updates Settings -->
+    <string name="updates_settings_title">Оновлення</string>
+    <string name="updates_settings_subtitle">Канали оновлень та перевірка версій</string>
+    <string name="update_status_category_title">Статус</string>
+    <string name="update_current_version_title">Встановлена версія</string>
+    <string name="update_status_title">Статус оновлення</string>
+    <string name="update_status_up_to_date">Встановлено останню версію</string>
+    <string name="update_status_available">Доступна нова версія: %s</string>
+    <string name="update_status_checking">Пошук оновлень…</string>
+    <string name="update_status_error">Не вдалося перевірити оновлення</string>
+    <string name="check_for_updates_title">Перевірити оновлення</string>
+    <string name="check_for_updates_never">Перевірка не проводилася</string>
+    <string name="check_for_updates_last_checked">Остання перевірка: %s</string>
+    <string name="download_and_install_title">Завантажити оновлення</string>
+    <string name="download_and_install_summary">Відкрити сторінку релізу на GitHub</string>
+    <string name="update_channel_category_title">Канали та сповіщення</string>
+    <string name="update_nightly_channel_title">Канал Nightly</string>
+    <string name="update_nightly_channel_summary">Отримувати попередні збірки з гілок розробки</string>
+    <string name="channel_nightly">Nightly</string>
+    <string name="channel_stable">Стабільний</string>
 </resources>

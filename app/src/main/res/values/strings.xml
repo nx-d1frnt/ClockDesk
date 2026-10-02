@@ -616,4 +616,25 @@
         <item quantity="one">%d notification</item>
         <item quantity="other">%d notifications</item>
     </plurals>
+
+    <!-- Updates Settings -->
+    <string name="updates_settings_title">Updates</string>
+    <string name="updates_settings_subtitle">Update channels and version checks</string>
+    <string name="update_status_category_title">Status</string>
+    <string name="update_current_version_title">Installed version</string>
+    <string name="update_status_title">Update status</string>
+    <string name="update_status_up_to_date">App is up to date</string>
+    <string name="update_status_available">New version available: %s</string>
+    <string name="update_status_checking">Checking for updates…</string>
+    <string name="update_status_error">Failed to check for updates</string>
+    <string name="check_for_updates_title">Check for updates</string>
+    <string name="check_for_updates_never">Never checked</string>
+    <string name="check_for_updates_last_checked">Last checked: %s</string>
+    <string name="download_and_install_title">Download update</string>
+    <string name="download_and_install_summary">Open GitHub release to download and install</string>
+    <string name="update_channel_category_title">Channels &amp; Notifications</string>
+    <string name="update_nightly_channel_title">Nightly channel</string>
+    <string name="update_nightly_channel_summary">Receive automated pre-release builds from development branches</string>
+    <string name="channel_nightly">Nightly</string>
+    <string name="channel_stable">Stable</string>
 </resources>

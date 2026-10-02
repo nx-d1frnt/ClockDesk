@@ -601,4 +601,25 @@
         <item quantity="many">%d уведомлений</item>
         <item quantity="other">%d уведомления</item>
     </plurals>
+
+    <!-- Updates Settings -->
+    <string name="updates_settings_title">Обновления</string>
+    <string name="updates_settings_subtitle">Каналы обновлений и проверка версий</string>
+    <string name="update_status_category_title">Статус</string>
+    <string name="update_current_version_title">Установленная версия</string>
+    <string name="update_status_title">Статус обновления</string>
+    <string name="update_status_up_to_date">Установлена актуальная версия</string>
+    <string name="update_status_available">Доступна новая версия: %s</string>
+    <string name="update_status_checking">Поиск обновлений…</string>
+    <string name="update_status_error">Не удалось проверить обновления</string>
+    <string name="check_for_updates_title">Проверить обновления</string>
+    <string name="check_for_updates_never">Проверка не проводилась</string>
+    <string name="check_for_updates_last_checked">Последняя проверка: %s</string>
+    <string name="download_and_install_title">Скачать обновление</string>
+    <string name="download_and_install_summary">Открыть страницу релиза на GitHub</string>
+    <string name="update_channel_category_title">Каналы и уведомления</string>
+    <string name="update_nightly_channel_title">Канал Nightly</string>
+    <string name="update_nightly_channel_summary">Получать предварительные сборки из веток разработки</string>
+    <string name="channel_nightly">Nightly</string>
+    <string name="channel_stable">Стабильный</string>
 </resources>

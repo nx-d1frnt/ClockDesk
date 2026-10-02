@@ -12,10 +12,16 @@ object UpdateManager {
 
     private const val GITHUB_OWNER = "nx-d1frnt"
     private const val GITHUB_REPO = "clockdesk"
-    private const val API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
-    private const val RELEASE_PAGE_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
-    private const val PREFS_NAME = "update_prefs"
-    private const val KEY_LAST_CHECK = "last_check_time"
+    private const val STABLE_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+    private const val NIGHTLY_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/tags/nightly"
+    private const val STABLE_RELEASE_PAGE_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+    private const val NIGHTLY_RELEASE_PAGE_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/tag/nightly"
+
+    private const val PREFS_SETTINGS = "ClockDeskPrefs"
+    private const val PREFS_UPDATE = "update_prefs"
+    const val KEY_UPDATE_NIGHTLY_CHANNEL = "update_nightly_channel"
+    const val KEY_LAST_CHECK = "last_check_time"
+    const val KEY_LAST_CHECK_SUCCESS = "last_check_success"
 
     var isChecking: Boolean = false
         private set
@@ -25,50 +31,114 @@ object UpdateManager {
         private set
     var downloadUrl: String? = null
         private set
-    private var latestVersion: String? = null
+    var latestVersion: String? = null
+        private set
+    var lastError: String? = null
+        private set
 
     var onUpdateStateChanged: (() -> Unit)? = null
 
-  fun checkForUpdates(context: Context, force: Boolean = false) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0L)
+    fun isNightlyChannel(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE)
+        val isNightlyBuild = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME.contains("nightly", ignoreCase = true)
+        return prefs.getBoolean(KEY_UPDATE_NIGHTLY_CHANNEL, isNightlyBuild)
+    }
+
+    fun getLastCheckTime(context: Context): Long {
+        return context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+            .getLong(KEY_LAST_CHECK, 0L)
+    }
+
+    fun checkForUpdates(context: Context, force: Boolean = false) {
+        val updatePrefs = context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+        val lastCheck = updatePrefs.getLong(KEY_LAST_CHECK, 0L)
         val now = System.currentTimeMillis()
 
-        // Проверяем раз в 24 часа, если не форсировано
+        // Check every 24 hours if not forced
         if (!force && (now - lastCheck) < 24 * 60 * 60 * 1000) return
 
+        val isNightly = isNightlyChannel(context)
+        val apiUrl = if (isNightly) NIGHTLY_API_URL else STABLE_API_URL
+        val fallbackReleaseUrl = if (isNightly) NIGHTLY_RELEASE_PAGE_URL else STABLE_RELEASE_PAGE_URL
+
         isChecking = true
+        lastError = null
         onUpdateStateChanged?.invoke()
 
-        val request = JsonObjectRequest(Request.Method.GET, API_URL, null,
+        val request = JsonObjectRequest(Request.Method.GET, apiUrl, null,
             { response ->
                 isChecking = false
                 try {
-                    val tagName = response.getString("tag_name")
-                    releaseNotes = response.optString("body", "") // Получаем ChangeLog
-                    val serverVersion = tagName.removePrefix("v")
-                    
                     val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                    val currentVersion = pInfo.versionName?.removePrefix("v") ?: "0"
-                    Logger.d("UpdateManager"){"Current version: $currentVersion, Server version: $serverVersion"}
-                    if (isNewer(serverVersion, currentVersion)) {
-                        downloadUrl = response.optString("html_url", RELEASE_PAGE_URL)
-                        latestVersion = tagName
-                        isUpdateAvailable = true
-                        onUpdateStateChanged?.invoke()
+                    val currentVersion = pInfo.versionName ?: "0"
+
+                    val tagName = response.optString("tag_name", "")
+                    val releaseName = response.optString("name", "")
+                    releaseNotes = response.optString("body", "")
+                    downloadUrl = response.optString("html_url", fallbackReleaseUrl)
+
+                    if (isNightly) {
+                        // Nightly Channel Comparison:
+                        // Extract 7-character commit hash from release name or body
+                        val serverCommit = Regex("""\b([0-9a-f]{7})\b""").find(releaseName)?.value
+                            ?: Regex("""\b([0-9a-f]{7})\b""").find(releaseNotes ?: "")?.value
+
+                        val isCurrentNightly = currentVersion.contains("nightly", ignoreCase = true)
+
+                        if (!isCurrentNightly) {
+                            // User is currently on stable release and switched to Nightly
+                            isUpdateAvailable = true
+                            latestVersion = releaseName.ifBlank { "Nightly" }
+                        } else if (serverCommit != null) {
+                            // Both are nightly builds -> compare commit hashes
+                            if (!currentVersion.contains(serverCommit, ignoreCase = true)) {
+                                isUpdateAvailable = true
+                                latestVersion = releaseName.ifBlank { "Nightly ($serverCommit)" }
+                            } else {
+                                isUpdateAvailable = false
+                                latestVersion = currentVersion
+                            }
+                        } else {
+                            // Fallback: compare release name with current version
+                            isUpdateAvailable = (releaseName != currentVersion)
+                            latestVersion = releaseName.ifBlank { "Nightly" }
+                        }
+                    } else {
+                        // Stable Channel Comparison:
+                        val serverVersion = tagName.removePrefix("v")
+                        val cleanCurrent = currentVersion.removePrefix("v")
+                        if (isNewer(serverVersion, cleanCurrent)) {
+                            latestVersion = tagName
+                            isUpdateAvailable = true
+                        } else {
+                            isUpdateAvailable = false
+                            latestVersion = currentVersion
+                        }
                     }
-                    prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+
+                    updatePrefs.edit()
+                        .putLong(KEY_LAST_CHECK, now)
+                        .putBoolean(KEY_LAST_CHECK_SUCCESS, true)
+                        .apply()
+
+                    Logger.d("UpdateManager") {
+                        "Checked ($apiUrl): current=$currentVersion, available=$isUpdateAvailable, latest=$latestVersion"
+                    }
                     onUpdateStateChanged?.invoke()
-                } catch (e: JSONException) {
+                } catch (e: Exception) {
                     e.printStackTrace()
                     isChecking = false
+                    lastError = e.message
                     onUpdateStateChanged?.invoke()
                 }
             },
-            { error -> 
-            error.printStackTrace() 
-            isChecking = false
-            onUpdateStateChanged?.invoke()}
+            { error ->
+                error.printStackTrace()
+                isChecking = false
+                lastError = error.message ?: "Network error"
+                updatePrefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+                onUpdateStateChanged?.invoke()
+            }
         )
 
         NetworkManager.getRequestQueue(context).add(request)
@@ -128,7 +198,8 @@ object UpdateManager {
     }
 
     fun openReleasePage(context: Context) {
-        val url = downloadUrl ?: RELEASE_PAGE_URL
+        val fallback = if (isNightlyChannel(context)) NIGHTLY_RELEASE_PAGE_URL else STABLE_RELEASE_PAGE_URL
+        val url = downloadUrl ?: fallback
 
         try {
         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))

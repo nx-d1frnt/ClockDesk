@@ -79,6 +79,13 @@ object SettingsCategoryProvider {
                 fragmentClass = BackupSettingsFragment::class.java
             ),
             SettingsCategory(
+                id = "updates",
+                title = context.getString(R.string.updates_settings_title),
+                subtitle = context.getString(R.string.updates_settings_subtitle),
+                iconResId = R.drawable.update,
+                fragmentClass = UpdatesSettingsFragment::class.java
+            ),
+            SettingsCategory(
                 id = "about",
                 title = context.getString(R.string.about_title),
                 subtitle = context.getString(R.string.about_subtitle),

@@ -181,3 +181,104 @@ class BackupSettingsFragment : PreferenceFragmentCompat() {
         Runtime.getRuntime().exit(0)
     }
 }
+
+class UpdatesSettingsFragment : PreferenceFragmentCompat() {
+
+    private var currentVersionPref: Preference? = null
+    private var statusPref: Preference? = null
+    private var checkUpdatesPref: Preference? = null
+    private var installUpdatePref: Preference? = null
+    private var nightlyChannelPref: SwitchPreferenceCompat? = null
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = "ClockDeskPrefs"
+        setPreferencesFromResource(R.xml.pref_updates, rootKey)
+
+        currentVersionPref = findPreference("update_current_version")
+        statusPref = findPreference("update_status")
+        checkUpdatesPref = findPreference("check_updates_now")
+        installUpdatePref = findPreference("install_update_now")
+        nightlyChannelPref = findPreference("update_nightly_channel")
+
+        val isNightlyBuild = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME.contains("nightly", ignoreCase = true)
+        val prefs = requireContext().getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
+        // Ensure default reflects current build if not set
+        if (!prefs.contains(com.nxd1frnt.clockdesk2.utils.UpdateManager.KEY_UPDATE_NIGHTLY_CHANNEL)) {
+            nightlyChannelPref?.isChecked = isNightlyBuild
+            prefs.edit().putBoolean(com.nxd1frnt.clockdesk2.utils.UpdateManager.KEY_UPDATE_NIGHTLY_CHANNEL, isNightlyBuild).apply()
+        }
+
+        currentVersionPref?.summary = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME
+
+        nightlyChannelPref?.setOnPreferenceChangeListener { _, newValue ->
+            val isNightly = newValue as? Boolean ?: false
+            prefs.edit().putBoolean(com.nxd1frnt.clockdesk2.utils.UpdateManager.KEY_UPDATE_NIGHTLY_CHANNEL, isNightly).apply()
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.checkForUpdates(requireContext(), force = true)
+            true
+        }
+
+        checkUpdatesPref?.setOnPreferenceClickListener {
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.checkForUpdates(requireContext(), force = true)
+            true
+        }
+
+        installUpdatePref?.setOnPreferenceClickListener {
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.downloadAndInstall(requireContext())
+            true
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.nxd1frnt.clockdesk2.utils.UpdateManager.onUpdateStateChanged = {
+            activity?.runOnUiThread {
+                updateUI()
+            }
+        }
+        updateUI()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        com.nxd1frnt.clockdesk2.utils.UpdateManager.onUpdateStateChanged = null
+    }
+
+    private fun updateUI() {
+        val ctx = context ?: return
+        val lastCheck = com.nxd1frnt.clockdesk2.utils.UpdateManager.getLastCheckTime(ctx)
+
+        if (lastCheck > 0L) {
+            val dateStr = android.text.format.DateFormat.getMediumDateFormat(ctx).format(java.util.Date(lastCheck))
+            val timeStr = android.text.format.DateFormat.getTimeFormat(ctx).format(java.util.Date(lastCheck))
+            checkUpdatesPref?.summary = getString(R.string.check_for_updates_last_checked, "$dateStr $timeStr")
+        } else {
+            checkUpdatesPref?.summary = getString(R.string.check_for_updates_never)
+        }
+
+        when {
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.isChecking -> {
+                statusPref?.summary = getString(R.string.update_status_checking)
+                installUpdatePref?.isVisible = false
+            }
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.isUpdateAvailable -> {
+                val version = com.nxd1frnt.clockdesk2.utils.UpdateManager.latestVersion ?: ""
+                statusPref?.summary = getString(R.string.update_status_available, version)
+                installUpdatePref?.isVisible = true
+            }
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.lastError != null -> {
+                statusPref?.summary = getString(R.string.update_status_error)
+                installUpdatePref?.isVisible = false
+            }
+            lastCheck > 0L -> {
+                statusPref?.summary = getString(R.string.update_status_up_to_date)
+                installUpdatePref?.isVisible = false
+            }
+            else -> {
+                statusPref?.summary = getString(R.string.check_for_updates_never)
+                installUpdatePref?.isVisible = false
+            }
+        }
+    }
+}
+
