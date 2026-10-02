@@ -4,6 +4,25 @@ plugins {
     kotlin("kapt")
 }
 
+fun getGitCommitHash(): String {
+    val ciCommit = System.getenv("GITHUB_SHA")
+    if (!ciCommit.isNullOrBlank()) {
+        return ciCommit.take(7)
+    }
+    return runCatching {
+        ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+            .directory(rootDir)
+            .redirectOutput(ProcessBuilder.Redirect.PIPE)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start()
+            .inputStream
+            .bufferedReader()
+            .readText()
+            .trim()
+            .ifEmpty { "dev" }
+    }.getOrDefault("dev")
+}
+
 android {
     namespace = "com.nxd1frnt.clockdesk2"
     compileSdk = 36
@@ -12,10 +31,33 @@ android {
         applicationId = "com.nxd1frnt.clockdesk2"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2000293
+        versionCode = 2000296
         versionName = "2.0.0-rc2"
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("releaseKey") {
+            val keystorePath = System.getenv("KEYSTORE_FILE")
+            val keystoreFile = if (!keystorePath.isNullOrBlank()) {
+                val f = file(keystorePath)
+                if (f.exists()) f else file("$rootDir/app/$keystorePath")
+            } else null
+
+            if (keystoreFile != null && keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                val debugConfig = getByName("debug")
+                storeFile = debugConfig.storeFile
+                storePassword = debugConfig.storePassword
+                keyAlias = debugConfig.keyAlias
+                keyPassword = debugConfig.keyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -32,8 +74,21 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("nightly") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            isDebuggable = false
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("releaseKey")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            versionNameSuffix = "-nightly-${getGitCommitHash()}"
+        }
         getByName("release") {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("releaseKey")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
