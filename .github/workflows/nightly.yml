@@ -1,0 +1,137 @@
+name: Nightly Build
+
+on:
+  schedule:
+    # 02:00 UTC daily
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'experimental-clockdesk-connect'
+
+concurrency:
+  group: nightly-build
+  cancel-in-progress: true
+
+env:
+  TARGET_BRANCH: ${{ github.event.inputs.branch || 'experimental-clockdesk-connect' }}
+
+jobs:
+  check_commits:
+    name: Check for New Commits
+    runs-on: ubuntu-latest
+    outputs:
+      has_new_commits: ${{ steps.check.outputs.has_new_commits }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Check if commits occurred in last 24h
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger; proceeding with build."
+            echo "has_new_commits=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SINCE=$(date --date="24 hours ago" --iso-8601=seconds)
+          COMMITS=$(git log --since="$SINCE" --oneline)
+          if [ -n "$COMMITS" ]; then
+            echo "New commits detected in the last 24 hours on $TARGET_BRANCH."
+            echo "has_new_commits=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No new commits in the last 24 hours on $TARGET_BRANCH. Skipping build."
+            echo "has_new_commits=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build & Publish Nightly
+    needs: check_commits
+    if: needs.check_commits.outputs.has_new_commits == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Restore Keystore from Secret
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding signing keystore..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/signing-keystore.jks
+            echo "KEYSTORE_FILE=signing-keystore.jks" >> "$GITHUB_ENV"
+          else
+            echo "KEYSTORE_BASE64 secret not found; falling back to debug signing."
+          fi
+
+      - name: Build Nightly APKs
+        env:
+          KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleNightly --no-daemon
+
+      - name: Cleanup Keystore
+        if: always()
+        run: rm -f app/signing-keystore.jks
+
+      - name: Collect Assets & Generate Checksums
+        id: assets
+        run: |
+          mkdir -p release-assets
+          find app/build/outputs/apk/nightly -type f -name "*.apk" -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum *.apk > sha256sums.txt
+          echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Publish Rolling Nightly Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly Build (${{ env.BUILD_DATE }} - ${{ env.TARGET_BRANCH }} - ${{ env.SHORT_SHA }})"
+          body: |
+            ### 🌙 ClockDesk Nightly Build
+
+            - **Branch:** [`${{ env.TARGET_BRANCH }}`](https://github.com/${{ github.repository }}/tree/${{ env.TARGET_BRANCH }})
+            - **Commit:** [`${{ env.SHORT_SHA }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            - **Date:** ${{ env.BUILD_DATE }}
+
+            > [!WARNING]
+            > Nightly builds are automated snapshots created directly from active development branches. They may contain experimental features, bugs, or incomplete functionality.
+
+            #### 📦 Downloads
+            Download the APK for your device architecture, or use the **universal** APK.
+
+            **SHA-256 Checksums:**
+            ```text
+            $(cat release-assets/sha256sums.txt)
+            ```
+          prerelease: true
+          make_latest: false
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
