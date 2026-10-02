@@ -14,20 +14,20 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import android.content.res.ColorStateList
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.DynamicColors
+import com.google.android.material.shape.ShapeAppearanceModel
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ui.LastFmSettingsFragment
 import com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment
 import com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment
 
-class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
+class SettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var collapsingToolbar: CollapsingToolbarLayout
 
@@ -101,6 +101,7 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
             is com.nxd1frnt.clockdesk2.notifications.ui.NotificationsSettingsFragment -> getString(R.string.notifications_settings_title)
             is MusicSourcesFragment -> getString(R.string.music_sources_title)
             is LastFmSettingsFragment -> getString(R.string.lastfm_plugin_name)
+            is UpdatesSettingsFragment -> getString(R.string.updates_settings_title)
             is AboutFragment -> getString(R.string.about_title)
             is com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment -> getString(R.string.deskconnect_settings_title)
             else -> getString(R.string.settings_title)
@@ -149,25 +150,6 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
         outState.putString("selected_category", selectedCategoryId)
     }
 
-    override fun onPreferenceStartFragment(caller: PreferenceFragmentCompat, pref: Preference): Boolean {
-        // Instantiate the new Fragment
-        val args = pref.extras
-        val fragment = supportFragmentManager.fragmentFactory.instantiate(
-            classLoader,
-            pref.fragment!!
-        ).apply {
-            arguments = args
-        }
-        
-        // Replace current fragment and add to backstack
-        supportFragmentManager.beginTransaction()
-            .setTransition(androidx.fragment.app.FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
-            .replace(R.id.settings_container, fragment)
-            .addToBackStack(null)
-            .commit()
-        return true
-    }
-
     private class TabletCategoryAdapter(
         private val items: List<SettingsCategory>,
         private var selectedId: String,
@@ -196,6 +178,23 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
             holder.subtitle.text = item.subtitle
             holder.icon.setImageResource(item.iconResId)
 
+            val isFirst = position == 0 || items[position - 1].groupId != item.groupId
+            val isLast = position == items.lastIndex || items[position + 1].groupId != item.groupId
+
+            val shapeRes = when {
+                isFirst && isLast -> R.style.ShapeAppearance_ClockDesk_Single
+                isFirst -> R.style.ShapeAppearance_ClockDesk_Top
+                isLast -> R.style.ShapeAppearance_ClockDesk_Bottom
+                else -> R.style.ShapeAppearance_ClockDesk_Middle
+            }
+            holder.cardContainer.shapeAppearanceModel = ShapeAppearanceModel.builder(holder.itemView.context, shapeRes, 0).build()
+
+            val marginBottomDp = if (isLast) 16 else 4
+            (holder.cardContainer.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+                lp.bottomMargin = (marginBottomDp * holder.itemView.context.resources.displayMetrics.density).toInt()
+                holder.cardContainer.layoutParams = lp
+            }
+
             val isSelected = item.id == selectedId
             val ctx = holder.itemView.context
 
@@ -203,18 +202,24 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
                 holder.cardContainer.setCardBackgroundColor(
                     ctx.getThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
                 )
+                holder.iconBadge.setCardBackgroundColor(
+                    ctx.getThemeColor(com.google.android.material.R.attr.colorSecondary)
+                )
                 holder.title.setTextColor(
                     ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
                 )
                 holder.subtitle.setTextColor(
                     ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
                 )
-                holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
+                holder.icon.imageTintList = ColorStateList.valueOf(
+                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondary)
                 )
             } else {
                 holder.cardContainer.setCardBackgroundColor(
-                    ctx.getColor(android.R.color.transparent)
+                    ctx.getThemeColor(com.google.android.material.R.attr.colorSurfaceContainerLow)
+                )
+                holder.iconBadge.setCardBackgroundColor(
+                    ctx.getThemeColor(com.google.android.material.R.attr.colorSurfaceContainerHigh)
                 )
                 holder.title.setTextColor(
                     ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurface)
@@ -222,8 +227,8 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
                 holder.subtitle.setTextColor(
                     ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
                 )
-                holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(
-                    ctx.getThemeColor(android.R.attr.colorPrimary)
+                holder.icon.imageTintList = ColorStateList.valueOf(
+                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
                 )
             }
 
@@ -234,6 +239,7 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val cardContainer: MaterialCardView = view.findViewById(R.id.card_container)
+            val iconBadge: MaterialCardView = view.findViewById(R.id.icon_badge)
             val icon: ImageView = view.findViewById(R.id.category_icon)
             val title: TextView = view.findViewById(R.id.category_title)
             val subtitle: TextView = view.findViewById(R.id.category_subtitle)
