@@ -622,4 +622,10 @@
     <string name="update_nightly_channel_summary">Получать предварительные сборки из веток разработки</string>
     <string name="channel_nightly">Nightly</string>
     <string name="channel_stable">Стабильный</string>
+    <string name="downloading_update_title">Загрузка обновления ClockDesk</string>
+    <string name="downloading_update_progress">Загрузка: %1$d%% (%2$s / %3$s)</string>
+    <string name="update_ready_to_install">Обновление готово к установке</string>
+    <string name="install_update_action">Установить обновление</string>
+    <string name="download_failed">Ошибка загрузки. Нажмите для повтора</string>
+    <string name="permission_unknown_apps_required">Разрешите ClockDesk устанавливать приложения для выполнения обновления.</string>
 </resources>

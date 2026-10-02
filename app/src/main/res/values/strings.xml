@@ -637,4 +637,10 @@
     <string name="update_nightly_channel_summary">Receive automated pre-release builds from development branches</string>
     <string name="channel_nightly">Nightly</string>
     <string name="channel_stable">Stable</string>
+    <string name="downloading_update_title">Downloading ClockDesk Update</string>
+    <string name="downloading_update_progress">Downloading: %1$d%% (%2$s / %3$s)</string>
+    <string name="update_ready_to_install">Update ready to install</string>
+    <string name="install_update_action">Install update</string>
+    <string name="download_failed">Download failed. Tap to retry</string>
+    <string name="permission_unknown_apps_required">Please allow ClockDesk to install apps to proceed with the update.</string>
 </resources>

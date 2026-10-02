@@ -256,27 +256,58 @@ class UpdatesSettingsFragment : PreferenceFragmentCompat() {
             checkUpdatesPref?.summary = getString(R.string.check_for_updates_never)
         }
 
-        when {
-            com.nxd1frnt.clockdesk2.utils.UpdateManager.isChecking -> {
-                statusPref?.summary = getString(R.string.update_status_checking)
-                installUpdatePref?.isVisible = false
+        val isUpdateAvail = com.nxd1frnt.clockdesk2.utils.UpdateManager.isUpdateAvailable
+        val downloadState = com.nxd1frnt.clockdesk2.utils.UpdateManager.downloadState
+
+        if (isUpdateAvail) {
+            installUpdatePref?.isVisible = true
+            when (downloadState) {
+                com.nxd1frnt.clockdesk2.utils.UpdateManager.DownloadState.DOWNLOADING -> {
+                    val percent = com.nxd1frnt.clockdesk2.utils.UpdateManager.downloadProgress
+                    val downloadedStr = com.nxd1frnt.clockdesk2.utils.UpdateManager.formatBytes(com.nxd1frnt.clockdesk2.utils.UpdateManager.downloadedBytes)
+                    val totalStr = com.nxd1frnt.clockdesk2.utils.UpdateManager.formatBytes(com.nxd1frnt.clockdesk2.utils.UpdateManager.totalBytes)
+                    val progressText = getString(R.string.downloading_update_progress, percent, downloadedStr, totalStr)
+
+                    statusPref?.summary = progressText
+                    installUpdatePref?.title = getString(R.string.downloading_update_title)
+                    installUpdatePref?.summary = "$percent%"
+                    installUpdatePref?.isEnabled = false
+                }
+                com.nxd1frnt.clockdesk2.utils.UpdateManager.DownloadState.READY_TO_INSTALL -> {
+                    statusPref?.summary = getString(R.string.update_ready_to_install)
+                    installUpdatePref?.title = getString(R.string.install_update_action)
+                    installUpdatePref?.summary = com.nxd1frnt.clockdesk2.utils.UpdateManager.apkFileName
+                    installUpdatePref?.isEnabled = true
+                }
+                com.nxd1frnt.clockdesk2.utils.UpdateManager.DownloadState.FAILED -> {
+                    statusPref?.summary = getString(R.string.download_failed)
+                    installUpdatePref?.title = getString(R.string.download_and_install_title)
+                    installUpdatePref?.summary = getString(R.string.download_failed)
+                    installUpdatePref?.isEnabled = true
+                }
+                com.nxd1frnt.clockdesk2.utils.UpdateManager.DownloadState.IDLE -> {
+                    val version = com.nxd1frnt.clockdesk2.utils.UpdateManager.latestVersion ?: ""
+                    statusPref?.summary = getString(R.string.update_status_available, version)
+                    installUpdatePref?.title = getString(R.string.download_and_install_title)
+                    installUpdatePref?.summary = getString(R.string.download_and_install_summary)
+                    installUpdatePref?.isEnabled = true
+                }
             }
-            com.nxd1frnt.clockdesk2.utils.UpdateManager.isUpdateAvailable -> {
-                val version = com.nxd1frnt.clockdesk2.utils.UpdateManager.latestVersion ?: ""
-                statusPref?.summary = getString(R.string.update_status_available, version)
-                installUpdatePref?.isVisible = true
-            }
-            com.nxd1frnt.clockdesk2.utils.UpdateManager.lastError != null -> {
-                statusPref?.summary = getString(R.string.update_status_error)
-                installUpdatePref?.isVisible = false
-            }
-            lastCheck > 0L -> {
-                statusPref?.summary = getString(R.string.update_status_up_to_date)
-                installUpdatePref?.isVisible = false
-            }
-            else -> {
-                statusPref?.summary = getString(R.string.check_for_updates_never)
-                installUpdatePref?.isVisible = false
+        } else {
+            installUpdatePref?.isVisible = false
+            when {
+                com.nxd1frnt.clockdesk2.utils.UpdateManager.isChecking -> {
+                    statusPref?.summary = getString(R.string.update_status_checking)
+                }
+                com.nxd1frnt.clockdesk2.utils.UpdateManager.lastError != null -> {
+                    statusPref?.summary = getString(R.string.update_status_error)
+                }
+                lastCheck > 0L -> {
+                    statusPref?.summary = getString(R.string.update_status_up_to_date)
+                }
+                else -> {
+                    statusPref?.summary = getString(R.string.check_for_updates_never)
+                }
             }
         }
     }

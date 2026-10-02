@@ -622,4 +622,10 @@
     <string name="update_nightly_channel_summary">Отримувати попередні збірки з гілок розробки</string>
     <string name="channel_nightly">Nightly</string>
     <string name="channel_stable">Стабільний</string>
+    <string name="downloading_update_title">Завантаження оновлення ClockDesk</string>
+    <string name="downloading_update_progress">Завантаження: %1$d%% (%2$s / %3$s)</string>
+    <string name="update_ready_to_install">Оновлення готове до встановлення</string>
+    <string name="install_update_action">Встановити оновлення</string>
+    <string name="download_failed">Помилка завантаження. Натисніть для повтору</string>
+    <string name="permission_unknown_apps_required">Дозвольте ClockDesk встановлювати додатки для оновлення.</string>
 </resources>

@@ -57,7 +57,13 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
 
         view.setOnClickListener {
             if (UpdateManager.isUpdateAvailable) {
-                showAppUpdateDialog()
+                if (UpdateManager.downloadState == UpdateManager.DownloadState.READY_TO_INSTALL) {
+                    UpdateManager.installApk(context)
+                } else if (UpdateManager.downloadState == UpdateManager.DownloadState.DOWNLOADING) {
+                    android.widget.Toast.makeText(context, R.string.downloading_update_title, android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    showAppUpdateDialog()
+                }
             }
         }
         return view
@@ -92,8 +98,20 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
 
         if (!UpdateManager.isUpdateAvailable) return false
 
-        iconView.setImageResource(context.resources.getIdentifier("update", "drawable", context.packageName))
-        textView.text = context.getString(R.string.update_available_text)
+        iconView.setImageResource(R.drawable.update)
+
+        when (UpdateManager.downloadState) {
+            UpdateManager.DownloadState.DOWNLOADING -> {
+                val percent = UpdateManager.downloadProgress
+                textView.text = "${context.getString(R.string.downloading_update_title)}: $percent%"
+            }
+            UpdateManager.DownloadState.READY_TO_INSTALL -> {
+                textView.text = context.getString(R.string.update_ready_to_install)
+            }
+            else -> {
+                textView.text = context.getString(R.string.update_available_text)
+            }
+        }
 
         return true
     }
