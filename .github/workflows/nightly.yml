@@ -17,7 +17,6 @@ concurrency:
 
 env:
   TARGET_BRANCH: ${{ github.event.inputs.branch || 'experimental-clockdesk-connect' }}
-  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"
 
 jobs:
   check_commits:
@@ -93,6 +92,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GITHUB_SHA: ""
         run: ./gradlew assembleNightly --no-daemon
 
       - name: Cleanup Keystore
@@ -108,6 +108,18 @@ jobs:
           sha256sum *.apk > sha256sums.txt
           echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> "$GITHUB_ENV"
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Clear Old Nightly Assets
+        run: |
+          echo "Checking for old assets in nightly release..."
+          ASSET_IDS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/nightly" \
+            | jq -r '.assets[]?.id // empty')
+          for id in $ASSET_IDS; do
+            echo "Deleting old asset ID: $id"
+            curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id"
+          done
 
       - name: Publish Rolling Nightly Release
         uses: softprops/action-gh-release@v2
