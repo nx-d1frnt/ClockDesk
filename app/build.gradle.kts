@@ -5,10 +5,6 @@ plugins {
 }
 
 fun getGitCommitHash(): String {
-    val ciCommit = System.getenv("GITHUB_SHA")
-    if (!ciCommit.isNullOrBlank()) {
-        return ciCommit.take(7)
-    }
     return runCatching {
         ProcessBuilder("git", "rev-parse", "--short", "HEAD")
             .directory(rootDir)
@@ -19,8 +15,8 @@ fun getGitCommitHash(): String {
             .bufferedReader()
             .readText()
             .trim()
-            .ifEmpty { "dev" }
-    }.getOrDefault("dev")
+            .ifEmpty { null }
+    }.getOrNull() ?: System.getenv("GITHUB_SHA")?.take(7) ?: "dev"
 }
 
 android {
