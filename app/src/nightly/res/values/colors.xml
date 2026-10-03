@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nightly Inverted Full-Time Dark Palette (Default / API < 31 Fallback) -->
+    <color name="ic_launcher_bg">#151728</color>
+    <color name="ic_launcher_pattern">#2A2E4B</color>
+    <color name="ic_launcher_tablet">#D0BCFF</color>
+    <color name="ic_launcher_hour_hand">#6750A4</color>
+    <color name="ic_launcher_minute_hand">#4F378A</color>
+</resources>

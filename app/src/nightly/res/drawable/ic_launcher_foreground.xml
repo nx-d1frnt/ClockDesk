@@ -1,19 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-  <group android:scaleX="0.95"
-      android:scaleY="0.95"
-      android:translateX="2.7"
-      android:translateY="2.7">
-      <!-- Main ClockDesk Clock -->
-      <path
-          android:fillColor="#FFFFFF"
-          android:pathData="M54 73.77c0.99 0 1.73 0 2.72-0.25 0.25 1.73 0.74 3.46 1.48 4.7-1.23 0.25-2.72 0.5-4.2 0.5-13.6 0-24.71-11.13-24.71-24.72 0-13.6 11.12-24.71 24.71-24.71 13.6 0 24.71 11.12 24.71 24.71 0 1.24-0.2 2.4-0.4 3.7l-0.09 0.5c-1.48-0.74-2.97-1.23-4.7-1.48 0.25-0.99 0.25-1.73 0.25-2.72 0-10.87-8.9-19.77-19.77-19.77S34.23 43.13 34.23 54 43.13 73.77 54 73.77m1.24-19.03l7.66 4.45c-1 0.74-1.98 1.48-2.72 2.47l-8.65-5.19V41.64h3.7v13.1M68.2 68.21l3.11-6.8 3.09 6.8 6.8 3.09-6.8 3.11-3.09 6.78-3.11-6.78-6.78-3.11 6.78-3.09Z"/>
-      <!-- Glowing Crescent Moon Accent for Nightly -->
-      <path
-          android:fillColor="#FBBF24"
-          android:pathData="M71 27 a 10.5 10.5 0 0 0 7.5 16 a 11.5 11.5 0 1 1 -7.5 -16 z"/>
-  </group>
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <group
+        android:scaleX="0.70"
+        android:scaleY="0.70"
+        android:translateX="30"
+        android:translateY="30">
+        <!-- Clock Display Tablet / Body -->
+        <path
+            android:fillColor="@color/ic_launcher_tablet"
+            android:pathData="M56.5941,78.8457C57.3596,71.5367 57.7424,67.8822 59.1479,64.9986C61.1817,60.8258 64.7308,57.6038 69.0578,56.0018C72.048,54.8947 75.6906,54.8947 82.9758,54.8947H119.762C128.572,54.8947 132.977,54.8947 136.34,56.3381C141.209,58.4281 144.914,62.5816 146.463,67.6861C147.532,71.2116 147.069,75.6311 146.143,84.4701L142.406,120.154C141.64,127.463 141.258,131.118 139.852,134.001C137.818,138.174 134.269,141.396 129.942,142.998C126.952,144.105 123.309,144.105 116.024,144.105H79.2383C70.4281,144.105 66.0229,144.105 62.6601,142.662C57.791,140.572 54.086,136.418 52.5375,131.314C51.468,127.788 51.9309,123.369 52.8567,114.53L56.5941,78.8457Z"/>
+        <!-- Clock Hour Hand -->
+        <path
+            android:pathData="M100,72L100,100"
+            android:strokeColor="@color/ic_launcher_hour_hand"
+            android:strokeWidth="13"
+            android:strokeLineCap="round"/>
+        <!-- Clock Minute Hand -->
+        <path
+            android:pathData="M112.596,112.596L99.8742,99.8742"
+            android:strokeColor="@color/ic_launcher_minute_hand"
+            android:strokeWidth="13"
+            android:strokeLineCap="round"/>
+    </group>
 </vector>

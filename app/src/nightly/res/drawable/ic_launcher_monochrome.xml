@@ -9,21 +9,26 @@
         android:scaleY="0.70"
         android:translateX="30"
         android:translateY="30">
-        <!-- Clock Display Tablet / Body -->
+        <!-- Clock Display Tablet Outline -->
         <path
-            android:fillColor="@color/ic_launcher_tablet"
+            android:strokeColor="#000000"
+            android:strokeWidth="10"
             android:pathData="M56.5941,78.8457C57.3596,71.5367 57.7424,67.8822 59.1479,64.9986C61.1817,60.8258 64.7308,57.6038 69.0578,56.0018C72.048,54.8947 75.6906,54.8947 82.9758,54.8947H119.762C128.572,54.8947 132.977,54.8947 136.34,56.3381C141.209,58.4281 144.914,62.5816 146.463,67.6861C147.532,71.2116 147.069,75.6311 146.143,84.4701L142.406,120.154C141.64,127.463 141.258,131.118 139.852,134.001C137.818,138.174 134.269,141.396 129.942,142.998C126.952,144.105 123.309,144.105 116.024,144.105H79.2383C70.4281,144.105 66.0229,144.105 62.6601,142.662C57.791,140.572 54.086,136.418 52.5375,131.314C51.468,127.788 51.9309,123.369 52.8567,114.53L56.5941,78.8457Z"/>
         <!-- Clock Hour Hand -->
         <path
             android:pathData="M100,72L100,100"
-            android:strokeColor="@color/ic_launcher_hour_hand"
-            android:strokeWidth="13"
+            android:strokeColor="#000000"
+            android:strokeWidth="14"
             android:strokeLineCap="round"/>
         <!-- Clock Minute Hand -->
         <path
             android:pathData="M112.596,112.596L99.8742,99.8742"
-            android:strokeColor="@color/ic_launcher_minute_hand"
-            android:strokeWidth="13"
+            android:strokeColor="#000000"
+            android:strokeWidth="14"
             android:strokeLineCap="round"/>
     </group>
+    <!-- Crescent Moon Accent for Nightly (Themed Icons / Monochrome) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 130 44 a 9 9 0 0 0 6 14 a 10 10 0 1 1 -6 -14 z"/>
 </vector>

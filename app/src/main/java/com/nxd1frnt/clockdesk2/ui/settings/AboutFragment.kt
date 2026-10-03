@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.nxd1frnt.clockdesk2.BuildConfig
 import com.nxd1frnt.clockdesk2.R
 
@@ -24,6 +25,9 @@ class AboutFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Ensure pattern is clipped to card corners
+        view.findViewById<MaterialCardView>(R.id.about_identity_card)?.clipToOutline = true
 
         val versionName = BuildConfig.VERSION_NAME
         val versionCode = BuildConfig.VERSION_CODE
