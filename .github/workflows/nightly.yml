@@ -113,12 +113,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly
+          target_commitish: ${{ env.TARGET_BRANCH }}
           name: "Nightly Build (${{ env.BUILD_DATE }} - ${{ env.TARGET_BRANCH }} - ${{ env.SHORT_SHA }})"
           body: |
             ### 🌙 ClockDesk Nightly Build
 
             - **Branch:** [`${{ env.TARGET_BRANCH }}`](https://github.com/${{ github.repository }}/tree/${{ env.TARGET_BRANCH }})
-            - **Commit:** [`${{ env.SHORT_SHA }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            - **Commit:** [`${{ env.SHORT_SHA }}`](https://github.com/${{ github.repository }}/commit/${{ env.SHORT_SHA }})
             - **Date:** ${{ env.BUILD_DATE }}
 
             > [!WARNING]
