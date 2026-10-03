@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app/src/main/res/mipmap-hdpi/ic_launcher_round.webp" alt="ClockDesk Logo" width="120" />
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" alt="ClockDesk Logo" width="120" />
 
 # ClockDesk
 
