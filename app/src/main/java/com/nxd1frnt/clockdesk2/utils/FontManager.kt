@@ -673,7 +673,9 @@ class FontManager(
             R.id.lastfm_layout -> {
                 applyStyleToTextView(lastfmText, settings, typeface, finalColor, colorOnly)
                 if (!colorOnly) {
-                    lastfmIcon.alpha = settings.alpha
+                    lastfmLayout.findViewById<View>(R.id.media_ticker_layout)?.alpha = settings.alpha
+                    lastfmText.alpha = 1.0f
+                    lastfmIcon.alpha = 1.0f
                 }
                 lastfmIcon.setColorFilter(finalColor)
 
@@ -717,23 +719,43 @@ class FontManager(
                 }
 
                 // Apply style to compact card views if present
-                lastfmLayout.findViewById<MaterialCardView>(R.id.media_compact_card)?.setCardBackgroundColor(finalCardBgColor)
+                val compactCard = lastfmLayout.findViewById<MaterialCardView>(R.id.media_compact_card)
+                compactCard?.setCardBackgroundColor(finalCardBgColor)
+                if (!colorOnly) {
+                    compactCard?.alpha = settings.alpha
+                }
                 lastfmLayout.findViewById<View>(R.id.compact_source_icon)?.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
                 lastfmLayout.findViewById<TextView>(R.id.compact_title_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 1.0f
+                    }
                 }
                 lastfmLayout.findViewById<TextView>(R.id.compact_artist_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 0.8f
+                    }
                 }
 
                 // Apply style to expanded player views if present
-                lastfmLayout.findViewById<MaterialCardView>(R.id.media_expanded_card)?.setCardBackgroundColor(finalCardBgColor)
+                val expandedCard = lastfmLayout.findViewById<MaterialCardView>(R.id.media_expanded_card)
+                expandedCard?.setCardBackgroundColor(finalCardBgColor)
+                if (!colorOnly) {
+                    expandedCard?.alpha = settings.alpha
+                }
                 lastfmLayout.findViewById<View>(R.id.expanded_source_icon)?.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
                 lastfmLayout.findViewById<TextView>(R.id.expanded_title_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 1.0f
+                    }
                 }
                 lastfmLayout.findViewById<TextView>(R.id.expanded_artist_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 0.8f
+                    }
                 }
 
                 // Apply colors to squiggly progress bar
@@ -758,10 +780,9 @@ class FontManager(
                 btnNext?.setColorFilter(finalColor)
 
                 if (!colorOnly) {
-                    val alpha = settings.alpha
-                    btnPrev?.alpha = alpha
-                    btnPlay?.alpha = alpha
-                    btnNext?.alpha = alpha
+                    btnPrev?.alpha = 1.0f
+                    btnPlay?.alpha = 1.0f
+                    btnNext?.alpha = 1.0f
                 }
             }
             R.id.smart_chip_container -> {
