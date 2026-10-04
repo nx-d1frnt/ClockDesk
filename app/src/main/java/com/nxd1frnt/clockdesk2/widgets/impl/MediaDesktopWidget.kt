@@ -90,6 +90,9 @@ class MediaDesktopWidget(
     var onPlayPauseAction: (() -> Unit)? = null
     var onNextAction: (() -> Unit)? = null
     var onPrevAction: (() -> Unit)? = null
+    var onTimeoutAction: (() -> Unit)? = null
+
+    private var isPausedTimedOut: Boolean = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pausedFadeOutRunnable: Runnable? = null
@@ -214,7 +217,7 @@ class MediaDesktopWidget(
             )
             updateSourceIcon(trackToPreview)
         } else {
-            val isMusicActive = currentTrack != null && layout.alpha > 0
+            val isMusicActive = currentTrack != null && !isPausedTimedOut && (isPlayingState || pausedFadeOutRunnable != null)
 
             if (!isMusicActive) {
                 layout.animate()
@@ -277,6 +280,7 @@ class MediaDesktopWidget(
 
         when (state) {
             is PluginState.Playing -> {
+                isPausedTimedOut = false
                 cancelPausedTimeout()
                 val track = state.track
                 val trackInfoText = "${track.artist} - ${track.title}"
@@ -301,6 +305,11 @@ class MediaDesktopWidget(
                 currentTrack = track
                 isPlayingState = false
 
+                if (isPausedTimedOut) {
+                    // Rule: Do not show paused players again after timeout
+                    return
+                }
+
                 populateTrackData(track, isPlaying = false)
 
                 if (layout.visibility != View.VISIBLE) {
@@ -312,6 +321,7 @@ class MediaDesktopWidget(
             }
 
             is PluginState.Idle, is PluginState.Disabled -> {
+                isPausedTimedOut = false
                 cancelPausedTimeout()
                 stopProgressTracker()
                 currentTrack = null
@@ -321,11 +331,17 @@ class MediaDesktopWidget(
     }
 
     private fun schedulePausedTimeout() {
-        cancelPausedTimeout()
+        if (pausedFadeOutRunnable != null) {
+            // Already scheduled, do not continuously postpone timeout on repeated paused updates
+            return
+        }
         val runnable = Runnable {
             if (!host.isEditMode && !isPlayingState) {
+                isPausedTimedOut = true
                 performIdleTransition()
+                onTimeoutAction?.invoke()
             }
+            pausedFadeOutRunnable = null
         }
         pausedFadeOutRunnable = runnable
         mainHandler.postDelayed(runnable, 45_000L)
@@ -701,6 +717,8 @@ class MediaDesktopWidget(
         btnPrev = null
         btnPlayPause = null
         btnNext = null
+        onTimeoutAction = null
+        isPausedTimedOut = false
         super.onDestroy()
     }
 }

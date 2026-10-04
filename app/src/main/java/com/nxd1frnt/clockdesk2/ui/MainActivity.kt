@@ -1347,6 +1347,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 onPlayPauseAction = { musicManager?.togglePlayPause() }
                 onNextAction = { musicManager?.next() }
                 onPrevAction = { musicManager?.previous() }
+                onTimeoutAction = { performMusicIdleState() }
             }
         }
     }
@@ -1501,6 +1502,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         } else if (state is PluginState.Paused) {
             val track = state.track
             lastTrackInfo = "${track.artist} - ${track.title}"
+
+            pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
+            pendingBackgroundRestoreRunnable = null
+
+            if (wasMusicBackgroundApplied) {
+                restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                wasMusicBackgroundApplied = false
+                currentAppliedArtworkSource = null
+            }
+
+            if (isGraphicsTurbulenceContinuousMusicEnabled || dynamicBackgroundView.isTurbulencePlaying) {
+                dynamicBackgroundView.finishTurbulence(750L)
+            }
         } else {
             lastTrackInfo = null
         }
@@ -1542,7 +1556,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             currentAppliedArtworkSource = null
         }
 
-        if (isGraphicsTurbulenceContinuousMusicEnabled) {
+        if (isGraphicsTurbulenceContinuousMusicEnabled || dynamicBackgroundView.isTurbulencePlaying) {
             dynamicBackgroundView.finishTurbulence(1000L)
         }
     }
