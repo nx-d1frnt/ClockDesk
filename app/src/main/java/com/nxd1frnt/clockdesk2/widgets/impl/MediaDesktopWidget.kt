@@ -4,12 +4,14 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Outline
 import android.graphics.PorterDuff
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -180,6 +182,10 @@ class MediaDesktopWidget(
 
     fun updateMediaStyle(style: MediaStyle) {
         applyStyleVisibility(style)
+        compactCoverArt?.tag = null
+        expandedCoverArt?.tag = null
+        compactSourceIcon?.tag = null
+        expandedSourceIcon?.tag = null
         currentTrack?.let { populateTrackData(it, isPlayingState) }
     }
 
@@ -204,11 +210,11 @@ class MediaDesktopWidget(
 
             if (nowPlayingTextView?.text.isNullOrEmpty()) {
                 val placeholder = host.hostContext.getString(R.string.now_playing_placeholder)
-                nowPlayingTextView?.text = placeholder
-                compactTitleText?.text = placeholder
-                compactArtistText?.text = "Artist"
-                expandedTitleText?.text = placeholder
-                expandedArtistText?.text = "Artist"
+                updateTextIfChanged(nowPlayingTextView, placeholder)
+                updateTextIfChanged(compactTitleText, placeholder)
+                updateTextIfChanged(compactArtistText, "Artist")
+                updateTextIfChanged(expandedTitleText, placeholder)
+                updateTextIfChanged(expandedArtistText, "Artist")
             }
             val trackToPreview = currentTrack ?: MusicTrack(
                 title = host.hostContext.getString(R.string.now_playing_placeholder),
@@ -266,11 +272,11 @@ class MediaDesktopWidget(
                 }
                 else -> {
                     val placeholder = host.hostContext.getString(R.string.now_playing_placeholder)
-                    nowPlayingTextView?.text = placeholder
-                    compactTitleText?.text = placeholder
-                    compactArtistText?.text = "Artist"
-                    expandedTitleText?.text = placeholder
-                    expandedArtistText?.text = "Artist"
+                    updateTextIfChanged(nowPlayingTextView, placeholder)
+                    updateTextIfChanged(compactTitleText, placeholder)
+                    updateTextIfChanged(compactArtistText, "Artist")
+                    updateTextIfChanged(expandedTitleText, placeholder)
+                    updateTextIfChanged(expandedArtistText, "Artist")
                     lastTrackInfo = null
                     currentTrack = null
                 }
@@ -352,25 +358,58 @@ class MediaDesktopWidget(
         pausedFadeOutRunnable = null
     }
 
+    private fun updateTextIfChanged(textView: TextView?, newText: CharSequence) {
+        if (textView == null) return
+        if (textView.text?.toString() != newText.toString()) {
+            textView.text = newText
+        }
+        if (!textView.isSelected) {
+            textView.isSelected = true
+        }
+    }
+
+    private fun areArtworkSourcesEqual(source1: Any?, source2: Any?): Boolean {
+        if (source1 === source2) return true
+        if (source1 == null || source2 == null) return false
+        if (source1 is String && source2 is String) {
+            return source1 == source2
+        }
+        if (source1 is Uri && source2 is Uri) {
+            return source1 == source2
+        }
+        if (source1 is Int && source2 is Int) {
+            return source1 == source2
+        }
+        if (source1 is Bitmap && source2 is Bitmap) {
+            if (source1.isRecycled || source2.isRecycled) return false
+            if (source1.width != source2.width || source1.height != source2.height) return false
+            return runCatching { source1.sameAs(source2) }.getOrDefault(false)
+        }
+        return false
+    }
+
     private fun populateTrackData(track: MusicTrack, isPlaying: Boolean) {
         val trackInfoText = "${track.artist} - ${track.title}"
 
         // 1. Minimal Ticker
-        nowPlayingTextView?.text = trackInfoText
-        nowPlayingTextView?.isSelected = true
+        updateTextIfChanged(nowPlayingTextView, trackInfoText)
         updateSourceIcon(track)
 
         // 2. Compact Card
-        compactTitleText?.text = track.title.ifEmpty { trackInfoText }
-        compactArtistText?.text = track.artist.ifEmpty { "Unknown Artist" }
+        updateTextIfChanged(compactTitleText, track.title.ifEmpty { trackInfoText })
+        updateTextIfChanged(compactArtistText, track.artist.ifEmpty { "Unknown Artist" })
         loadArtwork(track, compactCoverArt)
 
         // 3. Expanded Player
-        expandedTitleText?.text = track.title.ifEmpty { trackInfoText }
-        expandedArtistText?.text = track.artist.ifEmpty { "Unknown Artist" }
+        updateTextIfChanged(expandedTitleText, track.title.ifEmpty { trackInfoText })
+        updateTextIfChanged(expandedArtistText, track.artist.ifEmpty { "Unknown Artist" })
         loadArtwork(track, expandedCoverArt)
 
-        btnPlayPause?.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow)
+        val playPauseRes = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow
+        if (btnPlayPause?.tag != playPauseRes) {
+            btnPlayPause?.setImageResource(playPauseRes)
+            btnPlayPause?.tag = playPauseRes
+        }
 
         currentDurationMs = track.durationMs ?: 0L
         currentPositionMs = track.positionMs ?: 0L
@@ -380,6 +419,19 @@ class MediaDesktopWidget(
     private fun loadArtwork(track: MusicTrack, targetView: ImageView?) {
         val view = targetView ?: return
         val context = host.hostContext
+
+        val currentSource: Any? = when {
+            track.artworkBitmap != null && !track.artworkBitmap.isRecycled -> track.artworkBitmap
+            !track.artworkUrl.isNullOrEmpty() -> track.artworkUrl
+            track.sourceIconBitmap != null && !track.sourceIconBitmap.isRecycled -> track.sourceIconBitmap
+            track.sourceIconResId != null -> track.sourceIconResId
+            else -> R.drawable.music_note
+        }
+
+        if (areArtworkSourcesEqual(view.tag, currentSource)) {
+            return
+        }
+        view.tag = currentSource
 
         if (track.artworkBitmap != null && !track.artworkBitmap.isRecycled) {
             view.setImageBitmap(track.artworkBitmap)
@@ -438,14 +490,24 @@ class MediaDesktopWidget(
 
     private fun updateProgressBarUI() {
         val bar = expandedProgressBar ?: return
-        bar.isPlaying = isPlayingState
+        if (bar.isPlaying != isPlayingState) {
+            bar.isPlaying = isPlayingState
+        }
         if (currentDurationMs > 0) {
-            val progress = ((currentPositionMs.toFloat() / currentDurationMs.toFloat()) * 1000).toInt()
-            bar.progress = progress.coerceIn(0, 1000)
-            bar.visibility = View.VISIBLE
+            val progress = ((currentPositionMs.toFloat() / currentDurationMs.toFloat()) * 1000).toInt().coerceIn(0, 1000)
+            if (bar.progress != progress) {
+                bar.progress = progress
+            }
+            if (bar.visibility != View.VISIBLE) {
+                bar.visibility = View.VISIBLE
+            }
         } else {
-            bar.progress = 0
-            bar.visibility = View.GONE
+            if (bar.progress != 0) {
+                bar.progress = 0
+            }
+            if (bar.visibility != View.GONE) {
+                bar.visibility = View.GONE
+            }
         }
     }
 
@@ -556,21 +618,38 @@ class MediaDesktopWidget(
 
         // Handle badges on Compact & Expanded styles
         if (!showMediaIcon) {
-            compactSourceIcon?.visibility = View.GONE
-            expandedSourceIcon?.visibility = View.GONE
+            if (compactSourceIcon?.visibility != View.GONE) compactSourceIcon?.visibility = View.GONE
+            if (expandedSourceIcon?.visibility != View.GONE) expandedSourceIcon?.visibility = View.GONE
         } else {
             compactSourceIcon?.let {
-                it.visibility = View.VISIBLE
+                if (it.visibility != View.VISIBLE) it.visibility = View.VISIBLE
                 applyIconToBadge(it, track)
             }
             expandedSourceIcon?.let {
-                it.visibility = View.VISIBLE
+                if (it.visibility != View.VISIBLE) it.visibility = View.VISIBLE
                 applyIconToBadge(it, track)
             }
         }
 
         // Handle Minimal Ticker icon
         val iconView = lastfmIcon ?: return
+        val tickerKey: Any? = if (!showMediaIcon) {
+            R.drawable.music_note
+        } else {
+            when {
+                track.sourceIconResId != null -> track.sourceIconResId
+                track.sourceIconBitmap != null -> track.sourceIconBitmap
+                !track.sourcePackageName.isNullOrEmpty() -> track.sourcePackageName
+                else -> R.drawable.music_note
+            }
+        }
+
+        if (areArtworkSourcesEqual(iconView.tag, tickerKey)) {
+            if (iconView.visibility != View.VISIBLE) iconView.visibility = View.VISIBLE
+            return
+        }
+        iconView.tag = tickerKey
+
         if (!showMediaIcon) {
             iconView.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
             val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
@@ -660,6 +739,18 @@ class MediaDesktopWidget(
     }
 
     private fun applyIconToBadge(view: ImageView, track: MusicTrack) {
+        val badgeKey: Any? = when {
+            track.sourceIconResId != null -> track.sourceIconResId
+            track.sourceIconBitmap != null -> track.sourceIconBitmap
+            !track.sourcePackageName.isNullOrEmpty() -> track.sourcePackageName
+            else -> R.drawable.music_note
+        }
+
+        if (areArtworkSourcesEqual(view.tag, badgeKey)) {
+            return
+        }
+        view.tag = badgeKey
+
         if (track.sourceIconResId != null) {
             view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, track.sourceIconResId))
             view.colorFilter = null
