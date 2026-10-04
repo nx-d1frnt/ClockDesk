@@ -17,6 +17,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import android.content.res.ColorStateList
+import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import android.util.TypedValue
 import com.google.android.material.card.MaterialCardView
@@ -679,25 +681,44 @@ class FontManager(
                 val typedValue = TypedValue()
                 val theme = context.theme
                 val defaultSurfaceColor = if (theme.resolveAttribute(com.google.android.material.R.attr.colorSurfaceContainerHighest, typedValue, true)) {
-                    typedValue.data
+                    if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                        typedValue.data
+                    } else if (typedValue.resourceId != 0) {
+                        ContextCompat.getColor(context, typedValue.resourceId)
+                    } else {
+                        ContextCompat.getColor(context, R.color.md_theme_surfaceContainerHighest)
+                    }
                 } else {
-                    0xFF32353A.toInt()
+                    ContextCompat.getColor(context, R.color.md_theme_surfaceContainerHighest)
                 }
 
-                val finalCardBgColor = if (effectiveFactor > 0f) {
-                    val redShiftedBg = Color.argb(
-                        Color.alpha(defaultSurfaceColor),
-                        Color.red(defaultSurfaceColor),
-                        (Color.green(defaultSurfaceColor) * 0.4f).toInt(),
-                        (Color.blue(defaultSurfaceColor) * 0.3f).toInt()
-                    )
-                    interpolateColor(defaultSurfaceColor, redShiftedBg, effectiveFactor)
+                val baseBgColor = if (settings.useDynamicBackgroundColor) {
+                    if (currentScheme != null) {
+                        getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+                    } else {
+                        getColorfromRole(settings.dynamicBackgroundColorRole)
+                    }
+                } else if (settings.backgroundColor != Color.DKGRAY && settings.backgroundColor != 0) {
+                    settings.backgroundColor
                 } else {
                     defaultSurfaceColor
                 }
 
+                val finalCardBgColor = if (effectiveFactor > 0f) {
+                    val redShiftedBg = Color.argb(
+                        Color.alpha(baseBgColor),
+                        Color.red(baseBgColor),
+                        (Color.green(baseBgColor) * 0.4f).toInt(),
+                        (Color.blue(baseBgColor) * 0.3f).toInt()
+                    )
+                    interpolateColor(baseBgColor, redShiftedBg, effectiveFactor)
+                } else {
+                    baseBgColor
+                }
+
                 // Apply style to compact card views if present
                 lastfmLayout.findViewById<MaterialCardView>(R.id.media_compact_card)?.setCardBackgroundColor(finalCardBgColor)
+                lastfmLayout.findViewById<View>(R.id.compact_source_icon)?.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
                 lastfmLayout.findViewById<TextView>(R.id.compact_title_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
                 }
@@ -707,6 +728,7 @@ class FontManager(
 
                 // Apply style to expanded player views if present
                 lastfmLayout.findViewById<MaterialCardView>(R.id.media_expanded_card)?.setCardBackgroundColor(finalCardBgColor)
+                lastfmLayout.findViewById<View>(R.id.expanded_source_icon)?.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
                 lastfmLayout.findViewById<TextView>(R.id.expanded_title_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
                 }
@@ -767,7 +789,21 @@ class FontManager(
     }
 
     fun getColorfromRole(role: String?): Int {
-        if (currentScheme == null) return context.getColor(R.color.md_theme_primary)
+        if (currentScheme == null) {
+            return when (role) {
+                "primary" -> ContextCompat.getColor(context, R.color.md_theme_primary)
+                "primary_container" -> ContextCompat.getColor(context, R.color.md_theme_primaryContainer)
+                "secondary" -> ContextCompat.getColor(context, R.color.md_theme_secondary)
+                "secondary_container" -> ContextCompat.getColor(context, R.color.md_theme_secondaryContainer)
+                "tertiary" -> ContextCompat.getColor(context, R.color.md_theme_tertiary)
+                "tertiary_container" -> ContextCompat.getColor(context, R.color.md_theme_tertiaryContainer)
+                "surface_variant" -> ContextCompat.getColor(context, R.color.md_theme_surfaceVariant)
+                "outline" -> ContextCompat.getColor(context, R.color.md_theme_outline)
+                "surface" -> ContextCompat.getColor(context, R.color.md_theme_surface)
+                "inverse_surface" -> ContextCompat.getColor(context, R.color.md_theme_inverseSurface)
+                else -> ContextCompat.getColor(context, R.color.md_theme_primary)
+            }
+        }
         return when (role) {
             "primary" -> currentScheme!!.primary
             "primary_container" -> currentScheme!!.primaryContainer
@@ -777,6 +813,8 @@ class FontManager(
             "tertiary_container" -> currentScheme!!.tertiaryContainer
             "surface_variant" -> currentScheme!!.surfaceVariant
             "outline" -> currentScheme!!.outline
+            "surface" -> currentScheme!!.surface
+            "inverse_surface" -> currentScheme!!.inverseSurface
             else -> currentScheme!!.primary
         } as Int
     }
@@ -893,8 +931,12 @@ class FontManager(
         }
 
         val cardView = view as? MaterialCardView
-        val baseBgColor = if (settings.useDynamicBackgroundColor && currentScheme != null) {
-            getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+        val baseBgColor = if (settings.useDynamicBackgroundColor) {
+            if (currentScheme != null) {
+                getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+            } else {
+                getColorfromRole(settings.dynamicBackgroundColorRole)
+            }
         } else {
             settings.backgroundColor
         }

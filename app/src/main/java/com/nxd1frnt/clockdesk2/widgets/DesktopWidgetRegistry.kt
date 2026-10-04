@@ -102,6 +102,7 @@ object MediaWidgetDefinition : DesktopWidgetDefinition {
         WidgetFeature.MAX_WIDTH,
         WidgetFeature.MEDIA_ICON,
         WidgetFeature.MEDIA_STYLE,
+        WidgetFeature.BACKGROUND_COLOR,
         WidgetFeature.NIGHT_SHIFT
     )
 

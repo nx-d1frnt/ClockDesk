@@ -169,13 +169,33 @@
                     android:paddingEnd="16dp"
                     android:paddingVertical="8dp">
 
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:id="@+id/compact_cover_art"
+                    <FrameLayout
                         android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/music_note"
-                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/compact_cover_art"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/music_note"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/compact_source_icon"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="bottom|end"
+                            android:layout_marginEnd="-2dp"
+                            android:layout_marginBottom="-2dp"
+                            android:padding="2dp"
+                            android:scaleType="fitCenter"
+                            android:background="?attr/colorSurfaceContainerHighest"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                            android:visibility="gone" />
+                    </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -232,13 +252,33 @@
                     android:paddingEnd="14dp"
                     android:paddingVertical="10dp">
 
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:id="@+id/expanded_cover_art"
+                    <FrameLayout
                         android:layout_width="60dp"
                         android:layout_height="60dp"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/music_note"
-                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/expanded_cover_art"
+                            android:layout_width="60dp"
+                            android:layout_height="60dp"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/music_note"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/expanded_source_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="bottom|end"
+                            android:layout_marginEnd="-2dp"
+                            android:layout_marginBottom="-2dp"
+                            android:padding="2dp"
+                            android:scaleType="fitCenter"
+                            android:background="?attr/colorSurfaceContainerHighest"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                            android:visibility="gone" />
+                    </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"

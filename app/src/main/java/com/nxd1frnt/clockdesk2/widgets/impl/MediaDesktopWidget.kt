@@ -53,6 +53,8 @@ class MediaDesktopWidget(
         private set
     var compactCoverArt: ImageView? = null
         private set
+    var compactSourceIcon: ImageView? = null
+        private set
     var compactTitleText: TextView? = null
         private set
     var compactArtistText: TextView? = null
@@ -62,6 +64,8 @@ class MediaDesktopWidget(
     var mediaExpandedCard: MaterialCardView? = null
         private set
     var expandedCoverArt: ImageView? = null
+        private set
+    var expandedSourceIcon: ImageView? = null
         private set
     var expandedTitleText: TextView? = null
         private set
@@ -107,6 +111,7 @@ class MediaDesktopWidget(
         // 2. Compact Card
         mediaCompactCard = view.findViewById(R.id.media_compact_card)
         compactCoverArt = view.findViewById(R.id.compact_cover_art)
+        compactSourceIcon = view.findViewById(R.id.compact_source_icon)
         compactTitleText = view.findViewById(R.id.compact_title_text)
         compactArtistText = view.findViewById(R.id.compact_artist_text)
         compactTitleText?.isSelected = true
@@ -115,6 +120,7 @@ class MediaDesktopWidget(
         // 3. Expanded Player
         mediaExpandedCard = view.findViewById(R.id.media_expanded_card)
         expandedCoverArt = view.findViewById(R.id.expanded_cover_art)
+        expandedSourceIcon = view.findViewById(R.id.expanded_source_icon)
         expandedTitleText = view.findViewById(R.id.expanded_title_text)
         expandedArtistText = view.findViewById(R.id.expanded_artist_text)
         expandedProgressBar = view.findViewById(R.id.expanded_progress_bar)
@@ -201,6 +207,12 @@ class MediaDesktopWidget(
                 expandedTitleText?.text = placeholder
                 expandedArtistText?.text = "Artist"
             }
+            val trackToPreview = currentTrack ?: MusicTrack(
+                title = host.hostContext.getString(R.string.now_playing_placeholder),
+                artist = "Artist",
+                album = ""
+            )
+            updateSourceIcon(trackToPreview)
         } else {
             val isMusicActive = currentTrack != null && layout.alpha > 0
 
@@ -524,9 +536,25 @@ class MediaDesktopWidget(
     }
 
     fun updateSourceIcon(track: MusicTrack) {
-        val iconView = lastfmIcon ?: return
         val showMediaIcon = host.getPreferences().getBoolean("show_media_icon", false)
 
+        // Handle badges on Compact & Expanded styles
+        if (!showMediaIcon) {
+            compactSourceIcon?.visibility = View.GONE
+            expandedSourceIcon?.visibility = View.GONE
+        } else {
+            compactSourceIcon?.let {
+                it.visibility = View.VISIBLE
+                applyIconToBadge(it, track)
+            }
+            expandedSourceIcon?.let {
+                it.visibility = View.VISIBLE
+                applyIconToBadge(it, track)
+            }
+        }
+
+        // Handle Minimal Ticker icon
+        val iconView = lastfmIcon ?: return
         if (!showMediaIcon) {
             iconView.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
             val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
@@ -615,6 +643,43 @@ class MediaDesktopWidget(
         iconView.visibility = View.VISIBLE
     }
 
+    private fun applyIconToBadge(view: ImageView, track: MusicTrack) {
+        if (track.sourceIconResId != null) {
+            view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, track.sourceIconResId))
+            view.colorFilter = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                view.imageAlpha = 255
+            }
+        } else if (track.sourceIconBitmap != null) {
+            view.setImageBitmap(track.sourceIconBitmap)
+            view.colorFilter = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                view.imageAlpha = 255
+            }
+        } else if (!track.sourcePackageName.isNullOrEmpty()) {
+            try {
+                val icon = host.hostContext.packageManager.getApplicationIcon(track.sourcePackageName)
+                view.setImageDrawable(icon)
+                view.colorFilter = null
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    view.imageAlpha = 255
+                }
+            } catch (e: PackageManager.NameNotFoundException) {
+                view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
+                val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
+                if (tintColor != null) {
+                    view.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+                }
+            }
+        } else {
+            view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
+            val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
+            if (tintColor != null) {
+                view.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+            }
+        }
+    }
+
     override fun onDestroy() {
         cancelPausedTimeout()
         stopProgressTracker()
@@ -624,10 +689,12 @@ class MediaDesktopWidget(
         mediaTickerLayout = null
         mediaCompactCard = null
         compactCoverArt = null
+        compactSourceIcon = null
         compactTitleText = null
         compactArtistText = null
         mediaExpandedCard = null
         expandedCoverArt = null
+        expandedSourceIcon = null
         expandedTitleText = null
         expandedArtistText = null
         expandedProgressBar = null
