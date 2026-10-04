@@ -32,6 +32,7 @@ enum class WidgetFeature {
     FREE_MOVEMENT,
     TIME_FORMAT,
     DATE_FORMAT,
+    DATE_STYLE,
     CLOCK_STYLE,
     NIGHT_SHIFT,
     MAX_WIDTH,

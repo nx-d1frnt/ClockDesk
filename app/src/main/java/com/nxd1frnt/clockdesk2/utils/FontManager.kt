@@ -142,6 +142,7 @@ class FontManager(
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
     private var clockStyle: ClockStyle = ClockStyle.STANDARD
+    private var dateStyle: DateStyle = DateStyle.STANDARD
 
     private val baseChipContainerSizeDp = 165f
     private val baseChipFontSizeSp = 14f
@@ -467,6 +468,8 @@ class FontManager(
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
         clockStyle = ClockStyle.fromId(prefs.getString("clockStyle", ClockStyle.STANDARD.id))
         applyClockStyleToTimeView()
+        dateStyle = DateStyle.fromId(prefs.getString("dateStyle", DateStyle.STANDARD.id))
+        applyDateStyleToDateView()
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val defaults = getDefaultSettingsFor(viewId)
@@ -545,6 +548,7 @@ class FontManager(
         editor.putString("timeFormatPattern", timeFormatPattern)
         editor.putString("dateFormatPattern", dateFormatPattern)
         editor.putString("clockStyle", clockStyle.id)
+        editor.putString("dateStyle", dateStyle.id)
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val settings = settingsMap[viewId] ?: return@forEach
@@ -654,7 +658,10 @@ class FontManager(
                 applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
                 applyClockStyleToTimeView()
             }
-            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface, finalColor, colorOnly)
+            R.id.date_text -> {
+                applyStyleToTextView(dateText, settings, typeface, finalColor, colorOnly)
+                applyDateStyleToDateView()
+            }
             R.id.lastfm_layout -> {
                 applyStyleToTextView(lastfmText, settings, typeface, finalColor, colorOnly)
                 if (!colorOnly) {
@@ -865,6 +872,8 @@ class FontManager(
                     textView.fontVariationSettings = variationSettings
                     if (textView is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
                         textView.customFontVariationSettings = variationSettings
+                    } else if (textView is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+                        textView.customFontVariationSettings = variationSettings
                     }
                 } catch (e: Throwable) {
                     // Ignore UnsupportedOperationException or other framework/device-specific exceptions
@@ -913,6 +922,44 @@ class FontManager(
             timeText.setLineSpacing(0f, 1.0f)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 timeText.letterSpacing = 0.0f
+            }
+        }
+    }
+
+    fun getDateStyle(): DateStyle = dateStyle
+    fun setDateStyle(style: DateStyle) {
+        dateStyle = style
+        applyToView(R.id.date_text)
+        saveSettings()
+    }
+
+    fun applyDateStyleToDateView() {
+        if (dateText is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+            dateText.isBadgeMode = dateStyle.isBadge
+            dateText.isTwoLineMode = dateStyle.isTwoLine
+        }
+
+        if (dateStyle.isTwoLine) {
+            dateText.isSingleLine = false
+            dateText.maxLines = 2
+            dateText.maxWidth = Int.MAX_VALUE
+            dateText.setLineSpacing(0f, 0.85f)
+            dateText.gravity = android.view.Gravity.START or (dateText.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                dateText.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                dateText.letterSpacing = -0.01f
+            }
+        } else if (dateStyle.isBadge) {
+            dateText.isSingleLine = false
+            dateText.maxLines = 1
+        } else {
+            dateText.isSingleLine = true
+            dateText.maxLines = 1
+            dateText.setLineSpacing(0f, 1.0f)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                dateText.letterSpacing = 0.0f
             }
         }
     }

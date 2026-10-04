@@ -117,8 +117,57 @@ class ClockManager(
 
     fun updateDateText() {
         val currentTime = getCurrentTime()
-        val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
-        dateText.text = getFormatter(datePattern).format(currentTime)
+        val dateStyle = fontManager.getDateStyle()
+
+        if (dateText is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+            dateText.isBadgeMode = dateStyle.isBadge
+            dateText.isTwoLineMode = dateStyle.isTwoLine
+            dateText.setDate(currentTime)
+        }
+
+        if (dateStyle.isBadge) {
+            dateText.text = " "
+        } else if (dateStyle.isTwoLine) {
+            val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+            dateText.text = formatTwoLineDate(currentTime, datePattern)
+        } else {
+            val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+            val effectivePattern = datePattern.replace("\\n", " ").trim()
+            dateText.text = getFormatter(effectivePattern).format(currentTime)
+        }
+    }
+
+    fun formatTwoLineDate(currentTime: Date, pattern: String): String {
+        val effectivePattern = pattern.replace("\\n", "\n").trim()
+        return try {
+            val (topPattern, bottomPattern) = when {
+                effectivePattern.contains("\n") -> {
+                    val parts = effectivePattern.split("\n", limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                effectivePattern.contains(",") -> {
+                    val parts = effectivePattern.split(",", limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                effectivePattern.contains(" ") -> {
+                    val parts = effectivePattern.split(Regex("\\s+"), limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                else -> {
+                    "EEE" to effectivePattern
+                }
+            }
+
+            val line1 = getFormatter(topPattern.ifBlank { "EEE" }).format(currentTime)
+            val line2 = getFormatter(bottomPattern.ifBlank { "MMM d" }).format(currentTime)
+            val safeLine1 = line1.toCharArray().joinToString("\u2060")
+            val safeLine2 = line2.toCharArray().joinToString("\u2060")
+            "$safeLine1\n$safeLine2"
+        } catch (e: Exception) {
+            val line1 = getFormatter("EEE").format(currentTime)
+            val line2 = getFormatter("MMM d").format(currentTime)
+            "$line1\n$line2"
+        }
     }
 
     fun startUpdates() {

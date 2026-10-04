@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingEnd="12dp"
+    android:paddingStart="4dp"
+    android:paddingVertical="4dp">
+
+    <FrameLayout
+        android:id="@+id/date_card_container"
+        android:layout_width="76dp"
+        android:layout_height="76dp"
+        android:background="@drawable/bg_clock_style_unselected"
+        android:padding="8dp">
+
+        <!-- 2-Line stacked preview container -->
+        <LinearLayout
+            android:id="@+id/two_line_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_vertical|start"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/preview_top"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:gravity="start"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="Mon" />
+
+            <TextView
+                android:id="@+id/preview_bottom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:gravity="start"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="Oct 4" />
+        </LinearLayout>
+
+        <!-- Single line date preview -->
+        <TextView
+            android:id="@+id/single_line_preview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="12sp"
+            android:singleLine="true"
+            android:textStyle="bold"
+            tools:text="Mon, Oct 4" />
+
+        <!-- Calendar badge preview -->
+        <com.nxd1frnt.clockdesk2.ui.view.DateTextView
+            android:id="@+id/badge_preview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="2dp"
+            android:textSize="16sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Selection indicator divider line -->
+    <View
+        android:id="@+id/selection_divider"
+        android:layout_width="3dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="10dp"
+        android:background="?attr/colorOnSurface"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+</LinearLayout>

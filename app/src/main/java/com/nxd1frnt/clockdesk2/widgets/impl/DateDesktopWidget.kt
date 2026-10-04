@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2.widgets.impl
 
 import android.view.View
 import android.widget.TextView
+import com.nxd1frnt.clockdesk2.ui.view.DateTextView
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetDefinition
 import com.nxd1frnt.clockdesk2.widgets.WidgetInstance
 import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetController
@@ -27,13 +28,60 @@ class DateDesktopWidget(
     fun updateDate(currentDate: Date) {
         val view = textView ?: return
         val fontManager = host.fontManager ?: return
-        val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, d MMM" }
-        try {
-            val dateFormat = SimpleDateFormat(pattern, Locale.getDefault())
-            view.text = dateFormat.format(currentDate)
+        val dateStyle = fontManager.getDateStyle()
+
+        if (view is DateTextView) {
+            view.isBadgeMode = dateStyle.isBadge
+            view.isTwoLineMode = dateStyle.isTwoLine
+            view.setDate(currentDate)
+        }
+
+        if (dateStyle.isBadge) {
+            view.text = " "
+        } else if (dateStyle.isTwoLine) {
+            val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+            view.text = formatTwoLineDate(currentDate, pattern)
+        } else {
+            val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, d MMM" }
+            try {
+                val dateFormat = SimpleDateFormat(pattern, Locale.getDefault())
+                view.text = dateFormat.format(currentDate)
+            } catch (e: Exception) {
+                val fallbackFormat = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
+                view.text = fallbackFormat.format(currentDate)
+            }
+        }
+    }
+
+    private fun formatTwoLineDate(currentDate: Date, pattern: String): String {
+        val locale = Locale.getDefault()
+        val effectivePattern = pattern.replace("\\n", "\n").trim()
+        return try {
+            val (topPattern, bottomPattern) = when {
+                effectivePattern.contains("\n") -> {
+                    val parts = effectivePattern.split("\n", limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                effectivePattern.contains(",") -> {
+                    val parts = effectivePattern.split(",", limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                effectivePattern.contains(" ") -> {
+                    val parts = effectivePattern.split(Regex("\\s+"), limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                else -> {
+                    "EEE" to effectivePattern
+                }
+            }
+
+            val line1 = SimpleDateFormat(topPattern.ifBlank { "EEE" }, locale).format(currentDate)
+            val line2 = SimpleDateFormat(bottomPattern.ifBlank { "MMM d" }, locale).format(currentDate)
+            "$line1\n$line2"
         } catch (e: Exception) {
-            val fallbackFormat = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
-            view.text = fallbackFormat.format(currentDate)
+            val line1 = SimpleDateFormat("EEE", locale).format(currentDate)
+            val line2 = SimpleDateFormat("MMM d", locale).format(currentDate)
+            "$line1\n$line2"
         }
     }
 }

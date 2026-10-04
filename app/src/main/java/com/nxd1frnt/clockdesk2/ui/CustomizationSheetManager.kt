@@ -32,15 +32,18 @@ import com.google.android.material.textfield.TextInputLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.ClockStyleAdapter
+import com.nxd1frnt.clockdesk2.ui.adapters.DateStyleAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ClockStyle
+import com.nxd1frnt.clockdesk2.utils.DateStyle
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
 import com.nxd1frnt.clockdesk2.widgets.WidgetFeature
+import com.nxd1frnt.clockdesk2.widgets.impl.DateDesktopWidget
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -84,6 +87,10 @@ class CustomizationSheetManager(
     private val bsClockStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.clock_style_recycler_view) }
     private val bsClockStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_clock_style) }
     private var clockStyleAdapter: ClockStyleAdapter? = null
+
+    private val bsDateStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.date_style_recycler_view) }
+    private val bsDateStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_date_style) }
+    private var dateStyleAdapter: DateStyleAdapter? = null
 
     private val bsApplyButton by lazy { sideSheetView.findViewById<Button>(R.id.apply_button) }
     private val bsCancelButton by lazy { sideSheetView.findViewById<Button>(R.id.cancel_button) }
@@ -319,6 +326,7 @@ class CustomizationSheetManager(
         setupButtons()
         setupFontAdapter()
         setupClockStyleAdapter()
+        setupDateStyleAdapter()
     }
 
     fun showForView(viewToCustomize: View) {
@@ -482,15 +490,17 @@ class CustomizationSheetManager(
             )
 
         bsClockStyleCard.visibility = if (features?.contains(WidgetFeature.CLOCK_STYLE) ?: isTime) View.VISIBLE else View.GONE
+        bsDateStyleCard.visibility = if (features?.contains(WidgetFeature.DATE_STYLE) ?: isDate) View.VISIBLE else View.GONE
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatLabel.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
         bsShowAMPMSwitch.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId != R.id.time_custom_radio) View.VISIBLE else View.GONE
 
-        bsDateFormatGroup.visibility = if (isDate) View.VISIBLE else View.GONE
-        bsDateFormatLabel.visibility = if (isDate) View.VISIBLE else View.GONE
-        sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (isDate) View.VISIBLE else View.GONE
-        bsDateCustomInputLayout.visibility = if (isDate && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
+        val showDateFormat = isDate && (fontManager.getDateStyle() == DateStyle.STANDARD || fontManager.getDateStyle() == DateStyle.TWO_LINE)
+        bsDateFormatGroup.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+        bsDateFormatLabel.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+        bsDateCustomInputLayout.visibility = if (showDateFormat && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
 
         val positioningVisibility = if (showLayoutControls) View.VISIBLE else View.GONE
         sideSheetView.findViewById<View>(R.id.block_positioning_title)?.visibility = positioningVisibility
@@ -512,8 +522,8 @@ class CustomizationSheetManager(
         sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (features?.contains(WidgetFeature.MEDIA_ICON) ?: isLastFm) View.VISIBLE else View.GONE
         bsChipStackOverflowCard.visibility = if (features?.contains(WidgetFeature.CHIP_STACK_OVERFLOW) ?: isSmartChip) View.VISIBLE else View.GONE
         bsMaxWidthContainer.visibility = if (features?.contains(WidgetFeature.MAX_WIDTH) ?: isLastFm) View.VISIBLE else View.GONE
-        bsBlockFormatsTitle.visibility = if (isTime || isDate) View.VISIBLE else View.GONE
-        bsDateFormatCard.visibility = if (isDate) View.VISIBLE else View.GONE
+        bsBlockFormatsTitle.visibility = if (isTime || showDateFormat) View.VISIBLE else View.GONE
+        bsDateFormatCard.visibility = if (showDateFormat) View.VISIBLE else View.GONE
         bsTimeFormatCard.visibility = if (isTime) View.VISIBLE else View.GONE
         bsEditBackgroundSwitch.visibility = if (features?.contains(WidgetFeature.BACKGROUND_COLOR) ?: isSmartChip) View.VISIBLE else View.GONE
         bsRemoveWidgetCard.visibility = View.VISIBLE
@@ -579,6 +589,7 @@ class CustomizationSheetManager(
 
         // Загрузка формата даты
         if (view.id == R.id.date_text) {
+            dateStyleAdapter?.setSelectedStyle(fontManager.getDateStyle())
             val datePattern = fontManager.getDateFormatPattern()
             bsDateFormatGroup.setOnCheckedChangeListener(null)
             when (datePattern) {
@@ -797,7 +808,8 @@ class CustomizationSheetManager(
         })
 
         bsDateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (focusedView?.id == R.id.date_text) {
+            val view = focusedView
+            if (view?.id == R.id.date_text) {
                 if (checkedId == R.id.date_custom_radio) {
                     bsDateCustomInputLayout.visibility = View.VISIBLE
                     bsDateCustomInputLayout.requestFocus()
@@ -813,6 +825,7 @@ class CustomizationSheetManager(
                     })
                 }
                 clockManager.updateDateText()
+                (widgetManager?.getControllerForView(view) as? DateDesktopWidget)?.updateDate(clockManager.getCurrentTime())
                 applyRealTimeFocusUpdate(true)
             }
         }
@@ -821,13 +834,16 @@ class CustomizationSheetManager(
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                if (focusedView?.id == R.id.date_text && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) {
-                    val pattern = s?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
+                val view = focusedView
+                if (view?.id == R.id.date_text && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) {
+                    val rawPattern = s?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
+                    val testPattern = rawPattern.replace("\\n", "\n")
                     try {
-                        SimpleDateFormat(pattern, Locale.getDefault()) // Валидация
+                        SimpleDateFormat(testPattern, Locale.getDefault()) // Валидация
                         bsDateCustomInputLayout.error = null
-                        fontManager.setDateFormatPattern(pattern)
+                        fontManager.setDateFormatPattern(rawPattern)
                         clockManager.updateDateText()
+                        (widgetManager?.getControllerForView(view) as? DateDesktopWidget)?.updateDate(clockManager.getCurrentTime())
                         applyRealTimeFocusUpdate(false)
                     } catch (e: Exception) {
                         bsDateCustomInputLayout.error = "Invalid format"
@@ -1071,6 +1087,81 @@ class CustomizationSheetManager(
                 fontManager.setClockStyle(newStyle)
                 clockManager.updateTimeText()
                 applyRealTimeFocusUpdate(true)
+
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .alpha(targetAlpha)
+                    .setDuration(280)
+                    .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun setupDateStyleAdapter() {
+        dateStyleAdapter = DateStyleAdapter(
+            styles = DateStyle.values().toList(),
+            onStyleSelected = { selectedStyle ->
+                animateDateStyleChange(selectedStyle)
+            }
+        )
+        bsDateStyleRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsDateStyleRecyclerView.adapter = dateStyleAdapter
+        preventSheetDragForRecyclerView(bsDateStyleRecyclerView)
+    }
+
+    private fun animateDateStyleChange(newStyle: DateStyle) {
+        if (fontManager.getDateStyle() == newStyle) return
+
+        val view = focusedView ?: run {
+            fontManager.setDateStyle(newStyle)
+            clockManager.updateDateText()
+            return
+        }
+
+        view.animate().cancel()
+        val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
+
+        view.animate()
+            .scaleX(0.88f)
+            .scaleY(0.88f)
+            .alpha(0.2f)
+            .setDuration(120)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+            .withEndAction {
+                if (view.parent is ViewGroup) {
+                    try {
+                        TransitionManager.beginDelayedTransition(
+                            view.parent as ViewGroup,
+                            AutoTransition().apply {
+                                duration = 220
+                                interpolator = MotionUtils.EMPHASIZED
+                            }
+                        )
+                    } catch (e: Exception) {}
+                }
+
+                fontManager.setDateStyle(newStyle)
+                if (newStyle == DateStyle.TWO_LINE && view is TextView) {
+                    view.gravity = android.view.Gravity.START or (view.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                        view.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                    }
+                }
+                clockManager.updateDateText()
+                val controller = widgetManager?.getControllerForView(view) as? DateDesktopWidget
+                controller?.updateDate(clockManager.getCurrentTime())
+                applyRealTimeFocusUpdate(true)
+
+                val isDate = focusedView?.id == R.id.date_text || controller != null
+                val showDateFormat = isDate && (newStyle == DateStyle.STANDARD || newStyle == DateStyle.TWO_LINE)
+                bsDateFormatCard.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                bsDateFormatGroup.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                bsDateFormatLabel.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                bsDateCustomInputLayout.visibility = if (showDateFormat && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
+                bsBlockFormatsTitle.visibility = if (focusedView?.id == R.id.time_text || showDateFormat) View.VISIBLE else View.GONE
 
                 view.animate()
                     .scaleX(1.0f)

@@ -74,6 +74,7 @@ object DateWidgetDefinition : DesktopWidgetDefinition {
         WidgetFeature.VERTICAL_ALIGNMENT,
         WidgetFeature.FREE_MOVEMENT,
         WidgetFeature.DATE_FORMAT,
+        WidgetFeature.DATE_STYLE,
         WidgetFeature.NIGHT_SHIFT
     )
 

@@ -44,6 +44,12 @@
     <string name="clock_style_analog">Аналоговий циферблат</string>
     <string name="clock_style_analog_minimal">Мінімалістичний аналоговий</string>
 
+    <!-- Date Widget Styles -->
+    <string name="date_style">Стиль віджета дати</string>
+    <string name="date_style_standard">Стандартний</string>
+    <string name="date_style_two_line">Дворядковий</string>
+    <string name="date_style_calendar_badge">Календарний бейдж</string>
+
     <!-- New strings for background selection -->
     <string name="choose_background">Обрати фон</string>
     <string name="clear_background">Очистити фон</string>

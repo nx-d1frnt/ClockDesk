@@ -140,7 +140,7 @@
 
         </LinearLayout>
 
-        <TextView
+        <com.nxd1frnt.clockdesk2.ui.view.DateTextView
             android:id="@+id/date_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
