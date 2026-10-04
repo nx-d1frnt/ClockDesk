@@ -33,17 +33,20 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.ClockStyleAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.DateStyleAdapter
+import com.nxd1frnt.clockdesk2.ui.adapters.MediaStyleAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ClockStyle
 import com.nxd1frnt.clockdesk2.utils.DateStyle
+import com.nxd1frnt.clockdesk2.utils.MediaStyle
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
 import com.nxd1frnt.clockdesk2.widgets.WidgetFeature
 import com.nxd1frnt.clockdesk2.widgets.impl.DateDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -91,6 +94,10 @@ class CustomizationSheetManager(
     private val bsDateStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.date_style_recycler_view) }
     private val bsDateStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_date_style) }
     private var dateStyleAdapter: DateStyleAdapter? = null
+
+    private val bsMediaStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.media_style_recycler_view) }
+    private val bsMediaStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_media_style) }
+    private var mediaStyleAdapter: MediaStyleAdapter? = null
 
     private val bsApplyButton by lazy { sideSheetView.findViewById<Button>(R.id.apply_button) }
     private val bsCancelButton by lazy { sideSheetView.findViewById<Button>(R.id.cancel_button) }
@@ -327,6 +334,7 @@ class CustomizationSheetManager(
         setupFontAdapter()
         setupClockStyleAdapter()
         setupDateStyleAdapter()
+        setupMediaStyleAdapter()
     }
 
     fun showForView(viewToCustomize: View) {
@@ -491,6 +499,7 @@ class CustomizationSheetManager(
 
         bsClockStyleCard.visibility = if (features?.contains(WidgetFeature.CLOCK_STYLE) ?: isTime) View.VISIBLE else View.GONE
         bsDateStyleCard.visibility = if (features?.contains(WidgetFeature.DATE_STYLE) ?: isDate) View.VISIBLE else View.GONE
+        bsMediaStyleCard.visibility = if (features?.contains(WidgetFeature.MEDIA_STYLE) ?: isLastFm) View.VISIBLE else View.GONE
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatLabel.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
@@ -603,6 +612,11 @@ class CustomizationSheetManager(
                 }
             }
             setupSwitchesAndToggles() // Перепривязываем листенеры
+        }
+
+        // Загрузка стиля Now Playing
+        if (view.id == R.id.lastfm_layout) {
+            mediaStyleAdapter?.setSelectedStyle(fontManager.getMediaStyle())
         }
 
         bsNightShiftSwitch.setOnCheckedChangeListener(null)
@@ -1163,6 +1177,64 @@ class CustomizationSheetManager(
                 bsDateFormatLabel.visibility = if (showDateFormat) View.VISIBLE else View.GONE
                 bsDateCustomInputLayout.visibility = if (showDateFormat && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
                 bsBlockFormatsTitle.visibility = if (focusedView?.id == R.id.time_text || showDateFormat) View.VISIBLE else View.GONE
+
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .alpha(targetAlpha)
+                    .setDuration(280)
+                    .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun setupMediaStyleAdapter() {
+        mediaStyleAdapter = MediaStyleAdapter(
+            styles = MediaStyle.values().toList(),
+            onStyleSelected = { selectedStyle ->
+                animateMediaStyleChange(selectedStyle)
+            }
+        )
+        bsMediaStyleRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsMediaStyleRecyclerView.adapter = mediaStyleAdapter
+        preventSheetDragForRecyclerView(bsMediaStyleRecyclerView)
+    }
+
+    private fun animateMediaStyleChange(newStyle: MediaStyle) {
+        if (fontManager.getMediaStyle() == newStyle) return
+
+        val view = focusedView ?: run {
+            fontManager.setMediaStyle(newStyle)
+            return
+        }
+
+        view.animate().cancel()
+        val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
+
+        view.animate()
+            .scaleX(0.88f)
+            .scaleY(0.88f)
+            .alpha(0.2f)
+            .setDuration(120)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+            .withEndAction {
+                if (view.parent is ViewGroup) {
+                    try {
+                        TransitionManager.beginDelayedTransition(
+                            view.parent as ViewGroup,
+                            AutoTransition().apply {
+                                duration = 220
+                                interpolator = MotionUtils.EMPHASIZED
+                            }
+                        )
+                    } catch (e: Exception) {}
+                }
+
+                fontManager.setMediaStyle(newStyle)
+                val controller = widgetManager?.getControllerForView(view) as? MediaDesktopWidget
+                controller?.updateMediaStyle(newStyle)
+                applyRealTimeFocusUpdate(true)
 
                 view.animate()
                     .scaleX(1.0f)

@@ -11,17 +11,20 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.res.ResourcesCompat
+import android.util.TypedValue
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.utilities.Scheme
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontItem
+import com.nxd1frnt.clockdesk2.ui.view.SquigglyProgressBar
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
@@ -61,7 +64,7 @@ class FontManager(
     private val context: Context,
     private val timeText: TextView,
     private val dateText: TextView,
-    private val lastfmLayout: LinearLayout,
+    private val lastfmLayout: ViewGroup,
     private val lastfmText: TextView,
     private val lastfmIcon: ImageView,
     private val weatherText: TextView,
@@ -143,6 +146,7 @@ class FontManager(
     private var dateFormatPattern: String = "EEE, MMM dd"
     private var clockStyle: ClockStyle = ClockStyle.STANDARD
     private var dateStyle: DateStyle = DateStyle.STANDARD
+    private var mediaStyle: MediaStyle = MediaStyle.MINIMAL_TICKER
 
     private val baseChipContainerSizeDp = 165f
     private val baseChipFontSizeSp = 14f
@@ -470,6 +474,7 @@ class FontManager(
         applyClockStyleToTimeView()
         dateStyle = DateStyle.fromId(prefs.getString("dateStyle", DateStyle.STANDARD.id))
         applyDateStyleToDateView()
+        mediaStyle = MediaStyle.fromId(prefs.getString("mediaStyle", MediaStyle.MINIMAL_TICKER.id))
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val defaults = getDefaultSettingsFor(viewId)
@@ -549,6 +554,7 @@ class FontManager(
         editor.putString("dateFormatPattern", dateFormatPattern)
         editor.putString("clockStyle", clockStyle.id)
         editor.putString("dateStyle", dateStyle.id)
+        editor.putString("mediaStyle", mediaStyle.id)
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val settings = settingsMap[viewId] ?: return@forEach
@@ -668,6 +674,73 @@ class FontManager(
                     lastfmIcon.alpha = settings.alpha
                 }
                 lastfmIcon.setColorFilter(finalColor)
+
+                // Night shift warm color for cards and secondary elements
+                val typedValue = TypedValue()
+                val theme = context.theme
+                val defaultSurfaceColor = if (theme.resolveAttribute(com.google.android.material.R.attr.colorSurfaceContainerHighest, typedValue, true)) {
+                    typedValue.data
+                } else {
+                    0xFF32353A.toInt()
+                }
+
+                val finalCardBgColor = if (effectiveFactor > 0f) {
+                    val redShiftedBg = Color.argb(
+                        Color.alpha(defaultSurfaceColor),
+                        Color.red(defaultSurfaceColor),
+                        (Color.green(defaultSurfaceColor) * 0.4f).toInt(),
+                        (Color.blue(defaultSurfaceColor) * 0.3f).toInt()
+                    )
+                    interpolateColor(defaultSurfaceColor, redShiftedBg, effectiveFactor)
+                } else {
+                    defaultSurfaceColor
+                }
+
+                // Apply style to compact card views if present
+                lastfmLayout.findViewById<MaterialCardView>(R.id.media_compact_card)?.setCardBackgroundColor(finalCardBgColor)
+                lastfmLayout.findViewById<TextView>(R.id.compact_title_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                }
+                lastfmLayout.findViewById<TextView>(R.id.compact_artist_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                }
+
+                // Apply style to expanded player views if present
+                lastfmLayout.findViewById<MaterialCardView>(R.id.media_expanded_card)?.setCardBackgroundColor(finalCardBgColor)
+                lastfmLayout.findViewById<TextView>(R.id.expanded_title_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                }
+                lastfmLayout.findViewById<TextView>(R.id.expanded_artist_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                }
+
+                // Apply colors to squiggly progress bar
+                lastfmLayout.findViewById<SquigglyProgressBar>(R.id.expanded_progress_bar)?.let { bar ->
+                    bar.setWaveColor(finalColor)
+                    val unplayedTrackColor = Color.argb(
+                        70,
+                        Color.red(finalColor),
+                        Color.green(finalColor),
+                        Color.blue(finalColor)
+                    )
+                    bar.setTrackColor(unplayedTrackColor)
+                }
+
+                // Apply color filter to transport buttons
+                val btnPrev = lastfmLayout.findViewById<ImageView>(R.id.btn_media_prev)
+                val btnPlay = lastfmLayout.findViewById<ImageView>(R.id.btn_media_play_pause)
+                val btnNext = lastfmLayout.findViewById<ImageView>(R.id.btn_media_next)
+
+                btnPrev?.setColorFilter(finalColor)
+                btnPlay?.setColorFilter(finalColor)
+                btnNext?.setColorFilter(finalColor)
+
+                if (!colorOnly) {
+                    val alpha = settings.alpha
+                    btnPrev?.alpha = alpha
+                    btnPlay?.alpha = alpha
+                    btnNext?.alpha = alpha
+                }
             }
             R.id.smart_chip_container -> {
                 for (i in 0 until smartChipContainer.childCount) {
@@ -972,9 +1045,17 @@ class FontManager(
         }
     }
 
+    fun getMediaStyle(): MediaStyle = mediaStyle
+    fun setMediaStyle(style: MediaStyle) {
+        mediaStyle = style
+        applyToView(R.id.lastfm_layout)
+        saveSettings()
+    }
+
     fun setNightShiftEnabledForView(view: View, enabled: Boolean) {
         val settings = getOrCreateSettings(view)
         settings.isNightShiftEnabled = enabled
+        applyToView(view.id, colorOnly = true)
         saveSettings()
     }
 

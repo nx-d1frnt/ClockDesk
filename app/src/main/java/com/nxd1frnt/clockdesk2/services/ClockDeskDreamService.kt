@@ -12,6 +12,7 @@ import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -54,7 +55,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var weatherText: TextView
     private lateinit var weatherIcon: ImageView
     private lateinit var weatherLayout: LinearLayout
-    private lateinit var lastfmLayout: LinearLayout
+    private lateinit var lastfmLayout: FrameLayout
     private lateinit var lastfmIcon: ImageView
     private lateinit var nowPlayingText: TextView
     private lateinit var backgroundLayout: LinearLayout

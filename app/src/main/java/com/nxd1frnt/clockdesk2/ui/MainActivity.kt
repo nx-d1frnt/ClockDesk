@@ -35,6 +35,7 @@ import android.animation.TimeInterpolator
 import android.view.WindowManager
 import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -108,7 +109,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var weatherText: TextView
     private lateinit var weatherIcon: ImageView
     private lateinit var weatherLayout: LinearLayout
-    private lateinit var lastfmLayout: LinearLayout
+    private lateinit var lastfmLayout: FrameLayout
     private lateinit var lastfmIcon: ImageView
     private lateinit var nowPlayingTextView: TextView
     private lateinit var backgroundLayout: LinearLayout
@@ -580,6 +581,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             chipsView = chipContainer,
             weatherView = weatherLayout
         )
+        setupMediaWidgetCallbacks()
 
         val activeViews = desktopWidgetManager.getViews()
         val movableViews = activeViews.filter { it !== chipContainer }
@@ -599,6 +601,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 chipsView = chipContainer,
                 weatherView = weatherLayout
             )
+            setupMediaWidgetCallbacks()
             val currentActiveViews = desktopWidgetManager.getViews()
             widgetMover.setViews(currentActiveViews.filter { it !== chipContainer })
             burnInProtectionManager.updateViews(currentActiveViews)
@@ -1335,6 +1338,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 handleMusicStateUpdate(state)
             }
         }
+        setupMediaWidgetCallbacks()
+    }
+
+    private fun setupMediaWidgetCallbacks() {
+        if (::desktopWidgetManager.isInitialized) {
+            desktopWidgetManager.getController<com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget>()?.apply {
+                onPlayPauseAction = { musicManager?.togglePlayPause() }
+                onNextAction = { musicManager?.next() }
+                onPrevAction = { musicManager?.previous() }
+            }
+        }
     }
 
     private fun updateSourceIcon(track: MusicTrack) {
@@ -1484,12 +1498,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
                 }
             }
+        } else if (state is PluginState.Paused) {
+            val track = state.track
+            lastTrackInfo = "${track.artist} - ${track.title}"
         } else {
             lastTrackInfo = null
         }
 
         if (isMediaActive) {
-            if (state is PluginState.Playing) {
+            if (state is PluginState.Playing || state is PluginState.Paused) {
                 pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
                 pendingRestoreRunnable = null
             }

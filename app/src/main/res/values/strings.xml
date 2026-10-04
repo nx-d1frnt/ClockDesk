@@ -54,6 +54,15 @@
     <string name="date_style_hero_day">Hero Day</string>
     <string name="date_style_chip_pill">Pill Chip</string>
 
+    <!-- Media Widget Styles -->
+    <string name="media_style">Now Playing Widget Style</string>
+    <string name="media_style_minimal_ticker">Minimal Ticker</string>
+    <string name="media_style_compact_card">Compact Card</string>
+    <string name="media_style_expanded_player">Expanded Player</string>
+    <string name="action_previous">Previous</string>
+    <string name="action_play_pause">Play / Pause</string>
+    <string name="action_next">Next</string>
+
     <!-- New strings for background selection -->
     <string name="choose_background">Choose background</string>
     <string name="clear_background">Clear background</string>

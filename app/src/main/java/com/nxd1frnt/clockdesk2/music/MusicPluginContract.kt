@@ -11,11 +11,14 @@ data class MusicTrack(
     val sourcePackageName: String? = null,
     val sourceIconBitmap: Bitmap? = null,
     val sourceIconUri: String? = null,
-    val sourceIconResId: Int? = null
+    val sourceIconResId: Int? = null,
+    val durationMs: Long? = null,
+    val positionMs: Long? = null
 )
 
 sealed class PluginState {
     data class Playing(val track: MusicTrack) : PluginState()
+    data class Paused(val track: MusicTrack) : PluginState()
     object Idle : PluginState()
     object Disabled : PluginState()
 }
@@ -30,4 +33,11 @@ interface IMusicPlugin {
     fun init()
     fun destroy()
     fun setCallback(callback: (PluginState) -> Unit)
+
+    fun play() {}
+    fun pause() {}
+    fun togglePlayPause() {}
+    fun next() {}
+    fun previous() {}
+    val canControl: Boolean get() = false
 }

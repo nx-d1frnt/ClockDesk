@@ -33,6 +33,8 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
         var artworkUrl: String? = null,
         var artworkBitmap: Bitmap? = null,
         var rawAlbumArtUrl: String? = null,
+        var positionMs: Long? = null,
+        var lengthMs: Long? = null,
         var lastUpdated: Long = System.currentTimeMillis()
     )
 
@@ -43,6 +45,36 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
     private var selectedDeviceId: String? = null
     private var selectedPlayerName: String? = null
     private var currentlyDispatchedKey: String? = null
+
+    override val canControl: Boolean
+        get() = selectedDeviceId != null && selectedPlayerName != null
+
+    private fun sendMprisAction(action: String) {
+        val devId = selectedDeviceId ?: return
+        val player = selectedPlayerName ?: return
+        val conn = deskConnectManager.activeConnections[devId] ?: return
+        conn.sendPacket(DeskConnectPacket.createMprisRequest(player, action))
+    }
+
+    override fun play() {
+        sendMprisAction("Play")
+    }
+
+    override fun pause() {
+        sendMprisAction("Pause")
+    }
+
+    override fun togglePlayPause() {
+        sendMprisAction("PlayPause")
+    }
+
+    override fun next() {
+        sendMprisAction("Next")
+    }
+
+    override fun previous() {
+        sendMprisAction("Previous")
+    }
 
     private val artListener: (String, Bitmap) -> Unit = { url, bitmap ->
         var updatedAny = false
@@ -208,6 +240,12 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
                 if (isPlaying != null) {
                     existing.isPlaying = isPlaying
                 }
+                if (positionMs != null) {
+                    existing.positionMs = positionMs
+                }
+                if (lengthMs != null) {
+                    existing.lengthMs = lengthMs
+                }
                 existing.lastUpdated = System.currentTimeMillis()
 
                 if (decodedBitmap != null) {
@@ -246,6 +284,8 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
                     artworkUrl = if (isHttpArt) artworkUrl else null,
                     artworkBitmap = initialBitmap,
                     rawAlbumArtUrl = artworkUrl,
+                    positionMs = positionMs,
+                    lengthMs = lengthMs,
                     lastUpdated = System.currentTimeMillis()
                 )
                 activePlayers[key] = newPlayer
@@ -268,7 +308,7 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
 
     /**
      * Mirrors KDE Connect's MprisMediaSession.findPlayer() selection logic,
-     * tailored to ClockDesk's requirement that only actively playing media is shown.
+     * supporting active playback as well as paused fallback.
      */
     private fun findPlayer(): PlayerInfo? {
         val currentDevId = selectedDeviceId
@@ -299,7 +339,7 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
         }
 
         // 3. Try any playing player on any other connected device
-        val anotherDevicePlayer = activePlayers.values
+        val anotherDevicePlayingPlayer = activePlayers.values
             .filter {
                 deskConnectManager.activeConnections.containsKey(it.deviceId) &&
                 it.isPlaying &&
@@ -307,7 +347,26 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
             }
             .maxByOrNull { it.lastUpdated }
 
-        return anotherDevicePlayer
+        if (anotherDevicePlayingPlayer != null) {
+            return anotherDevicePlayingPlayer
+        }
+
+        // 4. Paused fallback: If currently selected player is still connected and paused with valid track, keep it!
+        if (currentDevId != null && currentPlayer != null) {
+            val isConnected = deskConnectManager.activeConnections.containsKey(currentDevId)
+            val current = activePlayers["$currentDevId:$currentPlayer"]
+            if (isConnected && current != null && (current.title.isNotEmpty() || current.artist.isNotEmpty())) {
+                return current
+            }
+        }
+
+        // 5. Any paused player on any connected device
+        return activePlayers.values
+            .filter {
+                deskConnectManager.activeConnections.containsKey(it.deviceId) &&
+                (it.title.isNotEmpty() || it.artist.isNotEmpty())
+            }
+            .maxByOrNull { it.lastUpdated }
     }
 
     @Synchronized
@@ -347,6 +406,7 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
         val iconRes = dev?.getDeviceTypeIconRes() ?: com.nxd1frnt.clockdesk2.R.drawable.ic_devices
         Logger.i("KdeConnectMusicPlugin") {
             "dispatchTrack: '${info.artist} - ${info.title}', " +
+            "isPlaying=${info.isPlaying}, " +
             "hasBitmap=${info.artworkBitmap != null} (${info.artworkBitmap?.width}x${info.artworkBitmap?.height}), " +
             "artworkUrl='${info.artworkUrl}', " +
             "deviceIconRes=$iconRes"
@@ -358,9 +418,15 @@ class KdeConnectMusicPlugin(private val context: Context) : IMusicPlugin {
             artworkUrl = info.artworkUrl,
             artworkBitmap = info.artworkBitmap,
             sourcePackageName = info.playerName,
-            sourceIconResId = iconRes
+            sourceIconResId = iconRes,
+            durationMs = info.lengthMs,
+            positionMs = info.positionMs
         )
-        callback?.invoke(PluginState.Playing(track))
+        if (info.isPlaying) {
+            callback?.invoke(PluginState.Playing(track))
+        } else {
+            callback?.invoke(PluginState.Paused(track))
+        }
     }
 
     override fun init() {

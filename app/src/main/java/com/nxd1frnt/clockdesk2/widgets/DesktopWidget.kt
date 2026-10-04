@@ -37,6 +37,7 @@ enum class WidgetFeature {
     NIGHT_SHIFT,
     MAX_WIDTH,
     MEDIA_ICON,
+    MEDIA_STYLE,
     BACKGROUND_COLOR,
     CHIP_STACK_OVERFLOW
 }

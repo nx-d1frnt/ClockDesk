@@ -57,6 +57,9 @@ class MusicPluginManager(
         recalculateOutput()
     }
 
+    private var primaryPluginId: String? = null
+    private var lastActivePluginId: String? = null
+
     private fun handlePluginUpdate(pluginId: String, newState: PluginState) {
         pluginStates[pluginId] = newState
         recalculateOutput()
@@ -64,40 +67,69 @@ class MusicPluginManager(
 
     private fun recalculateOutput() {
         var activeState: PluginState = PluginState.Idle
-        var primaryPluginId: String? = null
+        var selectedId: String? = null
 
+        // 1. Look for actively playing
         for (id in priorityList) {
             val state = pluginStates[id]
             if (state is PluginState.Playing) {
                 activeState = state
-                primaryPluginId = id
+                selectedId = id
                 break
             }
         }
 
-        if (activeState is PluginState.Playing && primaryPluginId != null) {
-            val primaryTrack = activeState.track
+        // 2. If nothing is actively playing, look for paused
+        if (selectedId == null) {
+            for (id in priorityList) {
+                val state = pluginStates[id]
+                if (state is PluginState.Paused) {
+                    activeState = state
+                    selectedId = id
+                    break
+                }
+            }
+        }
 
-            val isArtMissing = (primaryTrack.artworkBitmap == null || primaryTrack.artworkBitmap.isRecycled) && primaryTrack.artworkUrl.isNullOrEmpty()
+        primaryPluginId = selectedId
+        if (selectedId != null) {
+            lastActivePluginId = selectedId
+        }
 
-            if (isArtMissing) {
+        if ((activeState is PluginState.Playing || activeState is PluginState.Paused) && selectedId != null) {
+            val primaryTrack = when (activeState) {
+                is PluginState.Playing -> activeState.track
+                is PluginState.Paused -> activeState.track
+                else -> null
+            }
 
-                for ((id, state) in pluginStates) {
-                    if (id == primaryPluginId) continue
+            if (primaryTrack != null) {
+                val isArtMissing = (primaryTrack.artworkBitmap == null || primaryTrack.artworkBitmap.isRecycled) && primaryTrack.artworkUrl.isNullOrEmpty()
 
-                    if (state is PluginState.Playing) {
-                        val candidateTrack = state.track
+                if (isArtMissing) {
+                    for ((id, state) in pluginStates) {
+                        if (id == selectedId) continue
 
-                        if (areTracksSame(primaryTrack, candidateTrack)) {
+                        val candidateTrack = when (state) {
+                            is PluginState.Playing -> state.track
+                            is PluginState.Paused -> state.track
+                            else -> null
+                        }
+
+                        if (candidateTrack != null && areTracksSame(primaryTrack, candidateTrack)) {
                             val candidateBitmapValid = candidateTrack.artworkBitmap != null && !candidateTrack.artworkBitmap.isRecycled
                             if (candidateTrack.artworkUrl != null || candidateBitmapValid) {
-                                Logger.d("MusicManager"){"Merging art from $id into $primaryPluginId for '${primaryTrack.title}'"}
+                                Logger.d("MusicManager"){"Merging art from $id into $selectedId for '${primaryTrack.title}'"}
 
                                 val mergedTrack = primaryTrack.copy(
                                     artworkUrl = candidateTrack.artworkUrl,
                                     artworkBitmap = if (candidateBitmapValid) candidateTrack.artworkBitmap else null
                                 )
-                                activeState = PluginState.Playing(mergedTrack)
+                                activeState = if (activeState is PluginState.Playing) {
+                                    PluginState.Playing(mergedTrack)
+                                } else {
+                                    PluginState.Paused(mergedTrack)
+                                }
                                 break
                             }
                         }
@@ -107,6 +139,31 @@ class MusicPluginManager(
         }
 
         onUpdate(activeState)
+    }
+
+    fun play() {
+        val id = primaryPluginId ?: lastActivePluginId ?: return
+        plugins[id]?.play()
+    }
+
+    fun pause() {
+        val id = primaryPluginId ?: lastActivePluginId ?: return
+        plugins[id]?.pause()
+    }
+
+    fun togglePlayPause() {
+        val id = primaryPluginId ?: lastActivePluginId ?: return
+        plugins[id]?.togglePlayPause()
+    }
+
+    fun next() {
+        val id = primaryPluginId ?: lastActivePluginId ?: return
+        plugins[id]?.next()
+    }
+
+    fun previous() {
+        val id = primaryPluginId ?: lastActivePluginId ?: return
+        plugins[id]?.previous()
     }
 
     private fun areTracksSame(t1: MusicTrack, t2: MusicTrack): Boolean {
