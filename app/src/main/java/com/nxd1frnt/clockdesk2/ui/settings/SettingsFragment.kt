@@ -157,13 +157,20 @@ class DisplaySettingsFragment : BaseM3SettingsFragment() {
                 defaultValue = false
             )
 
+            burnInPreview(
+                isVisible = { prefs.getBoolean("burn_in_protection", false) }
+            )
+
             switch(
                 key = "smart_pixels_enabled",
                 title = getString(R.string.smart_pixels_title),
                 summary = getString(R.string.smart_pixels_summary),
                 defaultValue = false,
-                iconRes = R.drawable.ic_checkerboard,
-                isEnabled = { prefs.getBoolean("burn_in_protection", false) }
+                iconRes = R.drawable.ic_checkerboard
+            )
+
+            smartPixelsPreview(
+                isVisible = { prefs.getBoolean("smart_pixels_enabled", false) }
             )
         }
 

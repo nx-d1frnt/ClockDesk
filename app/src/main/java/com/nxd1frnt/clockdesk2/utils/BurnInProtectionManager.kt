@@ -8,7 +8,7 @@ import java.util.Random
 
 class BurnInProtectionManager(
     initialViews: List<View>,
-    private val maxShiftPx: Int = 10,
+    private var maxShiftPx: Int = 10,
     private val intervalMs: Long = 60000L //1 minute
 ) {
     private val views = initialViews.toMutableList()
@@ -16,6 +16,20 @@ class BurnInProtectionManager(
     fun updateViews(newViews: List<View>) {
         views.clear()
         views.addAll(newViews)
+    }
+
+    fun setMaxShiftPx(px: Int) {
+        maxShiftPx = px.coerceAtLeast(1)
+    }
+
+    fun setShiftDistanceDp(context: Context, dp: Float) {
+        val density = context.resources.displayMetrics.density
+        setMaxShiftPx((dp * density).toInt())
+    }
+
+    companion object {
+        const val PREF_KEY_SHIFT_DP = "burn_in_shift_distance_dp"
+        const val DEFAULT_SHIFT_DP = 10
     }
     private val handler = Handler(Looper.getMainLooper())
     private val random = Random()

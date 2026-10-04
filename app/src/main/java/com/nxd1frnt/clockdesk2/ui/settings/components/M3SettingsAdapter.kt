@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2.ui.settings.components
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.drawable.PaintDrawable
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
@@ -10,6 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -18,6 +20,7 @@ import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
 
 class M3SettingsAdapter(
     private val context: Context,
@@ -33,6 +36,8 @@ class M3SettingsAdapter(
         private const val TYPE_CHOICE = 3
         private const val TYPE_SLIDER = 4
         private const val TYPE_TEXT_EDIT = 5
+        private const val TYPE_BURN_IN_PREVIEW = 6
+        private const val TYPE_SMART_PIXELS_PREVIEW = 7
     }
 
     private var displayItems: List<SettingsItem> = emptyList()
@@ -86,6 +91,8 @@ class M3SettingsAdapter(
             is SettingsItem.SingleChoice -> TYPE_CHOICE
             is SettingsItem.Slider -> TYPE_SLIDER
             is SettingsItem.TextEdit -> TYPE_TEXT_EDIT
+            is SettingsItem.BurnInPreview -> TYPE_BURN_IN_PREVIEW
+            is SettingsItem.SmartPixelsPreview -> TYPE_SMART_PIXELS_PREVIEW
         }
     }
 
@@ -98,6 +105,8 @@ class M3SettingsAdapter(
             TYPE_CHOICE -> ChoiceViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
             TYPE_SLIDER -> SliderViewHolder(inflater.inflate(R.layout.item_settings_slider, parent, false))
             TYPE_TEXT_EDIT -> TextEditViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
+            TYPE_BURN_IN_PREVIEW -> BurnInPreviewViewHolder(inflater.inflate(R.layout.item_settings_burn_in_preview, parent, false))
+            TYPE_SMART_PIXELS_PREVIEW -> SmartPixelsPreviewViewHolder(inflater.inflate(R.layout.item_settings_smart_pixels_preview, parent, false))
             else -> throw IllegalArgumentException("Unknown view type $viewType")
         }
     }
@@ -110,6 +119,8 @@ class M3SettingsAdapter(
             is SettingsItem.SingleChoice -> (holder as ChoiceViewHolder).bind(item, position)
             is SettingsItem.Slider -> (holder as SliderViewHolder).bind(item, position)
             is SettingsItem.TextEdit -> (holder as TextEditViewHolder).bind(item, position)
+            is SettingsItem.BurnInPreview -> (holder as BurnInPreviewViewHolder).bind(item, position)
+            is SettingsItem.SmartPixelsPreview -> (holder as SmartPixelsPreviewViewHolder).bind(item, position)
         }
     }
 
@@ -488,6 +499,132 @@ class M3SettingsAdapter(
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+        }
+    }
+
+    inner class BurnInPreviewViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val previewCanvas: BurnInPreviewCanvas = view.findViewById(R.id.burn_in_preview_canvas)
+        private val valueLabel: TextView = view.findViewById(R.id.burn_in_value_label)
+        private val slider: Slider = view.findViewById(R.id.burn_in_slider)
+        private val btnSubtle: MaterialButton = view.findViewById(R.id.btn_preset_subtle)
+        private val btnNormal: MaterialButton = view.findViewById(R.id.btn_preset_normal)
+        private val btnAggressive: MaterialButton = view.findViewById(R.id.btn_preset_aggressive)
+
+        fun bind(entry: SettingsItem.BurnInPreview, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+
+            val currentShiftDp = prefs.getInt(entry.key, 10).toFloat().coerceIn(4f, 24f)
+
+            previewCanvas.shiftDistanceDp = currentShiftDp
+            slider.value = currentShiftDp
+            valueLabel.text = "${currentShiftDp.toInt()} dp"
+
+            val isEnabled = entry.isEnabled()
+            cardView.isEnabled = isEnabled
+            slider.isEnabled = isEnabled
+            btnSubtle.isEnabled = isEnabled
+            btnNormal.isEnabled = isEnabled
+            btnAggressive.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
+
+            slider.clearOnChangeListeners()
+            slider.addOnChangeListener { _, value, fromUser ->
+                if (fromUser) {
+                    valueLabel.text = "${value.toInt()} dp"
+                    previewCanvas.shiftDistanceDp = value
+                }
+            }
+
+            slider.clearOnSliderTouchListeners()
+            slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                override fun onStartTrackingTouch(s: Slider) {}
+                override fun onStopTrackingTouch(s: Slider) {
+                    s.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    val value = s.value.toInt()
+                    prefs.edit().putInt(entry.key, value).apply()
+                    onPreferenceChanged(entry.key, value)
+                }
+            })
+
+            fun applyPreset(dpVal: Float) {
+                slider.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                slider.value = dpVal
+                valueLabel.text = "${dpVal.toInt()} dp"
+                previewCanvas.shiftDistanceDp = dpVal
+                prefs.edit().putInt(entry.key, dpVal.toInt()).apply()
+                onPreferenceChanged(entry.key, dpVal.toInt())
+            }
+
+            btnSubtle.setOnClickListener { applyPreset(5f) }
+            btnNormal.setOnClickListener { applyPreset(10f) }
+            btnAggressive.setOnClickListener { applyPreset(20f) }
+        }
+    }
+
+    inner class SmartPixelsPreviewViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val overlayView: View = view.findViewById(R.id.smart_pixels_overlay)
+        private val loupeView: SmartPixelLoupeView = view.findViewById(R.id.smart_pixels_loupe)
+        private val valueLabel: TextView = view.findViewById(R.id.smart_pixels_value_label)
+        private val slider: Slider = view.findViewById(R.id.smart_pixels_slider)
+        private val btnLight: MaterialButton = view.findViewById(R.id.btn_pixel_preset_light)
+        private val btnBalanced: MaterialButton = view.findViewById(R.id.btn_pixel_preset_balanced)
+        private val btnStrong: MaterialButton = view.findViewById(R.id.btn_pixel_preset_strong)
+
+        fun bind(entry: SettingsItem.SmartPixelsPreview, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+
+            val currentIntensity = prefs.getInt(entry.key, 50).coerceIn(20, 80)
+
+            fun updatePreview(intensity: Int) {
+                valueLabel.text = "$intensity%"
+                loupeView.intensityPercent = intensity
+                val shader = SmartPixelManager.createPatternShader(intensity, blockSize = 2)
+                val drawable = PaintDrawable().apply { paint.shader = shader }
+                overlayView.background = drawable
+            }
+
+            updatePreview(currentIntensity)
+            slider.value = currentIntensity.toFloat()
+
+            val isEnabled = entry.isEnabled()
+            cardView.isEnabled = isEnabled
+            slider.isEnabled = isEnabled
+            btnLight.isEnabled = isEnabled
+            btnBalanced.isEnabled = isEnabled
+            btnStrong.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
+
+            slider.clearOnChangeListeners()
+            slider.addOnChangeListener { _, value, fromUser ->
+                if (fromUser) {
+                    updatePreview(value.toInt())
+                }
+            }
+
+            slider.clearOnSliderTouchListeners()
+            slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                override fun onStartTrackingTouch(s: Slider) {}
+                override fun onStopTrackingTouch(s: Slider) {
+                    s.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    val value = s.value.toInt()
+                    prefs.edit().putInt(entry.key, value).apply()
+                    onPreferenceChanged(entry.key, value)
+                }
+            })
+
+            fun applyPreset(intensityVal: Int) {
+                slider.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                slider.value = intensityVal.toFloat()
+                updatePreview(intensityVal)
+                prefs.edit().putInt(entry.key, intensityVal).apply()
+                onPreferenceChanged(entry.key, intensityVal)
+            }
+
+            btnLight.setOnClickListener { applyPreset(25) }
+            btnBalanced.setOnClickListener { applyPreset(50) }
+            btnStrong.setOnClickListener { applyPreset(75) }
         }
     }
 }

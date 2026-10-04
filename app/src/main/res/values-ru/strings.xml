@@ -49,6 +49,8 @@
     <string name="date_style_standard">Стандартный</string>
     <string name="date_style_two_line">Двухстрочный</string>
     <string name="date_style_calendar_badge">Календарный бейдж</string>
+    <string name="date_style_hero_day">Крупный день</string>
+    <string name="date_style_chip_pill">Капсула</string>
 
     <!-- New strings for background selection -->
     <string name="choose_background">Выбрать фон</string>
@@ -272,6 +274,19 @@
     <string name="music_sources_summary">Сортировать источники музыки и настраивать провайдеров</string>
     <string name="smart_pixels_title">Умные пиксели</string>
     <string name="smart_pixels_summary">Затемняет пиксели в шахматном порядке после бездействия для экономии заряда батареи и экрана</string>
+    <string name="burn_in_shift_distance_title">Дистанция смещения</string>
+    <string name="burn_in_shift_distance_summary">Максимальное расстояние периодического сдвига элементов</string>
+    <string name="burn_in_shift_preset_subtle">Мягкое</string>
+    <string name="burn_in_shift_preset_normal">Обычное</string>
+    <string name="burn_in_shift_preset_aggressive">Агрессивное</string>
+    <string name="burn_in_shift_distance_format">%d dp</string>
+    <string name="smart_pixels_intensity_title">Интенсивность умных пикселей</string>
+    <string name="smart_pixels_intensity_summary">Процент отключаемых пикселей при бездействии</string>
+    <string name="smart_pixels_preset_light">Легкая (25%)</string>
+    <string name="smart_pixels_preset_balanced">Баланс (50%)</string>
+    <string name="smart_pixels_preset_strong">Макс (75%)</string>
+    <string name="smart_pixels_loupe_title">OLED-сетка (Увеличено 8x)</string>
+    <string name="smart_pixels_intensity_format">%d%%</string>
     <string name="max_width">Максимальная ширина</string>
     <string name="show_background_progress_chip">Индикатор загрузки фона</string>
     <string name="show_background_progress_chip_summary">Отображать чип со статусом загрузки или обработки фонового изображения</string>

@@ -85,6 +85,26 @@ sealed class SettingsItem {
         override val isEnabled: () -> Boolean = { true },
         val onTextChange: ((String) -> Unit)? = null
     ) : Entry()
+
+    data class BurnInPreview(
+        override val key: String = "burn_in_shift_distance_dp",
+        override val title: String = "",
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true }
+    ) : Entry()
+
+    data class SmartPixelsPreview(
+        override val key: String = "smart_pixels_intensity",
+        override val title: String = "",
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true }
+    ) : Entry()
 }
 
 typealias SettingEntry = SettingsItem.Entry

@@ -411,8 +411,11 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         smartChipManager = SmartChipManager(themedContext, smartChipContainer, prefs, fontManager)
 
         // Burn-in (object created here; start/stop driven by prefs in lifecycle methods)
+        val dreamShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
+        val dreamShiftPx = (dreamShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
         burnInProtectionManager = BurnInProtectionManager(
-            listOf(timeText, dateText, lastfmLayout, smartChipContainer)
+            listOf(timeText, dateText, lastfmLayout, smartChipContainer),
+            maxShiftPx = dreamShiftPx
         )
 
         val mainLayout = findViewById<ConstraintLayout>(R.id.main_layout)

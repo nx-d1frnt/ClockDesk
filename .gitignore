@@ -21,3 +21,4 @@ gradle.properties
 *.jks
 *.keystore
 signing-keystore.jks
+/app/nightly/ClockDesk-nightly-arm64-v8a-v2.0.0-rc2-nightly-515e939.apk

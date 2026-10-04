@@ -584,7 +584,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val activeViews = desktopWidgetManager.getViews()
         val movableViews = activeViews.filter { it !== chipContainer }
 
-        burnInProtectionManager = BurnInProtectionManager(activeViews)
+        val burnInShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
+        val burnInShiftPx = (burnInShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+        burnInProtectionManager = BurnInProtectionManager(activeViews, maxShiftPx = burnInShiftPx)
 
         widgetMover = WidgetMover(this, movableViews, mainLayout)
         widgetMover.burnInProtectionManager = burnInProtectionManager
@@ -1218,6 +1220,26 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     if (!isPowerSavingMode && prefs.getString("brightness_mode", "system") == "smart_night") {
                         reEvaluateSmartNightDimming()
                     }
+                }
+                "burn_in_protection" -> runOnUiThread {
+                    if (prefs.getBoolean("burn_in_protection", false)) {
+                        burnInProtectionManager.start()
+                    } else {
+                        burnInProtectionManager.stop()
+                    }
+                }
+                "burn_in_shift_distance_dp" -> runOnUiThread {
+                    val shiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
+                    burnInProtectionManager.setShiftDistanceDp(this, shiftDp)
+                }
+                "smart_pixels_enabled" -> runOnUiThread {
+                    val enableSmartPixels = prefs.getBoolean("power_saver_enable_smart_pixels", true)
+                    val shouldStart = prefs.getBoolean("smart_pixels_enabled", false) || (isPowerSavingMode && enableSmartPixels)
+                    if (shouldStart) smartPixelManager.start() else smartPixelManager.stop()
+                }
+                "smart_pixels_intensity" -> runOnUiThread {
+                    val intensity = prefs.getInt("smart_pixels_intensity", 50)
+                    smartPixelManager.setIntensity(intensity)
                 }
             }
         }

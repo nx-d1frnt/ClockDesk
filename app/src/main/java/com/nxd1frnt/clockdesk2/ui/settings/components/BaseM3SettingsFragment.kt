@@ -251,5 +251,31 @@ abstract class BaseM3SettingsFragment : Fragment() {
                 )
             )
         }
+
+        fun burnInPreview(
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true }
+        ) {
+            entries.add(
+                SettingsItem.BurnInPreview(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled
+                )
+            )
+        }
+
+        fun smartPixelsPreview(
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true }
+        ) {
+            entries.add(
+                SettingsItem.SmartPixelsPreview(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled
+                )
+            )
+        }
     }
 }
