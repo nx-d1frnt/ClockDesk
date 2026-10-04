@@ -71,6 +71,72 @@
             android:padding="2dp"
             android:textSize="16sp"
             android:visibility="gone" />
+
+        <!-- Hero day preview container -->
+        <LinearLayout
+            android:id="@+id/hero_day_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/hero_day_number"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                tools:text="04" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="4dp"
+                android:gravity="start">
+
+                <TextView
+                    android:id="@+id/hero_day_weekday"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    tools:text="MON" />
+
+                <TextView
+                    android:id="@+id/hero_day_month"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    tools:text="OCT" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Chip pill preview container -->
+        <TextView
+            android:id="@+id/chip_pill_preview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_material_badge"
+            android:gravity="center"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="5dp"
+            android:singleLine="true"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="Mon, Oct 4" />
     </FrameLayout>
 
     <!-- Selection indicator divider line -->

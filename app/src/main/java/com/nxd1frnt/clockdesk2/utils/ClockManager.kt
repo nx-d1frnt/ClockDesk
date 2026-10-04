@@ -120,12 +120,13 @@ class ClockManager(
         val dateStyle = fontManager.getDateStyle()
 
         if (dateText is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+            dateText.dateStyle = dateStyle
             dateText.isBadgeMode = dateStyle.isBadge
             dateText.isTwoLineMode = dateStyle.isTwoLine
             dateText.setDate(currentTime)
         }
 
-        if (dateStyle.isBadge) {
+        if (dateStyle.isBadge || dateStyle.isHeroDay) {
             dateText.text = " "
         } else if (dateStyle.isTwoLine) {
             val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }

@@ -31,23 +31,24 @@ class DateDesktopWidget(
         val dateStyle = fontManager.getDateStyle()
 
         if (view is DateTextView) {
+            view.dateStyle = dateStyle
             view.isBadgeMode = dateStyle.isBadge
             view.isTwoLineMode = dateStyle.isTwoLine
             view.setDate(currentDate)
         }
 
-        if (dateStyle.isBadge) {
+        if (dateStyle.isBadge || dateStyle.isHeroDay) {
             view.text = " "
         } else if (dateStyle.isTwoLine) {
             val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
             view.text = formatTwoLineDate(currentDate, pattern)
         } else {
-            val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, d MMM" }
+            val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
             try {
                 val dateFormat = SimpleDateFormat(pattern, Locale.getDefault())
                 view.text = dateFormat.format(currentDate)
             } catch (e: Exception) {
-                val fallbackFormat = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
+                val fallbackFormat = SimpleDateFormat("EEE, MMM dd", Locale.getDefault())
                 view.text = fallbackFormat.format(currentDate)
             }
         }

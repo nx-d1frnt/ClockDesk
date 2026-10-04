@@ -28,6 +28,11 @@ class DateStyleAdapter(
         val previewBottom: TextView = itemView.findViewById(R.id.preview_bottom)
         val singleLinePreview: TextView = itemView.findViewById(R.id.single_line_preview)
         val badgePreview: DateTextView = itemView.findViewById(R.id.badge_preview)
+        val heroDayContainer: LinearLayout = itemView.findViewById(R.id.hero_day_container)
+        val heroDayNumber: TextView = itemView.findViewById(R.id.hero_day_number)
+        val heroDayWeekday: TextView = itemView.findViewById(R.id.hero_day_weekday)
+        val heroDayMonth: TextView = itemView.findViewById(R.id.hero_day_month)
+        val chipPillPreview: TextView = itemView.findViewById(R.id.chip_pill_preview)
         val selectionDivider: View = itemView.findViewById(R.id.selection_divider)
     }
 
@@ -53,42 +58,66 @@ class DateStyleAdapter(
             getThemeColor(context, com.google.android.material.R.attr.colorOnSurface, R.color.clock_style_card_unselected_text)
         }
 
-        if (style.isBadge) {
-            holder.twoLineContainer.visibility = View.GONE
-            holder.singleLinePreview.visibility = View.GONE
-            holder.badgePreview.visibility = View.VISIBLE
-            holder.badgePreview.isBadgeMode = true
-            holder.badgePreview.setTextColor(textColor)
+        val boldTypeface = try {
+            ResourcesCompat.getFont(context, R.font.googlesans_bold) ?: Typeface.DEFAULT_BOLD
+        } catch (e: Exception) {
+            Typeface.DEFAULT_BOLD
+        }
 
-            val cal = Calendar.getInstance().apply {
-                set(Calendar.MONTH, Calendar.OCTOBER)
-                set(Calendar.DAY_OF_MONTH, 4)
+        // Hide all variants by default
+        holder.twoLineContainer.visibility = View.GONE
+        holder.singleLinePreview.visibility = View.GONE
+        holder.badgePreview.visibility = View.GONE
+        holder.heroDayContainer.visibility = View.GONE
+        holder.chipPillPreview.visibility = View.GONE
+
+        when (style) {
+            DateStyle.CALENDAR_BADGE -> {
+                holder.badgePreview.visibility = View.VISIBLE
+                holder.badgePreview.dateStyle = DateStyle.CALENDAR_BADGE
+                holder.badgePreview.isBadgeMode = true
+                holder.badgePreview.setTextColor(textColor)
+
+                val cal = Calendar.getInstance().apply {
+                    set(Calendar.MONTH, Calendar.OCTOBER)
+                    set(Calendar.DAY_OF_MONTH, 4)
+                }
+                holder.badgePreview.setDate(cal.time)
             }
-            holder.badgePreview.setDate(cal.time)
-        } else if (style.isTwoLine) {
-            holder.badgePreview.visibility = View.GONE
-            holder.singleLinePreview.visibility = View.GONE
-            holder.twoLineContainer.visibility = View.VISIBLE
-
-            holder.previewTop.text = style.previewTop
-            holder.previewBottom.text = style.previewBottom
-            holder.previewTop.setTextColor(textColor)
-            holder.previewBottom.setTextColor(textColor)
-
-            val typeface = try {
-                ResourcesCompat.getFont(context, R.font.googlesans_bold) ?: Typeface.DEFAULT_BOLD
-            } catch (e: Exception) {
-                Typeface.DEFAULT_BOLD
+            DateStyle.TWO_LINE -> {
+                holder.twoLineContainer.visibility = View.VISIBLE
+                holder.previewTop.text = style.previewTop
+                holder.previewBottom.text = style.previewBottom
+                holder.previewTop.setTextColor(textColor)
+                holder.previewBottom.setTextColor(textColor)
+                holder.previewTop.typeface = boldTypeface
+                holder.previewBottom.typeface = boldTypeface
             }
-            holder.previewTop.typeface = typeface
-            holder.previewBottom.typeface = typeface
-        } else {
-            holder.badgePreview.visibility = View.GONE
-            holder.twoLineContainer.visibility = View.GONE
-            holder.singleLinePreview.visibility = View.VISIBLE
+            DateStyle.HERO_DAY -> {
+                holder.heroDayContainer.visibility = View.VISIBLE
+                holder.heroDayNumber.text = style.previewTop
+                holder.heroDayNumber.setTextColor(textColor)
+                holder.heroDayNumber.typeface = boldTypeface
 
-            holder.singleLinePreview.text = style.previewTop
-            holder.singleLinePreview.setTextColor(textColor)
+                holder.heroDayWeekday.text = "MON"
+                holder.heroDayWeekday.setTextColor(textColor)
+                holder.heroDayWeekday.typeface = boldTypeface
+
+                holder.heroDayMonth.text = "OCT"
+                holder.heroDayMonth.setTextColor(textColor)
+                holder.heroDayMonth.typeface = boldTypeface
+            }
+            DateStyle.CHIP_PILL -> {
+                holder.chipPillPreview.visibility = View.VISIBLE
+                holder.chipPillPreview.text = style.previewTop
+                holder.chipPillPreview.setTextColor(textColor)
+                holder.chipPillPreview.typeface = boldTypeface
+            }
+            DateStyle.STANDARD -> {
+                holder.singleLinePreview.visibility = View.VISIBLE
+                holder.singleLinePreview.text = style.previewTop
+                holder.singleLinePreview.setTextColor(textColor)
+            }
         }
 
         holder.itemView.setOnClickListener {

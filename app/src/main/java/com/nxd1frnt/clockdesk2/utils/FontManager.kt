@@ -935,6 +935,7 @@ class FontManager(
 
     fun applyDateStyleToDateView() {
         if (dateText is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+            dateText.dateStyle = dateStyle
             dateText.isBadgeMode = dateStyle.isBadge
             dateText.isTwoLineMode = dateStyle.isTwoLine
         }
@@ -951,9 +952,16 @@ class FontManager(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 dateText.letterSpacing = -0.01f
             }
-        } else if (dateStyle.isBadge) {
+        } else if (dateStyle.isBadge || dateStyle.isHeroDay) {
             dateText.isSingleLine = false
             dateText.maxLines = 1
+        } else if (dateStyle.isChipPill) {
+            dateText.isSingleLine = true
+            dateText.maxLines = 1
+            dateText.setLineSpacing(0f, 1.0f)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                dateText.letterSpacing = 0.04f
+            }
         } else {
             dateText.isSingleLine = true
             dateText.maxLines = 1

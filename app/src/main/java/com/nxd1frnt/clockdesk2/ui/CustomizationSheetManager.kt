@@ -496,7 +496,8 @@ class CustomizationSheetManager(
         bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
         bsShowAMPMSwitch.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId != R.id.time_custom_radio) View.VISIBLE else View.GONE
 
-        val showDateFormat = isDate && (fontManager.getDateStyle() == DateStyle.STANDARD || fontManager.getDateStyle() == DateStyle.TWO_LINE)
+        val currentStyle = fontManager.getDateStyle()
+        val showDateFormat = isDate && (currentStyle == DateStyle.STANDARD || currentStyle == DateStyle.TWO_LINE || currentStyle == DateStyle.CHIP_PILL)
         bsDateFormatGroup.visibility = if (showDateFormat) View.VISIBLE else View.GONE
         bsDateFormatLabel.visibility = if (showDateFormat) View.VISIBLE else View.GONE
         sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (showDateFormat) View.VISIBLE else View.GONE
@@ -1155,7 +1156,7 @@ class CustomizationSheetManager(
                 applyRealTimeFocusUpdate(true)
 
                 val isDate = focusedView?.id == R.id.date_text || controller != null
-                val showDateFormat = isDate && (newStyle == DateStyle.STANDARD || newStyle == DateStyle.TWO_LINE)
+                val showDateFormat = isDate && (newStyle == DateStyle.STANDARD || newStyle == DateStyle.TWO_LINE || newStyle == DateStyle.CHIP_PILL)
                 bsDateFormatCard.visibility = if (showDateFormat) View.VISIBLE else View.GONE
                 sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (showDateFormat) View.VISIBLE else View.GONE
                 bsDateFormatGroup.visibility = if (showDateFormat) View.VISIBLE else View.GONE
