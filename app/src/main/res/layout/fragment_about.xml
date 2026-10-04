@@ -93,7 +93,7 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/about_btn_github"
-                            style="@style/Widget.Material3.Button.TonalButton"
+                            style="@style/Widget.Material3Expressive.Button"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/about_github"
@@ -103,7 +103,7 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/about_btn_license"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            style="@style/Widget.Material3Expressive.Button"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/about_license" />
