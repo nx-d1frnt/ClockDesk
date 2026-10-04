@@ -2,8 +2,8 @@ package com.nxd1frnt.clockdesk2.ui.settings
 
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.res.ColorStateList
 import android.os.Bundle
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,11 +12,9 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import android.content.res.ColorStateList
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
@@ -247,9 +245,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 }
 
-// Extension function to load colors from active theme attributes
-private fun Context.getThemeColor(attr: Int): Int {
-    val typedValue = TypedValue()
-    theme.resolveAttribute(attr, typedValue, true)
-    return typedValue.data
+// Extension function to load colors from active theme attributes reliably
+private fun Context.getThemeColor(attr: Int, defaultColor: Int = 0): Int {
+    return com.google.android.material.color.MaterialColors.getColor(this, attr, defaultColor)
 }

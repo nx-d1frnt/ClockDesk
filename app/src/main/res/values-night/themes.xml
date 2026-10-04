@@ -28,10 +28,20 @@
         <item name="colorSurfaceVariant">@color/md_theme_surfaceVariant</item>
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorOutline">@color/md_theme_outline</item>
+
+        <!-- Surface Containers for Material 3 Expressive UI -->
+        <item name="colorSurfaceContainerLowest">@color/md_theme_surfaceContainerLowest</item>
+        <item name="colorSurfaceContainerLow">@color/md_theme_surfaceContainerLow</item>
+        <item name="colorSurfaceContainer">@color/md_theme_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/md_theme_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item>
         
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item> 
+        <item name="android:windowSharedElementsUseOverlay">false</item>
+
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
         <item name="materialButtonToggleGroupStyle">@style/Theme.ClockDesk.Button.ToggleGroup</item>
     </style>
@@ -45,6 +55,10 @@
     <style name="Theme.ClockDesk.Button.ToggleGroup" parent="Widget.Material3.MaterialButtonToggleGroup">
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
     </style>
+
+    <style name="Theme.ClockDesk" parent="Base.Theme.ClockDesk" />
+
+    <style name="Theme.ClockDesk.Settings" parent="Theme.ClockDesk" />
 
     <style name="ClockDesk.Dialog.Theme" parent="Theme.Material3.DayNight.Dialog">
         <item name="dialogCornerRadius">28dp</item>

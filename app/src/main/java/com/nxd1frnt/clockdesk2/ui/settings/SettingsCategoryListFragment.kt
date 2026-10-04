@@ -1,9 +1,6 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
-import android.content.Context
-import android.content.res.ColorStateList
 import android.os.Bundle
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -82,22 +79,6 @@ class SettingsCategoryListFragment : Fragment() {
                 holder.cardContainer.layoutParams = lp
             }
 
-            holder.cardContainer.setCardBackgroundColor(
-                context.getThemeColor(com.google.android.material.R.attr.colorSurfaceContainerLow)
-            )
-            holder.iconBadge.setCardBackgroundColor(
-                context.getThemeColor(com.google.android.material.R.attr.colorSurfaceContainerHigh)
-            )
-            holder.title.setTextColor(
-                context.getThemeColor(com.google.android.material.R.attr.colorOnSurface)
-            )
-            holder.subtitle.setTextColor(
-                context.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-            )
-            holder.icon.imageTintList = ColorStateList.valueOf(
-                context.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-            )
-
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
@@ -111,10 +92,4 @@ class SettingsCategoryListFragment : Fragment() {
             val subtitle: TextView = view.findViewById(R.id.category_subtitle)
         }
     }
-}
-
-private fun Context.getThemeColor(attr: Int): Int {
-    val typedValue = TypedValue()
-    theme.resolveAttribute(attr, typedValue, true)
-    return typedValue.data
 }

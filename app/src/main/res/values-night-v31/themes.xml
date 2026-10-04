@@ -1,30 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.ClockDesk" parent="Theme.Material3Expressive.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <item name="colorPrimary">@color/material_dynamic_primary80</item>
-        <item name="colorOnPrimary">@color/material_dynamic_primary20</item>
-        <item name="colorPrimaryContainer">@color/material_dynamic_primary90</item>
-        <item name="colorOnPrimaryContainer">@color/material_dynamic_primary10</item>
-        <item name="colorSecondary">@color/material_dynamic_secondary40</item>
-        <item name="colorOnSecondary">@color/material_dynamic_neutral99</item>
-        <item name="colorSecondaryContainer">@color/material_dynamic_secondary90</item>
-        <item name="colorOnSecondaryContainer">@color/material_dynamic_secondary10</item>
-        <item name="colorSurface">@color/material_dynamic_neutral10</item>
-        <item name="colorOnSurface">@color/material_dynamic_neutral90</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">false</item> 
+    <style name="Theme.ClockDesk" parent="Base.Theme.ClockDesk">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
-    <style name="ClockDesk.Dialog.Theme" parent="Theme.Material3.DayNight.Dialog">
-        <item name="dialogCornerRadius">28dp</item>
-        <item name="colorSurface">?attr/colorSurfaceContainerLowest</item>
-        <item name="textAppearanceHeadlineSmall">@style/ClockDesk.Type.Headline</item>
-    </style>
-
-    <style name="ClockDesk.Type.Headline" parent="TextAppearance.Material3.HeadlineSmall">
-        <item name="android:fontFamily">@font/googlesansflex</item>
-        <item name="android:letterSpacing">-0.01</item>
-    </style>
+    <style name="Theme.ClockDesk.Settings" parent="Theme.ClockDesk" />
 </resources>
