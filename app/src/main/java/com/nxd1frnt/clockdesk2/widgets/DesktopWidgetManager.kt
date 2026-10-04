@@ -61,7 +61,7 @@ class DesktopWidgetManager(
     }
 
     fun getViews(): List<View> {
-        return activeInstances.mapNotNull { instanceViewMap[it.instanceId] }
+        return activeInstances.sortedBy { it.orderIndex }.mapNotNull { instanceViewMap[it.instanceId] }
     }
 
     fun isWidgetTypeActive(type: DesktopWidgetType): Boolean {
@@ -118,28 +118,43 @@ class DesktopWidgetManager(
                 prefs.edit().putBoolean("has_configured_desktop", true).apply()
             }
         }
+
+        val layoutVersion = prefs.getInt("desktop_layout_version", 1)
+        if (layoutVersion < 2) {
+            val mediaInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.MEDIA }
+            val timeInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.TIME }
+            val dateInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.DATE }
+
+            if (mediaInstance != null && timeInstance != null && (timeInstance.orderIndex < mediaInstance.orderIndex || (timeInstance.orderIndex == 0 && mediaInstance.orderIndex == 2))) {
+                mediaInstance.orderIndex = 0
+                dateInstance?.orderIndex = 1
+                timeInstance.orderIndex = 2
+                saveLayout()
+            }
+            prefs.edit().putInt("desktop_layout_version", 2).apply()
+        }
     }
 
     private fun migrateOrInitDefaults() {
         Logger.d(TAG) { "Initializing default desktop widgets..." }
         activeInstances.clear()
 
-        // 1. Time
+        // 1. Media (Top, orderIndex 0)
         activeInstances.add(
             WidgetInstance(
-                instanceId = "widget_time_main",
-                type = DesktopWidgetType.TIME,
-                orderIndex = legacyPrefs.getInt("time_text_order_index", 2),
-                isFreeMode = legacyPrefs.getBoolean("time_text_individual_free_mode", false),
-                posX = legacyPrefs.getFloat("time_text_x", 0f),
-                posY = legacyPrefs.getFloat("time_text_y", 0f),
-                alignH = legacyPrefs.getInt("time_text_align_h", 1),
-                alignV = legacyPrefs.getInt("time_text_align_v", 2),
-                internalGravity = legacyPrefs.getInt("time_text_internal_gravity", 1)
+                instanceId = "widget_media_main",
+                type = DesktopWidgetType.MEDIA,
+                orderIndex = legacyPrefs.getInt("lastfm_layout_order_index", 0),
+                isFreeMode = legacyPrefs.getBoolean("lastfm_layout_individual_free_mode", false),
+                posX = legacyPrefs.getFloat("lastfm_layout_x", 0f),
+                posY = legacyPrefs.getFloat("lastfm_layout_y", 0f),
+                alignH = legacyPrefs.getInt("lastfm_layout_align_h", 1),
+                alignV = legacyPrefs.getInt("lastfm_layout_align_v", 2),
+                internalGravity = legacyPrefs.getInt("lastfm_layout_internal_gravity", 1)
             )
         )
 
-        // 2. Date
+        // 2. Date (Middle, orderIndex 1)
         activeInstances.add(
             WidgetInstance(
                 instanceId = "widget_date_main",
@@ -154,18 +169,18 @@ class DesktopWidgetManager(
             )
         )
 
-        // 3. Media
+        // 3. Time (Bottom, orderIndex 2)
         activeInstances.add(
             WidgetInstance(
-                instanceId = "widget_media_main",
-                type = DesktopWidgetType.MEDIA,
-                orderIndex = legacyPrefs.getInt("lastfm_layout_order_index", 0),
-                isFreeMode = legacyPrefs.getBoolean("lastfm_layout_individual_free_mode", false),
-                posX = legacyPrefs.getFloat("lastfm_layout_x", 0f),
-                posY = legacyPrefs.getFloat("lastfm_layout_y", 0f),
-                alignH = legacyPrefs.getInt("lastfm_layout_align_h", 1),
-                alignV = legacyPrefs.getInt("lastfm_layout_align_v", 2),
-                internalGravity = legacyPrefs.getInt("lastfm_layout_internal_gravity", 1)
+                instanceId = "widget_time_main",
+                type = DesktopWidgetType.TIME,
+                orderIndex = legacyPrefs.getInt("time_text_order_index", 2),
+                isFreeMode = legacyPrefs.getBoolean("time_text_individual_free_mode", false),
+                posX = legacyPrefs.getFloat("time_text_x", 0f),
+                posY = legacyPrefs.getFloat("time_text_y", 0f),
+                alignH = legacyPrefs.getInt("time_text_align_h", 1),
+                alignV = legacyPrefs.getInt("time_text_align_v", 2),
+                internalGravity = legacyPrefs.getInt("time_text_internal_gravity", 1)
             )
         )
 
@@ -311,6 +326,11 @@ class DesktopWidgetManager(
     fun resetToDefaults() {
         activeControllers.values.forEach { it.onDestroy() }
         activeControllers.clear()
+        legacyPrefs.edit()
+            .putInt("lastfm_layout_order_index", 0)
+            .putInt("date_text_order_index", 1)
+            .putInt("time_text_order_index", 2)
+            .apply()
         migrateOrInitDefaults()
         onWidgetsChanged?.invoke()
     }

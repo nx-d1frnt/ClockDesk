@@ -239,6 +239,7 @@ class WidgetMover(
     // ============================================================================
 
     private fun checkAndInitializeDefaults() {
+        val moverVersion = prefs.getInt("widget_mover_layout_version", 1)
         if (!prefs.contains("is_layout_initialized")) {
             Logger.d("WidgetMover"){"First run detected! Applying default layout settings."}
             val editor = prefs.edit()
@@ -258,8 +259,20 @@ class WidgetMover(
             }
 
             editor.putBoolean("is_layout_initialized", true)
+            editor.putInt("widget_mover_layout_version", 2)
             editor.apply()
             Logger.d("WidgetMover"){"Default settings initialized"}
+        } else if (moverVersion < 2) {
+            val editor = prefs.edit()
+            val timeOrder = prefs.getInt("time_text_order_index", -1)
+            val lastfmOrder = prefs.getInt("lastfm_layout_order_index", -1)
+            if (timeOrder == 0 && lastfmOrder == 2) {
+                editor.putInt("lastfm_layout_order_index", 0)
+                editor.putInt("date_text_order_index", 1)
+                editor.putInt("time_text_order_index", 2)
+            }
+            editor.putInt("widget_mover_layout_version", 2)
+            editor.apply()
         }
     }
 
