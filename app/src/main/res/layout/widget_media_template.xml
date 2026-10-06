@@ -87,6 +87,7 @@
                     android:scaleType="fitCenter"
                     android:background="?attr/colorSurfaceContainerHighest"
                     app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                    app:tint="#FFFFFFFF"
                     android:visibility="gone" />
             </FrameLayout>
 
@@ -172,6 +173,7 @@
                     android:scaleType="fitCenter"
                     android:background="?attr/colorSurfaceContainerHighest"
                     app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                    app:tint="#FFFFFFFF"
                     android:visibility="gone" />
             </FrameLayout>
 

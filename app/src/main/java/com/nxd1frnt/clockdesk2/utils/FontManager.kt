@@ -724,7 +724,10 @@ class FontManager(
                 if (!colorOnly) {
                     compactCard?.alpha = settings.alpha
                 }
-                lastfmLayout.findViewById<View>(R.id.compact_source_icon)?.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
+                lastfmLayout.findViewById<ImageView>(R.id.compact_source_icon)?.let { iconView ->
+                    iconView.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
+                    iconView.setColorFilter(finalColor, PorterDuff.Mode.SRC_IN)
+                }
                 lastfmLayout.findViewById<TextView>(R.id.compact_title_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
                     if (!colorOnly) {
@@ -744,7 +747,10 @@ class FontManager(
                 if (!colorOnly) {
                     expandedCard?.alpha = settings.alpha
                 }
-                lastfmLayout.findViewById<View>(R.id.expanded_source_icon)?.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
+                lastfmLayout.findViewById<ImageView>(R.id.expanded_source_icon)?.let { iconView ->
+                    iconView.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
+                    iconView.setColorFilter(finalColor, PorterDuff.Mode.SRC_IN)
+                }
                 lastfmLayout.findViewById<TextView>(R.id.expanded_title_text)?.let {
                     applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
                     if (!colorOnly) {

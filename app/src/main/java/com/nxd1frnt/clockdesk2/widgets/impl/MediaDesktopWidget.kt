@@ -746,44 +746,50 @@ class MediaDesktopWidget(
             else -> R.drawable.music_note
         }
 
-        if (areArtworkSourcesEqual(view.tag, badgeKey)) {
-            return
-        }
-        view.tag = badgeKey
+        val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
 
-        if (track.sourceIconResId != null) {
-            view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, track.sourceIconResId))
-            view.colorFilter = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                view.imageAlpha = 255
-            }
-        } else if (track.sourceIconBitmap != null) {
-            view.setImageBitmap(track.sourceIconBitmap)
-            view.colorFilter = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                view.imageAlpha = 255
-            }
-        } else if (!track.sourcePackageName.isNullOrEmpty()) {
-            try {
-                val icon = host.hostContext.packageManager.getApplicationIcon(track.sourcePackageName)
-                view.setImageDrawable(icon)
-                view.colorFilter = null
+        if (!areArtworkSourcesEqual(view.tag, badgeKey)) {
+            view.tag = badgeKey
+
+            if (track.sourceIconResId != null) {
+                view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, track.sourceIconResId))
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
                     view.imageAlpha = 255
                 }
-            } catch (e: PackageManager.NameNotFoundException) {
-                view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
-                val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
-                if (tintColor != null) {
-                    view.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+            } else if (track.sourceIconBitmap != null) {
+                view.setImageBitmap(track.sourceIconBitmap)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    view.imageAlpha = 255
                 }
+            } else if (!track.sourcePackageName.isNullOrEmpty()) {
+                try {
+                    val icon = host.hostContext.packageManager.getApplicationIcon(track.sourcePackageName)
+                    var monochromeDrawable: Drawable? = null
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && icon is AdaptiveIconDrawable) {
+                        monochromeDrawable = icon.monochrome
+                    }
+
+                    if (monochromeDrawable != null) {
+                        view.setImageDrawable(monochromeDrawable)
+                    } else {
+                        view.setImageDrawable(icon)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        view.imageAlpha = 255
+                    }
+                } catch (e: PackageManager.NameNotFoundException) {
+                    view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
+                }
+            } else {
+                view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
             }
+        }
+
+        if (tintColor != null) {
+            view.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
         } else {
-            view.setImageDrawable(ContextCompat.getDrawable(host.hostContext, R.drawable.music_note))
-            val tintColor = host.fontManager?.getFinalColorForView(R.id.lastfm_layout)
-            if (tintColor != null) {
-                view.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
-            }
+            view.colorFilter = null
         }
     }
 
