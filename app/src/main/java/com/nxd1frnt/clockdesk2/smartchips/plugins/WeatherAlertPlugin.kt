@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 import java.util.Calendar
 
@@ -51,6 +52,7 @@ class WeatherAlertPlugin(private val context: Context) : ISmartChip {
         val currentCode = WeatherGetter.cachedWeatherCode
         val windSpeed = WeatherGetter.cachedWindSpeed
         val hourlyCodes = WeatherGetter.cachedHourlyCodes
+        val uvIndex = WeatherGetter.cachedUvIndex
 
         val enableStorms = sharedPreferences.getBoolean("weather_alert_enable_storms", true)
         val enableWind = sharedPreferences.getBoolean("weather_alert_enable_wind", true)
@@ -61,32 +63,27 @@ class WeatherAlertPlugin(private val context: Context) : ISmartChip {
         val uvThreshold = sharedPreferences.getInt("weather_alert_uv_threshold", 6)
         val forecastHours = sharedPreferences.getInt("weather_alert_forecast_hours", 3)
 
+        val targetIcon: Int
+        val targetText: String
+
         // 1. Current Storm Alert
         if (enableStorms && currentCode != null && (currentCode == 95 || currentCode == 96 || currentCode == 99)) {
-            iconView.setImageResource(R.drawable.ic_weather_lightning_rainy)
-            textView.text = context.getString(R.string.weather_alert_storm_active)
-            return true
-        }
-
-        // 2. High UV Alert
-        val uvIndex = WeatherGetter.cachedUvIndex
-        if (enableUv && uvIndex != null && uvIndex >= uvThreshold) {
-            iconView.setImageResource(R.drawable.ic_clear_day)
-            textView.text = context.getString(R.string.weather_alert_high_uv, String.format(java.util.Locale.US, "%.1f", uvIndex))
-            return true
-        }
-
-        // 3. High Winds Alert
-        if (enableWind && windSpeed != null && windSpeed > windThreshold) {
-            iconView.setImageResource(R.drawable.ic_weather_windy)
-            textView.text = context.getString(R.string.weather_alert_high_winds)
-            return true
-        }
-
-        // 3. Upcoming Worsening Weather
-        if (enableWorsening && currentCode != null && hourlyCodes.isNotEmpty()) {
+            targetIcon = R.drawable.ic_weather_lightning_rainy
+            targetText = context.getString(R.string.weather_alert_storm_active)
+        } else if (enableUv && uvIndex != null && uvIndex >= uvThreshold) {
+            // 2. High UV Alert
+            targetIcon = R.drawable.ic_clear_day
+            targetText = context.getString(R.string.weather_alert_high_uv, String.format(java.util.Locale.US, "%.1f", uvIndex))
+        } else if (enableWind && windSpeed != null && windSpeed > windThreshold) {
+            // 3. High Winds Alert
+            targetIcon = R.drawable.ic_weather_windy
+            targetText = context.getString(R.string.weather_alert_high_winds)
+        } else if (enableWorsening && currentCode != null && hourlyCodes.isNotEmpty()) {
+            // 4. Upcoming Worsening Weather
             val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
             val currentSeverity = getSeverity(currentCode)
+            var foundText: String? = null
+            var foundIcon = 0
 
             for (offset in 1..forecastHours) {
                 val idx = currentHour + offset
@@ -94,29 +91,40 @@ class WeatherAlertPlugin(private val context: Context) : ISmartChip {
                     val futureCode = hourlyCodes[idx]
                     val futureSeverity = getSeverity(futureCode)
                     if (futureSeverity > currentSeverity && futureSeverity >= 4) {
-                        val alertText = when (futureSeverity) {
+                        foundText = when (futureSeverity) {
                             4 -> context.getString(R.string.weather_alert_rain_in_format, offset)
                             5 -> context.getString(R.string.weather_alert_snow_in_format, offset)
                             6 -> context.getString(R.string.weather_alert_storm_in_format, offset)
-                            else -> ""
+                            else -> null
                         }
-                        val alertIcon = when (futureSeverity) {
+                        foundIcon = when (futureSeverity) {
                             4 -> R.drawable.ic_weather_rainy
                             5 -> R.drawable.ic_weather_snowy
                             6 -> R.drawable.ic_weather_lightning_rainy
                             else -> 0
                         }
-                        if (alertText.isNotEmpty() && alertIcon != 0) {
-                            iconView.setImageResource(alertIcon)
-                            textView.text = alertText
-                            return true
-                        }
+                        break
                     }
                 }
             }
+            if (foundText != null && foundIcon != 0) {
+                targetIcon = foundIcon
+                targetText = foundText
+            } else {
+                return false
+            }
+        } else {
+            return false
         }
 
-        return false
+        if (iconView != null && iconView.tag != targetIcon) {
+            iconView.setImageResource(targetIcon)
+            iconView.tag = targetIcon
+        }
+        if (textView != null) {
+            textView.setTextWithFade(targetText)
+        }
+        return true
     }
 
     private fun getSeverity(code: Int): Int {

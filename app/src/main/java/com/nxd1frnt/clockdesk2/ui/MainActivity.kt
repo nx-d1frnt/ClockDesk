@@ -1123,20 +1123,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun setupPreferencesListener(prefs: SharedPreferences) {
         preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            val chipKeys = setOf("show_battery_alert") + smartChipManager.externalPlugins.map { it.preferenceKey }
-            if (chipKeys.contains(key)) smartChipManager.onPreferencesChanged()
+            if (::smartChipManager.isInitialized && smartChipManager.isChipRelatedPreference(key)) {
+                smartChipManager.onPreferencesChanged()
+            }
 
             when (key) {
                 "show_performance_overlay" -> runOnUiThread {
                     val showOverlay = prefs.getBoolean("show_performance_overlay", false)
                     togglePerformanceOverlay(showOverlay)
                 }
-                "automatic_battery_saver_mode", "battery_saver_trigger", "power_saver_manual", "power_saver_sync_system",
-                "battery_alert_show_low", "battery_alert_low_threshold", "battery_alert_show_charging",
-                "battery_alert_show_full", "battery_alert_show_saver",
-                "weather_alert_enable_storms", "weather_alert_enable_wind", "weather_alert_enable_worsening",
-                "weather_alert_enable_uv", "weather_alert_wind_threshold", "weather_alert_uv_threshold",
-                "weather_alert_forecast_hours", "smart_chips_stack_overflow" -> smartChipManager.onPreferencesChanged()
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging

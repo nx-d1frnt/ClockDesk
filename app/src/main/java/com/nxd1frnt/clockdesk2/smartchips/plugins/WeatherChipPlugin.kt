@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 import com.nxd1frnt.clockdesk2.weathergetter.getWeatherIconRes
 
@@ -54,8 +55,14 @@ class WeatherChipPlugin(private val context: Context) : ISmartChip {
 
         if (temp != null && code != null) {
             val iconRes = getWeatherIconRes(code, isDay)
-            iconView.setImageResource(iconRes)
-            textView.text = "${temp.toInt()}°"
+            if (iconView != null && iconView.tag != iconRes) {
+                iconView.setImageResource(iconRes)
+                iconView.tag = iconRes
+            }
+            val targetText = "${temp.toInt()}°"
+            if (textView != null) {
+                textView.setTextWithFade(targetText)
+            }
             return true
         }
 

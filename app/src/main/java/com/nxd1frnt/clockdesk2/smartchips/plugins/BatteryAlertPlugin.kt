@@ -15,6 +15,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 
 class BatteryAlertPlugin(private val context: Context) : ISmartChip {
 
@@ -30,11 +31,30 @@ class BatteryAlertPlugin(private val context: Context) : ISmartChip {
         stateChangeListener?.invoke()
     }
 
+    private var lastReportedStatus = -1
+    private var lastReportedPct = -1
+    private var lastReportedPowerSave = false
+
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val action = intent?.action
-            if (action == Intent.ACTION_BATTERY_CHANGED || action == PowerManager.ACTION_POWER_SAVE_MODE_CHANGED) {
-                stateChangeListener?.invoke()
+            val action = intent?.action ?: return
+            if (action == PowerManager.ACTION_POWER_SAVE_MODE_CHANGED) {
+                val pm = context?.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                val isPowerSave = pm?.isPowerSaveMode == true
+                if (isPowerSave != lastReportedPowerSave) {
+                    lastReportedPowerSave = isPowerSave
+                    stateChangeListener?.invoke()
+                }
+            } else if (action == Intent.ACTION_BATTERY_CHANGED) {
+                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                val pct = if (scale > 0) (level.toFloat() / scale.toFloat() * 100).toInt() else -1
+                if (status != lastReportedStatus || pct != lastReportedPct) {
+                    lastReportedStatus = status
+                    lastReportedPct = pct
+                    stateChangeListener?.invoke()
+                }
             }
         }
     }
@@ -49,7 +69,15 @@ class BatteryAlertPlugin(private val context: Context) : ISmartChip {
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
         }
-        context.registerReceiver(batteryReceiver, filter)
+        val stickyIntent = context.registerReceiver(batteryReceiver, filter)
+        if (stickyIntent != null) {
+            lastReportedStatus = stickyIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val level = stickyIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = stickyIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            lastReportedPct = if (scale > 0) (level.toFloat() / scale.toFloat() * 100).toInt() else -1
+        }
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        lastReportedPowerSave = pm?.isPowerSaveMode == true
         isListening = true
     }
 
@@ -81,8 +109,12 @@ class BatteryAlertPlugin(private val context: Context) : ISmartChip {
         val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val batteryPct = if (scale > 0) (level.toFloat() / scale.toFloat() * 100).toInt() else -1
 
-        // 1. App / System battery saver mode
+        // Preferences
         val showSaver = sharedPreferences.getBoolean("battery_alert_show_saver", true)
+        val showFull = sharedPreferences.getBoolean("battery_alert_show_full", true)
+        val showCharging = sharedPreferences.getBoolean("battery_alert_show_charging", true)
+        val showLow = sharedPreferences.getBoolean("battery_alert_show_low", true)
+
         val manualSaverOn = sharedPreferences.getBoolean("power_saver_manual", false)
         val autoSaverEnabled = sharedPreferences.getBoolean("automatic_battery_saver_mode", false)
         val saverThreshold = sharedPreferences.getInt("battery_saver_trigger", 15)
@@ -104,44 +136,42 @@ class BatteryAlertPlugin(private val context: Context) : ISmartChip {
             handler.removeCallbacks(hideSaverTextRunnable)
         }
 
+        val targetIconRes: Int
+        val targetText: String
+
         if (showSaver && isBatterySaverActive) {
-            iconView.setImageResource(R.drawable.ic_battery_saver)
+            targetIconRes = R.drawable.ic_battery_saver
             val elapsed = System.currentTimeMillis() - saverActivatedTimestamp
-            if (elapsed in 0 until 5000L) {
-                textView.text = context.getString(R.string.battery_saver_on)
+            targetText = if (elapsed in 0 until 5000L) {
+                context.getString(R.string.battery_saver_on)
             } else {
-                textView.text = if (batteryPct > 0) "$batteryPct%" else context.getString(R.string.battery_saver_on)
+                if (batteryPct > 0) "$batteryPct%" else context.getString(R.string.battery_saver_on)
             }
-            return true
-        }
-
-        // 2. Fully charged state
-        val showFull = sharedPreferences.getBoolean("battery_alert_show_full", true)
-        if (showFull && (isFull || batteryPct >= 100)) {
-            iconView.setImageResource(R.drawable.ic_battery_full)
-            textView.text = if (batteryPct > 0) "$batteryPct%" else "100%"
-            return true
-        }
-
-        // 3. Charging state
-        val showCharging = sharedPreferences.getBoolean("battery_alert_show_charging", true)
-        if (showCharging && isCharging) {
-            iconView.setImageResource(R.drawable.ic_battery_charging)
-            textView.text = if (batteryPct > 0) "$batteryPct%" else "Chg"
-            return true
-        }
-
-        // 4. Low battery warning state
-        val showLow = sharedPreferences.getBoolean("battery_alert_show_low", true)
-        if (showLow) {
+        } else if (showFull && (isFull || batteryPct >= 100)) {
+            targetIconRes = R.drawable.ic_battery_full
+            targetText = if (batteryPct > 0) "$batteryPct%" else "100%"
+        } else if (showCharging && isCharging) {
+            targetIconRes = R.drawable.ic_battery_charging
+            targetText = if (batteryPct > 0) "$batteryPct%" else "Chg"
+        } else if (showLow) {
             val threshold = sharedPreferences.getInt("battery_alert_low_threshold", 20)
             if (batteryPct in 1..threshold && !isCharging && !isFull) {
-                iconView.setImageResource(R.drawable.ic_battery_alert)
-                textView.text = "$batteryPct%"
-                return true
+                targetIconRes = R.drawable.ic_battery_alert
+                targetText = "$batteryPct%"
+            } else {
+                return false
             }
+        } else {
+            return false
         }
 
-        return false
+        if (iconView != null && iconView.tag != targetIconRes) {
+            iconView.setImageResource(targetIconRes)
+            iconView.tag = targetIconRes
+        }
+        if (textView != null) {
+            textView.setTextWithFade(targetText)
+        }
+        return true
     }
 }

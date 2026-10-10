@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 
 class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
 
@@ -45,10 +46,15 @@ companion object {
         val iconView = view.findViewById<ImageView>(R.id.chip_icon)
         val textView = view.findViewById<TextView>(R.id.chip_text)
 
-        iconView.setImageResource(currentStage.iconRes)
+        if (iconView != null && iconView.tag != currentStage.iconRes) {
+            iconView.setImageResource(currentStage.iconRes)
+            iconView.tag = currentStage.iconRes
+        }
         
         val text = customMessage ?: context.getString(currentStage.defaultMessageRes)
-        textView.text = text
+        if (textView != null) {
+            textView.setTextWithFade(text)
+        }
 
         return true
     }

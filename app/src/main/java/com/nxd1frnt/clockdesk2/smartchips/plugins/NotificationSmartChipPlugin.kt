@@ -11,6 +11,7 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.repo.DeskNotificationRepository
 import com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationHelper
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 
 class NotificationSmartChipPlugin(private val context: Context) : ISmartChip {
 
@@ -120,12 +121,7 @@ class NotificationSmartChipPlugin(private val context: Context) : ISmartChip {
             }
         }
 
-        if (chipText.text.toString() != label) {
-            chipText.text = label
-        }
-        if (!chipText.isSelected) {
-            chipText.isSelected = true
-        }
+        chipText.setTextWithFade(label)
 
         return true
     }

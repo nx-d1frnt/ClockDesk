@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.UpdateManager
 
@@ -91,26 +92,39 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
         val textView = view.findViewById<TextView>(R.id.chip_text)
 
         if (UpdateManager.isChecking) {
-            textView.text = context.getString(R.string.checking_updates)
-            iconView.setImageResource(R.drawable.update)
+            val checkText = context.getString(R.string.checking_updates)
+            if (iconView != null && iconView.tag != R.drawable.update) {
+                iconView.setImageResource(R.drawable.update)
+                iconView.tag = R.drawable.update
+            }
+            if (textView != null) {
+                textView.setTextWithFade(checkText)
+            }
             return true
         }
 
         if (!UpdateManager.isUpdateAvailable) return false
 
-        iconView.setImageResource(R.drawable.update)
+        if (iconView != null && iconView.tag != R.drawable.update) {
+            iconView.setImageResource(R.drawable.update)
+            iconView.tag = R.drawable.update
+        }
 
-        when (UpdateManager.downloadState) {
+        val targetText = when (UpdateManager.downloadState) {
             UpdateManager.DownloadState.DOWNLOADING -> {
                 val percent = UpdateManager.downloadProgress
-                textView.text = "${context.getString(R.string.downloading_update_title)}: $percent%"
+                "${context.getString(R.string.downloading_update_title)}: $percent%"
             }
             UpdateManager.DownloadState.READY_TO_INSTALL -> {
-                textView.text = context.getString(R.string.update_ready_to_install)
+                context.getString(R.string.update_ready_to_install)
             }
             else -> {
-                textView.text = context.getString(R.string.update_available_text)
+                context.getString(R.string.update_available_text)
             }
+        }
+
+        if (textView != null) {
+            textView.setTextWithFade(targetText)
         }
 
         return true
