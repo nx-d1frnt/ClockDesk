@@ -1,17 +1,29 @@
 package com.nxd1frnt.clockdesk2.ui.settings.components
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.drawable.PaintDrawable
+import android.os.Build
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
+import android.view.animation.OvershootInterpolator
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -20,7 +32,13 @@ import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationHelper
+import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
+import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
+import com.nxd1frnt.clockdesk2.utils.ColorItem
+import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
+import com.skydoves.colorpickerview.listeners.ColorEnvelopeListener
 
 class M3SettingsAdapter(
     private val context: Context,
@@ -38,9 +56,14 @@ class M3SettingsAdapter(
         private const val TYPE_TEXT_EDIT = 5
         private const val TYPE_BURN_IN_PREVIEW = 6
         private const val TYPE_SMART_PIXELS_PREVIEW = 7
+        private const val TYPE_NOTIFICATION_PREVIEW = 8
+        private const val TYPE_NOTIFICATION_APPEARANCE = 9
+
+        private const val PAYLOAD_UPDATE_PREVIEW = "payload_update_notification_preview"
     }
 
     private var displayItems: List<SettingsItem> = emptyList()
+    private var isEditingNotificationBg: Boolean = false
 
     init {
         updateDisplayList(items)
@@ -49,6 +72,13 @@ class M3SettingsAdapter(
     fun submitList(newItems: List<SettingsItem>) {
         updateDisplayList(newItems)
         notifyDataSetChanged()
+    }
+
+    fun notifyNotificationPreviewChanged(animatePosition: Boolean = false) {
+        val index = displayItems.indexOfFirst { it is SettingsItem.NotificationPreview }
+        if (index != -1) {
+            notifyItemChanged(index, if (animatePosition) "animate" else PAYLOAD_UPDATE_PREVIEW)
+        }
     }
 
     private fun updateDisplayList(rawItems: List<SettingsItem>) {
@@ -93,6 +123,8 @@ class M3SettingsAdapter(
             is SettingsItem.TextEdit -> TYPE_TEXT_EDIT
             is SettingsItem.BurnInPreview -> TYPE_BURN_IN_PREVIEW
             is SettingsItem.SmartPixelsPreview -> TYPE_SMART_PIXELS_PREVIEW
+            is SettingsItem.NotificationPreview -> TYPE_NOTIFICATION_PREVIEW
+            is SettingsItem.NotificationAppearance -> TYPE_NOTIFICATION_APPEARANCE
         }
     }
 
@@ -107,8 +139,25 @@ class M3SettingsAdapter(
             TYPE_TEXT_EDIT -> TextEditViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
             TYPE_BURN_IN_PREVIEW -> BurnInPreviewViewHolder(inflater.inflate(R.layout.item_settings_burn_in_preview, parent, false))
             TYPE_SMART_PIXELS_PREVIEW -> SmartPixelsPreviewViewHolder(inflater.inflate(R.layout.item_settings_smart_pixels_preview, parent, false))
+            TYPE_NOTIFICATION_PREVIEW -> NotificationPreviewViewHolder(inflater.inflate(R.layout.item_settings_notification_preview, parent, false))
+            TYPE_NOTIFICATION_APPEARANCE -> NotificationAppearanceViewHolder(inflater.inflate(R.layout.item_settings_notification_appearance, parent, false))
             else -> throw IllegalArgumentException("Unknown view type $viewType")
         }
+    }
+
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        if (payloads.isNotEmpty() && holder is NotificationPreviewViewHolder) {
+            val item = displayItems[position] as? SettingsItem.NotificationPreview
+            if (item != null) {
+                holder.updatePreview(item, playEntrance = payloads.contains("animate"))
+                return
+            }
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
@@ -121,6 +170,8 @@ class M3SettingsAdapter(
             is SettingsItem.TextEdit -> (holder as TextEditViewHolder).bind(item, position)
             is SettingsItem.BurnInPreview -> (holder as BurnInPreviewViewHolder).bind(item, position)
             is SettingsItem.SmartPixelsPreview -> (holder as SmartPixelsPreviewViewHolder).bind(item, position)
+            is SettingsItem.NotificationPreview -> (holder as NotificationPreviewViewHolder).bind(item, position)
+            is SettingsItem.NotificationAppearance -> (holder as NotificationAppearanceViewHolder).bind(item, position)
         }
     }
 
@@ -200,6 +251,7 @@ class M3SettingsAdapter(
                     switchView.isChecked = newChecked
                     prefs.edit().putBoolean(entry.key, newChecked).apply()
                     entry.onCheckedChange?.invoke(newChecked)
+                    notifyNotificationPreviewChanged()
                     onPreferenceChanged(entry.key, newChecked)
                 }
             } else {
@@ -320,6 +372,7 @@ class M3SettingsAdapter(
                         val newValue = entry.entryValues[tempSelectedIndex]
                         prefs.edit().putString(entry.key, newValue).apply()
                         entry.onSelectionChange?.invoke(newValue)
+                        notifyNotificationPreviewChanged(animatePosition = entry.key == DeskNotificationHelper.KEY_POSITION)
                         onPreferenceChanged(entry.key, newValue)
                     }
                     dialog.dismiss()
@@ -378,10 +431,17 @@ class M3SettingsAdapter(
             slider.isEnabled = isEnabled
             cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
+            val isLivePreviewSlider = entry.key == DeskNotificationHelper.KEY_SCALE ||
+                    entry.key == DeskNotificationHelper.KEY_BG_OPACITY
+
             slider.clearOnChangeListeners()
             slider.addOnChangeListener { _, value, fromUser ->
                 if (fromUser) {
                     updateLabel(value)
+                    if (isLivePreviewSlider) {
+                        writeSliderPreference(entry.key, value, entry.step)
+                        notifyNotificationPreviewChanged()
+                    }
                 }
             }
 
@@ -393,7 +453,10 @@ class M3SettingsAdapter(
                     val value = s.value
                     writeSliderPreference(entry.key, value, entry.step)
                     entry.onValueChange?.invoke(value)
-                    onPreferenceChanged(entry.key, value)
+                    notifyNotificationPreviewChanged()
+                    if (!isLivePreviewSlider) {
+                        onPreferenceChanged(entry.key, value)
+                    }
                 }
             })
         }
@@ -625,6 +688,486 @@ class M3SettingsAdapter(
             btnLight.setOnClickListener { applyPreset(25) }
             btnBalanced.setOnClickListener { applyPreset(50) }
             btnStrong.setOnClickListener { applyPreset(75) }
+        }
+    }
+
+    inner class NotificationPreviewViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val previewBanner: View = view.findViewById(R.id.preview_notification_banner)
+        private val btnReplay: MaterialButton = view.findViewById(R.id.btn_replay_notification_preview)
+
+        init {
+            val iconView = previewBanner.findViewById<ImageView>(R.id.notification_app_icon)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && iconView != null) {
+                iconView.outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(v: View, outline: Outline) {
+                        val radius = v.context.resources.displayMetrics.density * 8f
+                        outline.setRoundRect(0, 0, v.width, v.height, radius)
+                    }
+                }
+                iconView.clipToOutline = true
+            }
+        }
+
+        fun bind(entry: SettingsItem.NotificationPreview, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+            updatePreview(entry, playEntrance = false)
+
+            btnReplay.setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                playEntranceAnimation()
+            }
+
+            previewBanner.setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                playEntranceAnimation()
+            }
+        }
+
+        fun updatePreview(entry: SettingsItem.NotificationPreview, playEntrance: Boolean) {
+            val isEnabled = entry.isEnabled()
+            cardView.isEnabled = isEnabled
+            btnReplay.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
+
+            val density = context.resources.displayMetrics.density
+            (previewBanner.layoutParams as? FrameLayout.LayoutParams)?.let { flp ->
+                flp.gravity = DeskNotificationHelper.getBannerGravity(prefs)
+                val marginPx = (6f * density).toInt()
+                flp.topMargin = marginPx
+                flp.bottomMargin = marginPx
+                flp.marginStart = marginPx
+                flp.marginEnd = marginPx
+                previewBanner.layoutParams = flp
+            }
+
+            DeskNotificationHelper.applyBannerCustomization(
+                context = context,
+                view = previewBanner,
+                prefs = prefs,
+                appName = context.getString(R.string.desk_notification_preview_sample_app),
+                deviceName = context.getString(R.string.desk_notification_preview_sample_device),
+                title = context.getString(R.string.desk_notification_preview_sample_title),
+                text = context.getString(R.string.desk_notification_preview_sample_body),
+                iconBytes = null,
+                notificationId = "preview_sample",
+                isClearable = true,
+                isPreview = true
+            )
+
+            if (playEntrance) {
+                playEntranceAnimation()
+            }
+        }
+
+        private fun playEntranceAnimation() {
+            val isBottom = DeskNotificationHelper.isBottomPosition(prefs)
+            previewBanner.animate().cancel()
+            previewBanner.translationY = if (isBottom) 80f else -80f
+            previewBanner.alpha = 0f
+            previewBanner.animate()
+                .translationY(0f)
+                .alpha(1f)
+                .setDuration(420)
+                .setInterpolator(OvershootInterpolator(0.9f))
+                .start()
+        }
+    }
+
+    inner class NotificationAppearanceViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val fontRecyclerView: RecyclerView = view.findViewById(R.id.notification_font_recycler_view)
+        private val variableAxesSection: LinearLayout = view.findViewById(R.id.notification_variable_axes_section)
+        private val dynamicAxesContainer: LinearLayout = view.findViewById(R.id.notification_dynamic_axes_container)
+        private val btnResetAxes: MaterialButton = view.findViewById(R.id.btn_reset_notification_axes)
+        private val colorRecyclerView: RecyclerView = view.findViewById(R.id.notification_color_recycler_view)
+        private val colorModeGroup: MaterialButtonToggleGroup = view.findViewById(R.id.notification_color_mode_group)
+        private val btnResetColors: MaterialButton = view.findViewById(R.id.btn_reset_notification_colors)
+
+        init {
+            fontRecyclerView.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            colorRecyclerView.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            preventHorizontalIntercept(fontRecyclerView)
+            preventHorizontalIntercept(colorRecyclerView)
+        }
+
+        private fun preventHorizontalIntercept(rv: RecyclerView) {
+            rv.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
+                override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                    when (e.actionMasked) {
+                        MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> rv.parent?.requestDisallowInterceptTouchEvent(true)
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> rv.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    return false
+                }
+                override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {}
+                override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {}
+            })
+        }
+
+        fun bind(entry: SettingsItem.NotificationAppearance, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+
+            val isEnabled = entry.isEnabled()
+            cardView.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
+
+            setupFontCarousel(entry)
+            setupVariableAxesSection()
+            setupColorCarousel()
+        }
+
+        private fun setupFontCarousel(entry: SettingsItem.NotificationAppearance) {
+            val fonts = DeskNotificationHelper.getFontsList(context)
+            val selectedIdx = DeskNotificationHelper.resolveSelectedFontIndex(context, prefs, fonts)
+            val defaultIdx = DeskNotificationHelper.getDefaultFontIndex(fonts)
+
+            val fontAdapter = FontAdapter(
+                fonts = fonts,
+                onFontSelected = { fontIndex ->
+                    if (fontIndex in 1..fonts.lastIndex) {
+                        val id = DeskNotificationHelper.getFontIdentifier(context, fonts[fontIndex])
+                        prefs.edit()
+                            .putString(DeskNotificationHelper.KEY_FONT_ID, id)
+                            .putInt(DeskNotificationHelper.KEY_FONT_INDEX, fontIndex)
+                            .apply()
+                        setupVariableAxesSection()
+                        notifyNotificationPreviewChanged()
+                    }
+                },
+                onAddFontClicked = {
+                    entry.onAddFontRequested?.invoke()
+                },
+                onFontLongClick = { fontIndex ->
+                    if (fontIndex in fonts.indices) {
+                        val item = fonts[fontIndex]
+                        val deletedId = DeskNotificationHelper.getFontIdentifier(context, item)
+                        MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+                            .setTitle(context.getString(R.string.delete_font_title))
+                            .setMessage(context.getString(R.string.delete_font_msg))
+                            .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
+                                if (DeskNotificationHelper.deleteCustomFont(context, item)) {
+                                    val updatedFonts = DeskNotificationHelper.getFontsList(context)
+                                    val savedId = prefs.getString(DeskNotificationHelper.KEY_FONT_ID, null)
+                                    if (savedId == null || savedId == deletedId) {
+                                        val fallbackIdx = DeskNotificationHelper.getDefaultFontIndex(updatedFonts)
+                                        prefs.edit()
+                                            .putString(
+                                                DeskNotificationHelper.KEY_FONT_ID,
+                                                DeskNotificationHelper.DEFAULT_FONT_ID
+                                            )
+                                            .putInt(DeskNotificationHelper.KEY_FONT_INDEX, fallbackIdx)
+                                            .apply()
+                                    } else {
+                                        val newIdx = DeskNotificationHelper.resolveSelectedFontIndex(context, prefs, updatedFonts)
+                                        prefs.edit()
+                                            .putInt(DeskNotificationHelper.KEY_FONT_INDEX, newIdx)
+                                            .apply()
+                                    }
+                                    setupFontCarousel(entry)
+                                    setupVariableAxesSection()
+                                    notifyNotificationPreviewChanged()
+                                }
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton(context.getString(R.string.cancel), null)
+                            .show()
+                    }
+                }
+            )
+            fontAdapter.selectedPosition = selectedIdx
+            fontRecyclerView.adapter = fontAdapter
+
+            val lm = fontRecyclerView.layoutManager as? LinearLayoutManager
+            if (selectedIdx in 1..fonts.lastIndex && selectedIdx != defaultIdx) {
+                val offsetPx = (80 * context.resources.displayMetrics.density).toInt()
+                lm?.scrollToPositionWithOffset(selectedIdx, offsetPx)
+            } else {
+                lm?.scrollToPositionWithOffset(0, 0)
+            }
+        }
+
+        private fun setupVariableAxesSection() {
+            dynamicAxesContainer.removeAllViews()
+            val axes = DeskNotificationHelper.getFontAxesDetails(context, prefs)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && axes.isNotEmpty()) {
+                variableAxesSection.visibility = View.VISIBLE
+
+                btnResetAxes.setOnClickListener {
+                    it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    DeskNotificationHelper.resetVariationAxes(prefs)
+                    setupVariableAxesSection()
+                    notifyNotificationPreviewChanged()
+                }
+
+                axes.forEach { axis ->
+                    val currentValue = DeskNotificationHelper.getAxisValue(prefs, axis)
+                    dynamicAxesContainer.addView(createAxisSliderRow(axis, currentValue))
+                }
+            } else {
+                variableAxesSection.visibility = View.GONE
+            }
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        private fun createAxisSliderRow(axis: FontAxis, initialValue: Float): View {
+            val density = context.resources.displayMetrics.density
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, (2 * density).toInt(), 0, (2 * density).toInt())
+            }
+
+            val nameText = TextView(context).apply {
+                text = DeskNotificationHelper.getAxisDisplayName(context, axis.tag)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.1f)
+            }
+
+            val valueText = TextView(context).apply {
+                text = formatAxisValue(initialValue)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                gravity = Gravity.END
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.7f)
+            }
+
+            val slider = Slider(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2.2f)
+                val min = axis.minValue
+                val max = axis.maxValue
+                if (max > min) {
+                    valueFrom = min
+                    valueTo = max
+                    value = initialValue.coerceIn(min, max)
+                } else {
+                    valueFrom = 0f
+                    valueTo = 1f
+                    value = 0f
+                    isEnabled = false
+                }
+
+                setOnTouchListener { v, event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE ->
+                            v.parent?.requestDisallowInterceptTouchEvent(true)
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                            v.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    false
+                }
+
+                addOnChangeListener { _, sliderValue, fromUser ->
+                    if (fromUser) {
+                        valueText.text = formatAxisValue(sliderValue)
+                        DeskNotificationHelper.setVariationAxis(prefs, axis.tag, sliderValue)
+                        notifyNotificationPreviewChanged()
+                    }
+                }
+            }
+
+            row.addView(nameText)
+            row.addView(slider)
+            row.addView(valueText)
+            return row
+        }
+
+        private fun formatAxisValue(v: Float): String {
+            return if (kotlin.math.abs(v - kotlin.math.round(v)) < 0.05f) {
+                kotlin.math.round(v).toInt().toString()
+            } else {
+                String.format("%.1f", v)
+            }
+        }
+
+        private fun resolveThemeColor(attrResId: Int): Int {
+            val tv = TypedValue()
+            if (context.theme.resolveAttribute(attrResId, tv, true)) {
+                return tv.data
+            }
+            return Color.WHITE
+        }
+
+        private fun setupColorCarousel() {
+            colorModeGroup.clearOnButtonCheckedListeners()
+            colorModeGroup.check(if (isEditingNotificationBg) R.id.btn_color_mode_bg else R.id.btn_color_mode_text)
+            colorModeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (isChecked) {
+                    isEditingNotificationBg = (checkedId == R.id.btn_color_mode_bg)
+                    refreshColorAdapter()
+                }
+            }
+
+            btnResetColors.setOnClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                prefs.edit()
+                    .putBoolean(DeskNotificationHelper.KEY_TEXT_USE_DYNAMIC, true)
+                    .putString(DeskNotificationHelper.KEY_TEXT_DYNAMIC_ROLE, "default")
+                    .putBoolean(DeskNotificationHelper.KEY_BG_USE_DYNAMIC, true)
+                    .putString(DeskNotificationHelper.KEY_BG_DYNAMIC_ROLE, "default")
+                    .apply()
+                refreshColorAdapter()
+                notifyNotificationPreviewChanged()
+            }
+
+            refreshColorAdapter()
+        }
+
+        private fun getCurrentColorSelection(): Triple<Int, Boolean, String?> {
+            return if (isEditingNotificationBg) {
+                Triple(
+                    prefs.getInt(DeskNotificationHelper.KEY_BG_COLOR, Color.parseColor("#2B2930")),
+                    prefs.getBoolean(DeskNotificationHelper.KEY_BG_USE_DYNAMIC, true),
+                    prefs.getString(DeskNotificationHelper.KEY_BG_DYNAMIC_ROLE, "default")
+                )
+            } else {
+                Triple(
+                    prefs.getInt(DeskNotificationHelper.KEY_TEXT_COLOR, Color.WHITE),
+                    prefs.getBoolean(DeskNotificationHelper.KEY_TEXT_USE_DYNAMIC, true),
+                    prefs.getString(DeskNotificationHelper.KEY_TEXT_DYNAMIC_ROLE, "default")
+                )
+            }
+        }
+
+        private fun refreshColorAdapter() {
+            val (currentColor, useDynamic, currentRole) = getCurrentColorSelection()
+            val items = DeskNotificationHelper.getColorsList(context, prefs)
+
+            val existing = colorRecyclerView.adapter as? ColorAdapter
+            if (existing != null) {
+                existing.updateData(items, currentColor, useDynamic, currentRole)
+                return
+            }
+
+            colorRecyclerView.adapter = ColorAdapter(
+                items = items,
+                selectedColor = currentColor,
+                useDynamic = useDynamic,
+                selectedRole = currentRole,
+                onColorSelected = { item ->
+                    when (item) {
+                        is ColorItem.AddNew -> showColorPickerDialog()
+                        is ColorItem.Dynamic -> {
+                            if (isEditingNotificationBg) {
+                                prefs.edit()
+                                    .putBoolean(DeskNotificationHelper.KEY_BG_USE_DYNAMIC, true)
+                                    .putString(DeskNotificationHelper.KEY_BG_DYNAMIC_ROLE, item.roleKey)
+                                    .apply()
+                            } else {
+                                prefs.edit()
+                                    .putBoolean(DeskNotificationHelper.KEY_TEXT_USE_DYNAMIC, true)
+                                    .putString(DeskNotificationHelper.KEY_TEXT_DYNAMIC_ROLE, item.roleKey)
+                                    .apply()
+                            }
+                            refreshColorAdapter()
+                            notifyNotificationPreviewChanged()
+                        }
+                        is ColorItem.Solid -> {
+                            if (isEditingNotificationBg) {
+                                prefs.edit()
+                                    .putBoolean(DeskNotificationHelper.KEY_BG_USE_DYNAMIC, false)
+                                    .putInt(DeskNotificationHelper.KEY_BG_COLOR, item.color)
+                                    .apply()
+                            } else {
+                                prefs.edit()
+                                    .putBoolean(DeskNotificationHelper.KEY_TEXT_USE_DYNAMIC, false)
+                                    .putInt(DeskNotificationHelper.KEY_TEXT_COLOR, item.color)
+                                    .apply()
+                            }
+                            refreshColorAdapter()
+                            notifyNotificationPreviewChanged()
+                        }
+                    }
+                },
+                onColorLongClick = { item ->
+                    MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+                        .setTitle(context.getString(R.string.delete_color_title))
+                        .setMessage(context.getString(R.string.delete_color_msg))
+                        .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
+                            if (DeskNotificationHelper.deleteCustomColor(prefs, item.color)) {
+                                refreshColorAdapter()
+                            }
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton(context.getString(R.string.cancel), null)
+                        .show()
+                }
+            )
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        private fun showColorPickerDialog() {
+            val (currentColor, useDynamic, currentRole) = getCurrentColorSelection()
+            val initialColor = if (useDynamic) {
+                DeskNotificationHelper.resolveDynamicRoleColor(
+                    context,
+                    prefs,
+                    currentRole,
+                    isBackground = isEditingNotificationBg
+                )
+            } else {
+                currentColor
+            }
+
+            val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_color_picker, null)
+            val colorPickerView = dialogView.findViewById<com.skydoves.colorpickerview.ColorPickerView>(R.id.color_picker_view)
+            val brightnessSlideBar = dialogView.findViewById<com.skydoves.colorpickerview.sliders.BrightnessSlideBar>(R.id.brightness_slide_bar)
+            val previewBox = dialogView.findViewById<View>(R.id.color_preview_box)
+            val hexText = dialogView.findViewById<TextView>(R.id.hex_text)
+
+            colorPickerView.attachBrightnessSlider(brightnessSlideBar)
+            colorPickerView.setInitialColor(initialColor)
+
+            val preventDisallowIntercept: (View) -> Unit = { v ->
+                v.setOnTouchListener { target, event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> target.parent?.requestDisallowInterceptTouchEvent(true)
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> target.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    false
+                }
+            }
+            preventDisallowIntercept(colorPickerView)
+            preventDisallowIntercept(brightnessSlideBar)
+
+            var selectedColor = initialColor
+            previewBox.setBackgroundColor(selectedColor)
+            hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
+
+            colorPickerView.setColorListener(ColorEnvelopeListener { envelope, _ ->
+                selectedColor = envelope.color
+                previewBox.setBackgroundColor(selectedColor)
+                hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
+            })
+
+            MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+                .setTitle(context.getString(R.string.custom_color))
+                .setView(dialogView)
+                .setPositiveButton(context.getString(R.string.apply)) { dialog, _ ->
+                    DeskNotificationHelper.addCustomColor(prefs, selectedColor)
+                    if (isEditingNotificationBg) {
+                        prefs.edit()
+                            .putBoolean(DeskNotificationHelper.KEY_BG_USE_DYNAMIC, false)
+                            .putInt(DeskNotificationHelper.KEY_BG_COLOR, selectedColor)
+                            .apply()
+                    } else {
+                        prefs.edit()
+                            .putBoolean(DeskNotificationHelper.KEY_TEXT_USE_DYNAMIC, false)
+                            .putInt(DeskNotificationHelper.KEY_TEXT_COLOR, selectedColor)
+                            .apply()
+                    }
+                    refreshColorAdapter()
+                    notifyNotificationPreviewChanged()
+                    dialog.dismiss()
+                }
+                .setNegativeButton(context.getString(R.string.cancel), null)
+                .show()
         }
     }
 }

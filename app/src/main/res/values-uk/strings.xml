@@ -573,11 +573,50 @@
     <string name="pref_cat_floating_banners">Спливаючі банери</string>
     <string name="desk_notification_popup_title">Спливаючі сповіщення</string>
     <string name="desk_notification_popup_summary">Показувати спливаючий банер при надходженні сповіщень</string>
+    <string name="desk_notification_preview_title">Передперегляд банера</string>
+    <string name="desk_notification_preview_summary">Передперегляд відображення спливаючих сповіщень на годиннику</string>
+    <string name="desk_notification_preview_replay">Анімація</string>
+    <string name="desk_notification_preview_sample_app">Повідомлення</string>
+    <string name="desk_notification_preview_sample_device">Pixel 9</string>
+    <string name="desk_notification_preview_sample_title">Аліса Сміт</string>
+    <string name="desk_notification_preview_sample_body">Привіт! Ми все ще зустрічаємося сьогодні на каву о 16:00?</string>
+    <string name="desk_notification_font_summary">Оберіть шрифт або імпортуйте власний для сповіщень</string>
+    <string name="desk_notification_color_summary">Налаштуйте кольори тексту, акцентів та фону картки сповіщень</string>
+    <string name="desk_notification_color_mode_text">Текст і акцент</string>
+    <string name="desk_notification_color_mode_bg">Фон картки</string>
+    <string name="desk_notification_reset_colors">Скинути</string>
+    <string name="desk_notification_style_title">Стиль банера</string>
+    <string name="desk_notification_style_summary">Оберіть щільність компонування спливаючого банера</string>
+    <string name="desk_notification_position_title">Позиція банера</string>
+    <string name="desk_notification_position_summary">Де спливаючі сповіщення з’являються на екрані</string>
+    <string name="desk_notification_scale_title">Розмір банера</string>
+    <string name="desk_notification_scale_summary">Масштаб загального розміру та тексту банера</string>
+    <string name="desk_notification_bg_opacity_title">Непрозорість фону</string>
+    <string name="desk_notification_bg_opacity_summary">Налаштування прозорості картки поверх екрана годинника</string>
+    <string name="desk_notification_monochrome_icon_title">Монохромна іконка</string>
+    <string name="desk_notification_monochrome_icon_summary">Фарбувати іконки додатків в акцентний колір сповіщення</string>
+    <string name="desk_notification_show_device_title">Показувати ім’я пристрою</string>
+    <string name="desk_notification_show_device_summary">Відображати ім’я пристрою поруч із назвою додатка</string>
+    <string name="desk_notification_show_dismiss_title">Показувати кнопку закриття</string>
+    <string name="desk_notification_show_dismiss_summary">Показувати кнопку закриття на банерах (свайп завжди працює)</string>
     <string name="desk_notification_duration_title">Тривалість показу</string>
     <string name="desk_notification_duration_summary">Скільки секунд банер залишається на екрані</string>
     <string name="desk_notification_hide_sensitive_title">Приховувати приватні дані</string>
     <string name="desk_notification_hide_sensitive_summary">Приховувати текст повідомлення на спливаючих банерах</string>
     <string name="notification_hidden_content">Нове сповіщення</string>
+
+    <string-array name="desk_notification_style_entries">
+        <item>Стандартна картка</item>
+        <item>Компактний рядок</item>
+        <item>Розширена картка</item>
+    </string-array>
+
+    <string-array name="desk_notification_position_entries">
+        <item>Зверху по центру</item>
+        <item>Зверху ліворуч</item>
+        <item>Зверху праворуч</item>
+        <item>Знизу по центру</item>
+    </string-array>
 
     <string name="pref_cat_phone_calls">Телефонні виклики</string>
     <string name="desk_call_overlay_title">Екран вхідного дзвінка</string>

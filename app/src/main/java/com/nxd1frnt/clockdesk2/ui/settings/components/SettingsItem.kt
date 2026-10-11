@@ -105,6 +105,28 @@ sealed class SettingsItem {
         override val isVisible: () -> Boolean = { true },
         override val isEnabled: () -> Boolean = { true }
     ) : Entry()
+
+    data class NotificationPreview(
+        override val key: String = "desk_notification_preview",
+        override val title: String = "",
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true }
+    ) : Entry()
+
+    data class NotificationAppearance(
+        override val key: String = "desk_notification_appearance",
+        override val title: String = "",
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true },
+        val onAddFontRequested: (() -> Unit)? = null
+    ) : Entry()
 }
 
 typealias SettingEntry = SettingsItem.Entry
+

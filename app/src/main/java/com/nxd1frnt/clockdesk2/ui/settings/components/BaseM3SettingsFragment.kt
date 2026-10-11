@@ -277,5 +277,34 @@ abstract class BaseM3SettingsFragment : Fragment() {
                 )
             )
         }
+
+        fun notificationPreview(
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true }
+        ) {
+            entries.add(
+                SettingsItem.NotificationPreview(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled
+                )
+            )
+        }
+
+        fun notificationAppearance(
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true },
+            onAddFontRequested: (() -> Unit)? = null
+        ) {
+            entries.add(
+                SettingsItem.NotificationAppearance(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled,
+                    onAddFontRequested = onAddFontRequested
+                )
+            )
+        }
     }
 }
+

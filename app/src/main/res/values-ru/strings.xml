@@ -575,11 +575,50 @@
     <string name="pref_cat_floating_banners">Всплывающие баннеры</string>
     <string name="desk_notification_popup_title">Всплывающие уведомления</string>
     <string name="desk_notification_popup_summary">Показывать всплывающий баннер при поступлении уведомлений</string>
+    <string name="desk_notification_preview_title">Предпросмотр баннера</string>
+    <string name="desk_notification_preview_summary">Предпросмотр отображения всплывающих уведомлений на часах</string>
+    <string name="desk_notification_preview_replay">Анимация</string>
+    <string name="desk_notification_preview_sample_app">Сообщения</string>
+    <string name="desk_notification_preview_sample_device">Pixel 9</string>
+    <string name="desk_notification_preview_sample_title">Алиса Смит</string>
+    <string name="desk_notification_preview_sample_body">Привет! Мы всё ещё встречаемся сегодня на кофе в 16:00?</string>
+    <string name="desk_notification_font_summary">Выберите шрифт или импортируйте свой для уведомлений</string>
+    <string name="desk_notification_color_summary">Настройте цвета текста, акцентов и фона карточки уведомлений</string>
+    <string name="desk_notification_color_mode_text">Текст и акцент</string>
+    <string name="desk_notification_color_mode_bg">Фон карточки</string>
+    <string name="desk_notification_reset_colors">Сбросить</string>
+    <string name="desk_notification_style_title">Стиль баннера</string>
+    <string name="desk_notification_style_summary">Выберите плотность компоновки всплывающего баннера</string>
+    <string name="desk_notification_position_title">Позиция баннера</string>
+    <string name="desk_notification_position_summary">Где всплывающие уведомления появляются на экране</string>
+    <string name="desk_notification_scale_title">Размер баннера</string>
+    <string name="desk_notification_scale_summary">Масштаб общего размера и текста баннера</string>
+    <string name="desk_notification_bg_opacity_title">Непрозрачность фона</string>
+    <string name="desk_notification_bg_opacity_summary">Настройка прозрачности карточки поверх экрана часов</string>
+    <string name="desk_notification_monochrome_icon_title">Монохромная иконка</string>
+    <string name="desk_notification_monochrome_icon_summary">Окрашивать иконки приложений в акцентный цвет уведомления</string>
+    <string name="desk_notification_show_device_title">Показывать имя устройства</string>
+    <string name="desk_notification_show_device_summary">Отображать имя устройства рядом с названием приложения</string>
+    <string name="desk_notification_show_dismiss_title">Показывать кнопку закрытия</string>
+    <string name="desk_notification_show_dismiss_summary">Показывать кнопку закрытия на баннерах (свайп всегда работает)</string>
     <string name="desk_notification_duration_title">Длительность показа</string>
     <string name="desk_notification_duration_summary">Сколько секунд баннер остается на экране</string>
     <string name="desk_notification_hide_sensitive_title">Скрывать личные данные</string>
     <string name="desk_notification_hide_sensitive_summary">Скрывать текст сообщения на всплывающих баннерах</string>
     <string name="notification_hidden_content">Новое уведомление</string>
+
+    <string-array name="desk_notification_style_entries">
+        <item>Стандартная карточка</item>
+        <item>Компактная строка</item>
+        <item>Расширенная карточка</item>
+    </string-array>
+
+    <string-array name="desk_notification_position_entries">
+        <item>Сверху по центру</item>
+        <item>Сверху слева</item>
+        <item>Сверху справа</item>
+        <item>Снизу по центру</item>
+    </string-array>
 
     <string name="pref_cat_phone_calls">Телефонные вызовы</string>
     <string name="desk_call_overlay_title">Экран входящего вызова</string>

@@ -588,11 +588,61 @@
     <string name="pref_cat_floating_banners">Floating Banners</string>
     <string name="desk_notification_popup_title">Notification Popups</string>
     <string name="desk_notification_popup_summary">Show floating notification banner when notifications arrive</string>
+    <string name="desk_notification_preview_title">Banner Preview</string>
+    <string name="desk_notification_preview_summary">Preview of how floating notifications appear on your desk</string>
+    <string name="desk_notification_preview_replay">Animate</string>
+    <string name="desk_notification_preview_sample_app">Messages</string>
+    <string name="desk_notification_preview_sample_device">Pixel 9</string>
+    <string name="desk_notification_preview_sample_title">Alice Smith</string>
+    <string name="desk_notification_preview_sample_body">Hey! Are we still meeting for coffee today at 4:00 PM?</string>
+    <string name="desk_notification_font_summary">Choose a font family or import a custom font for notifications</string>
+    <string name="desk_notification_color_summary">Customize notification text, accent, and card background colors</string>
+    <string name="desk_notification_color_mode_text">Text &amp; Accent</string>
+    <string name="desk_notification_color_mode_bg">Card Background</string>
+    <string name="desk_notification_reset_colors">Reset</string>
+    <string name="desk_notification_style_title">Banner Style</string>
+    <string name="desk_notification_style_summary">Choose the layout density of the floating banner</string>
+    <string name="desk_notification_position_title">Banner Position</string>
+    <string name="desk_notification_position_summary">Where floating notifications appear on the screen</string>
+    <string name="desk_notification_scale_title">Banner Size</string>
+    <string name="desk_notification_scale_summary">Scale the overall size and text of the banner</string>
+    <string name="desk_notification_bg_opacity_title">Background Opacity</string>
+    <string name="desk_notification_bg_opacity_summary">Adjust card transparency over the clock desk</string>
+    <string name="desk_notification_monochrome_icon_title">Monochrome App Icon</string>
+    <string name="desk_notification_monochrome_icon_summary">Tint app icons to match the notification accent color</string>
+    <string name="desk_notification_show_device_title">Show Device Name</string>
+    <string name="desk_notification_show_device_summary">Display the source device name alongside the app name</string>
+    <string name="desk_notification_show_dismiss_title">Show Dismiss Button</string>
+    <string name="desk_notification_show_dismiss_summary">Show the close button on banners (swipe to dismiss always works)</string>
     <string name="desk_notification_duration_title">Popup Duration</string>
     <string name="desk_notification_duration_summary">How long the banner stays on screen (seconds)</string>
     <string name="desk_notification_hide_sensitive_title">Hide Sensitive Content</string>
     <string name="desk_notification_hide_sensitive_summary">Mask message content and sender on floating banners</string>
     <string name="notification_hidden_content">New notification</string>
+
+    <string-array name="desk_notification_style_entries">
+        <item>Standard Card</item>
+        <item>Compact Single-Line Pill</item>
+        <item>Expanded Detailed Card</item>
+    </string-array>
+    <string-array name="desk_notification_style_values">
+        <item>standard</item>
+        <item>compact</item>
+        <item>expanded</item>
+    </string-array>
+
+    <string-array name="desk_notification_position_entries">
+        <item>Top Center</item>
+        <item>Top Left</item>
+        <item>Top Right</item>
+        <item>Bottom Center</item>
+    </string-array>
+    <string-array name="desk_notification_position_values">
+        <item>top_center</item>
+        <item>top_start</item>
+        <item>top_end</item>
+        <item>bottom_center</item>
+    </string-array>
 
     <string name="pref_cat_phone_calls">Phone Calls</string>
     <string name="desk_call_overlay_title">Incoming Call Overlay</string>

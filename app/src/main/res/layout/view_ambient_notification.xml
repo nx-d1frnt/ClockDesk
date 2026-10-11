@@ -16,6 +16,7 @@
     app:strokeWidth="1dp">
 
     <LinearLayout
+        android:id="@+id/notification_content_row"
         android:layout_width="wrap_content"
         android:minWidth="280dp"
         android:maxWidth="420dp"
@@ -37,6 +38,7 @@
             android:contentDescription="@null" />
 
         <LinearLayout
+            android:id="@+id/notification_text_container"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -51,7 +53,7 @@
                 android:textColor="?attr/colorPrimary"
                 android:textSize="11sp"
                 android:textStyle="bold"
-                android:fontFamily="@font/googlesansflex"
+                tools:fontFamily="@font/googlesansflex"
                 android:letterSpacing="0.04"
                 android:textAllCaps="true"
                 tools:text="WHATSAPP • PIXEL 8" />
@@ -64,7 +66,7 @@
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                android:fontFamily="@font/googlesansflex"
+                tools:fontFamily="@font/googlesansflex"
                 android:maxLines="1"
                 android:ellipsize="end"
                 tools:text="Alice Smith" />
@@ -76,7 +78,7 @@
                 android:layout_marginTop="1dp"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="13sp"
-                android:fontFamily="@font/googlesansflex"
+                tools:fontFamily="@font/googlesansflex"
                 android:maxLines="2"
                 android:ellipsize="end"
                 tools:text="Hey, are we still meeting today at 4?" />

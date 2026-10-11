@@ -87,57 +87,233 @@ class FontManager(
     private val customColors: MutableList<Int> = mutableListOf()
     @SuppressLint("RestrictedApi")
     private var currentScheme: Scheme? = null
-    private val resourceFontIds = listOf(
-        R.font.googlesansflex,
-        R.font.anton_regular,
-        R.font.kanit_regular,
-        R.font.sigmar_regular,
-        R.font.monomakh_regular,
-        R.font.orbitron_regular,
-        R.font.dancingscript_regular,
-        R.font.grapenuts_regular,
-        R.font.madimione_regular,
-        R.font.montserrat_regular,
-        R.font.pressstart2p_regular,
-        R.font.shafarik_regular,
-        R.font.alexandria_bold,
-        R.font.m_plus_1_bold,
-        R.font.knewave,
-        R.font.chewy,
-        R.font.capriola,
-        R.font.cherry_bomb_one,
-        R.font.comfortaa_bold,
-        R.font.autour_one,
-        R.font.fascinate,
-        R.font.instrument_sans_bold,
-        R.font.googlesans_bold
-    )
+    companion object {
+        val resourceFontIds = listOf(
+            R.font.googlesansflex,
+            R.font.anton_regular,
+            R.font.kanit_regular,
+            R.font.sigmar_regular,
+            R.font.monomakh_regular,
+            R.font.orbitron_regular,
+            R.font.dancingscript_regular,
+            R.font.grapenuts_regular,
+            R.font.madimione_regular,
+            R.font.montserrat_regular,
+            R.font.pressstart2p_regular,
+            R.font.shafarik_regular,
+            R.font.alexandria_bold,
+            R.font.m_plus_1_bold,
+            R.font.knewave,
+            R.font.chewy,
+            R.font.capriola,
+            R.font.cherry_bomb_one,
+            R.font.comfortaa_bold,
+            R.font.autour_one,
+            R.font.fascinate,
+            R.font.instrument_sans_bold,
+            R.font.googlesans_bold
+        )
 
-    private val staticResourceFontNames = mapOf(
-        R.font.googlesansflex to "Google Sans Flex",
-        R.font.anton_regular to "Anton",
-        R.font.kanit_regular to "Kanit",
-        R.font.sigmar_regular to "Sigmar",
-        R.font.monomakh_regular to "Monomakh",
-        R.font.orbitron_regular to "Orbitron",
-        R.font.dancingscript_regular to "Dancing Script",
-        R.font.grapenuts_regular to "Grape Nuts",
-        R.font.madimione_regular to "Madimi One",
-        R.font.montserrat_regular to "Montserrat",
-        R.font.pressstart2p_regular to "Press Start 2P",
-        R.font.shafarik_regular to "Shafarik",
-        R.font.alexandria_bold to "Alexandria",
-        R.font.m_plus_1_bold to "M PLUS 1",
-        R.font.knewave to "Knewave",
-        R.font.chewy to "Chewy",
-        R.font.capriola to "Capriola",
-        R.font.cherry_bomb_one to "Cherry Bomb One",
-        R.font.comfortaa_bold to "Comfortaa",
-        R.font.autour_one to "Autour One",
-        R.font.fascinate to "Fascinate",
-        R.font.instrument_sans_bold to "Instrument Sans",
-        R.font.googlesans_bold to "Google Sans Bold"
-    )
+        val staticResourceFontKeys = mapOf(
+            R.font.googlesansflex to "res:googlesansflex",
+            R.font.anton_regular to "res:anton_regular",
+            R.font.kanit_regular to "res:kanit_regular",
+            R.font.sigmar_regular to "res:sigmar_regular",
+            R.font.monomakh_regular to "res:monomakh_regular",
+            R.font.orbitron_regular to "res:orbitron_regular",
+            R.font.dancingscript_regular to "res:dancingscript_regular",
+            R.font.grapenuts_regular to "res:grapenuts_regular",
+            R.font.madimione_regular to "res:madimione_regular",
+            R.font.montserrat_regular to "res:montserrat_regular",
+            R.font.pressstart2p_regular to "res:pressstart2p_regular",
+            R.font.shafarik_regular to "res:shafarik_regular",
+            R.font.alexandria_bold to "res:alexandria_bold",
+            R.font.m_plus_1_bold to "res:m_plus_1_bold",
+            R.font.knewave to "res:knewave",
+            R.font.chewy to "res:chewy",
+            R.font.capriola to "res:capriola",
+            R.font.cherry_bomb_one to "res:cherry_bomb_one",
+            R.font.comfortaa_bold to "res:comfortaa_bold",
+            R.font.autour_one to "res:autour_one",
+            R.font.fascinate to "res:fascinate",
+            R.font.instrument_sans_bold to "res:instrument_sans_bold",
+            R.font.googlesans_bold to "res:googlesans_bold"
+        )
+
+        val staticResourceFontNames = mapOf(
+            R.font.googlesansflex to "Google Sans Flex",
+            R.font.anton_regular to "Anton",
+            R.font.kanit_regular to "Kanit",
+            R.font.sigmar_regular to "Sigmar",
+            R.font.monomakh_regular to "Monomakh",
+            R.font.orbitron_regular to "Orbitron",
+            R.font.dancingscript_regular to "Dancing Script",
+            R.font.grapenuts_regular to "Grape Nuts",
+            R.font.madimione_regular to "Madimi One",
+            R.font.montserrat_regular to "Montserrat",
+            R.font.pressstart2p_regular to "Press Start 2P",
+            R.font.shafarik_regular to "Shafarik",
+            R.font.alexandria_bold to "Alexandria",
+            R.font.m_plus_1_bold to "M PLUS 1",
+            R.font.knewave to "Knewave",
+            R.font.chewy to "Chewy",
+            R.font.capriola to "Capriola",
+            R.font.cherry_bomb_one to "Cherry Bomb One",
+            R.font.comfortaa_bold to "Comfortaa",
+            R.font.autour_one to "Autour One",
+            R.font.fascinate to "Fascinate",
+            R.font.instrument_sans_bold to "Instrument Sans",
+            R.font.googlesans_bold to "Google Sans Bold"
+        )
+
+        fun buildFontsList(context: Context): List<FontItem> {
+            val list = mutableListOf<FontItem>()
+            list.add(FontItem.AddNew)
+
+            val fontDir = File(context.filesDir, "custom_fonts")
+            if (fontDir.exists()) {
+                val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+                fontDir.listFiles()
+                    ?.filter {
+                        it.isFile && (
+                            it.extension.equals("ttf", ignoreCase = true) ||
+                            it.extension.equals("otf", ignoreCase = true) ||
+                            it.extension.equals("ttc", ignoreCase = true) ||
+                            it.length() > 0L
+                        )
+                    }
+                    ?.sortedBy { it.name.lowercase() }
+                    ?.forEach { file ->
+                        val cachedName = prefs.getString("custom_font_name_${file.name}", null)
+                        val displayName = if (!cachedName.isNullOrBlank()) {
+                            cachedName
+                        } else {
+                            val parsed = FontNameUtils.getFontName(file) ?: file.nameWithoutExtension
+                            prefs.edit().putString("custom_font_name_${file.name}", parsed).apply()
+                            parsed
+                        }
+                        list.add(FontItem.CustomFont(file.absolutePath, displayName))
+                    }
+            }
+
+            list.addAll(resourceFontIds.map { resId ->
+                val displayName = staticResourceFontNames[resId] ?: run {
+                    try {
+                        context.resources.getResourceEntryName(resId)
+                            .replace("_", " ")
+                            .split(" ")
+                            .joinToString(" ") { word -> word.replaceFirstChar { c -> c.uppercase() } }
+                    } catch (e: Exception) {
+                        "Font"
+                    }
+                }
+                FontItem.ResourceFont(resId, displayName)
+            })
+            return list
+        }
+
+        fun getFontIdentifier(context: Context, item: FontItem): String {
+            return when (item) {
+                is FontItem.ResourceFont -> {
+                    staticResourceFontKeys[item.resId] ?: try {
+                        "res:${context.resources.getResourceEntryName(item.resId)}"
+                    } catch (e: Exception) {
+                        "res:${item.resId}"
+                    }
+                }
+                is FontItem.CustomFont -> "file:${File(item.path).name}"
+                is FontItem.AddNew -> "add_new"
+            }
+        }
+
+        fun importCustomFontToStorage(context: Context, uri: Uri): String? {
+            return try {
+                val fontDir = File(context.filesDir, "custom_fonts")
+                if (!fontDir.exists()) fontDir.mkdirs()
+
+                val rawName = resolveFileName(context, uri)
+                    ?.replace(Regex("[^a-zA-Z0-9._\\- ]"), "_")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: "custom_${System.currentTimeMillis()}.ttf"
+
+                val normalizedName = if (
+                    rawName.endsWith(".ttf", ignoreCase = true) ||
+                    rawName.endsWith(".otf", ignoreCase = true) ||
+                    rawName.endsWith(".ttc", ignoreCase = true)
+                ) {
+                    rawName
+                } else {
+                    "$rawName.ttf"
+                }
+
+                val destFile = File(fontDir, normalizedName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: return null
+
+                val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+                val parsed = FontNameUtils.getFontName(destFile) ?: destFile.nameWithoutExtension
+                prefs.edit().putString("custom_font_name_${destFile.name}", parsed).apply()
+
+                "file:${destFile.name}"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+
+        fun deleteCustomFontFile(context: Context, item: FontItem): Boolean {
+            if (item is FontItem.CustomFont) {
+                return try {
+                    val file = File(item.path)
+                    val deleted = file.exists() && file.delete()
+                    if (deleted) {
+                        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+                        prefs.edit().remove("custom_font_name_${file.name}").apply()
+                    }
+                    deleted
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            return false
+        }
+
+        fun getFontAxesDetailsForItem(context: Context, item: FontItem): List<FontAxis> {
+            return FontVariationUtils.scanAxesDetails {
+                try {
+                    when (item) {
+                        is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
+                        is FontItem.CustomFont -> File(item.path).inputStream()
+                        is FontItem.AddNew -> null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+
+        private fun resolveFileName(context: Context, uri: Uri): String? {
+            var result: String? = null
+            if (uri.scheme == "content") {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (index != -1) result = cursor.getString(index)
+                    }
+                }
+            }
+            if (result == null) {
+                result = uri.path
+                val cut = result?.lastIndexOf('/')
+                if (cut != null && cut != -1) result = result?.substring(cut + 1)
+            }
+            return result
+        }
+    }
 
     private var isNightShiftEnabled = false
     private var lastNightFactor = 0f
@@ -290,67 +466,21 @@ class FontManager(
         }
     }
 
-    private fun rebuildFontList() {
+    fun rebuildFontList() {
         fonts.clear()
-        fonts.add(FontItem.AddNew)
-
-        val fontDir = File(context.filesDir, "custom_fonts")
-        if (fontDir.exists()) {
-            val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
-            fontDir.listFiles()
-                ?.filter { it.extension.equals("ttf", ignoreCase = true) || it.extension.equals("otf", ignoreCase = true) }
-                ?.sortedBy { it.name }
-                ?.forEach { file ->
-                    val cachedName = prefs.getString("custom_font_name_${file.name}", null)
-                    val displayName = if (cachedName != null) {
-                        cachedName
-                    } else {
-                        val parsed = FontNameUtils.getFontName(file) ?: file.nameWithoutExtension
-                        prefs.edit().putString("custom_font_name_${file.name}", parsed).apply()
-                        parsed
-                    }
-                    fonts.add(FontItem.CustomFont(file.absolutePath, displayName))
-                }
-        }
-
-        fonts.addAll(resourceFontIds.map { resId ->
-            val displayName = staticResourceFontNames[resId] ?: run {
-                try {
-                    context.resources.getResourceEntryName(resId)
-                        .replace("_", " ")
-                        .capitalizeWords()
-                } catch (e: Exception) {
-                    "Font"
-                }
-            }
-            FontItem.ResourceFont(resId, displayName)
-        })
-    }
-
-    private fun String.capitalizeWords(): String = split(" ").joinToString(" ") {
-        it.replaceFirstChar { char -> char.uppercase() }
+        fonts.addAll(buildFontsList(context))
     }
 
     fun addCustomFont(uri: Uri): Int {
         return try {
-            val fontDir = File(context.filesDir, "custom_fonts")
-            if (!fontDir.exists()) fontDir.mkdirs()
-
-            val fileName = getFileName(uri) ?: "custom_${System.currentTimeMillis()}.ttf"
-            val destFile = File(fontDir, fileName)
-
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
-                }
-            }
-
             val viewFontMap = mutableMapOf<Int, String>()
             settingsMap.forEach { (viewId, settings) ->
                 if (settings.fontIndex in fonts.indices) {
                     viewFontMap[viewId] = getFontIdentifier(fonts[settings.fontIndex])
                 }
             }
+
+            val newFontId = importCustomFontToStorage(context, uri) ?: return -1
 
             rebuildFontList()
 
@@ -369,9 +499,7 @@ class FontManager(
             saveSettings()
             applyAll()
 
-            val newFontId = "file:$fileName"
             val newlyAddedIndex = fonts.indexOfFirst { getFontIdentifier(it) == newFontId }
-
             if (newlyAddedIndex != -1) newlyAddedIndex else 1
         } catch (e: Exception) {
             e.printStackTrace()
@@ -385,7 +513,6 @@ class FontManager(
 
         if (item is FontItem.CustomFont) {
             try {
-                val file = File(item.path)
                 val deletedId = getFontIdentifier(item)
 
                 val viewFontMap = mutableMapOf<Int, String>()
@@ -395,55 +522,34 @@ class FontManager(
                     }
                 }
 
-                if (file.exists()) {
-                    val deleted = file.delete()
-                    if (deleted) {
-                        rebuildFontList()
+                if (deleteCustomFontFile(context, item)) {
+                    rebuildFontList()
 
-                        viewFontMap.forEach { (viewId, oldFontId) ->
-                            val settings = settingsMap[viewId]
-                            if (settings != null) {
-                                if (oldFontId == deletedId) {
-                                    settings.fontIndex = 1
+                    viewFontMap.forEach { (viewId, oldFontId) ->
+                        val settings = settingsMap[viewId]
+                        if (settings != null) {
+                            if (oldFontId == deletedId) {
+                                settings.fontIndex = 1
+                            } else {
+                                val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
+                                if (newIndex != -1) {
+                                    settings.fontIndex = newIndex
                                 } else {
-                                    val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
-                                    if (newIndex != -1) {
-                                        settings.fontIndex = newIndex
-                                    } else {
-                                        settings.fontIndex = 1
-                                    }
+                                    settings.fontIndex = 1
                                 }
                             }
                         }
-
-                        saveSettings()
-                        applyAll()
-                        return true
                     }
+
+                    saveSettings()
+                    applyAll()
+                    return true
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
         return false
-    }
-
-    private fun getFileName(uri: Uri): String? {
-        var result: String? = null
-        if (uri.scheme == "content") {
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index != -1) result = cursor.getString(index)
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.path
-            val cut = result?.lastIndexOf('/')
-            if (cut != null && cut != -1) result = result?.substring(cut + 1)
-        }
-        return result
     }
 
     private fun getTypeface(index: Int): Typeface {
@@ -462,6 +568,7 @@ class FontManager(
     fun loadFont() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
+        rebuildFontList()
         loadCustomColors()
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
@@ -533,17 +640,7 @@ class FontManager(
     }
 
     private fun getFontIdentifier(item: FontItem): String {
-        return when (item) {
-            is FontItem.ResourceFont -> {
-                try {
-                    "res:${context.resources.getResourceEntryName(item.resId)}"
-                } catch (e: Exception) {
-                    "res:${item.resId}"
-                }
-            }
-            is FontItem.CustomFont -> "file:${File(item.path).name}"
-            else -> "unknown"
-        }
+        return getFontIdentifier(context, item)
     }
 
     fun saveSettings() {
@@ -619,16 +716,7 @@ class FontManager(
         val index = settings.fontIndex
         if (index !in fonts.indices) return emptyList()
 
-        val item = fonts[index]
-        return FontVariationUtils.scanAxesDetails {
-            try {
-                when (item) {
-                    is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
-                    is FontItem.CustomFont -> context.contentResolver.openInputStream(Uri.fromFile(File(item.path)))
-                    is FontItem.AddNew -> null
-                }
-            } catch (e: Exception) { null }
-        }
+        return getFontAxesDetailsForItem(context, fonts[index])
     }
 
     fun getSupportedAxesForCurrentIndex(view: View): List<String> {

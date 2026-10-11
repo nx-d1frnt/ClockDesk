@@ -4,10 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.graphics.Outline
-import android.graphics.PorterDuff
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -20,10 +17,10 @@ import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.TextView
-import androidx.core.widget.ImageViewCompat
+import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
@@ -153,34 +150,22 @@ class DeskNotificationManager(
     }
 
     private fun updateViewContent(view: View, item: NotificationItem) {
-        val appNameView = view.findViewById<TextView>(R.id.notification_app_name)
-        val titleView = view.findViewById<TextView>(R.id.notification_title)
-        val bodyView = view.findViewById<TextView>(R.id.notification_body)
-        val iconView = view.findViewById<ImageView>(R.id.notification_app_icon)
-
         val dev = deskConnectManager.discoveredDevices[item.deviceId]
         val deviceName = dev?.getDisplayName()
 
-        appNameView.text = if (!deviceName.isNullOrEmpty()) {
-            "${item.appName.uppercase()} • $deviceName"
-        } else {
-            item.appName.uppercase()
-        }
-
-        val hideSensitive = getPrefs().getBoolean("desk_notification_hide_sensitive", false)
-        if (hideSensitive) {
-            titleView.text = item.appName
-            bodyView.text = context.getString(R.string.notification_hidden_content)
-        } else {
-            titleView.text = item.title
-            bodyView.text = item.text
-        }
-
-        applyIcon(iconView, item)
-    }
-
-    private fun applyIcon(iconView: ImageView, item: NotificationItem) {
-        DeskNotificationHelper.applyIcon(context, iconView, item.iconBytes, item.notificationId)
+        DeskNotificationHelper.applyBannerCustomization(
+            context = context,
+            view = view,
+            prefs = getPrefs(),
+            appName = item.appName,
+            deviceName = deviceName,
+            title = item.title,
+            text = item.text,
+            iconBytes = item.iconBytes,
+            notificationId = item.notificationId,
+            isClearable = item.isClearable,
+            isPreview = false
+        )
     }
 
     private fun showNext() {
@@ -199,8 +184,40 @@ class DeskNotificationManager(
         // Clean up any residual views in container before adding new notification
         container.removeAllViews()
 
+        val prefs = getPrefs()
+        val isBottom = DeskNotificationHelper.isBottomPosition(prefs)
+        val density = context.resources.displayMetrics.density
+
+        // Position container at top or bottom of parent ConstraintLayout
+        (container.layoutParams as? ConstraintLayout.LayoutParams)?.let { clp ->
+            if (isBottom) {
+                clp.topToTop = ConstraintLayout.LayoutParams.UNSET
+                clp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
+            } else {
+                clp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET
+                clp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID
+            }
+            container.layoutParams = clp
+        }
+
         val view = LayoutInflater.from(context).inflate(R.layout.view_ambient_notification, container, false)
         currentView = view
+
+        (view.layoutParams as? FrameLayout.LayoutParams)?.let { flp ->
+            flp.gravity = DeskNotificationHelper.getBannerGravity(prefs)
+            val marginPx = (16f * density).toInt()
+            val sideMarginPx = (24f * density).toInt()
+            flp.marginStart = sideMarginPx
+            flp.marginEnd = sideMarginPx
+            if (isBottom) {
+                flp.topMargin = 0
+                flp.bottomMargin = marginPx
+            } else {
+                flp.topMargin = marginPx
+                flp.bottomMargin = 0
+            }
+            view.layoutParams = flp
+        }
 
         val iconView = view.findViewById<ImageView>(R.id.notification_app_icon)
         val dismissBtn = view.findViewById<ImageButton>(R.id.btn_dismiss_notification)
@@ -217,16 +234,15 @@ class DeskNotificationManager(
 
         updateViewContent(view, item)
 
-        dismissBtn.visibility = if (item.isClearable) View.VISIBLE else View.GONE
         dismissBtn.setOnClickListener {
             dismissCurrent(notifyManager = true)
         }
 
-        setupSwipeToDismiss(view)
+        setupSwipeToDismiss(view, isBottom)
 
-        // Animate entrance: slide down from top + fade in
+        // Animate entrance: slide from top or bottom + fade in
         view.translationX = 0f
-        view.translationY = -120f
+        view.translationY = if (isBottom) 120f else -120f
         view.alpha = 0f
         container.addView(view)
 
@@ -238,7 +254,7 @@ class DeskNotificationManager(
             .start()
 
         // Auto dismiss based on user preference: duration if single, 3 seconds if backlog exists
-        val baseDurationSec = getPrefs().getInt("desk_notification_duration", 5)
+        val baseDurationSec = prefs.getInt("desk_notification_duration", 5)
         val defaultDisplayMs = (baseDurationSec * 1000L).coerceAtLeast(2000L)
         val displayTimeMs = if (queue.isNotEmpty()) 3000L else defaultDisplayMs
         scheduleAutoDismiss(displayTimeMs)
@@ -258,13 +274,18 @@ class DeskNotificationManager(
     private fun scheduleAutoDismiss(delayMs: Long = 5000L) {
         dismissRunnable?.let { mainHandler.removeCallbacks(it) }
         dismissRunnable = Runnable {
-            dismissCurrent(notifyManager = false)
+            val isBottom = DeskNotificationHelper.isBottomPosition(getPrefs())
+            dismissCurrent(
+                notifyManager = false,
+                exitTranslationX = 0f,
+                exitTranslationY = if (isBottom) 100f else -100f
+            )
         }
         mainHandler.postDelayed(dismissRunnable!!, delayMs)
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun setupSwipeToDismiss(view: View) {
+    private fun setupSwipeToDismiss(view: View, isBottom: Boolean) {
         val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
         var downX = 0f
         var downY = 0f
@@ -296,7 +317,11 @@ class DeskNotificationManager(
 
                     if (isDragging) {
                         v.translationX = deltaX
-                        v.translationY = if (deltaY < 0) deltaY else deltaY * 0.25f
+                        v.translationY = if (isBottom) {
+                            if (deltaY > 0) deltaY else deltaY * 0.25f
+                        } else {
+                            if (deltaY < 0) deltaY else deltaY * 0.25f
+                        }
 
                         val maxDragDist = v.width * 0.75f
                         val currentDist = sqrt((deltaX * deltaX + v.translationY * v.translationY).toDouble()).toFloat()
@@ -324,15 +349,19 @@ class DeskNotificationManager(
                         val widthThreshold = v.width * 0.35f
                         val heightThreshold = 50f * context.resources.displayMetrics.density
 
-                        val isSwipeUp = (deltaY < -heightThreshold || vy < -minFlingVelocity) && abs(deltaX) < abs(deltaY) * 1.5f
+                        val isVerticalDismiss = if (isBottom) {
+                            (deltaY > heightThreshold || vy > minFlingVelocity) && abs(deltaX) < abs(deltaY) * 1.5f
+                        } else {
+                            (deltaY < -heightThreshold || vy < -minFlingVelocity) && abs(deltaX) < abs(deltaY) * 1.5f
+                        }
                         val isSwipeRight = (deltaX > widthThreshold || vx > minFlingVelocity) && deltaX > 0
                         val isSwipeLeft = (deltaX < -widthThreshold || vx < -minFlingVelocity) && deltaX < 0
 
-                        if (isSwipeUp) {
+                        if (isVerticalDismiss) {
                             dismissCurrent(
                                 notifyManager = true,
                                 exitTranslationX = v.translationX,
-                                exitTranslationY = -v.height.toFloat() - 150f
+                                exitTranslationY = if (isBottom) v.height.toFloat() + 150f else -v.height.toFloat() - 150f
                             )
                         } else if (isSwipeRight) {
                             dismissCurrent(
@@ -374,7 +403,7 @@ class DeskNotificationManager(
     private fun dismissCurrent(
         notifyManager: Boolean,
         exitTranslationX: Float = 0f,
-        exitTranslationY: Float = -100f
+        exitTranslationY: Float = if (DeskNotificationHelper.isBottomPosition(getPrefs())) 100f else -100f
     ) {
         if (isDismissing) return
 
