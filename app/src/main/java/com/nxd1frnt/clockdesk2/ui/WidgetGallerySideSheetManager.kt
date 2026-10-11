@@ -14,6 +14,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.sidesheet.SideSheetBehavior
 import com.google.android.material.sidesheet.SideSheetCallback
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetDefinition
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetRegistry
@@ -140,6 +141,7 @@ class WidgetGallerySideSheetManager(
                 hide()
             }
         }
+        refreshMonetTheme()
         behavior.state = SideSheetBehavior.STATE_EXPANDED
     }
 
@@ -149,6 +151,12 @@ class WidgetGallerySideSheetManager(
 
     val isShowing: Boolean
         get() = behavior.state != SideSheetBehavior.STATE_HIDDEN
+
+    fun refreshMonetTheme() {
+        val palette = UiMonetThemeManager.getPalette(sideSheetView.context)
+        UiMonetThemeManager.applyLiveToViewHierarchy(sideSheetView, palette)
+        recyclerView.adapter?.notifyDataSetChanged()
+    }
 
     private inner class WidgetPickerAdapter(
         private val items: List<DesktopWidgetDefinition>,
@@ -186,6 +194,8 @@ class WidgetGallerySideSheetManager(
                     onSelect(item)
                 }
             }
+            val palette = UiMonetThemeManager.getPalette(sideSheetView.context)
+            UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView, palette)
         }
 
         override fun getItemCount(): Int = items.size

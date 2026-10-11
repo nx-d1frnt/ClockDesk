@@ -148,6 +148,18 @@ class MusicSettingsFragment : BaseM3SettingsFragment() {
 
 class DisplaySettingsFragment : BaseM3SettingsFragment() {
     override fun buildSettings(): List<SettingsItem> = settings {
+        category(getString(R.string.appearance)) {
+            switch(
+                key = "ui_monet_from_background",
+                title = getString(R.string.ui_monet_from_background_title),
+                summary = getString(R.string.ui_monet_from_background_summary),
+                iconRes = R.drawable.ic_palette_swatch,
+                defaultValue = true
+            ) {
+                activity?.recreate()
+            }
+        }
+
         category(getString(R.string.display_settings_title)) {
             switch(
                 key = "burn_in_protection",
@@ -504,7 +516,7 @@ class BackupSettingsFragment : BaseM3SettingsFragment() {
     }
 
     private fun confirmRestore(uri: android.net.Uri) {
-        MaterialAlertDialogBuilder(requireContext(), R.style.ClockDesk_Dialog_Theme)
+        val dialog = MaterialAlertDialogBuilder(requireContext(), R.style.ClockDesk_Dialog_Theme)
             .setTitle(R.string.confirm_restore_title)
             .setMessage(R.string.confirm_restore_message)
             .setPositiveButton(R.string.apply) { _, _ ->
@@ -518,6 +530,7 @@ class BackupSettingsFragment : BaseM3SettingsFragment() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+        com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun restartApp() {

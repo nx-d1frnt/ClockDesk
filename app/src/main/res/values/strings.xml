@@ -730,4 +730,6 @@
     <string name="install_update_action">Install update</string>
     <string name="download_failed">Download failed. Tap to retry</string>
     <string name="permission_unknown_apps_required">Please allow ClockDesk to install apps to proceed with the update.</string>
+    <string name="ui_monet_from_background_title">Color UI from background</string>
+    <string name="ui_monet_from_background_summary">Apply Monet colors extracted from the active background or album art to all menus and settings</string>
 </resources>

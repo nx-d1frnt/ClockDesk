@@ -25,6 +25,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class DeskConnectSettingsFragment : Fragment() {
 
@@ -116,6 +117,10 @@ class DeskConnectSettingsFragment : Fragment() {
         menuHost.addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
                 menuInflater.inflate(R.menu.menu_deskconnect_settings, menu)
+                val palette = UiMonetThemeManager.getPalette(requireContext())
+                for (i in 0 until menu.size()) {
+                    menu.getItem(i)?.icon?.mutate()?.setTint(palette.onSurface)
+                }
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
@@ -173,6 +178,7 @@ class DeskConnectSettingsFragment : Fragment() {
         txtDiscovering.visibility = if (availableDevices.isEmpty()) View.VISIBLE else View.GONE
 
         val inflater = LayoutInflater.from(requireContext())
+        val palette = UiMonetThemeManager.getPalette(requireContext())
 
         for (dev in pairedDevices) {
             val itemView = inflater.inflate(R.layout.item_connected_device, layoutPaired, false)
@@ -190,7 +196,7 @@ class DeskConnectSettingsFragment : Fragment() {
 
             itemView.setOnClickListener {
                 if (dev.isConnected) {
-                    MaterialAlertDialogBuilder(requireContext())
+                    val dialog = MaterialAlertDialogBuilder(requireContext())
                         .setTitle(dev.getDisplayName())
                         .setItems(arrayOf("Send Ping", "Unpair")) { _, which ->
                             when (which) {
@@ -205,6 +211,7 @@ class DeskConnectSettingsFragment : Fragment() {
                             }
                         }
                         .show()
+                    UiMonetThemeManager.styleAlertDialog(dialog, palette)
                 }
             }
 
@@ -213,6 +220,7 @@ class DeskConnectSettingsFragment : Fragment() {
                 deskConnectManager.unpairDevice(dev.deviceId)
                 refreshDeviceLists()
             }
+            UiMonetThemeManager.applyLiveToViewHierarchy(itemView, palette)
             layoutPaired.addView(itemView)
         }
 
@@ -235,12 +243,13 @@ class DeskConnectSettingsFragment : Fragment() {
                 btnAction.isEnabled = false
                 btnAction.text = "Pairing…"
             }
+            UiMonetThemeManager.applyLiveToViewHierarchy(itemView, palette)
             layoutAvailable.addView(itemView)
         }
     }
 
     private fun showPairingDialog(context: Context, device: DeskConnectDevice, verificationKey: String) {
-        MaterialAlertDialogBuilder(context)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.deskconnect_pairing_request_title)
             .setMessage(getString(R.string.deskconnect_pairing_request_message, device.getDisplayName(), verificationKey))
             .setPositiveButton(R.string.deskconnect_accept) { _, _ ->
@@ -251,5 +260,6 @@ class DeskConnectSettingsFragment : Fragment() {
             }
             .setCancelable(false)
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 }

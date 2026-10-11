@@ -12,8 +12,8 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
-import com.google.android.material.color.MaterialColors
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import java.util.Random
 
 /**
@@ -116,9 +116,10 @@ class BurnInPreviewCanvas @JvmOverloads constructor(
     }
 
     private fun updateColors() {
-        val primaryColor = MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary, Color.CYAN)
-        val onSurface = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface, Color.WHITE)
-        val surfaceContainerHigh = MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerHigh, Color.DKGRAY)
+        val palette = UiMonetThemeManager.getPalette(context)
+        val primaryColor = palette.primary
+        val onSurface = palette.onSurface
+        val surfaceContainerHigh = palette.surfaceContainerHigh
 
         crosshairPaint.color = Color.argb(40, Color.red(onSurface), Color.green(onSurface), Color.blue(onSurface))
         originDotPaint.color = Color.argb(90, Color.red(onSurface), Color.green(onSurface), Color.blue(onSurface))

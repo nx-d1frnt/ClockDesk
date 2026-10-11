@@ -43,6 +43,7 @@ import com.nxd1frnt.clockdesk2.utils.MediaStyle
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
 import com.nxd1frnt.clockdesk2.widgets.WidgetFeature
 import com.nxd1frnt.clockdesk2.widgets.impl.DateDesktopWidget
@@ -346,6 +347,7 @@ class CustomizationSheetManager(
         highlightFocusedView(true)
         configureVisibilityForView(viewToCustomize)
         loadSettingsForView(viewToCustomize)
+        UiMonetThemeManager.applyLiveToViewHierarchy(sideSheetView)
 
         calculateHorizontalFocus(viewToCustomize)
 
@@ -446,6 +448,10 @@ class CustomizationSheetManager(
 
         preventSheetDragForSlider(slider)
         container.addView(nameText); container.addView(slider); container.addView(valueText)
+        val palette = UiMonetThemeManager.getPalette(context)
+        nameText.setTextColor(palette.onSurfaceVariant)
+        valueText.setTextColor(palette.primary)
+        UiMonetThemeManager.applyLiveToViewHierarchy(slider, palette)
         return container
     }
 
@@ -897,8 +903,8 @@ class CustomizationSheetManager(
             },
             onAddFontClicked = { onAddFontRequested() },
             onFontLongClick = { fontIndex ->
-                val context = sideSheetView.context
-                MaterialAlertDialogBuilder(context)
+                val context = UiMonetThemeManager.wrapContext(sideSheetView.context)
+                val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_font_title))
                     .setMessage(context.getString(R.string.delete_font_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -910,6 +916,7 @@ class CustomizationSheetManager(
                     }
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
+                UiMonetThemeManager.styleAlertDialog(dialog)
             }
         )
         bsFontRecyclerView.adapter = adapter
@@ -952,8 +959,8 @@ class CustomizationSheetManager(
                 }
             },
             onColorLongClick = { item ->
-                val context = sideSheetView.context
-                MaterialAlertDialogBuilder(context)
+                val context = UiMonetThemeManager.wrapContext(sideSheetView.context)
+                val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_color_title))
                     .setMessage(context.getString(R.string.delete_color_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -964,6 +971,7 @@ class CustomizationSheetManager(
                     }
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
+                UiMonetThemeManager.styleAlertDialog(dialog)
             }
         )
     }
@@ -994,7 +1002,8 @@ class CustomizationSheetManager(
     }
 
     private fun showColorPickerDialog(view: View) {
-        val context = sideSheetView.context
+        val context = UiMonetThemeManager.wrapContext(sideSheetView.context)
+        val palette = UiMonetThemeManager.getPalette(sideSheetView.context)
         val settings = fontManager.getSettings(view)
         val initialColor = if (isEditingBackground) {
             if (settings?.useDynamicBackgroundColor == true) {
@@ -1015,6 +1024,7 @@ class CustomizationSheetManager(
         val brightnessSlideBar = dialogView.findViewById<com.skydoves.colorpickerview.sliders.BrightnessSlideBar>(R.id.brightness_slide_bar)
         val previewBox = dialogView.findViewById<View>(R.id.color_preview_box)
         val hexText = dialogView.findViewById<TextView>(R.id.hex_text)
+        hexText.setTextColor(palette.onSurface)
 
         colorPickerView.attachBrightnessSlider(brightnessSlideBar)
         colorPickerView.setInitialColor(initialColor)
@@ -1041,7 +1051,7 @@ class CustomizationSheetManager(
             hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
         })
 
-        MaterialAlertDialogBuilder(context)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(context.getString(R.string.custom_color))
             .setView(dialogView)
             .setPositiveButton(context.getString(R.string.apply)) { dialog, _ ->
@@ -1057,6 +1067,7 @@ class CustomizationSheetManager(
             }
             .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog, palette)
     }
 
     private fun setupClockStyleAdapter() {
@@ -1268,5 +1279,15 @@ class CustomizationSheetManager(
                 setViewsEnabledRecursive(view.getChildAt(i), enabled)
             }
         }
+    }
+
+    fun refreshMonetTheme() {
+        val palette = UiMonetThemeManager.getPalette(sideSheetView.context)
+        UiMonetThemeManager.applyLiveToViewHierarchy(sideSheetView, palette)
+        focusedView?.let { refreshColorAdapter(it) }
+        bsFontRecyclerView.adapter?.notifyDataSetChanged()
+        clockStyleAdapter?.notifyDataSetChanged()
+        dateStyleAdapter?.notifyDataSetChanged()
+        mediaStyleAdapter?.notifyDataSetChanged()
     }
 }

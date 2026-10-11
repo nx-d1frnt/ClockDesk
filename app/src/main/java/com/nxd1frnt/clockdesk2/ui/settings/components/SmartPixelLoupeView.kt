@@ -7,9 +7,9 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
-import com.google.android.material.color.MaterialColors
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 /**
  * Magnified OLED Loupe View for Smart Pixels.
@@ -59,8 +59,9 @@ class SmartPixelLoupeView @JvmOverloads constructor(
     }
 
     private fun updateColors() {
-        val primaryColor = MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary, Color.CYAN)
-        val onSurface = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface, Color.WHITE)
+        val palette = UiMonetThemeManager.getPalette(context)
+        val primaryColor = palette.primary
+        val onSurface = palette.onSurface
 
         onPixelPaint.color = Color.rgb(
             (Color.red(primaryColor) * 0.7f + Color.red(onSurface) * 0.3f).toInt(),
@@ -82,6 +83,7 @@ class SmartPixelLoupeView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        updateColors()
         val w = width.toFloat()
         val h = height.toFloat()
         val cornerRadius = 14f * density

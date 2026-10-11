@@ -7,16 +7,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.color.DynamicColors
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class NotificationChipSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        DynamicColors.applyToActivityIfAvailable(this)
+        UiMonetThemeManager.applyToActivity(this)
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_sub_settings)
+        UiMonetThemeManager.applyToSettingsActivity(this)
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         val collapsingToolbar = findViewById<CollapsingToolbarLayout>(R.id.collapsingToolbar)

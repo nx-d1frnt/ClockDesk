@@ -38,6 +38,7 @@ import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.skydoves.colorpickerview.listeners.ColorEnvelopeListener
 
 class M3SettingsAdapter(
@@ -173,6 +174,7 @@ class M3SettingsAdapter(
             is SettingsItem.NotificationPreview -> (holder as NotificationPreviewViewHolder).bind(item, position)
             is SettingsItem.NotificationAppearance -> (holder as NotificationAppearanceViewHolder).bind(item, position)
         }
+        UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView)
     }
 
     private fun applyCardShapeAndMargin(cardView: MaterialCardView, position: Int) {
@@ -362,7 +364,7 @@ class M3SettingsAdapter(
             val currentIndex = entry.entryValues.indexOf(currentValue).coerceAtLeast(0)
             var tempSelectedIndex = currentIndex
 
-            MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+            val dialog = MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
                 .setTitle(entry.title)
                 .setSingleChoiceItems(entry.entries, currentIndex) { _, which ->
                     tempSelectedIndex = which
@@ -379,6 +381,7 @@ class M3SettingsAdapter(
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+            UiMonetThemeManager.styleAlertDialog(dialog)
         }
     }
 
@@ -529,6 +532,7 @@ class M3SettingsAdapter(
 
         private fun showTextEditDialog(entry: SettingsItem.TextEdit) {
             val currentValue = prefs.getString(entry.key, entry.defaultValue) ?: entry.defaultValue
+            val palette = UiMonetThemeManager.getPalette(context)
 
             val layout = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -548,9 +552,10 @@ class M3SettingsAdapter(
             }
 
             textInputLayout.addView(editText)
+            UiMonetThemeManager.styleTextInputLayout(textInputLayout, palette)
             layout.addView(textInputLayout)
 
-            MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+            val dialog = MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
                 .setTitle(entry.dialogTitle)
                 .setView(layout)
                 .setPositiveButton(android.R.string.ok) { dialog, _ ->
@@ -562,6 +567,7 @@ class M3SettingsAdapter(
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
+            UiMonetThemeManager.styleAlertDialog(dialog, palette)
         }
     }
 
@@ -842,7 +848,7 @@ class M3SettingsAdapter(
                     if (fontIndex in fonts.indices) {
                         val item = fonts[fontIndex]
                         val deletedId = DeskNotificationHelper.getFontIdentifier(context, item)
-                        MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+                        val dialog = MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
                             .setTitle(context.getString(R.string.delete_font_title))
                             .setMessage(context.getString(R.string.delete_font_msg))
                             .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -872,6 +878,7 @@ class M3SettingsAdapter(
                             }
                             .setNegativeButton(context.getString(R.string.cancel), null)
                             .show()
+                        UiMonetThemeManager.styleAlertDialog(dialog)
                     }
                 }
             )
@@ -913,6 +920,7 @@ class M3SettingsAdapter(
         @SuppressLint("ClickableViewAccessibility")
         private fun createAxisSliderRow(axis: FontAxis, initialValue: Float): View {
             val density = context.resources.displayMetrics.density
+            val palette = UiMonetThemeManager.getPalette(context)
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
@@ -926,14 +934,14 @@ class M3SettingsAdapter(
             val nameText = TextView(context).apply {
                 text = DeskNotificationHelper.getAxisDisplayName(context, axis.tag)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setTextColor(palette.onSurfaceVariant)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.1f)
             }
 
             val valueText = TextView(context).apply {
                 text = formatAxisValue(initialValue)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setTextColor(palette.onSurfaceVariant)
                 gravity = Gravity.END
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.7f)
             }
@@ -971,6 +979,7 @@ class M3SettingsAdapter(
                     }
                 }
             }
+            UiMonetThemeManager.styleSlider(slider, palette)
 
             row.addView(nameText)
             row.addView(slider)
@@ -986,20 +995,13 @@ class M3SettingsAdapter(
             }
         }
 
-        private fun resolveThemeColor(attrResId: Int): Int {
-            val tv = TypedValue()
-            if (context.theme.resolveAttribute(attrResId, tv, true)) {
-                return tv.data
-            }
-            return Color.WHITE
-        }
-
         private fun setupColorCarousel() {
             colorModeGroup.clearOnButtonCheckedListeners()
             colorModeGroup.check(if (isEditingNotificationBg) R.id.btn_color_mode_bg else R.id.btn_color_mode_text)
             colorModeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
                 if (isChecked) {
                     isEditingNotificationBg = (checkedId == R.id.btn_color_mode_bg)
+                    UiMonetThemeManager.styleButtonToggleGroup(colorModeGroup, UiMonetThemeManager.getPalette(context))
                     refreshColorAdapter()
                 }
             }
@@ -1086,7 +1088,7 @@ class M3SettingsAdapter(
                     }
                 },
                 onColorLongClick = { item ->
-                    MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+                    val dialog = MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
                         .setTitle(context.getString(R.string.delete_color_title))
                         .setMessage(context.getString(R.string.delete_color_msg))
                         .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -1097,6 +1099,7 @@ class M3SettingsAdapter(
                         }
                         .setNegativeButton(context.getString(R.string.cancel), null)
                         .show()
+                    UiMonetThemeManager.styleAlertDialog(dialog)
                 }
             )
         }
@@ -1115,11 +1118,13 @@ class M3SettingsAdapter(
                 currentColor
             }
 
+            val palette = UiMonetThemeManager.getPalette(context)
             val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_color_picker, null)
             val colorPickerView = dialogView.findViewById<com.skydoves.colorpickerview.ColorPickerView>(R.id.color_picker_view)
             val brightnessSlideBar = dialogView.findViewById<com.skydoves.colorpickerview.sliders.BrightnessSlideBar>(R.id.brightness_slide_bar)
             val previewBox = dialogView.findViewById<View>(R.id.color_preview_box)
             val hexText = dialogView.findViewById<TextView>(R.id.hex_text)
+            hexText.setTextColor(palette.onSurface)
 
             colorPickerView.attachBrightnessSlider(brightnessSlideBar)
             colorPickerView.setInitialColor(initialColor)
@@ -1146,7 +1151,7 @@ class M3SettingsAdapter(
                 hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
             })
 
-            MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
+            val dialog = MaterialAlertDialogBuilder(context, R.style.ClockDesk_Dialog_Theme)
                 .setTitle(context.getString(R.string.custom_color))
                 .setView(dialogView)
                 .setPositiveButton(context.getString(R.string.apply)) { dialog, _ ->
@@ -1168,6 +1173,7 @@ class M3SettingsAdapter(
                 }
                 .setNegativeButton(context.getString(R.string.cancel), null)
                 .show()
+            UiMonetThemeManager.styleAlertDialog(dialog, palette)
         }
     }
 }

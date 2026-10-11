@@ -25,12 +25,12 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.color.DynamicColors
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskNotification
 import com.nxd1frnt.clockdesk2.connect.repo.DeskNotificationRepository
 import com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationHelper
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 object NotificationShadeBottomSheet {
 
@@ -40,10 +40,12 @@ object NotificationShadeBottomSheet {
             activityContext = activityContext.baseContext
         }
         val targetContext = activityContext ?: context
-        val dialogContext = DynamicColors.wrapContextIfAvailable(targetContext)
+        val dialogContext = UiMonetThemeManager.wrapContext(targetContext)
+        val palette = UiMonetThemeManager.getPalette(targetContext)
 
         val dialog = BottomSheetDialog(dialogContext)
         val view = LayoutInflater.from(dialogContext).inflate(R.layout.bottom_sheet_notification_shade, null, false)
+        UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
         dialog.setContentView(view)
 
         val displayMetrics = targetContext.resources.displayMetrics
@@ -58,6 +60,7 @@ object NotificationShadeBottomSheet {
         }
 
         fun applySheetHeight(sheet: View) {
+            sheet.backgroundTintList = android.content.res.ColorStateList.valueOf(palette.surfaceContainerLow)
             sheet.layoutParams?.let { lp ->
                 lp.height = targetHeight
                 sheet.layoutParams = lp
@@ -363,6 +366,7 @@ object NotificationShadeBottomSheet {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
             holder.bind(item, context, deskConnectManager, onDismissClick)
+            UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView)
         }
 
         class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {

@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.utils.ColorItem
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.R
 
 class ColorAdapter(
@@ -58,10 +59,11 @@ class ColorAdapter(
         val drawable = previewBackground?.mutate() as? GradientDrawable
 
         // Устанавливаем фон для кольца выбора (если оно есть)
-        val ringBackground = AppCompatResources.getDrawable(holder.itemView.context, R.drawable.color_selection_ring)
+        val ringBackground = AppCompatResources.getDrawable(holder.itemView.context, R.drawable.color_selection_ring)?.mutate()
         holder.selectionRing.background = ringBackground
         // --------------------------------------------------
         val context = holder.itemView.context
+        val palette = UiMonetThemeManager.getPalette(context)
         var isSelected = false
         when (item) {
             is ColorItem.Dynamic -> {
@@ -83,12 +85,11 @@ class ColorAdapter(
                 isSelected = (!useDynamic && selectedColor == item.color)
             }
             is ColorItem.AddNew -> {
-                val surfaceVariantColor = ContextCompat.getColor(context, R.color.md_theme_surfaceVariant)
-                drawable?.setColor(surfaceVariantColor)
+                drawable?.setColor(palette.surfaceVariant)
 
                 holder.icon.visibility = View.VISIBLE
                 holder.icon.setImageResource(R.drawable.ic_palette_swatch)
-                holder.icon.setColorFilter(ContextCompat.getColor(context, R.color.md_theme_onSurfaceVariant))
+                holder.icon.setColorFilter(palette.onSurfaceVariant)
 
                 isSelected = false
             }
@@ -98,7 +99,7 @@ class ColorAdapter(
         // Set selection ring visibility
         if (isSelected) {
             holder.selectionRing.visibility = View.VISIBLE
-            val ringColor = if (item is ColorItem.Dynamic) item.color else ContextCompat.getColor(context, R.color.md_theme_primary)
+            val ringColor = if (item is ColorItem.Dynamic) item.color else palette.primary
             (holder.selectionRing.background as? GradientDrawable)?.setStroke(6, ringColor)
         } else {
             holder.selectionRing.visibility = View.GONE

@@ -85,6 +85,7 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
         .create()
 
         materialDialog.show()
+        com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager.styleAlertDialog(materialDialog)
     }
 
     override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {

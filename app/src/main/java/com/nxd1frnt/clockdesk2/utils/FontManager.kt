@@ -87,6 +87,7 @@ class FontManager(
     private val customColors: MutableList<Int> = mutableListOf()
     @SuppressLint("RestrictedApi")
     private var currentScheme: Scheme? = null
+    var onDynamicSchemeChanged: ((Int?) -> Unit)? = null
     companion object {
         val resourceFontIds = listOf(
             R.font.googlesansflex,
@@ -576,6 +577,9 @@ class FontManager(
         if (savedSeed != -1) {
             this.currentScheme = Scheme.dark(savedSeed)
             this.dynamicColor = this.currentScheme?.secondary
+        } else {
+            this.currentScheme = null
+            this.dynamicColor = null
         }
         timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
@@ -637,6 +641,7 @@ class FontManager(
         }
 
         applyAll()
+        onDynamicSchemeChanged?.invoke(if (savedSeed != -1) savedSeed else null)
     }
 
     private fun getFontIdentifier(item: FontItem): String {
@@ -940,6 +945,7 @@ class FontManager(
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         prefs.edit().putInt("dynamic_seed_color", seedColor).apply()
         applyAll()
+        onDynamicSchemeChanged?.invoke(seedColor)
     }
 
     fun getDynamicScheme(): Scheme {
@@ -1273,6 +1279,7 @@ class FontManager(
         currentScheme = null
         dynamicColor = null
         applyAll()
+        onDynamicSchemeChanged?.invoke(null)
     }
 
     private fun getTargetColorForView(viewId: Int): Int {

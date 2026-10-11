@@ -1,14 +1,18 @@
 package com.nxd1frnt.clockdesk2.background
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class BackgroundsAdapter(
     private val context: Context,
@@ -30,14 +34,20 @@ class BackgroundsAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val id = items[position]
+        val palette = UiMonetThemeManager.getPalette(holder.itemView.context)
+        (holder.thumb.background?.mutate() as? GradientDrawable)?.setColor(palette.surfaceContainerHighest)
+        holder.overlay.backgroundTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 187))
+
         try {
             when (id) {
                 "__ADD__" -> {
                     holder.thumb.setImageResource(R.drawable.baseline_add_photo_alternate_24)
                     holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    holder.thumb.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
                     holder.itemView.setOnLongClickListener(null) 
                 }
                 "__DEFAULT_GRADIENT__" -> {
+                    holder.thumb.imageTintList = null
                     // Load app drawable gradient as preview
                     Glide.with(context)
                         .load(R.drawable.gradient_background)
@@ -46,6 +56,7 @@ class BackgroundsAdapter(
                     holder.itemView.setOnLongClickListener(null)
                 }
                 else -> {
+                    holder.thumb.imageTintList = null
                     holder.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                     Glide.with(context)
                         .load(Uri.parse(id))
@@ -60,7 +71,7 @@ class BackgroundsAdapter(
         } catch (e: Exception) {
             // ignore and leave empty thumbnail
         }
-    holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
+        holder.overlay.visibility = if (id == selectedId) View.VISIBLE else View.GONE
         holder.itemView.setOnClickListener {
             onClick(id)
             if (id != "__ADD__") {

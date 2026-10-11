@@ -18,7 +18,7 @@ import com.nxd1frnt.clockdesk2.weathergetter.getWeatherIconRes
 import java.util.Calendar
 import java.util.Locale
 
-import com.google.android.material.color.DynamicColors
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 object WeatherDialog {
 
@@ -28,7 +28,7 @@ object WeatherDialog {
             activityContext = activityContext.baseContext
         }
         val targetContext = activityContext ?: context
-        val dialogContext = DynamicColors.wrapContextIfAvailable(targetContext)
+        val dialogContext = UiMonetThemeManager.wrapContext(targetContext)
 
         val view = LayoutInflater.from(dialogContext).inflate(R.layout.dialog_weather, null, false)
 
@@ -155,7 +155,7 @@ object WeatherDialog {
                         val hourlyCode = hourlyCodes[idx]
                         val hourlyTemp = if (idx in hourlyTemps.indices) hourlyTemps[idx] else null
 
-                        val itemView = LayoutInflater.from(targetContext).inflate(R.layout.item_weather_forecast, forecastContainer, false)
+                        val itemView = LayoutInflater.from(dialogContext).inflate(R.layout.item_weather_forecast, forecastContainer, false)
                         val itemTime = itemView.findViewById<TextView>(R.id.forecast_item_time)
                         val itemIcon = itemView.findViewById<ImageView>(R.id.forecast_item_icon)
                         val itemTemp = itemView.findViewById<TextView>(R.id.forecast_item_temp)
@@ -184,7 +184,13 @@ object WeatherDialog {
             forecastTitle.visibility = View.GONE
         }
 
-        MaterialAlertDialogBuilder(dialogContext)
+        val palette = UiMonetThemeManager.getPalette(targetContext)
+        UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
+        if (alertBanner.visibility == View.VISIBLE) {
+            (alertBanner.background?.mutate() as? android.graphics.drawable.GradientDrawable)?.setColor(palette.errorContainer)
+        }
+
+        val dialog = MaterialAlertDialogBuilder(dialogContext)
             .setTitle(targetContext.getString(R.string.weather_dialog_title))
             .setView(view)
             .setPositiveButton(android.R.string.ok, null)
@@ -195,5 +201,6 @@ object WeatherDialog {
                 } catch (e: Exception) {}
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog, palette)
     }
 }

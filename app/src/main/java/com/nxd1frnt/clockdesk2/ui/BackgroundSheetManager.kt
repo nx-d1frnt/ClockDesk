@@ -24,6 +24,7 @@ import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import com.nxd1frnt.clockdesk2.utils.Logger
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
 class BackgroundSheetManager(
@@ -135,8 +136,8 @@ class BackgroundSheetManager(
                 }
             },
             onLongClick = { id ->
-                val context = floatingMenuView.context
-                MaterialAlertDialogBuilder(context)
+                val context = UiMonetThemeManager.wrapContext(floatingMenuView.context)
+                val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_background_title))
                     .setMessage(context.getString(R.string.delete_background_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -152,6 +153,7 @@ class BackgroundSheetManager(
                     }
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
+                UiMonetThemeManager.styleAlertDialog(dialog)
             }
         )
         bgRecycler.adapter = backgroundsAdapter
@@ -714,6 +716,12 @@ class BackgroundSheetManager(
                 }
                 .start()
         }
+    }
+
+    fun refreshMonetTheme() {
+        val palette = UiMonetThemeManager.getPalette(floatingMenuView.context)
+        UiMonetThemeManager.applyLiveToViewHierarchy(floatingMenuView, palette)
+        backgroundsAdapter?.notifyDataSetChanged()
     }
 
     fun onDestroy() {

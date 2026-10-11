@@ -24,6 +24,7 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ui.LastFmSettingsFragment
 import com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment
 import com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
@@ -35,8 +36,8 @@ class SettingsActivity : AppCompatActivity() {
     private var selectedCategoryId: String = "general"
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply dynamic colors for Material You
-        DynamicColors.applyToActivityIfAvailable(this)
+        // Apply dynamic colors for Material You / Background Monet
+        UiMonetThemeManager.applyToActivity(this)
         super.onCreate(savedInstanceState)
 
         // Enable Edge-to-Edge
@@ -45,6 +46,7 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
         toolbar = findViewById(R.id.toolbar)
         collapsingToolbar = findViewById(R.id.collapsingToolbar)
+        UiMonetThemeManager.applyToSettingsActivity(this)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // Keep landscape for desk clock consistency
@@ -195,39 +197,23 @@ class SettingsActivity : AppCompatActivity() {
 
             val isSelected = item.id == selectedId
             val ctx = holder.itemView.context
+            val palette = UiMonetThemeManager.getPalette(ctx)
 
+            holder.cardContainer.rippleColor = ColorStateList.valueOf(
+                androidx.core.graphics.ColorUtils.setAlphaComponent(palette.primary, 32)
+            )
             if (isSelected) {
-                holder.cardContainer.setCardBackgroundColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
-                )
-                holder.iconBadge.setCardBackgroundColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorSecondary)
-                )
-                holder.title.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
-                )
-                holder.subtitle.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
-                )
-                holder.icon.imageTintList = ColorStateList.valueOf(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondary)
-                )
+                holder.cardContainer.setCardBackgroundColor(palette.secondaryContainer)
+                holder.iconBadge.setCardBackgroundColor(palette.secondary)
+                holder.title.setTextColor(palette.onSecondaryContainer)
+                holder.subtitle.setTextColor(palette.onSecondaryContainer)
+                holder.icon.imageTintList = ColorStateList.valueOf(palette.onSecondary)
             } else {
-                holder.cardContainer.setCardBackgroundColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorSurfaceContainerLow)
-                )
-                holder.iconBadge.setCardBackgroundColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorSurfaceContainerHigh)
-                )
-                holder.title.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurface)
-                )
-                holder.subtitle.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-                )
-                holder.icon.imageTintList = ColorStateList.valueOf(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-                )
+                holder.cardContainer.setCardBackgroundColor(palette.surfaceContainerLow)
+                holder.iconBadge.setCardBackgroundColor(palette.surfaceContainerHigh)
+                holder.title.setTextColor(palette.onSurface)
+                holder.subtitle.setTextColor(palette.onSurfaceVariant)
+                holder.icon.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
             }
 
             holder.itemView.setOnClickListener { onSelected(item) }
@@ -243,9 +229,4 @@ class SettingsActivity : AppCompatActivity() {
             val subtitle: TextView = view.findViewById(R.id.category_subtitle)
         }
     }
-}
-
-// Extension function to load colors from active theme attributes reliably
-private fun Context.getThemeColor(attr: Int, defaultColor: Int = 0): Int {
-    return com.google.android.material.color.MaterialColors.getColor(this, attr, defaultColor)
 }

@@ -1,17 +1,20 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.shape.ShapeAppearanceModel
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class SettingsCategoryListFragment : Fragment() {
 
@@ -57,10 +60,18 @@ class SettingsCategoryListFragment : Fragment() {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
             val context = holder.itemView.context
+            val palette = UiMonetThemeManager.getPalette(context)
 
             holder.title.text = item.title
             holder.subtitle.text = item.subtitle
             holder.icon.setImageResource(item.iconResId)
+
+            holder.cardContainer.setCardBackgroundColor(palette.surfaceContainerLow)
+            holder.cardContainer.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+            holder.iconBadge.setCardBackgroundColor(palette.surfaceContainerHigh)
+            holder.icon.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
+            holder.title.setTextColor(palette.onSurface)
+            holder.subtitle.setTextColor(palette.onSurfaceVariant)
 
             val isFirst = position == 0 || items[position - 1].groupId != item.groupId
             val isLast = position == items.lastIndex || items[position + 1].groupId != item.groupId

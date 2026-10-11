@@ -693,4 +693,6 @@
     <string name="install_update_action">Встановити оновлення</string>
     <string name="download_failed">Помилка завантаження. Натисніть для повтору</string>
     <string name="permission_unknown_apps_required">Дозвольте ClockDesk встановлювати додатки для оновлення.</string>
+    <string name="ui_monet_from_background_title">Кольори інтерфейсу з фону</string>
+    <string name="ui_monet_from_background_summary">Фарбувати меню та налаштування в кольори Monet, витягнуті з поточного фону або обкладинки треку</string>
 </resources>

@@ -91,6 +91,7 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import com.nxd1frnt.clockdesk2.utils.PowerStateManager
 import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
@@ -342,7 +343,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         activityStartTime = System.currentTimeMillis()
-        DynamicColors.applyToActivityIfAvailable(this)
+        UiMonetThemeManager.applyToActivity(this)
         super.onCreate(savedInstanceState)
 
         setupWindowFlags()
@@ -360,12 +361,26 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         setupEntranceAnimation()
         initUIManagers()
         setupListeners()
+        applyLiveMonetTheme()
 
         val skipAnimation = savedInstanceState != null
         loadSavedBackground(skipAnimation)
         checkForFirstLaunchAnimation()
         restoreSavedWeatherState()
         startUpdates()
+    }
+
+    private fun applyLiveMonetTheme() {
+        UiMonetThemeManager.applyLiveToMainActivity(this)
+        if (::customizationSheetManager.isInitialized) {
+            customizationSheetManager.refreshMonetTheme()
+        }
+        if (::widgetGallerySideSheetManager.isInitialized) {
+            widgetGallerySideSheetManager.refreshMonetTheme()
+        }
+        if (::backgroundSheetManager.isInitialized) {
+            backgroundSheetManager.refreshMonetTheme()
+        }
     }
 
     private fun setupEntranceAnimation() {
@@ -512,6 +527,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             chipContainer,
             enableAdditionalLogging
         )
+        fontManager.onDynamicSchemeChanged = {
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    applyLiveMonetTheme()
+                }
+            }
+        }
 
         smartChipManager = SmartChipManager(
             this,
@@ -644,7 +666,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             override fun onPairingRequested(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, verificationKey: String) {
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
-                        com.google.android.material.dialog.MaterialAlertDialogBuilder(this@MainActivity)
+                        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this@MainActivity))
                             .setTitle(R.string.deskconnect_pairing_request_title)
                             .setMessage(getString(R.string.deskconnect_pairing_request_message, device.getDisplayName(), verificationKey))
                             .setPositiveButton(R.string.deskconnect_accept) { _, _ ->
@@ -655,6 +677,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                             }
                             .setCancelable(false)
                             .show()
+                        UiMonetThemeManager.styleAlertDialog(dialog)
                     }
                 }
             }
@@ -1065,7 +1088,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
 
         btnResetLayout.setOnClickListener {
-            MaterialAlertDialogBuilder(this)
+            val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
                 .setTitle(R.string.confirm_reset_layout_title)
                 .setMessage(R.string.confirm_reset_layout_msg)
                 .setPositiveButton(R.string.reset_layout) { _, _ ->
@@ -1074,6 +1097,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
+            UiMonetThemeManager.styleAlertDialog(dialog)
             resetEditModeTimeout()
         }
 
@@ -1128,6 +1152,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
 
             when (key) {
+                "ui_monet_from_background" -> runOnUiThread {
+                    applyLiveMonetTheme()
+                }
                 "show_performance_overlay" -> runOnUiThread {
                     val showOverlay = prefs.getBoolean("show_performance_overlay", false)
                     togglePerformanceOverlay(showOverlay)
@@ -1683,7 +1710,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun showLocationRationaleDialog() {
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
             .setTitle(getString(R.string.location_permission_title))
             .setMessage(getString(R.string.location_permission_message))
             .setPositiveButton(getString(R.string.location_permission_grant)) { _, _ ->
@@ -1712,6 +1739,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 showManualLocationOptionDialog()
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showManualLocationOptionDialog() {
@@ -1721,7 +1749,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         prefs.edit().putBoolean("manual_location_prompt_shown", true).apply()
 
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
             .setTitle(getString(R.string.location_permission_title))
             .setMessage(getString(R.string.location_search_city_prompt))
             .setPositiveButton(getString(android.R.string.yes)) { _, _ ->
@@ -1731,6 +1759,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 dialog.dismiss()
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showCitySearchDialog() {
@@ -1851,6 +1880,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             } catch (e: Exception) {
                 backgroundManager.setSavedBackgroundUri(null)
                 setCustomBackground(false)
+                if (!wasMusicBackgroundApplied) {
+                    fontManager.clearDynamicColors()
+                }
                 Logger.w("MainActivity") {"Failed to load saved background: ${e.message}"}
 
                 isBackgroundReady = true
@@ -1859,6 +1891,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         } else {
             backgroundImageView.visibility = View.GONE
             setCustomBackground(false)
+            if (!wasMusicBackgroundApplied) {
+                fontManager.clearDynamicColors()
+            }
             gradientManager.startUpdates()
             updateBackgroundFilters()
 
@@ -2324,7 +2359,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun showDeleteConfirmationDialog(title: String, message: String, onConfirm: () -> Unit) {
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton(getString(R.string.delete)) { dialog, _ ->
@@ -2335,6 +2370,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 dialog.dismiss()
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun startUpdates() {
@@ -2724,6 +2760,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
                 backgroundManager.setSavedBackgroundUri(null)
                 setCustomBackground(false)
+                fontManager.clearDynamicColors()
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
                 dynamicBackgroundView.visibility = View.VISIBLE
                 backgroundImageView.visibility = View.GONE
