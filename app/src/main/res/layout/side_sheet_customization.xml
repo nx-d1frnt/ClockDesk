@@ -454,6 +454,43 @@
                         android:textAppearance="?attr/textAppearanceTitleMedium"
                         android:paddingHorizontal="16dp"
                         android:paddingBottom="12dp" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/color_mode_toggle_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="16dp"
+                        android:paddingBottom="12dp"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        app:singleSelection="true"
+                        app:selectionRequired="true"
+                        app:checkedButton="@+id/btn_sheet_color_mode_text">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_sheet_color_mode_text"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="38dp"
+                            android:layout_weight="1"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/desk_notification_color_mode_text"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_sheet_color_mode_bg"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="38dp"
+                            android:layout_weight="1"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="@string/desk_notification_color_mode_bg"
+                            android:textSize="12sp" />
+
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/color_recycler_view"
                         android:layout_width="match_parent"
@@ -480,16 +517,6 @@
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
                     android:paddingVertical="8dp">
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/edit_background_switch"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingVertical="8dp"
-                        android:text="@string/edit_background"
-                        android:textAppearance="?attr/textAppearanceTitleMedium"
-                        android:visibility="gone"
-                        tools:visibility="visible"/>
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/night_shift_switch"

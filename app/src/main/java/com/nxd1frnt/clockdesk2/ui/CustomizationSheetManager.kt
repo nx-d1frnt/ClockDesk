@@ -103,7 +103,7 @@ class CustomizationSheetManager(
     private val bsCancelButton by lazy { sideSheetView.findViewById<Button>(R.id.cancel_button) }
 
     private val bsNightShiftSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.night_shift_switch) }
-    private val bsEditBackgroundSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.edit_background_switch) }
+    private val bsColorModeGroup by lazy { sideSheetView.findViewById<MaterialButtonToggleGroup>(R.id.color_mode_toggle_group) }
     private val bsFreeModeSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.free_mode_switch) }
     private val bsGridSnapSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.grid_snap_switch) }
     private val bsIgnoreCollisionSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.ignore_collision_switch) }
@@ -341,6 +341,7 @@ class CustomizationSheetManager(
         dockView?.animate()?.cancel()
         focusedView = viewToCustomize
         isEditingBackground = false
+        bsColorModeGroup.check(R.id.btn_sheet_color_mode_text)
 
         highlightFocusedView(true)
         configureVisibilityForView(viewToCustomize)
@@ -535,7 +536,7 @@ class CustomizationSheetManager(
         bsBlockFormatsTitle.visibility = if (isTime || showDateFormat) View.VISIBLE else View.GONE
         bsDateFormatCard.visibility = if (showDateFormat) View.VISIBLE else View.GONE
         bsTimeFormatCard.visibility = if (isTime) View.VISIBLE else View.GONE
-        bsEditBackgroundSwitch.visibility = if (features?.contains(WidgetFeature.BACKGROUND_COLOR) ?: isSmartChip) View.VISIBLE else View.GONE
+        bsColorModeGroup.visibility = if (features?.contains(WidgetFeature.BACKGROUND_COLOR) ?: (isSmartChip || isLastFm)) View.VISIBLE else View.GONE
         bsRemoveWidgetCard.visibility = View.VISIBLE
     }
 
@@ -739,9 +740,11 @@ class CustomizationSheetManager(
     }
 
     private fun setupSwitchesAndToggles() {
-        bsEditBackgroundSwitch.setOnCheckedChangeListener { _, isChecked ->
-            isEditingBackground = isChecked
-            focusedView?.let { bsColorRecyclerView.adapter = createColorAdapter(it) }
+        bsColorModeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                isEditingBackground = (checkedId == R.id.btn_sheet_color_mode_bg)
+                focusedView?.let { bsColorRecyclerView.adapter = createColorAdapter(it) }
+            }
         }
 
         bsGridSnapSwitch.setOnCheckedChangeListener { _, isChecked -> widgetMover.setGridSnapEnabled(isChecked) }
