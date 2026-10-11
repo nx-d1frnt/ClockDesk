@@ -185,11 +185,11 @@
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/compact_source_icon"
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
+                            android:layout_width="21dp"
+                            android:layout_height="21dp"
                             android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="-2dp"
-                            android:layout_marginBottom="-2dp"
+                            android:layout_marginEnd="-3dp"
+                            android:layout_marginBottom="-3dp"
                             android:padding="2dp"
                             android:scaleType="fitCenter"
                             android:background="?attr/colorSurfaceContainerHighest"
@@ -269,11 +269,11 @@
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/expanded_source_icon"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
                             android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="-2dp"
-                            android:layout_marginBottom="-2dp"
+                            android:layout_marginEnd="-3dp"
+                            android:layout_marginBottom="-3dp"
                             android:padding="2dp"
                             android:scaleType="fitCenter"
                             android:background="?attr/colorSurfaceContainerHighest"
