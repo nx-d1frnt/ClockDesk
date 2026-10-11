@@ -1949,7 +1949,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 req = req.transform(
                     BlurTransformation(this, blurIntensity, 1) {
                         if (!isDestroyed && !isFinishing) {
-                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING)
+                            val blurMsg = getString(R.string.stage_blurring_detail, blurIntensity)
+                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING, blurMsg)
                         }
                     }
                 )
@@ -1982,6 +1983,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                     val bgOffsetY = backgroundManager.getBgOffsetY()
                                     val bgScale   = backgroundManager.getBgScale()
 
+                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
+
                                     // 1. Запускаем кинематографичный GLSL-переход (Crossfade)
                                     val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 2000L
                                     dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
@@ -2010,16 +2013,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                             .setListener(object : AnimatorListenerAdapter() {
                                                 override fun onAnimationEnd(animation: Animator) {
                                                     isScaleAnimating = false
-                                                    handler.postDelayed({
-                                                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-                                                    }, 500)
+                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
                                                 }
                                             }).start()
                                     } else {
                                         dynamicBackgroundView.scaleX = finalZoom
                                         dynamicBackgroundView.scaleY = finalZoom
                                         isScaleAnimating = false
-                                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
                                     }
                                 }
                             }
@@ -2029,27 +2030,26 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                         val bgOffsetY = backgroundManager.getBgOffsetY()
                         val bgScale   = backgroundManager.getBgScale()
 
+                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
+
                         val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 300L
                         dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
 
                         updateBackgroundFilters()
-                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
                         onComplete?.invoke()
                     }
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                    BackgroundProgressPlugin.reset()
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
                     super.onLoadFailed(errorDrawable)
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
                     Logger.w("MainActivity") {"Glide failed to load background: $model"}
                     isScaleAnimating = false
-                    handler.postDelayed({
-                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-                    }, 2000)
 
                     onComplete?.invoke()
 
@@ -2065,7 +2065,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
                 override fun onLoadStarted(placeholder: Drawable?) {
                     super.onLoadStarted(placeholder)
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.DOWNLOADING)
+                    val initialStage = when {
+                        model is Uri && (model.scheme == "http" || model.scheme == "https") -> BackgroundProgressPlugin.Stage.DOWNLOADING
+                        model is String && (model.startsWith("http://") || model.startsWith("https://")) -> BackgroundProgressPlugin.Stage.DOWNLOADING
+                        else -> BackgroundProgressPlugin.Stage.LOADING
+                    }
+                    updateBackgroundProgress(initialStage)
                 }
             }
 
@@ -2083,10 +2088,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
 
         } catch (e: Exception) {
-            updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
-            handler.postDelayed({
-                updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-            }, 2000)
+            updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
             Logger.e("MainActivity"){"loadBackgroundInternal failed: ${e.message}"}
             onComplete?.invoke()
         }
@@ -2296,12 +2298,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun updateBackgroundProgress(stage: BackgroundProgressPlugin.Stage, messageOverride: String? = null) {
-        BackgroundProgressPlugin.Companion.currentStage = stage
-        BackgroundProgressPlugin.Companion.customMessage = messageOverride
-
-        runOnUiThread {
-            BackgroundProgressPlugin.onGlobalStateChanged?.invoke()
-        }
+        BackgroundProgressPlugin.postStage(stage, messageOverride)
     }
 
     private fun setupSideSheet() {
@@ -2641,12 +2638,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun previewGradient() {
         lastBackgroundSource = null
+        BackgroundProgressPlugin.startSession()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
         val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
         dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L)
         fontManager.clearDynamicColors()
         setCustomBackground(false)
         gradientManager.startUpdates()
         updateBackgroundFilters()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
     }
 
     private fun previewMusicAlbumArt(enabled: Boolean, blur: Int) {
@@ -2720,6 +2720,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         when (previewUri) {
             "__DEFAULT_GRADIENT__" -> {
+                BackgroundProgressPlugin.startSession()
+                updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
                 backgroundManager.setSavedBackgroundUri(null)
                 setCustomBackground(false)
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
@@ -2727,6 +2729,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 backgroundImageView.visibility = View.GONE
                 backgroundManager.clearDim()
                 gradientManager.startUpdates()
+                updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
             }
             null -> {
                 val existing = backgroundManager.getSavedBackgroundUri()
@@ -2759,6 +2762,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         lastBackgroundSource = null
         currentAppliedArtworkSource = null
         wasMusicBackgroundApplied = false
+        BackgroundProgressPlugin.startSession()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
         dynamicBackgroundView.visibility = View.VISIBLE
         backgroundImageView.visibility = View.GONE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -2771,6 +2776,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         editModeBlurLayer.setImageDrawable(null)
         editModeBlurLayer.visibility = View.GONE
         gradientManager.startUpdates()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
     }
 
     fun restoreUserBackground(savedUriStr: String?) {
