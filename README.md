@@ -11,6 +11,8 @@
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-35-green.svg?style=flat-square&logo=android&logoColor=white)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-100%25-7F52FF.svg?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-Channel-2CA5E0.svg?style=flat-square&logo=telegram&logoColor=white)](https://t.me/clockdesk_app)
+
 
 <br />
 
