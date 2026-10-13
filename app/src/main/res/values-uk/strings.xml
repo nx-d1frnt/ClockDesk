@@ -171,6 +171,13 @@
     <string name="power_saver_dim_level_summary">Налаштуйте відсоток затемнення фону при економії батареї</string>
     <string name="power_saver_brightness_level_title">Яскравість екрана</string>
     <string name="power_saver_brightness_level_summary">Налаштуйте рівень яскравості екрана в режимі економії батареї</string>
+    <string name="power_saver_trigger_rules_category">Умови активації</string>
+    <string name="power_saver_display_category">Екран та яскравість</string>
+    <string name="power_saver_visual_effects_category">Анімації та ефекти</string>
+    <string name="power_saver_background_activity_category">Датчики та фон</string>
+    <string name="graphics_visual_effects_category">Візуальні ефекти</string>
+    <string name="graphics_optimization_category">Роздільна здатність та оптимізація</string>
+    <string name="performance_diagnostics_category">Діагностика та інструменти</string>
     <string name="smart_chips_settings_title">Налаштування розумних чіпів</string>
     <string name="show_battery_alert_chip">Показувати чіп сповіщення про батарею</string>
     <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї додатку</string>

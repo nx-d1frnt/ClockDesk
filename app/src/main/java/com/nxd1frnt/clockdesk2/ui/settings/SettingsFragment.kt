@@ -233,7 +233,9 @@ class BatterySettingsFragment : BaseM3SettingsFragment() {
                 iconRes = R.drawable.ic_battery_saver,
                 defaultValue = false
             )
+        }
 
+        category(getString(R.string.power_saver_trigger_rules_category)) {
             switch(
                 key = "power_saver_sync_system",
                 title = getString(R.string.power_saver_sync_system_title),
@@ -261,7 +263,54 @@ class BatterySettingsFragment : BaseM3SettingsFragment() {
             )
         }
 
-        category(getString(R.string.power_saver_rules_title)) {
+        category(getString(R.string.power_saver_display_category)) {
+            switch(
+                key = "power_saver_lock_brightness",
+                title = getString(R.string.power_saver_lock_brightness_title),
+                summary = getString(R.string.power_saver_lock_brightness_summary),
+                defaultValue = true
+            )
+
+            slider(
+                key = "power_saver_brightness_level",
+                title = getString(R.string.power_saver_brightness_level_title),
+                summary = getString(R.string.power_saver_brightness_level_summary),
+                min = 1f,
+                max = 100f,
+                step = 1f,
+                defaultValue = 1f,
+                valueFormatter = { "${it.toInt()}%" },
+                isEnabled = { prefs.getBoolean("power_saver_lock_brightness", true) }
+            )
+
+            switch(
+                key = "power_saver_dim_background",
+                title = getString(R.string.power_saver_dim_background_title),
+                summary = getString(R.string.power_saver_dim_background_summary),
+                defaultValue = true
+            )
+
+            slider(
+                key = "power_saver_dim_level",
+                title = getString(R.string.power_saver_dim_level_title),
+                summary = getString(R.string.power_saver_dim_level_summary),
+                min = 0f,
+                max = 100f,
+                step = 1f,
+                defaultValue = 85f,
+                valueFormatter = { "${it.toInt()}%" },
+                isEnabled = { prefs.getBoolean("power_saver_dim_background", true) }
+            )
+
+            switch(
+                key = "power_saver_enable_smart_pixels",
+                title = getString(R.string.power_saver_enable_smart_pixels_title),
+                summary = getString(R.string.power_saver_enable_smart_pixels_summary),
+                defaultValue = true
+            )
+        }
+
+        category(getString(R.string.power_saver_visual_effects_category)) {
             switch(
                 key = "power_saver_disable_animations",
                 title = getString(R.string.power_saver_disable_animations_title),
@@ -287,6 +336,15 @@ class BatterySettingsFragment : BaseM3SettingsFragment() {
                 valueFormatter = { "${it.toInt()} fps" },
                 isEnabled = { prefs.getBoolean("power_saver_limit_fps", true) }
             )
+        }
+
+        category(getString(R.string.power_saver_background_activity_category)) {
+            switch(
+                key = "power_saver_limit_clock",
+                title = getString(R.string.power_saver_limit_clock_title),
+                summary = getString(R.string.power_saver_limit_clock_summary),
+                defaultValue = true
+            )
 
             switch(
                 key = "power_saver_disable_weather",
@@ -296,62 +354,10 @@ class BatterySettingsFragment : BaseM3SettingsFragment() {
             )
 
             switch(
-                key = "power_saver_lock_brightness",
-                title = getString(R.string.power_saver_lock_brightness_title),
-                summary = getString(R.string.power_saver_lock_brightness_summary),
-                defaultValue = true
-            )
-
-            slider(
-                key = "power_saver_brightness_level",
-                title = getString(R.string.power_saver_brightness_level_title),
-                summary = getString(R.string.power_saver_brightness_level_summary),
-                min = 1f,
-                max = 100f,
-                step = 1f,
-                defaultValue = 1f,
-                valueFormatter = { "${it.toInt()}%" },
-                isEnabled = { prefs.getBoolean("power_saver_lock_brightness", true) }
-            )
-
-            switch(
-                key = "power_saver_limit_clock",
-                title = getString(R.string.power_saver_limit_clock_title),
-                summary = getString(R.string.power_saver_limit_clock_summary),
-                defaultValue = true
-            )
-
-            switch(
                 key = "power_saver_disable_light_sensor",
                 title = getString(R.string.power_saver_disable_light_sensor_title),
                 summary = getString(R.string.power_saver_disable_light_sensor_summary),
                 defaultValue = true
-            )
-
-            switch(
-                key = "power_saver_enable_smart_pixels",
-                title = getString(R.string.power_saver_enable_smart_pixels_title),
-                summary = getString(R.string.power_saver_enable_smart_pixels_summary),
-                defaultValue = true
-            )
-
-            switch(
-                key = "power_saver_dim_background",
-                title = getString(R.string.power_saver_dim_background_title),
-                summary = getString(R.string.power_saver_dim_background_summary),
-                defaultValue = true
-            )
-
-            slider(
-                key = "power_saver_dim_level",
-                title = getString(R.string.power_saver_dim_level_title),
-                summary = getString(R.string.power_saver_dim_level_summary),
-                min = 0f,
-                max = 100f,
-                step = 1f,
-                defaultValue = 85f,
-                valueFormatter = { "${it.toInt()}%" },
-                isEnabled = { prefs.getBoolean("power_saver_dim_background", true) }
             )
         }
     }
@@ -359,26 +365,12 @@ class BatterySettingsFragment : BaseM3SettingsFragment() {
 
 class PerformanceSettingsFragment : BaseM3SettingsFragment() {
     override fun buildSettings(): List<SettingsItem> = settings {
-        category(getString(R.string.performance_settings)) {
-            switch(
-                key = "additional_logging",
-                title = getString(R.string.enable_additional_logging),
-                summary = getString(R.string.enable_additional_logging_summary),
-                iconRes = R.drawable.ic_speedometer,
-                defaultValue = false
-            )
-
-            switch(
-                key = "show_performance_overlay",
-                title = getString(R.string.show_performance_overlay_title),
-                summary = getString(R.string.show_performance_overlay_summary),
-                defaultValue = false
-            )
-
+        category(getString(R.string.graphics_visual_effects_category)) {
             switch(
                 key = "advanced_graphics",
                 title = getString(R.string.enable_advanced_graphics),
                 summary = getString(R.string.enable_advanced_graphics_summary),
+                iconRes = R.drawable.ic_speedometer,
                 defaultValue = false
             )
 
@@ -439,7 +431,9 @@ class PerformanceSettingsFragment : BaseM3SettingsFragment() {
                 defaultValue = true,
                 isEnabled = { advGraphics }
             )
+        }
 
+        category(getString(R.string.graphics_optimization_category)) {
             slider(
                 key = "graphics_render_scale",
                 title = getString(R.string.graphics_render_scale_title),
@@ -448,8 +442,7 @@ class PerformanceSettingsFragment : BaseM3SettingsFragment() {
                 max = 100f,
                 step = 1f,
                 defaultValue = 100f,
-                valueFormatter = { "${it.toInt()}%" },
-                isEnabled = { advGraphics }
+                valueFormatter = { "${it.toInt()}%" }
             )
 
             slider(
@@ -460,8 +453,23 @@ class PerformanceSettingsFragment : BaseM3SettingsFragment() {
                 max = 100f,
                 step = 1f,
                 defaultValue = 40f,
-                valueFormatter = { "${it.toInt()}%" },
-                isEnabled = { advGraphics }
+                valueFormatter = { "${it.toInt()}%" }
+            )
+        }
+
+        category(getString(R.string.performance_diagnostics_category)) {
+            switch(
+                key = "show_performance_overlay",
+                title = getString(R.string.show_performance_overlay_title),
+                summary = getString(R.string.show_performance_overlay_summary),
+                defaultValue = false
+            )
+
+            switch(
+                key = "additional_logging",
+                title = getString(R.string.enable_additional_logging),
+                summary = getString(R.string.enable_additional_logging_summary),
+                defaultValue = false
             )
         }
     }

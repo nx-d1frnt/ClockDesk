@@ -184,6 +184,13 @@
     <string name="power_saver_dim_level_summary">Adjust background dim percentage during battery saver</string>
     <string name="power_saver_brightness_level_title">Screen brightness level</string>
     <string name="power_saver_brightness_level_summary">Adjust screen brightness level when locked in battery saver</string>
+    <string name="power_saver_trigger_rules_category">Trigger Conditions</string>
+    <string name="power_saver_display_category">Display &amp; Screen</string>
+    <string name="power_saver_visual_effects_category">Animations &amp; Visuals</string>
+    <string name="power_saver_background_activity_category">Sensors &amp; Background</string>
+    <string name="graphics_visual_effects_category">Visual Effects</string>
+    <string name="graphics_optimization_category">Resolution &amp; Optimization</string>
+    <string name="performance_diagnostics_category">Diagnostics &amp; Developer Tools</string>
     <string name="smart_chips_settings_title">Smart Chips Settings</string>
     <string name="show_battery_alert_chip">Battery Alert Chip</string>
     <string name="show_battery_alert_chip_summary">Low battery alert chip</string>
