@@ -71,13 +71,16 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun setupToolbar() {
         setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        toolbar.navigationIcon = null
 
         supportFragmentManager.addOnBackStackChangedListener {
             updateToolbarTitle()
         }
 
-        toolbar.setNavigationOnClickListener {
+        findViewById<View>(R.id.btn_back)?.setOnClickListener {
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
             if (supportFragmentManager.backStackEntryCount > 0) {
                 supportFragmentManager.popBackStack()
             } else {

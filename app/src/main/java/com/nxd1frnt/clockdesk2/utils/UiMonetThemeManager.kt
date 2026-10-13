@@ -139,8 +139,8 @@ object UiMonetThemeManager {
         activity.findViewById<CollapsingToolbarLayout>(R.id.collapsingToolbar)?.let { collapsing ->
             collapsing.setCollapsedTitleTextColor(palette.onSurface)
             collapsing.setExpandedTitleColor(palette.onSurface)
-            collapsing.setContentScrimColor(palette.surfaceContainer)
-            collapsing.setStatusBarScrimColor(palette.surfaceContainer)
+            collapsing.setContentScrimColor(palette.surface)
+            collapsing.setStatusBarScrimColor(palette.surface)
         }
         activity.findViewById<MaterialToolbar>(R.id.toolbar)?.let { toolbar ->
             toolbar.setTitleTextColor(palette.onSurface)
@@ -481,10 +481,12 @@ object UiMonetThemeManager {
             is CollapsingToolbarLayout -> {
                 root.setCollapsedTitleTextColor(palette.onSurface)
                 root.setExpandedTitleColor(palette.onSurface)
-                root.setContentScrimColor(palette.surfaceContainer)
+                root.setContentScrimColor(palette.surface)
+                root.setStatusBarScrimColor(palette.surface)
             }
             is AppBarLayout -> {
                 root.setBackgroundColor(palette.surface)
+                root.isLiftOnScroll = false
             }
             is ProgressBar -> {
                 root.indeterminateTintList = ColorStateList.valueOf(palette.primary)
@@ -637,6 +639,7 @@ object UiMonetThemeManager {
                 btn.iconTint = ColorStateList.valueOf(palette.onPrimary)
             }
             // Filled Tonal Buttons
+            R.id.btn_back,
             R.id.btn_add_widget,
             R.id.apply_button,
             R.id.apply_background_button,

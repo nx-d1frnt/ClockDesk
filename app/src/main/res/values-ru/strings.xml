@@ -93,6 +93,7 @@
     <string name="onboarding_permission_granted">Доступ разрешен</string>
     <string name="onboarding_next_btn">Далее</string>
     <string name="onboarding_back_btn">Назад</string>
+    <string name="back">Назад</string>
     <string name="onboarding_finish_btn">Начать работу</string>
     <string name="onboarding_skip_btn">Пропустить</string>
     <string name="onboarding_try_guide_btn">Показать как</string>

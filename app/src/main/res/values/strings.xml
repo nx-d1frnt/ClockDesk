@@ -104,6 +104,7 @@
     <string name="onboarding_permission_granted">Permission Granted</string>
     <string name="onboarding_next_btn">Next</string>
     <string name="onboarding_back_btn">Back</string>
+    <string name="back">Back</string>
     <string name="onboarding_finish_btn">Get Started</string>
     <string name="onboarding_skip_btn">Skip</string>
     <string name="onboarding_try_guide_btn">Show Me How</string>

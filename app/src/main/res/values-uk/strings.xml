@@ -91,6 +91,7 @@
     <string name="onboarding_permission_granted">Дозвіл надано</string>
     <string name="onboarding_next_btn">Далі</string>
     <string name="onboarding_back_btn">Назад</string>
+    <string name="back">Назад</string>
     <string name="onboarding_finish_btn">Почати роботу</string>
     <string name="onboarding_skip_btn">Пропустити</string>
     <string name="onboarding_try_guide_btn">Показати як</string>
