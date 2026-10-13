@@ -11,6 +11,7 @@ import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 /**
@@ -30,7 +31,9 @@ class SquigglyProgressBar @JvmOverloads constructor(
     private val strokeWidthPx = 3.5f * density
     private val maxWaveAmplitudePx = 3f * density
     private val waveLengthPx = 28f * density
-    private val thumbRadiusPx = 4f * density
+    private val thumbWidthPx = 3.5f * density
+    private val thumbHeightPx = 13f * density
+    private val thumbCornerRadiusPx = thumbWidthPx / 2f
 
     // State
     var max: Int = 1000
@@ -170,7 +173,7 @@ class SquigglyProgressBar @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = ((maxWaveAmplitudePx * 2f) + strokeWidthPx + (8f * density)).toInt()
+        val desiredHeight = (maxOf(maxWaveAmplitudePx * 2f + strokeWidthPx, thumbHeightPx) + (4f * density)).toInt()
         val height = resolveSize(desiredHeight, heightMeasureSpec)
         val width = resolveSize(0, widthMeasureSpec)
         setMeasuredDimension(width, height)
@@ -179,15 +182,16 @@ class SquigglyProgressBar @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val availableWidth = (width - paddingLeft - paddingRight).toFloat()
+        // Inset by half-stroke / thumb width so round caps and thumb are never clipped at view edges
+        val horizontalInset = maxOf(strokeWidthPx / 2f, thumbWidthPx / 2f) + (1f * density)
+        val startX = paddingLeft + horizontalInset
+        val endX = width - paddingRight - horizontalInset
+        val availableWidth = (endX - startX).coerceAtLeast(0f)
         if (availableWidth <= 0f) return
 
         val centerY = height / 2f
         val progressRatio = (progress.toFloat() / max.toFloat()).coerceIn(0f, 1f)
-        val progressX = paddingLeft + (availableWidth * progressRatio)
-
-        val startX = paddingLeft.toFloat()
-        val endX = (width - paddingRight).toFloat()
+        val progressX = startX + (availableWidth * progressRatio)
 
         // 1. Draw unplayed straight line (from progressX to endX)
         if (progressX < endX) {
@@ -197,30 +201,44 @@ class SquigglyProgressBar @JvmOverloads constructor(
         // 2. Draw played wave (from startX to progressX)
         if (progressX > startX) {
             wavePath.reset()
-            wavePath.moveTo(startX, centerY)
 
             if (currentAmplitudePx > 0.1f) {
+                // Wave starts directly at startY without any point at centerY, eliminating the dot behind the wave
+                val startAngle = phaseOffset
+                val startY = centerY + sin(startAngle) * currentAmplitudePx
+                wavePath.moveTo(startX, startY)
+
                 val stepPx = 2f * density
-                var x = startX
+                var x = startX + stepPx
                 while (x <= progressX) {
                     val angle = ((x - startX) / waveLengthPx) * (2f * PI.toFloat()) + phaseOffset
                     val y = centerY + sin(angle) * currentAmplitudePx
                     wavePath.lineTo(x, y)
                     x += stepPx
                 }
-                // Connect to exact progress point
+
+                // Connect to exact progress point into the vertical pill thumb
                 val endAngle = ((progressX - startX) / waveLengthPx) * (2f * PI.toFloat()) + phaseOffset
                 val endY = centerY + sin(endAngle) * currentAmplitudePx
                 wavePath.lineTo(progressX, endY)
                 canvas.drawPath(wavePath, wavePaint)
-
-                // 3. Draw thumb at wave end
-                canvas.drawCircle(progressX, endY, thumbRadiusPx, thumbPaint)
             } else {
                 // Flat line when amplitude is 0 (paused)
-                canvas.drawLine(startX, centerY, progressX, centerY, wavePaint)
-                canvas.drawCircle(progressX, centerY, thumbRadiusPx, thumbPaint)
+                wavePath.moveTo(startX, centerY)
+                wavePath.lineTo(progressX, centerY)
+                canvas.drawPath(wavePath, wavePaint)
             }
         }
+
+        // 3. Draw vertical pill thumb (matching Android 13+ QPR / Android 16 scrubber)
+        canvas.drawRoundRect(
+            progressX - thumbWidthPx / 2f,
+            centerY - thumbHeightPx / 2f,
+            progressX + thumbWidthPx / 2f,
+            centerY + thumbHeightPx / 2f,
+            thumbCornerRadiusPx,
+            thumbCornerRadiusPx,
+            thumbPaint
+        )
     }
 }
