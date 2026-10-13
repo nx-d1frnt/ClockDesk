@@ -305,6 +305,34 @@ abstract class BaseM3SettingsFragment : Fragment() {
                 )
             )
         }
+
+        fun batteryStatus(
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true },
+            onToggleManual: ((Boolean) -> Unit)? = null
+        ) {
+            entries.add(
+                SettingsItem.BatteryStatus(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled,
+                    onToggleManual = onToggleManual
+                )
+            )
+        }
+
+        fun turbulencePreview(
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true }
+        ) {
+            entries.add(
+                SettingsItem.TurbulencePreview(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled
+                )
+            )
+        }
     }
 }
 

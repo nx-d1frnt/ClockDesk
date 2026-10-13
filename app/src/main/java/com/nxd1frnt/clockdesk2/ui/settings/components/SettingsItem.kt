@@ -126,6 +126,27 @@ sealed class SettingsItem {
         override val isEnabled: () -> Boolean = { true },
         val onAddFontRequested: (() -> Unit)? = null
     ) : Entry()
+
+    data class BatteryStatus(
+        override val key: String = "power_saver_status_card",
+        override val title: String = "",
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true },
+        val onToggleManual: ((Boolean) -> Unit)? = null
+    ) : Entry()
+
+    data class TurbulencePreview(
+        override val key: String = "graphics_turbulence_preview",
+        override val title: String = "",
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true }
+    ) : Entry()
 }
 
 typealias SettingEntry = SettingsItem.Entry

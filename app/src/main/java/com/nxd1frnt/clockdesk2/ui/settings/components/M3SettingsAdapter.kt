@@ -59,15 +59,25 @@ class M3SettingsAdapter(
         private const val TYPE_SMART_PIXELS_PREVIEW = 7
         private const val TYPE_NOTIFICATION_PREVIEW = 8
         private const val TYPE_NOTIFICATION_APPEARANCE = 9
+        private const val TYPE_BATTERY_STATUS = 10
+        private const val TYPE_TURBULENCE_PREVIEW = 11
 
         private const val PAYLOAD_UPDATE_PREVIEW = "payload_update_notification_preview"
     }
 
     private var displayItems: List<SettingsItem> = emptyList()
     private var isEditingNotificationBg: Boolean = false
+    private var activeTurbulenceView: com.nxd1frnt.clockdesk2.ui.view.TurbulenceView? = null
 
     init {
         updateDisplayList(items)
+    }
+
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
+        if (holder is TurbulencePreviewViewHolder && activeTurbulenceView == holder.turbulenceView) {
+            activeTurbulenceView = null
+        }
     }
 
     fun submitList(newItems: List<SettingsItem>) {
@@ -126,6 +136,8 @@ class M3SettingsAdapter(
             is SettingsItem.SmartPixelsPreview -> TYPE_SMART_PIXELS_PREVIEW
             is SettingsItem.NotificationPreview -> TYPE_NOTIFICATION_PREVIEW
             is SettingsItem.NotificationAppearance -> TYPE_NOTIFICATION_APPEARANCE
+            is SettingsItem.BatteryStatus -> TYPE_BATTERY_STATUS
+            is SettingsItem.TurbulencePreview -> TYPE_TURBULENCE_PREVIEW
         }
     }
 
@@ -142,6 +154,8 @@ class M3SettingsAdapter(
             TYPE_SMART_PIXELS_PREVIEW -> SmartPixelsPreviewViewHolder(inflater.inflate(R.layout.item_settings_smart_pixels_preview, parent, false))
             TYPE_NOTIFICATION_PREVIEW -> NotificationPreviewViewHolder(inflater.inflate(R.layout.item_settings_notification_preview, parent, false))
             TYPE_NOTIFICATION_APPEARANCE -> NotificationAppearanceViewHolder(inflater.inflate(R.layout.item_settings_notification_appearance, parent, false))
+            TYPE_BATTERY_STATUS -> BatteryStatusViewHolder(inflater.inflate(R.layout.item_settings_battery_status, parent, false))
+            TYPE_TURBULENCE_PREVIEW -> TurbulencePreviewViewHolder(inflater.inflate(R.layout.item_settings_turbulence_preview, parent, false))
             else -> throw IllegalArgumentException("Unknown view type $viewType")
         }
     }
@@ -173,6 +187,8 @@ class M3SettingsAdapter(
             is SettingsItem.SmartPixelsPreview -> (holder as SmartPixelsPreviewViewHolder).bind(item, position)
             is SettingsItem.NotificationPreview -> (holder as NotificationPreviewViewHolder).bind(item, position)
             is SettingsItem.NotificationAppearance -> (holder as NotificationAppearanceViewHolder).bind(item, position)
+            is SettingsItem.BatteryStatus -> (holder as BatteryStatusViewHolder).bind(item, position)
+            is SettingsItem.TurbulencePreview -> (holder as TurbulencePreviewViewHolder).bind(item, position)
         }
         UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView)
     }
@@ -435,7 +451,9 @@ class M3SettingsAdapter(
             cardView.alpha = if (isEnabled) 1.0f else 0.38f
 
             val isLivePreviewSlider = entry.key == DeskNotificationHelper.KEY_SCALE ||
-                    entry.key == DeskNotificationHelper.KEY_BG_OPACITY
+                    entry.key == DeskNotificationHelper.KEY_BG_OPACITY ||
+                    entry.key == "graphics_turbulence_grid" ||
+                    entry.key == "graphics_turbulence_speed"
 
             slider.clearOnChangeListeners()
             slider.addOnChangeListener { _, value, fromUser ->
@@ -443,7 +461,11 @@ class M3SettingsAdapter(
                     updateLabel(value)
                     if (isLivePreviewSlider) {
                         writeSliderPreference(entry.key, value, entry.step)
-                        notifyNotificationPreviewChanged()
+                        if (entry.key == DeskNotificationHelper.KEY_SCALE ||
+                            entry.key == DeskNotificationHelper.KEY_BG_OPACITY
+                        ) {
+                            notifyNotificationPreviewChanged()
+                        }
                     }
                 }
             }
@@ -456,9 +478,18 @@ class M3SettingsAdapter(
                     val value = s.value
                     writeSliderPreference(entry.key, value, entry.step)
                     entry.onValueChange?.invoke(value)
-                    notifyNotificationPreviewChanged()
+                    if (entry.key == DeskNotificationHelper.KEY_SCALE ||
+                        entry.key == DeskNotificationHelper.KEY_BG_OPACITY
+                    ) {
+                        notifyNotificationPreviewChanged()
+                    }
                     if (!isLivePreviewSlider) {
                         onPreferenceChanged(entry.key, value)
+                    } else if (entry.key == "graphics_turbulence_grid" || entry.key == "graphics_turbulence_speed") {
+                        if (activeTurbulenceView?.isPlaying == true) {
+                            val primaryColor = UiMonetThemeManager.getPalette(context).primary
+                            activeTurbulenceView?.playAnimation(primaryColor) {}
+                        }
                     }
                 }
             })
@@ -1174,6 +1205,112 @@ class M3SettingsAdapter(
                 .setNegativeButton(context.getString(R.string.cancel), null)
                 .show()
             UiMonetThemeManager.styleAlertDialog(dialog, palette)
+        }
+    }
+
+    inner class BatteryStatusViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val iconView: ImageView = view.findViewById(R.id.battery_status_icon)
+        private val titleView: TextView = view.findViewById(R.id.battery_status_title)
+        private val subtitleView: TextView = view.findViewById(R.id.battery_status_subtitle)
+        private val reasonView: TextView = view.findViewById(R.id.battery_status_reason)
+        private val manualSwitch: MaterialSwitch = view.findViewById(R.id.battery_manual_switch)
+
+        fun bind(entry: SettingsItem.BatteryStatus, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+
+            val batteryFilter = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+            val batteryIntent = context.registerReceiver(null, batteryFilter)
+            val level = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val batteryPct = if (scale > 0) (level.toFloat() / scale.toFloat() * 100).toInt() else 100
+
+            val status = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+            val isFull = status == android.os.BatteryManager.BATTERY_STATUS_FULL
+
+            val isManual = prefs.getBoolean("power_saver_manual", false)
+            val isAutoEnabled = prefs.getBoolean("automatic_battery_saver_mode", false)
+            val threshold = prefs.getInt("battery_saver_trigger", 15)
+            val isSyncSystem = prefs.getBoolean("power_saver_sync_system", true)
+
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            val isSystemPowerSave = isSyncSystem && powerManager?.isPowerSaveMode == true
+            val isAutoActive = isAutoEnabled && batteryPct <= threshold && !isCharging
+
+            val isPowerSaverActive = isManual || isAutoActive || isSystemPowerSave
+
+            if (isPowerSaverActive) {
+                titleView.text = context.getString(R.string.battery_status_active)
+                iconView.setImageResource(R.drawable.ic_battery_saver)
+                val primaryColor = UiMonetThemeManager.getPalette(context).primary
+                iconView.setColorFilter(primaryColor)
+            } else {
+                titleView.text = context.getString(R.string.battery_status_inactive)
+                val iconRes = when {
+                    isCharging -> R.drawable.ic_battery_charging
+                    isFull -> R.drawable.ic_battery_full
+                    batteryPct <= threshold -> R.drawable.ic_battery_alert
+                    else -> R.drawable.ic_battery_full
+                }
+                iconView.setImageResource(iconRes)
+                iconView.clearColorFilter()
+            }
+
+            subtitleView.text = when {
+                isFull -> context.getString(R.string.battery_status_full)
+                isCharging -> context.getString(R.string.battery_status_charging, batteryPct)
+                else -> context.getString(R.string.battery_status_discharging, batteryPct)
+            }
+
+            val reasonText = when {
+                isManual -> context.getString(R.string.battery_status_reason_manual)
+                isSystemPowerSave -> context.getString(R.string.battery_status_reason_system)
+                isAutoActive -> context.getString(R.string.battery_status_reason_auto, threshold)
+                else -> null
+            }
+
+            if (!reasonText.isNullOrBlank()) {
+                reasonView.text = reasonText
+                reasonView.visibility = View.VISIBLE
+            } else {
+                reasonView.visibility = View.GONE
+            }
+
+            manualSwitch.setOnCheckedChangeListener(null)
+            manualSwitch.isChecked = isManual
+            manualSwitch.setOnCheckedChangeListener { _, isChecked ->
+                manualSwitch.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                prefs.edit().putBoolean("power_saver_manual", isChecked).apply()
+                entry.onToggleManual?.invoke(isChecked)
+                onPreferenceChanged("power_saver_manual", isChecked)
+            }
+
+            cardView.setOnClickListener {
+                manualSwitch.toggle()
+            }
+        }
+    }
+
+    inner class TurbulencePreviewViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val btnTest: MaterialButton = view.findViewById(R.id.btn_test_turbulence)
+        val turbulenceView: com.nxd1frnt.clockdesk2.ui.view.TurbulenceView = view.findViewById(R.id.turbulence_preview_view)
+
+        fun bind(entry: SettingsItem.TurbulencePreview, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+            activeTurbulenceView = turbulenceView
+
+            val isEnabled = entry.isEnabled()
+            cardView.isEnabled = isEnabled
+            btnTest.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
+
+            btnTest.setOnClickListener {
+                btnTest.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                val primaryColor = UiMonetThemeManager.getPalette(context).primary
+                turbulenceView.playAnimation(primaryColor) {}
+            }
         }
     }
 }

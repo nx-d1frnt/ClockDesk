@@ -226,12 +226,10 @@ class DisplaySettingsFragment : BaseM3SettingsFragment() {
 class BatterySettingsFragment : BaseM3SettingsFragment() {
     override fun buildSettings(): List<SettingsItem> = settings {
         category(getString(R.string.battery_saver_settings_title)) {
-            switch(
-                key = "power_saver_manual",
-                title = getString(R.string.power_saver_manual_title),
-                summary = getString(R.string.power_saver_manual_summary),
-                iconRes = R.drawable.ic_battery_saver,
-                defaultValue = false
+            batteryStatus(
+                onToggleManual = {
+                    rebuildSettings()
+                }
             )
         }
 
@@ -393,6 +391,10 @@ class PerformanceSettingsFragment : BaseM3SettingsFragment() {
             )
 
             val turbulence = advGraphics && prefs.getBoolean("graphics_enable_turbulence", true)
+
+            turbulencePreview(
+                isVisible = { turbulence }
+            )
 
             slider(
                 key = "graphics_turbulence_grid",

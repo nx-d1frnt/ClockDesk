@@ -71,18 +71,25 @@ class TurbulenceNoiseController(private val turbulenceNoiseView: TurbulenceNoise
         config: TurbulenceNoiseAnimationConfig
     ) {
         if (state != AnimationState.NOT_PLAYING) {
-            return // Ignore if any of the animation is playing.
+            forceFinish()
         }
 
         turbulenceNoiseView.initShader(baseType, config)
         playEaseInAnimation()
     }
 
-    // TODO(b/237282226): Support force finish.
+    /** Immediately stops any running animation and resets to NOT_PLAYING. */
+    fun forceFinish() {
+        turbulenceNoiseView.finish(nextAnimation = null)
+        state = AnimationState.NOT_PLAYING
+    }
+
     /** Finishes the main animation, which triggers the ease-out animation. */
     fun finish() {
         if (state == AnimationState.MAIN) {
             turbulenceNoiseView.finish(nextAnimation = this::playEaseOutAnimation)
+        } else if (state == AnimationState.EASE_IN) {
+            forceFinish()
         }
     }
 
