@@ -47,6 +47,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
     private val renderer: BackgroundRenderer
     private var transitionAnimator: ValueAnimator? = null
+    @Volatile private var transitionVersion = 0L
+    private var isPaused = false
     private var fadeAnimator: ValueAnimator? = null
     private var lastTopColor: Int? = null
     private var lastBottomColor: Int? = null
@@ -129,11 +131,15 @@ class DynamicBackgroundView @JvmOverloads constructor(
             lastBottomColor = null
         }
         currentBitmap = bitmap
+        val version = ++transitionVersion
+        transitionAnimator?.cancel()
         queueEvent {
+            if (version != transitionVersion) return@queueEvent
             val shouldAnimate = renderer.setNextTexture(bitmap, durationMs <= 0, isGradient, scale, offsetX, offsetY)
 
             post {
-                if (shouldAnimate && durationMs > 0) {
+                if (version != transitionVersion) return@post
+                if (shouldAnimate && durationMs > 0 && !isPaused) {
                     transitionAnimator?.cancel()
                     transitionAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
                         duration = durationMs
@@ -418,9 +424,19 @@ class DynamicBackgroundView @JvmOverloads constructor(
     }
 
     override fun onPause() {
-        transitionAnimator?.cancel()
+        isPaused = true
+        transitionAnimator?.end()
+        transitionVersion++
+        queueEvent {
+            renderer.setTransitionProgress(1f)
+        }
         fadeAnimator?.cancel()
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isPaused = false
     }
 
     private class Particle {
