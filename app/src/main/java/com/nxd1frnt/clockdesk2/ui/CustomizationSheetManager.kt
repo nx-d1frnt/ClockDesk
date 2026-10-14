@@ -473,7 +473,15 @@ class CustomizationSheetManager(
         focusedView?.let { view ->
             val scale = if (isHighlighted) 1.05f else 1.0f
             view.animate().scaleX(scale).scaleY(scale).setDuration(animationDuration).start()
-            if (isHighlighted) view.setBackgroundResource(R.drawable.editable_border)
+            if (isHighlighted) {
+                view.setBackgroundResource(R.drawable.editable_border)
+            } else {
+                val inEditMode = widgetManager?.isEditMode == true
+                val isManagedWidget = widgetManager?.getControllerForView(view) != null
+                if (!inEditMode || !isManagedWidget) {
+                    view.background = null
+                }
+            }
         }
     }
 
@@ -484,7 +492,11 @@ class CustomizationSheetManager(
         val isTime = if (features != null) features.contains(WidgetFeature.TIME_FORMAT) else view.id == R.id.time_text
         val isDate = if (features != null) features.contains(WidgetFeature.DATE_FORMAT) else view.id == R.id.date_text
         val isLastFm = if (features != null) features.contains(WidgetFeature.MEDIA_ICON) else view.id == R.id.lastfm_layout
-        val isSmartChip = if (features != null) features.contains(WidgetFeature.BACKGROUND_COLOR) else view.id == R.id.smart_chip_container
+        val isSmartChip = if (features != null) {
+            features.contains(WidgetFeature.CHIP_STACK_OVERFLOW) || controller?.type == com.nxd1frnt.clockdesk2.widgets.DesktopWidgetType.SMART_CHIPS
+        } else {
+            view.id == R.id.smart_chip_container || view.id == R.id.smart_chip_scrollview
+        }
         val isWeather = view.id == R.id.weather_layout
         val showLayoutControls = if (features != null) {
             features.contains(WidgetFeature.HORIZONTAL_ALIGNMENT) || features.contains(WidgetFeature.VERTICAL_ALIGNMENT)

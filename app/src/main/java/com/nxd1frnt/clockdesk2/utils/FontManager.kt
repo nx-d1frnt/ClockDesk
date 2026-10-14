@@ -685,7 +685,10 @@ class FontManager(
         editor.apply()
     }
 
-    fun getSettings(view: View): FontSettings? = settingsMap[view.id]
+    fun getSettings(view: View): FontSettings? {
+        val targetId = if (view.id == R.id.smart_chip_scrollview) R.id.smart_chip_container else view.id
+        return settingsMap[targetId]
+    }
 
     fun setFontIndex(view: View, index: Int) {
         if (index !in fonts.indices || fonts[index] is FontItem.AddNew) return
@@ -729,9 +732,10 @@ class FontManager(
     }
 
     private inline fun updateSettings(viewId: Int, block: (FontSettings) -> Unit) {
-        val settings = settingsMap[viewId] ?: return
+        val targetId = if (viewId == R.id.smart_chip_scrollview) R.id.smart_chip_container else viewId
+        val settings = settingsMap[targetId] ?: return
         block(settings)
-        applyToView(viewId)
+        applyToView(targetId)
         saveSettings()
     }
 
@@ -1283,7 +1287,8 @@ class FontManager(
     }
 
     private fun getTargetColorForView(viewId: Int): Int {
-        val settings = settingsMap[viewId] ?: return Color.WHITE
+        val targetId = if (viewId == R.id.smart_chip_scrollview) R.id.smart_chip_container else viewId
+        val settings = settingsMap[targetId] ?: return Color.WHITE
 
         if (settings.useDynamicColor && currentScheme != null) {
             return getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
@@ -1292,7 +1297,8 @@ class FontManager(
     }
 
     fun getFinalColorForView(viewId: Int): Int {
-        val settings = settingsMap[viewId] ?: return Color.WHITE
+        val targetId = if (viewId == R.id.smart_chip_scrollview) R.id.smart_chip_container else viewId
+        val settings = settingsMap[targetId] ?: return Color.WHITE
         var finalColor = if (settings.useDynamicColor && currentScheme != null) {
             getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
         } else {

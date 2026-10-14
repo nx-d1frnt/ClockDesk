@@ -15,6 +15,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import android.hardware.Sensor
@@ -64,6 +65,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var dynamicBackgroundView: DynamicBackgroundView
     private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var smartChipContainer: ConstraintLayout
+    private lateinit var smartChipScrollView: ScrollView
     // endregion
 
     // region Managers
@@ -302,6 +304,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
         performanceOverlay = findViewById(R.id.performance_overlay)
         smartChipContainer = findViewById(R.id.smart_chip_container)
+        smartChipScrollView = findViewById(R.id.smart_chip_scrollview)
     }
 
     private fun hideUIControls() {
@@ -415,7 +418,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         val dreamShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
         val dreamShiftPx = (dreamShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
         burnInProtectionManager = BurnInProtectionManager(
-            listOf(timeText, dateText, lastfmLayout, smartChipContainer),
+            listOf(timeText, dateText, lastfmLayout, smartChipScrollView),
             maxShiftPx = dreamShiftPx
         )
 

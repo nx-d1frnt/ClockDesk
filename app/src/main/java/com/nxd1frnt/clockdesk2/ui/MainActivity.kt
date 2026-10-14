@@ -38,6 +38,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -157,6 +158,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private lateinit var smartChipManager: SmartChipManager
     private lateinit var chipContainer: ConstraintLayout
+    private lateinit var smartChipScrollView: ScrollView
     private lateinit var widgetMover: WidgetMover
     private lateinit var deskNotificationManager: com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager
     private lateinit var deskCallOverlay: com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay
@@ -443,6 +445,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
         chipContainer = findViewById(R.id.smart_chip_container)
+        smartChipScrollView = findViewById(R.id.smart_chip_scrollview)
         smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
         editModeActionBar = findViewById(R.id.edit_mode_action_bar)
@@ -606,7 +609,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         setupMediaWidgetCallbacks()
 
         val activeViews = desktopWidgetManager.getViews()
-        val movableViews = activeViews.filter { it !== chipContainer }
+        val movableViews = activeViews.filter { it !== smartChipScrollView && it !== chipContainer }
 
         val burnInShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
         val burnInShiftPx = (burnInShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
@@ -625,7 +628,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             )
             setupMediaWidgetCallbacks()
             val currentActiveViews = desktopWidgetManager.getViews()
-            widgetMover.setViews(currentActiveViews.filter { it !== chipContainer })
+            widgetMover.setViews(currentActiveViews.filter { it !== smartChipScrollView && it !== chipContainer })
             burnInProtectionManager.updateViews(currentActiveViews)
             fontManager.loadFont()
             updateEmptyDeskPromptVisibility()
@@ -1026,6 +1029,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         chipContainer.setOnClickListener {
             if (isEditMode) {
                 ensureCustomizationSheetManager().showForView(it)
+                resetEditModeTimeout()
+            }
+        }
+        smartChipScrollView.setOnClickListener {
+            if (isEditMode) {
+                ensureCustomizationSheetManager().showForView(chipContainer)
                 resetEditModeTimeout()
             }
         }
@@ -2527,8 +2536,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             cropController.cancelAndExit()
         }
 
+        if (::customizationSheetManager.isInitialized && customizationSheetManager.isShowing) {
+            customizationSheetManager.hide()
+        }
+
         emptyDeskPrompt.visibility = View.GONE
         desktopWidgetManager.setEditMode(false)
+
+        chipContainer.background = null
+        smartChipScrollView.background = null
 
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
@@ -2573,7 +2589,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
         desktopWidgetManager.bindExistingViews(timeText, dateText, lastfmLayout, chipContainer, weatherLayout)
         val activeViews = desktopWidgetManager.getViews()
-        widgetMover.setViews(activeViews.filter { it !== chipContainer })
+        widgetMover.setViews(activeViews.filter { it !== smartChipScrollView && it !== chipContainer })
         burnInProtectionManager.updateViews(activeViews)
         fontManager.loadFont()
         updateEmptyDeskPromptVisibility()

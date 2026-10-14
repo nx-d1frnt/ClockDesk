@@ -15,7 +15,7 @@ class SmartChipsDesktopWidget(
 ) : DesktopWidgetController(instance, definition, host) {
 
     override var rootView: View? = null
-    val container: LinearLayout? get() = rootView as? LinearLayout
+    val container: View? get() = rootView
 
     var smartChipManager: SmartChipManager? = null
 
