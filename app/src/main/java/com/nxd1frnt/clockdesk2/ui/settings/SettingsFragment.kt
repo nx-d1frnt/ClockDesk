@@ -164,7 +164,9 @@ class DisplaySettingsFragment : BaseM3SettingsFragment() {
             action(
                 key = "open_screensaver_settings",
                 title = getString(R.string.screensaver_settings_title),
-                summary = getString(R.string.screensaver_settings_summary)
+                summary = getString(R.string.screensaver_settings_summary),
+                iconRes = R.drawable.ic_desktop,
+                showChevron = true
             ) {
                 try {
                     startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS))
