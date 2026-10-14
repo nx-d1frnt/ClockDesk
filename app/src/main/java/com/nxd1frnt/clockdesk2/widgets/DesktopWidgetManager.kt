@@ -68,7 +68,11 @@ class DesktopWidgetManager(
         return activeInstances.any { it.type == type }
     }
 
+    var isEditMode: Boolean = false
+        private set
+
     fun setEditMode(isEditMode: Boolean) {
+        this.isEditMode = isEditMode
         activeControllers.values.forEach { it.setEditMode(isEditMode) }
     }
 
