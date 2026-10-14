@@ -44,7 +44,7 @@ object NotificationShadeBottomSheet {
         val palette = UiMonetThemeManager.getPalette(targetContext)
 
         val dialog = BottomSheetDialog(dialogContext)
-        val view = LayoutInflater.from(dialogContext).inflate(R.layout.bottom_sheet_notification_shade, null, false)
+        val view = LayoutInflater.from(dialog.context).inflate(R.layout.bottom_sheet_notification_shade, null, false)
         UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
         dialog.setContentView(view)
 
@@ -91,14 +91,14 @@ object NotificationShadeBottomSheet {
         var isFirstLoad = true
 
         val adapter = NotificationAdapter(
-            context = dialogContext,
+            context = dialog.context,
             deskConnectManager = deskConnectManager,
             onDismissClick = { item ->
                 repository.dismissNotification(item.deviceId, item.notificationId)
             }
         )
 
-        recyclerView.layoutManager = LinearLayoutManager(dialogContext)
+        recyclerView.layoutManager = LinearLayoutManager(dialog.context)
         recyclerView.adapter = adapter
         recyclerView.itemAnimator = NotificationItemAnimator().apply {
             removeDuration = 220

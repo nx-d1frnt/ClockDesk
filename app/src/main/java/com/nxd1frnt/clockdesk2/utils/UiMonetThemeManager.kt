@@ -185,14 +185,14 @@ object UiMonetThemeManager {
             activityContext = activityContext.baseContext
         }
         val base = activityContext ?: context
+        val themed = ContextThemeWrapper(base, R.style.Theme_ClockDesk)
         val seedColor = getActiveSeedColor(base)
         return if (seedColor != null) {
             val options = DynamicColorsOptions.Builder()
                 .setContentBasedSource(seedColor)
                 .build()
-            DynamicColors.wrapContextIfAvailable(base, options)
+            DynamicColors.wrapContextIfAvailable(themed, options)
         } else {
-            val themed = ContextThemeWrapper(base, R.style.Theme_ClockDesk)
             DynamicColors.wrapContextIfAvailable(themed)
         }
     }

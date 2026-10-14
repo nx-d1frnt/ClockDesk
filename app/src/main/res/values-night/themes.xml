@@ -44,6 +44,8 @@
         <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
         <item name="materialButtonToggleGroupStyle">@style/Theme.ClockDesk.Button.ToggleGroup</item>
+        <item name="selectableItemBackgroundBorderless">?android:attr/selectableItemBackgroundBorderless</item>
+        <item name="selectableItemBackground">?android:attr/selectableItemBackground</item>
     </style>
 
     <style name="Theme.ClockDesk.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
