@@ -161,6 +161,20 @@ class DisplaySettingsFragment : BaseM3SettingsFragment() {
         }
 
         category(getString(R.string.display_settings_title)) {
+            action(
+                key = "open_screensaver_settings",
+                title = getString(R.string.screensaver_settings_title),
+                summary = getString(R.string.screensaver_settings_summary),
+                iconRes = R.drawable.ic_desktop,
+                showChevron = true
+            ) {
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_DREAM_SETTINGS))
+                } catch (e: Exception) {
+                    Toast.makeText(requireContext(), R.string.screensaver_settings_not_found, Toast.LENGTH_SHORT).show()
+                }
+            }
+
             switch(
                 key = "burn_in_protection",
                 title = getString(R.string.burn_in_protection_title),

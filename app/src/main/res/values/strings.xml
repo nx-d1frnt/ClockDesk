@@ -277,6 +277,9 @@
     <string name="send_backward">Send to Back</string>
     <string name="bring_forward">Bring to Front</string>
     <string name="display_settings_title">Display Settings</string>
+    <string name="screensaver_settings_title">Screensaver Settings</string>
+    <string name="screensaver_settings_summary">Configure Android system screensaver</string>
+    <string name="screensaver_settings_not_found">Could not open screensaver settings</string>
     <string name="burn_in_protection_title">Burn-in Protection</string>
     <string name="burn_in_protection_summary">Prevent burn-in on OLED screens by moving UI elements periodically</string>
     <string name="system_media_plugin_name">System Media</string>

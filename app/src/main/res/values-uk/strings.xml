@@ -261,6 +261,9 @@
     <string name="send_backward">Відправити назад</string>
     <string name="bring_forward">Вивести вперед</string>
     <string name="display_settings_title">Налаштування відображення</string>
+    <string name="screensaver_settings_title">Системна заставка</string>
+    <string name="screensaver_settings_summary">Налаштування системного скрінсейвера Android</string>
+    <string name="screensaver_settings_not_found">Не вдалося відкрити налаштування заставки</string>
     <string name="burn_in_protection_title">Захист від вигорання</string>
     <string name="burn_in_protection_summary">Запобігти вигоранню на екранах OLED, періодично переміщуючи елементи інтерфейсу</string>
     <string name="system_media_plugin_name">Системні медіа</string>
