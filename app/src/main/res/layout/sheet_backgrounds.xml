@@ -113,7 +113,7 @@
         app:layout_constraintWidth_max="400dp"
         app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.ExtraLarge">
 
-        <androidx.core.widget.NestedScrollView
+        <com.nxd1frnt.clockdesk2.ui.touch.VerticalNestedScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
@@ -417,7 +417,7 @@
                 </LinearLayout>
 
             </FrameLayout>
-        </androidx.core.widget.NestedScrollView>
+        </com.nxd1frnt.clockdesk2.ui.touch.VerticalNestedScrollView>
     </com.google.android.material.card.MaterialCardView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

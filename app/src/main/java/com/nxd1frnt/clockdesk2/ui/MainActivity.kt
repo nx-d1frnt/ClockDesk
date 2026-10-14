@@ -87,6 +87,7 @@ import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.EntranceAnimationManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.utils.ForegroundStateDispatcher
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
@@ -170,6 +171,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     // State Variables
     private var musicManager: MusicPluginManager? = null
     private var currentMusicState: PluginState = PluginState.Idle
+    private val musicStateUpdates = ForegroundStateDispatcher<PluginState> { applyMusicStateUpdate(it) }
     private var lastTrackInfo: String? = null
     private var wasMusicBackgroundApplied = false
     private var currentAppliedArtworkSource: Any? = null
@@ -199,6 +201,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private var previewBackgroundUri: String? = null
     private var lastBackgroundSource: Any? = null
     private var lastBlurIntensity: Int? = null
+    private data class BackgroundLoad(
+        val model: Any,
+        val blurIntensity: Int,
+        val skipAnimation: Boolean,
+        val onComplete: (() -> Unit)?
+    )
+    private val backgroundLoads = ForegroundStateDispatcher<BackgroundLoad> {
+        performBackgroundLoad(it.model, it.blurIntensity, it.skipAnimation, it.onComplete)
+    }
+    private var backgroundRequestId = 0L
+    private var isBackgroundLoading = false
+    private var activeBackgroundTarget: CustomTarget<Bitmap>? = null
+    private var activeEditBackgroundTarget: CustomTarget<Drawable>? = null
     private var isAdvancedGraphicsEnabled = false
     private var isGraphicsTransitionsEnabled = true
     private var isGraphicsTurbulenceEnabled = true
@@ -1333,6 +1348,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     override fun onDestroy() {
+        musicStateUpdates.pause()
+        musicStateUpdates.clear()
+        backgroundLoads.pause()
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
         super.onDestroy()
         weatherGetter.stopUpdates()
         musicManager?.destroy()
@@ -1505,7 +1525,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun handleMusicStateUpdate(state: PluginState) {
+        if (isDestroyed || isFinishing) return
         currentMusicState = state
+        musicStateUpdates.submit(state)
+    }
+
+    private fun applyMusicStateUpdate(state: PluginState) {
         val isMediaActive = ::desktopWidgetManager.isInitialized && desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.MEDIA)
 
         if (state is PluginState.Playing) {
@@ -1576,6 +1601,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun performMusicIdleState() {
+        if (!isResumed) return
         pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
         pendingBackgroundRestoreRunnable = null
 
@@ -1920,6 +1946,28 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun loadBackgroundInternal(model: Any, blurIntensity: Int, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        if (isFinishing || isDestroyed) return
+        backgroundLoads.submit(BackgroundLoad(model, blurIntensity, skipAnimation, onComplete))
+    }
+
+    private fun cancelBackgroundLoads(clearEditBackground: Boolean = true) {
+        backgroundRequestId++
+        activeBackgroundTarget?.let {
+            activeBackgroundTarget = null
+            GlideApp.with(this).clear(it)
+        }
+        if (clearEditBackground) {
+            activeEditBackgroundTarget?.let {
+                activeEditBackgroundTarget = null
+                GlideApp.with(this).clear(it)
+            }
+        }
+    }
+
+    private fun isBackgroundRequestCurrent(requestId: Long): Boolean =
+        requestId == backgroundRequestId && isResumed && !isFinishing && !isDestroyed
+
+    private fun performBackgroundLoad(model: Any, blurIntensity: Int, skipAnimation: Boolean, onComplete: (() -> Unit)?) {
         if (isFinishing) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
         
@@ -1929,6 +1977,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
         
         val isSourceChanged = !areArtworkSourcesEqual(lastBackgroundSource, model)
+
+        cancelBackgroundLoads()
+        val requestId = backgroundRequestId
+        isBackgroundLoading = true
         
         lastBackgroundSource = model
         lastBlurIntensity = blurIntensity
@@ -1992,7 +2044,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             if (blurIntensity > 0) {
                 req = req.transform(
                     BlurTransformation(this, blurIntensity, 1) {
-                        if (!isDestroyed && !isFinishing) {
+                        if (isBackgroundRequestCurrent(requestId)) {
                             val blurMsg = getString(R.string.stage_blurring_detail, blurIntensity)
                             updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING, blurMsg)
                         }
@@ -2000,17 +2052,33 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 )
             }
 
+            val requestManager = GlideApp.with(this)
             val mainTarget = object : CustomTarget<Bitmap>() {
                 override fun onResourceReady(
-                    bitmap: Bitmap,
+                    resource: Bitmap,
                     transition: Transition<in Bitmap>?
                 ) {
+                    if (!isBackgroundRequestCurrent(requestId)) return
+                    // The renderer and color extractor outlive Glide's target. Own their bitmap
+                    // so clearing a superseded request cannot recycle an image they still use.
+                    val bitmap = resource.copy(Bitmap.Config.ARGB_8888, false)
+                    if (bitmap == null) {
+                        onLoadFailed(null)
+                        return
+                    }
+                    activeBackgroundTarget = null
+                    // Glide forbids clearing the request from inside its own target callback.
+                    handler.post { requestManager.clear(this) }
                     if (isSourceChanged) {
                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.EXTRACTING_COLORS)
 
                         Thread {
                             ColorExtractor.extractColor(bitmap) { seedColor ->
                                 handler.post {
+                                    if (!isBackgroundRequestCurrent(requestId)) {
+                                        bitmap.recycle()
+                                        return@post
+                                    }
                                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
 
                                     fontManager.setDynamicScheme(seedColor)
@@ -2044,7 +2112,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                         true
                                     )
 
-                                    onComplete?.invoke()
+                                    isBackgroundLoading = false
 
                                     updateBackgroundFilters()
 
@@ -2056,6 +2124,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                             .setDuration(1200)
                                             .setListener(object : AnimatorListenerAdapter() {
                                                 override fun onAnimationEnd(animation: Animator) {
+                                                    if (!isBackgroundRequestCurrent(requestId)) return
                                                     isScaleAnimating = false
                                                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
                                                 }
@@ -2066,6 +2135,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                         isScaleAnimating = false
                                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
                                     }
+                                    onComplete?.invoke()
                                 }
                             }
                         }.start()
@@ -2081,33 +2151,44 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
                         updateBackgroundFilters()
                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
+                        isBackgroundLoading = false
                         onComplete?.invoke()
                     }
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    BackgroundProgressPlugin.reset()
+                    // No borrowed Glide bitmap is retained after onResourceReady.
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
+                    if (!isBackgroundRequestCurrent(requestId)) return
                     super.onLoadFailed(errorDrawable)
+                    activeBackgroundTarget = null
+                    handler.post { requestManager.clear(this) }
+                    isBackgroundLoading = false
+                    lastBackgroundSource = null
+                    lastBlurIntensity = null
                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
                     Logger.w("MainActivity") {"Glide failed to load background: $model"}
                     isScaleAnimating = false
 
                     onComplete?.invoke()
 
-                    try {
-                        val savedUri = backgroundManager.getSavedBackgroundUri()
-                        if (model.toString() != savedUri) {
-                            restoreUserBackground(savedUri)
+                    handler.post {
+                        if (!isBackgroundRequestCurrent(requestId)) return@post
+                        try {
+                            val savedUri = backgroundManager.getSavedBackgroundUri()
+                            if (model.toString() != savedUri) {
+                                restoreUserBackground(savedUri)
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("MainActivity"){"Failed to restore user background: ${e.message}"}
                         }
-                    } catch (e: Exception) {
-                        Logger.e("MainActivity"){"Failed to restore user background: ${e.message}"}
                     }
                 }
 
                 override fun onLoadStarted(placeholder: Drawable?) {
+                    if (!isBackgroundRequestCurrent(requestId)) return
                     super.onLoadStarted(placeholder)
                     val initialStage = when {
                         model is Uri && (model.scheme == "http" || model.scheme == "https") -> BackgroundProgressPlugin.Stage.DOWNLOADING
@@ -2118,6 +2199,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 }
             }
 
+            activeBackgroundTarget = mainTarget
             GlideApp.with(this)
                 .asBitmap()
                 .load(model)
@@ -2132,6 +2214,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
 
         } catch (e: Exception) {
+            if (!isBackgroundRequestCurrent(requestId)) return
+            isBackgroundLoading = false
             updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
             Logger.e("MainActivity"){"loadBackgroundInternal failed: ${e.message}"}
             onComplete?.invoke()
@@ -2150,6 +2234,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 resource: Drawable,
                 transition: Transition<in Drawable>?
             ) {
+                if (activeEditBackgroundTarget !== this || isDestroyed || isFinishing) return
                 editModeBlurLayer.setImageDrawable(resource)
                 updateBackgroundFilters()
             }
@@ -2158,6 +2243,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
         }
 
+        activeEditBackgroundTarget = editTarget
         GlideApp.with(this)
             .load(model)
             .apply(ambientReq)
@@ -2658,6 +2744,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         startUpdates()
         val showPerformance = prefs.getBoolean("show_performance_overlay", false)
         togglePerformanceOverlay(showPerformance)
+        // Choose the current music background before resuming any interrupted image load.
+        musicStateUpdates.resume()
+        backgroundLoads.resume()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -2812,6 +2901,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun restoreGradientBackground() {
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
+        isBackgroundLoading = false
         lastBackgroundSource = null
         currentAppliedArtworkSource = null
         wasMusicBackgroundApplied = false
@@ -2858,8 +2950,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     override fun onPause() {
         super.onPause()
         isResumed = false
+        musicStateUpdates.pause(replayLatest = true)
+        backgroundLoads.pause(replayLatest = isBackgroundLoading)
+        if (isBackgroundLoading) {
+            lastBackgroundSource = null
+            lastBlurIntensity = null
+        }
+        isBackgroundLoading = false
+        cancelBackgroundLoads(clearEditBackground = false)
+        pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
+        pendingRestoreRunnable = null
+        pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
+        pendingBackgroundRestoreRunnable = null
         updateSensorRegistration()
         if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.animate().setListener(null).cancel()
+            dynamicBackgroundView.alpha = 1f
+            isScaleAnimating = false
             dynamicBackgroundView.onPause()
         }
         burnInProtectionManager.stop()

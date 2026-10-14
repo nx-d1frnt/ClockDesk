@@ -9,7 +9,7 @@
     android:clickable="true"
     android:focusable="true">
 
-    <androidx.core.widget.NestedScrollView
+    <com.nxd1frnt.clockdesk2.ui.touch.VerticalNestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -1293,7 +1293,7 @@
             </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </com.nxd1frnt.clockdesk2.ui.touch.VerticalNestedScrollView>
 
     <!-- Нижняя панель с кнопками -->
     <LinearLayout
