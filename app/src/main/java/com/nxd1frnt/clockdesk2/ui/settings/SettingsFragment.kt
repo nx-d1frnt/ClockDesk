@@ -1,6 +1,11 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.text.InputType
 import android.widget.Toast
@@ -147,6 +152,43 @@ class MusicSettingsFragment : BaseM3SettingsFragment() {
 }
 
 class DisplaySettingsFragment : BaseM3SettingsFragment() {
+    private var sensorManager: SensorManager? = null
+    private var lightSensor: Sensor? = null
+    private var currentLux: Float? = null
+    private var hasLightSensor: Boolean = true
+
+    private val sensorEventListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (event?.sensor?.type == Sensor.TYPE_LIGHT) {
+                val lux = event.values.getOrNull(0) ?: return
+                currentLux = lux
+                updateLightLevel(lux)
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val sm = requireContext().getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        sensorManager = sm
+        lightSensor = sm?.getDefaultSensor(Sensor.TYPE_LIGHT)
+        hasLightSensor = (lightSensor != null)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lightSensor?.let { sensor ->
+            sensorManager?.registerListener(sensorEventListener, sensor, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onPause() {
+        sensorManager?.unregisterListener(sensorEventListener)
+        super.onPause()
+    }
+
     override fun buildSettings(): List<SettingsItem> = settings {
         category(getString(R.string.appearance)) {
             switch(
@@ -232,6 +274,14 @@ class DisplaySettingsFragment : BaseM3SettingsFragment() {
                 defaultValue = 5f,
                 valueFormatter = { "${it.toInt()} lx" },
                 isEnabled = { prefs.getString("brightness_mode", "system") == "smart_night" }
+            )
+
+            lightLevel(
+                title = getString(R.string.current_light_level_title),
+                summary = getString(R.string.current_light_level_summary),
+                iconRes = R.drawable.ic_light_mode,
+                luxValue = currentLux,
+                hasSensor = hasLightSensor
             )
         }
     }

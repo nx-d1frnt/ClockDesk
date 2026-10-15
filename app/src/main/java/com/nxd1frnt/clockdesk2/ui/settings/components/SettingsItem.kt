@@ -147,6 +147,18 @@ sealed class SettingsItem {
         override val isVisible: () -> Boolean = { true },
         override val isEnabled: () -> Boolean = { true }
     ) : Entry()
+
+    data class LightLevel(
+        override val key: String = "current_light_level",
+        override val title: String,
+        override val summary: String? = null,
+        override val iconRes: Int? = null,
+        var luxValue: Float? = null,
+        val hasSensor: Boolean = true,
+        override val groupId: Int = 0,
+        override val isVisible: () -> Boolean = { true },
+        override val isEnabled: () -> Boolean = { true }
+    ) : Entry()
 }
 
 typealias SettingEntry = SettingsItem.Entry

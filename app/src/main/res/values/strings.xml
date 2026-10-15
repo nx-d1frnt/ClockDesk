@@ -483,6 +483,10 @@
     <string name="smart_night_min_brightness_summary">Preferred brightness level when dimmed in bedtime conditions</string>
     <string name="smart_night_lux_threshold_title">Ambient Lux Threshold</string>
     <string name="smart_night_lux_threshold_summary">Ambient light level (lux) below which night dimming activates</string>
+    <string name="current_light_level_title">Current Light Level</string>
+    <string name="current_light_level_summary">Real-time reading from ambient light sensor</string>
+    <string name="light_sensor_unavailable">Sensor unavailable</string>
+    <string name="light_sensor_measuring">Measuring…</string>
 
     <!-- Weather Details Dialog -->
     <string name="weather_dialog_title">Weather Details</string>

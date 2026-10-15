@@ -69,6 +69,14 @@ abstract class BaseM3SettingsFragment : Fragment() {
         }
     }
 
+    fun isAdapterInitialized(): Boolean = ::adapter.isInitialized
+
+    fun updateLightLevel(lux: Float) {
+        if (::adapter.isInitialized) {
+            adapter.updateLightLevel(lux)
+        }
+    }
+
     fun scheduleRebuild(delayMs: Long = 250L) {
         view?.removeCallbacks(rebuildRunnable)
         view?.postDelayed(rebuildRunnable, delayMs)
@@ -327,6 +335,31 @@ abstract class BaseM3SettingsFragment : Fragment() {
         ) {
             entries.add(
                 SettingsItem.TurbulencePreview(
+                    groupId = groupId,
+                    isVisible = isVisible,
+                    isEnabled = isEnabled
+                )
+            )
+        }
+
+        fun lightLevel(
+            key: String = "current_light_level",
+            title: String,
+            summary: String? = null,
+            iconRes: Int? = null,
+            luxValue: Float? = null,
+            hasSensor: Boolean = true,
+            isVisible: () -> Boolean = { true },
+            isEnabled: () -> Boolean = { true }
+        ) {
+            entries.add(
+                SettingsItem.LightLevel(
+                    key = key,
+                    title = title,
+                    summary = summary,
+                    iconRes = iconRes,
+                    luxValue = luxValue,
+                    hasSensor = hasSensor,
                     groupId = groupId,
                     isVisible = isVisible,
                     isEnabled = isEnabled

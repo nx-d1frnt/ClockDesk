@@ -48,5 +48,10 @@
             android:max="50"
             android:defaultValue="5"
             app:showSeekBarValue="true" />
+
+        <androidx.preference.Preference
+            app:key="current_light_level"
+            app:title="@string/current_light_level_title"
+            app:summary="@string/current_light_level_summary" />
     </androidx.preference.PreferenceCategory>
 </androidx.preference.PreferenceScreen>

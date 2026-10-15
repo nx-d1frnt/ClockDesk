@@ -453,6 +453,10 @@
     <string name="smart_night_min_brightness_summary">Предпочтительный уровень яркости при затемнении ночью</string>
     <string name="smart_night_lux_threshold_title">Порог освещенности (lux)</string>
     <string name="smart_night_lux_threshold_summary">Уровень освещенности (люкс), ниже которого включается ночное затемнение</string>
+    <string name="current_light_level_title">Текущий уровень освещенности</string>
+    <string name="current_light_level_summary">Показания датчика освещенности в реальном времени</string>
+    <string name="light_sensor_unavailable">Датчик недоступен</string>
+    <string name="light_sensor_measuring">Измерение…</string>
 
     <!-- Weather Details Dialog -->
     <string name="weather_dialog_title">Детали погоды</string>

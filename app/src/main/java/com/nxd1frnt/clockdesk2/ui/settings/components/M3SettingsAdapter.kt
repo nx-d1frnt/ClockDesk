@@ -61,6 +61,7 @@ class M3SettingsAdapter(
         private const val TYPE_NOTIFICATION_APPEARANCE = 9
         private const val TYPE_BATTERY_STATUS = 10
         private const val TYPE_TURBULENCE_PREVIEW = 11
+        private const val TYPE_LIGHT_LEVEL = 12
 
         private const val PAYLOAD_UPDATE_PREVIEW = "payload_update_notification_preview"
     }
@@ -89,6 +90,15 @@ class M3SettingsAdapter(
         val index = displayItems.indexOfFirst { it is SettingsItem.NotificationPreview }
         if (index != -1) {
             notifyItemChanged(index, if (animatePosition) "animate" else PAYLOAD_UPDATE_PREVIEW)
+        }
+    }
+
+    fun updateLightLevel(lux: Float) {
+        val index = displayItems.indexOfFirst { it is SettingsItem.LightLevel }
+        if (index != -1) {
+            val item = displayItems[index] as? SettingsItem.LightLevel ?: return
+            item.luxValue = lux
+            notifyItemChanged(index, lux)
         }
     }
 
@@ -138,6 +148,7 @@ class M3SettingsAdapter(
             is SettingsItem.NotificationAppearance -> TYPE_NOTIFICATION_APPEARANCE
             is SettingsItem.BatteryStatus -> TYPE_BATTERY_STATUS
             is SettingsItem.TurbulencePreview -> TYPE_TURBULENCE_PREVIEW
+            is SettingsItem.LightLevel -> TYPE_LIGHT_LEVEL
         }
     }
 
@@ -156,6 +167,7 @@ class M3SettingsAdapter(
             TYPE_NOTIFICATION_APPEARANCE -> NotificationAppearanceViewHolder(inflater.inflate(R.layout.item_settings_notification_appearance, parent, false))
             TYPE_BATTERY_STATUS -> BatteryStatusViewHolder(inflater.inflate(R.layout.item_settings_battery_status, parent, false))
             TYPE_TURBULENCE_PREVIEW -> TurbulencePreviewViewHolder(inflater.inflate(R.layout.item_settings_turbulence_preview, parent, false))
+            TYPE_LIGHT_LEVEL -> LightLevelViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
             else -> throw IllegalArgumentException("Unknown view type $viewType")
         }
     }
@@ -165,11 +177,20 @@ class M3SettingsAdapter(
         position: Int,
         payloads: MutableList<Any>
     ) {
-        if (payloads.isNotEmpty() && holder is NotificationPreviewViewHolder) {
-            val item = displayItems[position] as? SettingsItem.NotificationPreview
-            if (item != null) {
-                holder.updatePreview(item, playEntrance = payloads.contains("animate"))
-                return
+        if (payloads.isNotEmpty()) {
+            if (holder is NotificationPreviewViewHolder) {
+                val item = displayItems[position] as? SettingsItem.NotificationPreview
+                if (item != null) {
+                    holder.updatePreview(item, playEntrance = payloads.contains("animate"))
+                    return
+                }
+            } else if (holder is LightLevelViewHolder) {
+                val item = displayItems[position] as? SettingsItem.LightLevel
+                if (item != null) {
+                    val lux = payloads.firstOrNull { it is Float } as? Float ?: item.luxValue
+                    holder.updateValues(item.hasSensor, lux, item.summary)
+                    return
+                }
             }
         }
         super.onBindViewHolder(holder, position, payloads)
@@ -189,6 +210,7 @@ class M3SettingsAdapter(
             is SettingsItem.NotificationAppearance -> (holder as NotificationAppearanceViewHolder).bind(item, position)
             is SettingsItem.BatteryStatus -> (holder as BatteryStatusViewHolder).bind(item, position)
             is SettingsItem.TurbulencePreview -> (holder as TurbulencePreviewViewHolder).bind(item, position)
+            is SettingsItem.LightLevel -> (holder as LightLevelViewHolder).bind(item, position)
         }
         UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView)
     }
@@ -1310,6 +1332,64 @@ class M3SettingsAdapter(
                 btnTest.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 val primaryColor = UiMonetThemeManager.getPalette(context).primary
                 turbulenceView.playAnimation(primaryColor) {}
+            }
+        }
+    }
+
+    inner class LightLevelViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val cardView = view as MaterialCardView
+        private val titleView: TextView = view.findViewById(R.id.item_title)
+        private val summaryView: TextView = view.findViewById(R.id.item_summary)
+        private val iconView: ImageView = view.findViewById(R.id.item_icon)
+        private val statusView: TextView = view.findViewById(R.id.item_status_text)
+        private val chevronView: ImageView = view.findViewById(R.id.item_chevron)
+
+        fun bind(entry: SettingsItem.LightLevel, position: Int) {
+            applyCardShapeAndMargin(cardView, position)
+
+            titleView.text = entry.title
+            if (entry.iconRes != null) {
+                iconView.setImageResource(entry.iconRes)
+                iconView.visibility = View.VISIBLE
+            } else {
+                iconView.visibility = View.GONE
+            }
+
+            chevronView.visibility = View.GONE
+            cardView.isClickable = false
+            cardView.isFocusable = false
+
+            val isEnabled = entry.isEnabled()
+            cardView.isEnabled = isEnabled
+            cardView.alpha = if (isEnabled) 1.0f else 0.38f
+
+            updateValues(entry.hasSensor, entry.luxValue, entry.summary)
+        }
+
+        fun updateValues(hasSensor: Boolean, lux: Float?, defaultSummary: String?) {
+            if (!hasSensor) {
+                summaryView.text = context.getString(R.string.light_sensor_unavailable)
+                summaryView.visibility = View.VISIBLE
+                statusView.text = "—"
+                statusView.visibility = View.VISIBLE
+            } else if (lux != null) {
+                if (!defaultSummary.isNullOrBlank()) {
+                    summaryView.text = defaultSummary
+                    summaryView.visibility = View.VISIBLE
+                } else {
+                    summaryView.visibility = View.GONE
+                }
+                statusView.text = if (lux < 10f) {
+                    String.format(java.util.Locale.US, "%.1f lx", lux)
+                } else {
+                    "${lux.toInt()} lx"
+                }
+                statusView.visibility = View.VISIBLE
+            } else {
+                summaryView.text = context.getString(R.string.light_sensor_measuring)
+                summaryView.visibility = View.VISIBLE
+                statusView.text = "… lx"
+                statusView.visibility = View.VISIBLE
             }
         }
     }
