@@ -41,6 +41,7 @@ class BackgroundSheetManager(
     private val onPreviewImage: (Uri, blur: Int) -> Unit,
     private val onPreviewBlur: (blur: Int) -> Unit,
     private val onPreviewGradient: () -> Unit,
+    private val onPreviewSolidColor: ((Int) -> Unit)? = null,
     private val onPreviewMusicAlbumArt: (enabled: Boolean, blur: Int) -> Unit,
     private val onRestoreOriginalState: () -> Unit,
     private val onUpdateFilters: (Int?, Int?, Int?, Int?, Boolean?, Boolean?) -> Unit,
@@ -110,32 +111,108 @@ class BackgroundSheetManager(
             floatingMenuView.context,
             mutableListOf(),
             onClick = { id ->
+                Logger.i("BackgroundSheet") { "Background item clicked: id='$id', previousPreview='$previewBackgroundUri'" }
                 if (id == "__ADD__") {
                     onAddBackgroundRequested()
                     return@BackgroundsAdapter
                 }
+
+                if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val isAlreadySelected = (previewBackgroundUri == id)
+                    previewBackgroundUri = id
+                    updateProviderCapabilities(id)
+                    val solidProvider = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+                    val currentColor = solidProvider.getColor(floatingMenuView.context)
+                    Logger.i("BackgroundSheet") { "Solid color item clicked. isAlreadySelected=$isAlreadySelected, currentColor=#${String.format("%06X", 0xFFFFFF and currentColor)}" }
+                    if (isAlreadySelected) {
+                        com.nxd1frnt.clockdesk2.ui.dialog.SolidColorPickerDialog.show(
+                            floatingMenuView.context,
+                            currentColor
+                        ) { newColor ->
+                            Logger.i("BackgroundSheet") { "New solid color selected from dialog: #${String.format("%06X", 0xFFFFFF and newColor)}" }
+                            solidProvider.setColor(floatingMenuView.context, newColor)
+                            onPreviewSolidColor?.invoke(newColor)
+                            backgroundsAdapter?.notifyDataSetChanged()
+                        }
+                    } else {
+                        onPreviewSolidColor?.invoke(currentColor)
+                    }
+                    updateCropButtonVisibility(false)
+                    return@BackgroundsAdapter
+                }
+
                 previewBackgroundUri = id
+                updateProviderCapabilities(id)
 
                 when (id) {
-                    "__DEFAULT_GRADIENT__" -> {
+                    "__DEFAULT_GRADIENT__",
+                    com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
+                        Logger.i("BackgroundSheet") { "onItemClick: Default gradient selected" }
                         previewTask?.let { floatingMenuView.removeCallbacks(it) }
                         onPreviewGradient()
                         updateCropButtonVisibility(false)
                     }
                     else -> {
-                        previewTask?.let { floatingMenuView.removeCallbacks(it) }
-                        try {
-                            val uri = Uri.parse(id)
-                            val intensity = bgBlurSeek.value.toInt()
-                            onPreviewImage(uri, intensity)
-                            updateCropButtonVisibility(true)
-                        } catch (e: Exception) {
-                            Logger.e("BackgroundSheetManager") { "Error selecting background: $id - ${e.message}" }
+                        if (id.startsWith("external:")) {
+                            Logger.i("BackgroundSheet") { "onItemClick: External provider selected: $id" }
+                            updateCropButtonVisibility(false)
+                        } else {
+                            previewTask?.let { floatingMenuView.removeCallbacks(it) }
+                            try {
+                                val uri = Uri.parse(id)
+                                val intensity = bgBlurSeek.value.toInt()
+                                Logger.i("BackgroundSheet") { "onItemClick: Image selected: $id, blur=$intensity" }
+                                onPreviewImage(uri, intensity)
+                                updateCropButtonVisibility(true)
+                            } catch (e: Exception) {
+                                Logger.e("BackgroundSheetManager") { "Error selecting background: $id - ${e.message}" }
+                            }
                         }
                     }
                 }
             },
             onLongClick = { id ->
+                if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val solidProvider = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+                    com.nxd1frnt.clockdesk2.ui.dialog.SolidColorPickerDialog.show(
+                        floatingMenuView.context,
+                        solidProvider.getColor(floatingMenuView.context)
+                    ) { newColor ->
+                        solidProvider.setColor(floatingMenuView.context, newColor)
+                        previewBackgroundUri = id
+                        backgroundsAdapter?.selectedId = id
+                        onPreviewSolidColor?.invoke(newColor)
+                        backgroundsAdapter?.notifyDataSetChanged()
+                    }
+                    return@BackgroundsAdapter
+                }
+
+                if (id.startsWith("external:")) {
+                    val plugin = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                        .getExternalProviders().firstOrNull { it.id == id }
+                    if (plugin != null) {
+                        val context = UiMonetThemeManager.wrapContext(floatingMenuView.context)
+                        val builder = MaterialAlertDialogBuilder(context)
+                            .setTitle(plugin.displayName)
+                            .setMessage(plugin.description)
+                            .setPositiveButton(context.getString(android.R.string.ok)) { d, _ -> d.dismiss() }
+                        if (!plugin.settingsActivity.isNullOrEmpty()) {
+                            builder.setNeutralButton(R.string.settings_title) { d, _ ->
+                                try {
+                                    val intent = android.content.Intent().setClassName(plugin.packageName, plugin.settingsActivity)
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Logger.e("BackgroundSheetManager") { "Failed to launch plugin settings: ${e.message}" }
+                                }
+                                d.dismiss()
+                            }
+                        }
+                        val dialog = builder.show()
+                        UiMonetThemeManager.styleAlertDialog(dialog)
+                    }
+                    return@BackgroundsAdapter
+                }
+
                 val context = UiMonetThemeManager.wrapContext(floatingMenuView.context)
                 val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_background_title))
@@ -154,6 +231,33 @@ class BackgroundSheetManager(
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
                 UiMonetThemeManager.styleAlertDialog(dialog)
+            },
+            onSettingsClick = { id ->
+                Logger.i("BackgroundSheet") { "onSettingsClick: id='$id'" }
+                if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val solidProvider = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+                    com.nxd1frnt.clockdesk2.ui.dialog.SolidColorPickerDialog.show(
+                        floatingMenuView.context,
+                        solidProvider.getColor(floatingMenuView.context)
+                    ) { newColor ->
+                        solidProvider.setColor(floatingMenuView.context, newColor)
+                        previewBackgroundUri = id
+                        backgroundsAdapter?.selectedId = id
+                        onPreviewSolidColor?.invoke(newColor)
+                        backgroundsAdapter?.notifyDataSetChanged()
+                    }
+                } else if (id.startsWith("external:")) {
+                    val plugin = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                        .getExternalProviders().firstOrNull { it.id == id }
+                    if (plugin != null && !plugin.settingsActivity.isNullOrEmpty()) {
+                        try {
+                            val intent = android.content.Intent().setClassName(plugin.packageName, plugin.settingsActivity)
+                            floatingMenuView.context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Logger.e("BackgroundSheetManager") { "Failed to launch plugin settings: ${e.message}" }
+                        }
+                    }
+                }
             }
         )
         bgRecycler.adapter = backgroundsAdapter
@@ -320,6 +424,7 @@ class BackgroundSheetManager(
     }
 
     fun show() {
+        Logger.i("BackgroundSheet") { "show() called. ActiveProvider='${com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getActiveProviderId()}', SavedUri='${backgroundManager.getSavedBackgroundUri()}'" }
         isApplying = false
         initialMusicAlbumArtEnabled = backgroundManager.isMusicAlbumArtEnabled()
         loadCurrentSettings()
@@ -382,6 +487,7 @@ class BackgroundSheetManager(
     }
 
     fun cancelAndHide() {
+        Logger.i("BackgroundSheet") { "cancelAndHide() called. isApplying=$isApplying, previewBackgroundUri=$previewBackgroundUri" }
         if (!isApplying) {
             backgroundManager.setMusicAlbumArtEnabled(initialMusicAlbumArtEnabled)
             onRestoreOriginalState()
@@ -417,14 +523,23 @@ class BackgroundSheetManager(
         val currentPreview = previewBackgroundUri
         if (currentPreview != null) {
             backgroundsAdapter?.selectedId = currentPreview
-            updateCropButtonVisibility(currentPreview != "__DEFAULT_GRADIENT__")
+            updateCropButtonVisibility(currentPreview != "__DEFAULT_GRADIENT__" && currentPreview != com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID && !currentPreview.startsWith("external:"))
+            updateProviderCapabilities(currentPreview)
         } else if (isMusic) {
             backgroundsAdapter?.selectedId = null
             updateCropButtonVisibility(false)
+            updateProviderCapabilities(null)
         } else {
-            backgroundsAdapter?.selectedId = savedUri ?: "__DEFAULT_GRADIENT__"
-            val hasCustom = savedUri != null && savedUri != "__DEFAULT_GRADIENT__"
+            val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getActiveProviderId()
+            val selected = when (activeProviderId) {
+                com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> activeProviderId
+                com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> "__DEFAULT_GRADIENT__"
+                else -> savedUri ?: "__DEFAULT_GRADIENT__"
+            }
+            backgroundsAdapter?.selectedId = selected
+            val hasCustom = selected != "__DEFAULT_GRADIENT__" && selected != com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID && !selected.startsWith("external:")
             updateCropButtonVisibility(hasCustom)
+            updateProviderCapabilities(selected)
         }
 
         bgRecycler.scrollToPosition(0)
@@ -485,6 +600,7 @@ class BackgroundSheetManager(
     }
 
     private fun applyBackgroundSettings() {
+        Logger.i("BackgroundSheet") { "applyBackgroundSettings() called. previewBackgroundUri=$previewBackgroundUri" }
         val blur = bgBlurSeek.value.toInt()
         backgroundManager.setBlurIntensity(blur)
 
@@ -624,10 +740,32 @@ class BackgroundSheetManager(
     private fun updateAdapterItems() {
         val items = mutableListOf<String>().apply {
             add("__DEFAULT_GRADIENT__")
+            add(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID)
+            val externalPlugins = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getExternalProviders()
+            externalPlugins.forEach { add(it.id) }
             addAll(backgroundManager.getSavedUriSet())
             add("__ADD__")
         }
         backgroundsAdapter?.updateItems(items)
+    }
+
+    private fun updateProviderCapabilities(providerId: String?) {
+        val provider = when (providerId) {
+            com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID ->
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+            "__DEFAULT_GRADIENT__",
+            com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID ->
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).gradientProvider
+            else ->
+                if (providerId != null && providerId.startsWith("external:")) {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                        .getExternalProviders().firstOrNull { it.id == providerId }
+                } else {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).imageProvider
+                }
+        }
+        val caps = provider?.capabilities ?: com.nxd1frnt.clockdesk2.background.provider.ProviderCapabilities()
+        bgBlurSeek.isEnabled = caps.supportsBlur
     }
 
     fun updateCropButtonVisibility(hasCustomBackground: Boolean) {

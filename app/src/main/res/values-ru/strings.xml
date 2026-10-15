@@ -723,4 +723,13 @@
     <string name="permission_unknown_apps_required">Разрешите ClockDesk устанавливать приложения для выполнения обновления.</string>
     <string name="ui_monet_from_background_title">Цвета интерфейса из фона</string>
     <string name="ui_monet_from_background_summary">Окрашивать меню и настройки в цвета Monet, извлеченные из текущего фона или обложки трека</string>
+    <string name="background_provider_solid_color">Сплошной цвет</string>
+    <string name="background_provider_solid_color_desc">AMOLED черный или собственный цвет</string>
+    <string name="background_provider_gradient">Динамический градиент</string>
+    <string name="background_provider_gradient_desc">Градиент дня и ночи по положению солнца</string>
+    <string name="background_provider_image">Свои фото</string>
+    <string name="background_provider_image_desc">Фотографии из вашей галереи</string>
+    <string name="background_plugins_title">Плагины фона</string>
+    <string name="manage_background_plugins">Управление плагинами фона</string>
+    <string name="manage_background_plugins_summary">Настройка и выбор источников фона</string>
 </resources>

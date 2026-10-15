@@ -34,6 +34,14 @@ object SettingsCategoryProvider {
                 groupId = 0
             ),
             SettingsCategory(
+                id = "background_plugins",
+                title = context.getString(R.string.background_plugins_title),
+                subtitle = context.getString(R.string.manage_background_plugins_summary),
+                iconResId = R.drawable.ic_palette_swatch,
+                fragmentClass = com.nxd1frnt.clockdesk2.background.ui.BackgroundPluginsFragment::class.java,
+                groupId = 0
+            ),
+            SettingsCategory(
                 id = "smart_chips",
                 title = context.getString(R.string.smart_chips_settings_title),
                 subtitle = context.getString(R.string.smart_chips_settings_subtitle),

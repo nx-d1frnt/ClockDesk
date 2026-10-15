@@ -758,4 +758,13 @@
     <string name="permission_unknown_apps_required">Please allow ClockDesk to install apps to proceed with the update.</string>
     <string name="ui_monet_from_background_title">Color UI from background</string>
     <string name="ui_monet_from_background_summary">Apply Monet colors extracted from the active background or album art to all menus and settings</string>
+    <string name="background_provider_solid_color">Solid Color</string>
+    <string name="background_provider_solid_color_desc">AMOLED Black or custom color</string>
+    <string name="background_provider_gradient">Dynamic Gradient</string>
+    <string name="background_provider_gradient_desc">Sun-based day/night gradient</string>
+    <string name="background_provider_image">Custom Photos</string>
+    <string name="background_provider_image_desc">Photos from your gallery</string>
+    <string name="background_plugins_title">Background Plugins</string>
+    <string name="manage_background_plugins">Manage Background plugins</string>
+    <string name="manage_background_plugins_summary">Configure and choose background sources</string>
 </resources>

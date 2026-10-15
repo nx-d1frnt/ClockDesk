@@ -931,6 +931,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 onPreviewGradient = {
                     previewGradient()
                 },
+                onPreviewSolidColor = { color ->
+                    applySolidColorBackground(color)
+                },
                 onPreviewMusicAlbumArt = { enabled, blur ->
                     previewMusicAlbumArt(enabled, blur)
                 },
@@ -1890,9 +1893,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun loadSavedBackground(skipAnimation: Boolean = false) {
+        val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+        Logger.i("BackgroundFlow") { "loadSavedBackground: activeProviderId=$activeProviderId, skipAnimation=$skipAnimation" }
+        if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+            val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+            applySolidColorBackground(color, skipAnimation) {
+                isBackgroundReady = true
+                checkAndPlayEntranceAnimation()
+            }
+            return
+        }
+
         val uriStr = backgroundManager.getSavedBackgroundUri()
         val blurIntensity = backgroundManager.getBlurIntensity()
-        if (uriStr != null) {
+        if (uriStr != null && activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
             try {
                 val uri = Uri.parse(uriStr)
                 try {
@@ -1910,7 +1924,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     checkAndPlayEntranceAnimation()
                 }
                 setCustomBackground(true)
-                Logger.d("MainActivity") {"Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"}
+                Logger.i("BackgroundFlow") { "Loaded custom background: $uriStr (blurIntensity=$blurIntensity)" }
                 updateBackgroundFilters()
             } catch (e: Exception) {
                 backgroundManager.setSavedBackgroundUri(null)
@@ -1918,12 +1932,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 if (!wasMusicBackgroundApplied) {
                     fontManager.clearDynamicColors()
                 }
-                Logger.w("MainActivity") {"Failed to load saved background: ${e.message}"}
+                Logger.w("BackgroundFlow") { "Failed to load saved background: ${e.message}" }
 
                 isBackgroundReady = true
                 checkAndPlayEntranceAnimation()
             }
         } else {
+            Logger.i("BackgroundFlow") { "No saved custom background, reverting to gradient" }
             backgroundImageView.visibility = View.GONE
             setCustomBackground(false)
             if (!wasMusicBackgroundApplied) {
@@ -1937,11 +1952,35 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
     }
 
+    fun applySolidColorBackground(color: Int, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        Logger.i("BackgroundFlow") { "applySolidColorBackground: color=#${String.format("%06X", 0xFFFFFF and color)}, skipAnimation=$skipAnimation" }
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
+        isBackgroundLoading = false
+        lastBackgroundSource = "solid_color:$color"
+        lastBlurIntensity = null
+        gradientManager.stopUpdates()
+        setCustomBackground(true)
+        fontManager.setDynamicScheme(color)
+        fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
+        fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+
+        backgroundImageView.setImageDrawable(null)
+        backgroundImageView.visibility = View.GONE
+        dynamicBackgroundView.visibility = View.VISIBLE
+        val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 1200L
+        dynamicBackgroundView.transitionToSolidColor(color, duration, force = true)
+        updateBackgroundFilters()
+        onComplete?.invoke()
+    }
+
     fun applyImageBackground(uri: Uri, blurIntensity: Int = 0, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        Logger.i("BackgroundFlow") { "applyImageBackground: uri=$uri, blur=$blurIntensity, skipAnimation=$skipAnimation" }
         loadBackgroundInternal(uri, blurIntensity, skipAnimation, onComplete)
     }
 
     fun applyBitmapBackground(bitmap: Bitmap, blurIntensity: Int = 0, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        Logger.i("BackgroundFlow") { "applyBitmapBackground: bitmap=${bitmap.width}x${bitmap.height}, blur=$blurIntensity, skipAnimation=$skipAnimation" }
         loadBackgroundInternal(bitmap, blurIntensity, skipAnimation, onComplete)
     }
 
@@ -1971,7 +2010,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (isFinishing) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
         
+        Logger.i("BackgroundFlow") { "performBackgroundLoad: model=$model, blur=$blurIntensity, lastSource=$lastBackgroundSource, lastBlur=$lastBlurIntensity" }
         if (areArtworkSourcesEqual(lastBackgroundSource, model) && lastBlurIntensity == blurIntensity) {
+            Logger.i("BackgroundFlow") { "performBackgroundLoad: source and blur unchanged, skipping reload" }
             onComplete?.invoke()
             return
         }
@@ -2099,6 +2140,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
                                     // 1. Запускаем кинематографичный GLSL-переход (Crossfade)
                                     val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 2000L
+                                    Logger.i("BackgroundFlow") { "onResourceReady: starting crossfade transitionTo bitmap (${bitmap.width}x${bitmap.height}) duration=$duration, scale=$bgScale" }
                                     dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
 
                                     val currentTargetMode = backgroundManager.getDimMode()
@@ -2147,6 +2189,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
 
                         val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 300L
+                        Logger.i("BackgroundFlow") { "onResourceReady: quick transitionTo bitmap (${bitmap.width}x${bitmap.height}) duration=$duration" }
                         dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
 
                         updateBackgroundFilters()
@@ -2169,7 +2212,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     lastBackgroundSource = null
                     lastBlurIntensity = null
                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
-                    Logger.w("MainActivity") {"Glide failed to load background: $model"}
+                    Logger.w("BackgroundFlow") { "Glide failed to load background: $model" }
                     isScaleAnimating = false
 
                     onComplete?.invoke()
@@ -2778,11 +2821,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun previewGradient() {
-        lastBackgroundSource = null
+        Logger.i("BackgroundFlow") { "previewGradient() called" }
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
+        isBackgroundLoading = false
+        lastBackgroundSource = "gradient"
+        lastBlurIntensity = null
+        backgroundImageView.setImageDrawable(null)
+        backgroundImageView.visibility = View.GONE
+        dynamicBackgroundView.visibility = View.VISIBLE
+
         BackgroundProgressPlugin.startSession()
         updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
         val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
-        dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L)
+        dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
         fontManager.clearDynamicColors()
         setCustomBackground(false)
         gradientManager.startUpdates()
@@ -2809,6 +2861,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun restoreInitialBackgroundState() {
         val blurIntensity = backgroundManager.getBlurIntensity()
+        Logger.i("BackgroundFlow") { "restoreInitialBackgroundState() called. blurIntensity=$blurIntensity" }
         if (backgroundManager.isMusicAlbumArtEnabled() && wasMusicBackgroundApplied && currentAppliedArtworkSource != null) {
             when (val art = currentAppliedArtworkSource) {
                 is Bitmap -> applyBitmapBackground(art, blurIntensity, skipAnimation = true)
@@ -2817,12 +2870,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
             setCustomBackground(true)
         } else {
-            val savedUri = backgroundManager.getSavedBackgroundUri()
-            if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
-                applyImageBackground(Uri.parse(savedUri), blurIntensity, skipAnimation = true)
+            val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+            Logger.i("BackgroundFlow") { "restoreInitialBackgroundState: activeProviderId=$activeProviderId" }
+            if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                applySolidColorBackground(color, skipAnimation = true)
                 setCustomBackground(true)
             } else {
-                restoreGradientBackground()
+                val savedUri = backgroundManager.getSavedBackgroundUri()
+                if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__" && activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
+                    applyImageBackground(Uri.parse(savedUri), blurIntensity, skipAnimation = true)
+                    setCustomBackground(true)
+                } else {
+                    restoreGradientBackground()
+                }
             }
         }
         restoreSavedWeatherState()
@@ -2830,15 +2891,31 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun applyBackgroundSettingsFromSheet(previewUri: String?, blur: Int) {
+        Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet: previewUri=$previewUri, blur=$blur" }
         val albumArtEnabled = backgroundManager.isMusicAlbumArtEnabled()
         if (albumArtEnabled && wasMusicBackgroundApplied) {
             when (previewUri) {
-                "__DEFAULT_GRADIENT__" -> {
+                "__DEFAULT_GRADIENT__",
+                com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID)
+                    backgroundManager.setSavedBackgroundUri(null)
+                }
+                com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID)
                     backgroundManager.setSavedBackgroundUri(null)
                 }
                 null -> { }
                 else -> {
-                    backgroundManager.setSavedBackgroundUri(previewUri)
+                    if (previewUri.startsWith("external:")) {
+                        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                            .setActiveProviderId(previewUri)
+                    } else {
+                        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                            .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID)
+                        backgroundManager.setSavedBackgroundUri(previewUri)
+                    }
                 }
             }
             if (currentAppliedArtworkSource != null) {
@@ -2860,39 +2937,74 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
 
         when (previewUri) {
-            "__DEFAULT_GRADIENT__" -> {
+            com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> SolidColorBackgroundProvider" }
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID)
+                backgroundManager.setSavedBackgroundUri(null)
+                val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                applySolidColorBackground(color, skipAnimation = false)
+            }
+            "__DEFAULT_GRADIENT__",
+            com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> DynamicGradientBackgroundProvider" }
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID)
                 BackgroundProgressPlugin.startSession()
                 updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
                 backgroundManager.setSavedBackgroundUri(null)
                 setCustomBackground(false)
                 fontManager.clearDynamicColors()
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+                backgroundLoads.clear()
+                cancelBackgroundLoads()
+                isBackgroundLoading = false
+                lastBackgroundSource = "gradient"
+                lastBlurIntensity = null
                 dynamicBackgroundView.visibility = View.VISIBLE
+                backgroundImageView.setImageDrawable(null)
                 backgroundImageView.visibility = View.GONE
                 backgroundManager.clearDim()
+                val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
+                dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
                 gradientManager.startUpdates()
                 updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
             }
             null -> {
-                val existing = backgroundManager.getSavedBackgroundUri()
-                if (existing != null) {
-                    try {
-                        applyImageBackground(Uri.parse(existing), blur, skipAnimation = true)
-                        setCustomBackground(true)
-                    } catch (e: Exception) {
-                        Logger.w("MainActivity") { "Failed to re-apply existing background" }
-                    }
+                val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> null previewUri, activeProviderId=$activeProviderId" }
+                if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                    applySolidColorBackground(color, skipAnimation = true)
                 } else {
-                    restoreGradientBackground()
+                    val existing = backgroundManager.getSavedBackgroundUri()
+                    if (existing != null) {
+                        try {
+                            applyImageBackground(Uri.parse(existing), blur, skipAnimation = true)
+                            setCustomBackground(true)
+                        } catch (e: Exception) {
+                            Logger.w("BackgroundFlow") { "Failed to re-apply existing background: ${e.message}" }
+                        }
+                    } else {
+                        restoreGradientBackground()
+                    }
                 }
             }
             else -> {
-                backgroundManager.setSavedBackgroundUri(previewUri)
-                try {
-                    applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
-                    setCustomBackground(true)
-                } catch (e: Exception) {
-                    Logger.w("MainActivity") { "Failed to apply new background" }
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> external or image: $previewUri" }
+                if (previewUri.startsWith("external:")) {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(previewUri)
+                } else {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID)
+                    backgroundManager.setSavedBackgroundUri(previewUri)
+                    try {
+                        applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
+                        setCustomBackground(true)
+                    } catch (e: Exception) {
+                        Logger.w("BackgroundFlow") { "Failed to apply new background: ${e.message}" }
+                    }
                 }
             }
         }
@@ -2901,15 +3013,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun restoreGradientBackground() {
+        Logger.i("BackgroundFlow") { "restoreGradientBackground() called" }
         backgroundLoads.clear()
         cancelBackgroundLoads()
         isBackgroundLoading = false
-        lastBackgroundSource = null
+        lastBackgroundSource = "gradient"
+        lastBlurIntensity = null
         currentAppliedArtworkSource = null
         wasMusicBackgroundApplied = false
         BackgroundProgressPlugin.startSession()
         updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
         dynamicBackgroundView.visibility = View.VISIBLE
+        backgroundImageView.setImageDrawable(null)
         backgroundImageView.visibility = View.GONE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
@@ -2920,6 +3035,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         setCustomBackground(false)
         editModeBlurLayer.setImageDrawable(null)
         editModeBlurLayer.visibility = View.GONE
+        val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
+        dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
         gradientManager.startUpdates()
         updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
     }

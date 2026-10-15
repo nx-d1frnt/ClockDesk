@@ -16,6 +16,9 @@
             <action android:name="com.nxd1frnt.clockdesk2.music.PLUGIN" />
         </intent>
         <intent>
+            <action android:name="com.nxd1frnt.clockdesk2.ACTION_QUERY_BACKGROUND_PLUGINS" />
+        </intent>
+        <intent>
             <action android:name="android.media.browse.MediaBrowserService" />
         </intent>
     </queries>

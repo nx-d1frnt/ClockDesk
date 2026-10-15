@@ -168,14 +168,28 @@ class DynamicBackgroundView @JvmOverloads constructor(
     /**
      * Генерация градиента в Bitmap и плавный переход к нему на GPU.
      */
-    fun transitionToGradient(topColor: Int, bottomColor: Int, durationMs: Long = 1800L) {
-        if (lastTopColor == topColor && lastBottomColor == bottomColor) {
+    fun transitionToGradient(topColor: Int, bottomColor: Int, durationMs: Long = 1800L, force: Boolean = false) {
+        if (!force && lastTopColor == topColor && lastBottomColor == bottomColor) {
+            com.nxd1frnt.clockdesk2.utils.Logger.d("BackgroundFlow") { "DynamicBackgroundView.transitionToGradient: colors unchanged, ignoring" }
             return
         }
+        com.nxd1frnt.clockdesk2.utils.Logger.i("BackgroundFlow") { "DynamicBackgroundView.transitionToGradient: top=#${String.format("%06X", 0xFFFFFF and topColor)}, bottom=#${String.format("%06X", 0xFFFFFF and bottomColor)}, durationMs=$durationMs" }
         lastTopColor = topColor
         lastBottomColor = bottomColor
         val bitmap = createGradientBitmap(topColor, bottomColor, 256, 256)
         transitionToInternal(bitmap, durationMs, true)
+    }
+
+    /**
+     * Smooth transition to a uniform solid color on GPU.
+     */
+    fun transitionToSolidColor(color: Int, durationMs: Long = 1800L, force: Boolean = true) {
+        com.nxd1frnt.clockdesk2.utils.Logger.i("BackgroundFlow") { "DynamicBackgroundView.transitionToSolidColor: color=#${String.format("%06X", 0xFFFFFF and color)}, durationMs=$durationMs, force=$force" }
+        if (force) {
+            lastTopColor = null
+            lastBottomColor = null
+        }
+        transitionToGradient(color, color, durationMs, force)
     }
 
     private fun createGradientBitmap(topColor: Int, bottomColor: Int, width: Int, height: Int): Bitmap {
