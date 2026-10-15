@@ -79,8 +79,8 @@ class BackgroundPluginsFragment : Fragment() {
                     }
                 } else if (provider is ExternalBackgroundPlugin && !provider.settingsActivity.isNullOrEmpty()) {
                     try {
-                        val intent = Intent().setClassName(provider.packageName, provider.settingsActivity)
-                        startActivity(intent)
+                        val intent = provider.getSettingsIntent()
+                        if (intent != null) startActivity(intent)
                     } catch (e: Exception) {
                         Toast.makeText(requireContext(), R.string.error_opening_settings, Toast.LENGTH_SHORT).show()
                     }

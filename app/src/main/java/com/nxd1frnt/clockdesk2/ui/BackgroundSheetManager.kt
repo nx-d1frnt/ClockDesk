@@ -1,8 +1,11 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import android.os.Build
 import android.transition.AutoTransition
+import com.nxd1frnt.clockdesk2.ui.MainActivity
 import android.transition.TransitionManager
 import android.view.View
 import android.view.ViewGroup
@@ -106,6 +109,15 @@ class BackgroundSheetManager(
         setupListeners()
     }
 
+    private fun getHostActivity(): MainActivity? {
+        var ctx: Context? = floatingMenuView.context
+        while (ctx is ContextWrapper) {
+            if (ctx is MainActivity) return ctx
+            ctx = ctx.baseContext
+        }
+        return null
+    }
+
     private fun setupAdapter() {
         backgroundsAdapter = BackgroundsAdapter(
             floatingMenuView.context,
@@ -156,6 +168,25 @@ class BackgroundSheetManager(
                         if (id.startsWith("external:")) {
                             Logger.i("BackgroundSheet") { "onItemClick: External provider selected: $id" }
                             updateCropButtonVisibility(false)
+                            previewTask?.let { floatingMenuView.removeCallbacks(it) }
+                            val plugin = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                                .getExternalProviders().firstOrNull { it.id == id }
+                            if (plugin != null) {
+                                when (val payload = plugin.getCurrentPayload(floatingMenuView.context)) {
+                                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor -> onPreviewSolidColor?.invoke(payload.color)
+                                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                                        try {
+                                            onPreviewImage(Uri.parse(payload.uriString), bgBlurSeek.value.toInt())
+                                        } catch (e: Exception) {
+                                            Logger.e("BackgroundSheetManager") { "Failed to preview plugin image: ${e.message}" }
+                                        }
+                                    }
+                                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient -> onPreviewGradient()
+                                    else -> {}
+                                }
+                                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                                    .requestDataFromPlugin(plugin)
+                            }
                         } else {
                             previewTask?.let { floatingMenuView.removeCallbacks(it) }
                             try {
@@ -199,8 +230,11 @@ class BackgroundSheetManager(
                         if (!plugin.settingsActivity.isNullOrEmpty()) {
                             builder.setNeutralButton(R.string.settings_title) { d, _ ->
                                 try {
-                                    val intent = android.content.Intent().setClassName(plugin.packageName, plugin.settingsActivity)
-                                    context.startActivity(intent)
+                                    val intent = plugin.getSettingsIntent()
+                                    if (intent != null) {
+                                        getHostActivity()?.isLaunchingExternalActivity = true
+                                        context.startActivity(intent)
+                                    }
                                 } catch (e: Exception) {
                                     Logger.e("BackgroundSheetManager") { "Failed to launch plugin settings: ${e.message}" }
                                 }
@@ -251,8 +285,11 @@ class BackgroundSheetManager(
                         .getExternalProviders().firstOrNull { it.id == id }
                     if (plugin != null && !plugin.settingsActivity.isNullOrEmpty()) {
                         try {
-                            val intent = android.content.Intent().setClassName(plugin.packageName, plugin.settingsActivity)
-                            floatingMenuView.context.startActivity(intent)
+                            val intent = plugin.getSettingsIntent()
+                            if (intent != null) {
+                                getHostActivity()?.isLaunchingExternalActivity = true
+                                floatingMenuView.context.startActivity(intent)
+                            }
                         } catch (e: Exception) {
                             Logger.e("BackgroundSheetManager") { "Failed to launch plugin settings: ${e.message}" }
                         }
@@ -531,9 +568,10 @@ class BackgroundSheetManager(
             updateProviderCapabilities(null)
         } else {
             val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getActiveProviderId()
-            val selected = when (activeProviderId) {
-                com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> activeProviderId
-                com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> "__DEFAULT_GRADIENT__"
+            val selected = when {
+                activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> activeProviderId
+                activeProviderId == com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> "__DEFAULT_GRADIENT__"
+                activeProviderId.startsWith("external:") -> activeProviderId
                 else -> savedUri ?: "__DEFAULT_GRADIENT__"
             }
             backgroundsAdapter?.selectedId = selected
@@ -542,7 +580,8 @@ class BackgroundSheetManager(
             updateProviderCapabilities(selected)
         }
 
-        bgRecycler.scrollToPosition(0)
+        val targetIndex = backgroundsAdapter?.items?.indexOf(backgroundsAdapter?.selectedId) ?: 0
+        bgRecycler.scrollToPosition(if (targetIndex >= 0) targetIndex else 0)
 
         val blurInt = backgroundManager.getBlurIntensity()
         bgBlurSeek.value = blurInt.toFloat()

@@ -16,6 +16,7 @@ class BackgroundProviderManager private constructor(private val context: Context
 
     companion object {
         const val KEY_ACTIVE_PROVIDER_ID = "active_background_provider_id"
+        private const val KEY_CACHED_PLUGINS = "cached_external_background_plugins"
         private const val PREFS_NAME = "ClockDeskPrefs"
 
         @Volatile
@@ -59,17 +60,116 @@ class BackgroundProviderManager private constructor(private val context: Context
         } else {
             context.registerReceiver(updateReceiver, filter)
         }
+        loadCachedPlugins()
         discoverExternalPlugins()
     }
 
     fun getAllProviders(): List<IBackgroundProvider> {
         val result = mutableListOf<IBackgroundProvider>()
         result.addAll(internalProviders)
-        result.addAll(externalPlugins)
+        synchronized(externalPlugins) {
+            result.addAll(externalPlugins)
+        }
         return result
     }
 
-    fun getExternalProviders(): List<ExternalBackgroundPlugin> = externalPlugins.toList()
+    fun getExternalProviders(): List<ExternalBackgroundPlugin> = synchronized(externalPlugins) {
+        externalPlugins.toList()
+    }
+
+    fun savePayloadForId(id: String, payload: BackgroundPayload) {
+        val editor = prefs.edit()
+        when (payload) {
+            is BackgroundPayload.SolidColor -> {
+                editor.putString("bg_plugin_payload_type_$id", "color")
+                editor.putInt("bg_plugin_payload_color_$id", payload.color)
+            }
+            is BackgroundPayload.ImageUri -> {
+                editor.putString("bg_plugin_payload_type_$id", "image_uri")
+                editor.putString("bg_plugin_payload_uri_$id", payload.uriString)
+            }
+            is BackgroundPayload.Gradient -> {
+                editor.putString("bg_plugin_payload_type_$id", "gradient")
+            }
+            is BackgroundPayload.ImageBitmap -> {
+                // Bitmaps are not persisted via SharedPreferences
+            }
+        }
+        editor.apply()
+    }
+
+    fun getSavedPayloadForId(id: String): BackgroundPayload {
+        val type = prefs.getString("bg_plugin_payload_type_$id", null)
+        return when (type) {
+            "color" -> {
+                val color = prefs.getInt("bg_plugin_payload_color_$id", Color.BLACK)
+                BackgroundPayload.SolidColor(color)
+            }
+            "image_uri" -> {
+                val uriStr = prefs.getString("bg_plugin_payload_uri_$id", null)
+                if (uriStr != null) BackgroundPayload.ImageUri(uriStr) else BackgroundPayload.Gradient
+            }
+            else -> BackgroundPayload.Gradient
+        }
+    }
+
+    private fun loadCachedPlugins() {
+        val jsonStr = prefs.getString(KEY_CACHED_PLUGINS, null) ?: return
+        try {
+            val jsonArray = org.json.JSONArray(jsonStr)
+            val cached = mutableListOf<ExternalBackgroundPlugin>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                cached.add(
+                    ExternalBackgroundPlugin(
+                        packageName = obj.getString("packageName"),
+                        receiverClassName = obj.getString("receiverClassName"),
+                        id = obj.getString("id"),
+                        displayName = obj.getString("displayName"),
+                        description = obj.optString("description", ""),
+                        settingsActivity = if (obj.isNull("settingsActivity")) null else obj.getString("settingsActivity"),
+                        capabilities = ProviderCapabilities(
+                            supportsBlur = obj.optBoolean("supportsBlur", true),
+                            supportsCrop = obj.optBoolean("supportsCrop", true),
+                            supportsDimming = obj.optBoolean("supportsDimming", true),
+                            supportsWeather = obj.optBoolean("supportsWeather", true)
+                        )
+                    )
+                )
+            }
+            synchronized(externalPlugins) {
+                externalPlugins.clear()
+                externalPlugins.addAll(cached)
+            }
+            Logger.i("BackgroundProvider") { "Loaded ${cached.size} external background plugins from cache" }
+        } catch (e: Exception) {
+            Logger.w("BackgroundProvider") { "Failed to load cached background plugins: ${e.message}" }
+        }
+    }
+
+    private fun savePluginsToCache(plugins: List<ExternalBackgroundPlugin>) {
+        try {
+            val jsonArray = org.json.JSONArray()
+            for (p in plugins) {
+                val obj = org.json.JSONObject().apply {
+                    put("packageName", p.packageName)
+                    put("receiverClassName", p.receiverClassName)
+                    put("id", p.id)
+                    put("displayName", p.displayName)
+                    put("description", p.description)
+                    if (p.settingsActivity != null) put("settingsActivity", p.settingsActivity)
+                    put("supportsBlur", p.capabilities.supportsBlur)
+                    put("supportsCrop", p.capabilities.supportsCrop)
+                    put("supportsDimming", p.capabilities.supportsDimming)
+                    put("supportsWeather", p.capabilities.supportsWeather)
+                }
+                jsonArray.put(obj)
+            }
+            prefs.edit().putString(KEY_CACHED_PLUGINS, jsonArray.toString()).apply()
+        } catch (e: Exception) {
+            Logger.w("BackgroundProvider") { "Failed to save plugins to cache: ${e.message}" }
+        }
+    }
 
     fun getActiveProviderId(): String {
         val saved = prefs.getString(KEY_ACTIVE_PROVIDER_ID, null)
@@ -90,7 +190,7 @@ class BackgroundProviderManager private constructor(private val context: Context
         return getAllProviders().firstOrNull { it.id == id } ?: gradientProvider
     }
 
-    fun setActiveProviderId(id: String) {
+    fun setActiveProviderId(id: String, notify: Boolean = true) {
         val previous = getActiveProvider()
         previous.onDeselected(context)
 
@@ -99,8 +199,10 @@ class BackgroundProviderManager private constructor(private val context: Context
         val next = getActiveProvider()
         next.onSelected(context)
 
-        val payload = next.getCurrentPayload(context)
-        notifyListeners(next, payload)
+        if (notify) {
+            val payload = next.getCurrentPayload(context)
+            notifyListeners(next, payload)
+        }
 
         if (next is ExternalBackgroundPlugin) {
             requestDataFromPlugin(next)
@@ -164,6 +266,12 @@ class BackgroundProviderManager private constructor(private val context: Context
                         }
 
                         if (pluginId != null && displayName != null) {
+                            val resolvedSettingsActivity = when {
+                                settingsActivity.isNullOrEmpty() -> null
+                                settingsActivity.startsWith(".") -> "$packageName$settingsActivity"
+                                !settingsActivity.contains(".") -> "$packageName.$settingsActivity"
+                                else -> settingsActivity
+                            }
                             discovered.add(
                                 ExternalBackgroundPlugin(
                                     packageName = packageName,
@@ -171,7 +279,7 @@ class BackgroundProviderManager private constructor(private val context: Context
                                     id = "external:$packageName/$pluginId",
                                     displayName = displayName,
                                     description = description ?: "",
-                                    settingsActivity = settingsActivity,
+                                    settingsActivity = resolvedSettingsActivity,
                                     capabilities = ProviderCapabilities(
                                         supportsBlur = supportsBlur,
                                         supportsCrop = supportsCrop,
@@ -188,14 +296,34 @@ class BackgroundProviderManager private constructor(private val context: Context
             }
 
             mainHandler.post {
-                externalPlugins.clear()
-                externalPlugins.addAll(discovered)
+                synchronized(externalPlugins) {
+                    externalPlugins.clear()
+                    externalPlugins.addAll(discovered)
+                }
+                savePluginsToCache(discovered)
                 onComplete?.invoke()
+
+                val activeId = getActiveProviderId()
+                if (activeId.startsWith("external:")) {
+                    val activePlugin = externalPlugins.firstOrNull { it.id == activeId }
+                    if (activePlugin != null) {
+                        val payload = activePlugin.getCurrentPayload(context)
+                        if (payload !is BackgroundPayload.Gradient) {
+                            notifyListeners(activePlugin, payload)
+                        }
+                        requestDataFromPlugin(activePlugin)
+                    } else if (discovered.isNotEmpty()) {
+                        // The external plugin was uninstalled
+                        Logger.w("BackgroundProvider") { "Active external plugin $activeId is no longer installed, reverting to gradient" }
+                        setActiveProviderId(DynamicGradientBackgroundProvider.ID)
+                    }
+                }
             }
         }.start()
     }
 
-    private fun requestDataFromPlugin(plugin: ExternalBackgroundPlugin) {
+    fun requestDataFromPlugin(plugin: ExternalBackgroundPlugin) {
+        Logger.i("BackgroundProvider") { "requestDataFromPlugin: sending broadcast to ${plugin.packageName}/${plugin.receiverClassName} for id=${plugin.id}" }
         val intent = Intent(BackgroundPluginContract.ACTION_REQUEST_BACKGROUND_DATA).apply {
             setClassName(plugin.packageName, plugin.receiverClassName)
             putExtra(BackgroundPluginContract.KEY_PLUGIN_ID, plugin.id)
@@ -203,9 +331,40 @@ class BackgroundProviderManager private constructor(private val context: Context
         context.sendBroadcast(intent)
     }
 
+    fun requestDataFromPluginId(pluginId: String) {
+        val plugin = synchronized(externalPlugins) {
+            externalPlugins.firstOrNull { it.id == pluginId || it.id.endsWith("/$pluginId") || it.id == "external:$pluginId" }
+        }
+        if (plugin != null) {
+            requestDataFromPlugin(plugin)
+            return
+        }
+        if (pluginId.startsWith("external:")) {
+            val stripped = pluginId.removePrefix("external:")
+            val parts = stripped.split("/", limit = 2)
+            if (parts.isNotEmpty()) {
+                val pkg = parts[0]
+                val id = if (parts.size > 1) parts[1] else pluginId
+                val intent = Intent(BackgroundPluginContract.ACTION_REQUEST_BACKGROUND_DATA).apply {
+                    setPackage(pkg)
+                    putExtra(BackgroundPluginContract.KEY_PLUGIN_ID, id)
+                }
+                context.sendBroadcast(intent)
+            }
+        }
+    }
+
     private fun handlePluginUpdate(intent: Intent) {
         val pluginId = intent.getStringExtra(BackgroundPluginContract.KEY_PLUGIN_ID) ?: return
-        val plugin = externalPlugins.firstOrNull { it.id == pluginId } ?: return
+        val packageName = intent.getStringExtra(BackgroundPluginContract.KEY_PLUGIN_PACKAGE)
+        val plugin = synchronized(externalPlugins) {
+            externalPlugins.firstOrNull {
+                it.id == pluginId ||
+                it.id.endsWith("/$pluginId") ||
+                it.id == "external:$pluginId" ||
+                (packageName != null && it.id == "external:$packageName/$pluginId")
+            }
+        }
 
         val color = if (intent.hasExtra(BackgroundPluginContract.KEY_COLOR)) {
             intent.getIntExtra(BackgroundPluginContract.KEY_COLOR, Color.TRANSPARENT)
@@ -219,10 +378,21 @@ class BackgroundProviderManager private constructor(private val context: Context
             else -> BackgroundPayload.Gradient
         }
 
-        plugin.updatePayload(payload)
+        val effectiveId = plugin?.id ?: if (packageName != null) "external:$packageName/$pluginId" else "external:$pluginId"
+        Logger.i("BackgroundProvider") { "handlePluginUpdate: plugin=$effectiveId, payload=$payload" }
+        savePayloadForId(effectiveId, payload)
+        plugin?.updatePayload(context, payload)
 
-        if (getActiveProviderId() == plugin.id) {
-            notifyListeners(plugin, payload)
+        val activeId = getActiveProviderId()
+        if (activeId == effectiveId || (plugin != null && activeId == plugin.id)) {
+            val target = plugin ?: ExternalBackgroundPlugin(
+                packageName = packageName ?: "",
+                receiverClassName = "",
+                id = effectiveId,
+                displayName = "",
+                description = ""
+            )
+            notifyListeners(target, payload)
         }
     }
 

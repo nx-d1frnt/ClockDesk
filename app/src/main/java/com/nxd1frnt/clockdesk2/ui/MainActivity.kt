@@ -191,6 +191,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private var isCropModeActive = false
     private var isScaleAnimating = false
     private var isLaunchingFilePicker = false
+    var isLaunchingExternalActivity = false
     private var isDemoMode = false
     private var isTutorialRunning = false
     private var isNightShiftEnabled = false
@@ -209,6 +210,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     )
     private val backgroundLoads = ForegroundStateDispatcher<BackgroundLoad> {
         performBackgroundLoad(it.model, it.blurIntensity, it.skipAnimation, it.onComplete)
+    }
+    private val backgroundProviderListener: (com.nxd1frnt.clockdesk2.background.provider.IBackgroundProvider, com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload) -> Unit = { provider, payload ->
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            val activeId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+            if (activeId == provider.id) {
+                Logger.i("BackgroundFlow") { "BackgroundProvider updated: ${provider.id}, applying payload $payload" }
+                applyBackgroundPayload(payload)
+            }
+        }
     }
     private var backgroundRequestId = 0L
     private var isBackgroundLoading = false
@@ -667,6 +678,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         fontManager.loadFont()
         setupPreferencesListener(prefs)
+        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).addListener(backgroundProviderListener)
     }
 
     private fun setupDeskConnectSystem() {
@@ -1381,6 +1393,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         dimDebounceHandler.removeCallbacksAndMessages(null)
         handler.removeCallbacksAndMessages(null)
         if (::backgroundSheetManager.isInitialized) backgroundSheetManager.onDestroy()
+        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).removeListener(backgroundProviderListener)
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)
     }
@@ -1904,6 +1917,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             return
         }
 
+        if (activeProviderId.startsWith("external:")) {
+            val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+            val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+            val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+            Logger.i("BackgroundFlow") { "loadSavedBackground: external provider=$activeProviderId, payload=$payload" }
+            applyBackgroundPayload(payload, skipAnimation) {
+                isBackgroundReady = true
+                checkAndPlayEntranceAnimation()
+            }
+            if (provider != null) {
+                bpm.requestDataFromPlugin(provider)
+            } else {
+                bpm.requestDataFromPluginId(activeProviderId)
+            }
+            return
+        }
+
         val uriStr = backgroundManager.getSavedBackgroundUri()
         val blurIntensity = backgroundManager.getBlurIntensity()
         if (uriStr != null && activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
@@ -1949,6 +1979,31 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
             isBackgroundReady = true
             checkAndPlayEntranceAnimation()
+        }
+    }
+
+    fun applyBackgroundPayload(
+        payload: com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload,
+        skipAnimation: Boolean = false,
+        onComplete: (() -> Unit)? = null
+    ) {
+        Logger.i("BackgroundFlow") { "applyBackgroundPayload: $payload, skipAnimation=$skipAnimation" }
+        when (payload) {
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor -> {
+                applySolidColorBackground(payload.color, skipAnimation, onComplete)
+            }
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                val blur = backgroundManager.getBlurIntensity()
+                applyImageBackground(Uri.parse(payload.uriString), blur, skipAnimation, onComplete)
+            }
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap -> {
+                val blur = backgroundManager.getBlurIntensity()
+                applyBitmapBackground(payload.bitmap, blur, skipAnimation, onComplete)
+            }
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient -> {
+                previewGradient()
+                onComplete?.invoke()
+            }
         }
     }
 
@@ -2669,6 +2724,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             customizationSheetManager.hide()
         }
 
+        if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
+            backgroundSheetManager.cancelAndHide()
+        }
+
         emptyDeskPrompt.visibility = View.GONE
         desktopWidgetManager.setEditMode(false)
 
@@ -2755,8 +2814,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 weatherGetter.startUpdates(lat, lon)
             }
         }
-        if (isEditMode && !isLaunchingFilePicker) exitEditMode()
+        if (isEditMode && !isLaunchingFilePicker && !isLaunchingExternalActivity && !isAnySheetShowing()) {
+            exitEditMode()
+        }
         isLaunchingFilePicker = false
+        isLaunchingExternalActivity = false
         if (isDemoMode) {
             isDemoMode = false
             clockManager.toggleDebugMode(false)
@@ -2876,6 +2938,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
                 applySolidColorBackground(color, skipAnimation = true)
                 setCustomBackground(true)
+            } else if (activeProviderId.startsWith("external:")) {
+                val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+                val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+                applyBackgroundPayload(payload, skipAnimation = true)
             } else {
                 val savedUri = backgroundManager.getSavedBackgroundUri()
                 if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__" && activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
@@ -2897,24 +2964,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             when (previewUri) {
                 "__DEFAULT_GRADIENT__",
                 com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
-                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID)
                     backgroundManager.setSavedBackgroundUri(null)
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID, notify = false)
                 }
                 com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
-                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID)
                     backgroundManager.setSavedBackgroundUri(null)
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID, notify = false)
                 }
                 null -> { }
                 else -> {
                     if (previewUri.startsWith("external:")) {
+                        backgroundManager.setSavedBackgroundUri(null)
                         com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                            .setActiveProviderId(previewUri)
+                            .setActiveProviderId(previewUri, notify = false)
                     } else {
-                        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                            .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID)
                         backgroundManager.setSavedBackgroundUri(previewUri)
+                        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                            .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID, notify = false)
                     }
                 }
             }
@@ -2939,20 +3007,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         when (previewUri) {
             com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
                 Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> SolidColorBackgroundProvider" }
-                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID)
                 backgroundManager.setSavedBackgroundUri(null)
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID, notify = false)
                 val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
                 applySolidColorBackground(color, skipAnimation = false)
             }
             "__DEFAULT_GRADIENT__",
             com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
                 Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> DynamicGradientBackgroundProvider" }
+                backgroundManager.setSavedBackgroundUri(null)
                 com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID)
+                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID, notify = false)
                 BackgroundProgressPlugin.startSession()
                 updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
-                backgroundManager.setSavedBackgroundUri(null)
                 setCustomBackground(false)
                 fontManager.clearDynamicColors()
                 fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
@@ -2976,6 +3044,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
                     val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
                     applySolidColorBackground(color, skipAnimation = true)
+                } else if (activeProviderId.startsWith("external:")) {
+                    val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+                    val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+                    applyBackgroundPayload(payload, skipAnimation = true)
                 } else {
                     val existing = backgroundManager.getSavedBackgroundUri()
                     if (existing != null) {
@@ -2993,12 +3066,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             else -> {
                 Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> external or image: $previewUri" }
                 if (previewUri.startsWith("external:")) {
-                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                        .setActiveProviderId(previewUri)
+                    backgroundManager.setSavedBackgroundUri(null)
+                    val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    bpm.setActiveProviderId(previewUri, notify = false)
+                    val provider = bpm.getExternalProviders().firstOrNull { it.id == previewUri }
+                    val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(previewUri)
+                    if (payload !is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient) {
+                        applyBackgroundPayload(payload, skipAnimation = false)
+                    }
+                    if (provider != null) {
+                        bpm.requestDataFromPlugin(provider)
+                    } else {
+                        bpm.requestDataFromPluginId(previewUri)
+                    }
                 } else {
-                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
-                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID)
                     backgroundManager.setSavedBackgroundUri(previewUri)
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID, notify = false)
                     try {
                         applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
                         setCustomBackground(true)

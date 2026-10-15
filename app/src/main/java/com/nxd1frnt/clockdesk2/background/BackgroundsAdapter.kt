@@ -100,7 +100,20 @@ class BackgroundsAdapter(
                         } else {
                             holder.settingsBtn.setOnClickListener(null)
                         }
-                        holder.thumb.imageTintList = ColorStateList.valueOf(palette.primary)
+                        val payload = plugin?.getCurrentPayload(context)
+                        if (payload is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor) {
+                            holder.thumb.setImageDrawable(null)
+                            val bg = GradientDrawable().apply {
+                                shape = GradientDrawable.RECTANGLE
+                                setColor(payload.color)
+                            }
+                            holder.thumb.background = bg
+                            val isLight = ColorUtils.calculateLuminance(payload.color) > 0.5
+                            val iconTint = if (isLight) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                            holder.thumb.imageTintList = ColorStateList.valueOf(iconTint)
+                        } else {
+                            holder.thumb.imageTintList = ColorStateList.valueOf(palette.primary)
+                        }
                         holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
                         holder.thumb.setImageResource(R.drawable.ic_layers)
                         holder.itemView.setOnLongClickListener {
