@@ -53,6 +53,11 @@ class BackgroundPluginsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         providerManager = BackgroundProviderManager.getInstance(requireContext())
         setupAdapter()
+        providerManager.discoverExternalPlugins {
+            if (isAdded) {
+                setupAdapter()
+            }
+        }
     }
 
     private fun setupAdapter() {

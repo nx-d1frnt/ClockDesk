@@ -120,13 +120,16 @@ class BackgroundProviderManager private constructor(private val context: Context
             val cached = mutableListOf<ExternalBackgroundPlugin>()
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
+                val pkg = obj.getString("packageName")
+                val rawName = obj.getString("displayName")
+                val rawDesc = obj.optString("description", "")
                 cached.add(
                     ExternalBackgroundPlugin(
-                        packageName = obj.getString("packageName"),
+                        packageName = pkg,
                         receiverClassName = obj.getString("receiverClassName"),
                         id = obj.getString("id"),
-                        displayName = obj.getString("displayName"),
-                        description = obj.optString("description", ""),
+                        displayName = resolvePotentiallyRawString(pkg, rawName),
+                        description = resolvePotentiallyRawString(pkg, rawDesc),
                         settingsActivity = if (obj.isNull("settingsActivity")) null else obj.getString("settingsActivity"),
                         capabilities = ProviderCapabilities(
                             supportsBlur = obj.optBoolean("supportsBlur", true),
@@ -255,8 +258,8 @@ class BackgroundProviderManager private constructor(private val context: Context
                         while (parser.next() != XmlPullParser.END_DOCUMENT) {
                             if (parser.eventType == XmlPullParser.START_TAG && parser.name == "background-plugin") {
                                 pluginId = parser.getAttributeValue(null, "id")
-                                displayName = parser.getAttributeValue(null, "displayName")
-                                description = parser.getAttributeValue(null, "description")
+                                displayName = resolveXmlString(parser, pluginRes, "displayName")
+                                description = resolveXmlString(parser, pluginRes, "description")
                                 settingsActivity = parser.getAttributeValue(null, "settingsActivity")
                                 supportsBlur = parser.getAttributeBooleanValue(null, "supportsBlur", true)
                                 supportsCrop = parser.getAttributeBooleanValue(null, "supportsCrop", true)
@@ -394,6 +397,46 @@ class BackgroundProviderManager private constructor(private val context: Context
             )
             notifyListeners(target, payload)
         }
+    }
+
+    private fun resolvePotentiallyRawString(packageName: String, raw: String): String {
+        if (raw.startsWith("@")) {
+            val resId = raw.substring(1).toIntOrNull()
+            if (resId != null && resId != 0) {
+                try {
+                    return context.packageManager.getResourcesForApplication(packageName).getString(resId)
+                } catch (_: Exception) {}
+            }
+        }
+        return raw
+    }
+
+    private fun resolveXmlString(
+        parser: android.content.res.XmlResourceParser,
+        pluginRes: android.content.res.Resources,
+        attrName: String
+    ): String? {
+        for (i in 0 until parser.attributeCount) {
+            if (parser.getAttributeName(i) == attrName) {
+                val resId = parser.getAttributeResourceValue(i, 0)
+                if (resId != 0) {
+                    try {
+                        return pluginRes.getString(resId)
+                    } catch (_: Exception) {}
+                }
+                val rawValue = parser.getAttributeValue(i) ?: return null
+                if (rawValue.startsWith("@")) {
+                    val parsedId = rawValue.substring(1).toIntOrNull()
+                    if (parsedId != null && parsedId != 0) {
+                        try {
+                            return pluginRes.getString(parsedId)
+                        } catch (_: Exception) {}
+                    }
+                }
+                return rawValue
+            }
+        }
+        return null
     }
 
     fun onDestroy() {
