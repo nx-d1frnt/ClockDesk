@@ -96,6 +96,8 @@ class SmartChipManager(
         }
     }
 
+    private var activeTouchedChip: View? = null
+
     fun expandStack() {
         if (isStackExpanded) return
         isStackExpanded = true
@@ -107,6 +109,7 @@ class SmartChipManager(
     fun collapseStack() {
         if (!isStackExpanded) return
         isStackExpanded = false
+        activeTouchedChip = null
         autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         (chipContainer.parent as? android.widget.ScrollView)?.smoothScrollTo(0, 0)
         sortAndRedrawChips(contentChanged = true)
@@ -123,9 +126,124 @@ class SmartChipManager(
         sharedPreferences.edit().putBoolean("smart_chips_stack_overflow", enabled).apply()
         if (!enabled && isStackExpanded) {
             isStackExpanded = false
+            activeTouchedChip = null
             autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         }
         onPreferencesChanged()
+    }
+
+    fun handleExpandedStackTouch(ev: MotionEvent): Boolean {
+        if (!isStackExpanded || isEditMode) {
+            activeTouchedChip = null
+            return false
+        }
+
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val hitChip = findHitChip(ev.rawX, ev.rawY)
+                if (hitChip != null) {
+                    activeTouchedChip = hitChip
+                    dispatchToChip(hitChip, ev)
+                    return true
+                } else {
+                    activeTouchedChip = null
+                    collapseStack()
+                    return false
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val target = activeTouchedChip
+                if (target != null) {
+                    dispatchToChip(target, ev)
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                val target = activeTouchedChip
+                activeTouchedChip = null
+                if (target != null) {
+                    dispatchToChip(target, ev)
+                    return true
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                val target = activeTouchedChip
+                activeTouchedChip = null
+                if (target != null) {
+                    dispatchToChip(target, ev)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun findHitChip(rawX: Float, rawY: Float): View? {
+        val visibleChips = getOrderedVisibleChips()
+        if (visibleChips.isEmpty()) return null
+
+        val loc = IntArray(2)
+        val density = context.resources.displayMetrics.density
+        val gapSlopPx = (6 * density).toInt()
+
+        var bestChip: View? = null
+        var bestDistance = Float.MAX_VALUE
+
+        // First pass: exact hit inside view bounds
+        for (chipInfo in visibleChips) {
+            val v = chipInfo.view
+            if (v.visibility != View.VISIBLE || !ViewCompat.isAttachedToWindow(v) || v.alpha < 0.1f) continue
+            v.getLocationOnScreen(loc)
+            val left = loc[0].toFloat()
+            val top = loc[1].toFloat()
+            val right = left + v.width
+            val bottom = top + v.height
+
+            if (rawX in left..right && rawY in top..bottom) {
+                return v
+            }
+
+            // Candidate for vertical gap match if X is within bounds and Y is within gapSlop
+            if (rawX in left..right && rawY >= top - gapSlopPx && rawY <= bottom + gapSlopPx) {
+                val centerY = (top + bottom) / 2f
+                val dist = kotlin.math.abs(rawY - centerY)
+                if (dist < bestDistance) {
+                    bestDistance = dist
+                    bestChip = v
+                }
+            }
+        }
+
+        return bestChip
+    }
+
+    private fun dispatchToChip(target: View, ev: MotionEvent): Boolean {
+        if (!ViewCompat.isAttachedToWindow(target)) return false
+        val loc = IntArray(2)
+        target.getLocationOnScreen(loc)
+        val density = context.resources.displayMetrics.density
+        val gapSlopPx = (6 * density).toInt()
+
+        val rawLocalX = ev.rawX - loc[0].toFloat()
+        val rawLocalY = ev.rawY - loc[1].toFloat()
+
+        val localX = if (rawLocalX in -gapSlopPx.toFloat()..(target.width + gapSlopPx).toFloat()) {
+            rawLocalX.coerceIn(0f, target.width.toFloat().coerceAtLeast(1f))
+        } else {
+            rawLocalX
+        }
+
+        val localY = if (rawLocalY in -gapSlopPx.toFloat()..(target.height + gapSlopPx).toFloat()) {
+            rawLocalY.coerceIn(0f, target.height.toFloat().coerceAtLeast(1f))
+        } else {
+            rawLocalY
+        }
+
+        val childEvent = MotionEvent.obtain(ev)
+        childEvent.setLocation(localX, localY)
+        val handled = target.dispatchTouchEvent(childEvent)
+        childEvent.recycle()
+        return handled
     }
 
 //    private val periodicUpdateRunnable = object : Runnable {
@@ -393,6 +511,7 @@ class SmartChipManager(
         if (isStackExpanded) {
             isStackExpanded = false
         }
+        activeTouchedChip = null
 
         unregisterReceiver()
         Logger.d("SmartChipManager") { "Stopped listening. App is sleeping." }
@@ -401,6 +520,7 @@ class SmartChipManager(
     // Вызывается при полном уничтожении экрана (защита от утечек)
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
+        activeTouchedChip = null
         unregisterReceiver() // На всякий случай
     }
 

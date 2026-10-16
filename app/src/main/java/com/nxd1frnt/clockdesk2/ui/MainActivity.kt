@@ -1340,11 +1340,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (::smartPixelManager.isInitialized) {
             smartPixelManager.onUserInteraction()
         }
-        if (ev?.action == MotionEvent.ACTION_DOWN && ::smartChipManager.isInitialized && smartChipManager.isStackExpanded) {
-            val rect = android.graphics.Rect()
-            chipContainer.getGlobalVisibleRect(rect)
-            if (!rect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
-                smartChipManager.collapseStack()
+        if (ev != null && ::smartChipManager.isInitialized && smartChipManager.isStackExpanded) {
+            if (smartChipManager.handleExpandedStackTouch(ev)) {
+                return true
             }
         }
         return super.dispatchTouchEvent(ev)
