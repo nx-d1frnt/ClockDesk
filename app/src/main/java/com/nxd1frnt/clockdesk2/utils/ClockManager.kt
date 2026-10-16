@@ -42,17 +42,43 @@ class ClockManager(
 
     private var additionalLoggingEnabled = initialLoggingState
 
+    private val formatterCache = HashMap<String, SimpleDateFormat>()
+
+    private fun getFormatter(pattern: String): SimpleDateFormat {
+        val locale = Locale.getDefault()
+        val key = "$pattern|${locale.toLanguageTag()}"
+        return formatterCache.getOrPut(key) {
+            SimpleDateFormat(pattern, locale)
+        }
+    }
+
+    private fun shouldUpdateEverySecond(): Boolean {
+        if (isDebugMode) return true
+        val limitClock = prefs.getBoolean("power_saver_limit_clock", true)
+        if (isLowPower && limitClock) return false
+        val clockStyle = fontManager.getClockStyle()
+        if (clockStyle.isAnalog) return true
+        val timePattern = fontManager.getTimeFormatPattern()
+        return timePattern.contains('s') || timePattern.contains('S')
+    }
+
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
             updateClock()
-            val limitClock = prefs.getBoolean("power_saver_limit_clock", true)
+            val now = System.currentTimeMillis()
             val interval = when {
                 isDebugMode -> debugCycleInterval
-                isLowPower && limitClock -> 60000L // 1 minute
-                else -> 1000L // 1 second
+                shouldUpdateEverySecond() -> {
+                    val delay = 1000L - (now % 1000L)
+                    if (delay <= 0L) 1000L else delay
+                }
+                else -> {
+                    val delay = 60000L - (now % 60000L)
+                    if (delay <= 0L) 60000L else delay
+                }
             }
             handler.postDelayed(this, interval)
-            Logger.v("ClockUpdate"){"Clock updated at ${System.currentTimeMillis()}"}
+            Logger.v("ClockUpdate"){"Clock updated at $now, next in ${interval}ms"}
         }
     }
 
@@ -79,20 +105,70 @@ class ClockManager(
         } else if (clockStyle.isTwoLine) {
             val hourPattern = if (timePattern.contains("h")) "hh" else "HH"
             val minPattern = "mm"
-            val hourStr = SimpleDateFormat(hourPattern, Locale.getDefault()).format(currentTime)
-            val minStr = SimpleDateFormat(minPattern, Locale.getDefault()).format(currentTime)
+            val hourStr = getFormatter(hourPattern).format(currentTime)
+            val minStr = getFormatter(minPattern).format(currentTime)
             val safeHour = hourStr.toCharArray().joinToString("\u2060")
             val safeMin = minStr.toCharArray().joinToString("\u2060")
             timeText.text = "$safeHour\n$safeMin"
         } else {
-            timeText.text = SimpleDateFormat(timePattern, Locale.getDefault()).format(currentTime)
+            timeText.text = getFormatter(timePattern).format(currentTime)
         }
     }
 
     fun updateDateText() {
         val currentTime = getCurrentTime()
-        val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
-        dateText.text = SimpleDateFormat(datePattern, Locale.getDefault()).format(currentTime)
+        val dateStyle = fontManager.getDateStyle()
+
+        if (dateText is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+            dateText.dateStyle = dateStyle
+            dateText.isBadgeMode = dateStyle.isBadge
+            dateText.isTwoLineMode = dateStyle.isTwoLine
+            dateText.setDate(currentTime)
+        }
+
+        if (dateStyle.isBadge || dateStyle.isHeroDay) {
+            dateText.text = " "
+        } else if (dateStyle.isTwoLine) {
+            val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+            dateText.text = formatTwoLineDate(currentTime, datePattern)
+        } else {
+            val datePattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+            val effectivePattern = datePattern.replace("\\n", " ").trim()
+            dateText.text = getFormatter(effectivePattern).format(currentTime)
+        }
+    }
+
+    fun formatTwoLineDate(currentTime: Date, pattern: String): String {
+        val effectivePattern = pattern.replace("\\n", "\n").trim()
+        return try {
+            val (topPattern, bottomPattern) = when {
+                effectivePattern.contains("\n") -> {
+                    val parts = effectivePattern.split("\n", limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                effectivePattern.contains(",") -> {
+                    val parts = effectivePattern.split(",", limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                effectivePattern.contains(" ") -> {
+                    val parts = effectivePattern.split(Regex("\\s+"), limit = 2)
+                    parts[0].trim() to parts[1].trim()
+                }
+                else -> {
+                    "EEE" to effectivePattern
+                }
+            }
+
+            val line1 = getFormatter(topPattern.ifBlank { "EEE" }).format(currentTime)
+            val line2 = getFormatter(bottomPattern.ifBlank { "MMM d" }).format(currentTime)
+            val safeLine1 = line1.toCharArray().joinToString("\u2060")
+            val safeLine2 = line2.toCharArray().joinToString("\u2060")
+            "$safeLine1\n$safeLine2"
+        } catch (e: Exception) {
+            val line1 = getFormatter("EEE").format(currentTime)
+            val line2 = getFormatter("MMM d").format(currentTime)
+            "$line1\n$line2"
+        }
     }
 
     fun startUpdates() {
@@ -128,9 +204,10 @@ class ClockManager(
         today.set(Calendar.SECOND, 0)
         today.set(Calendar.MILLISECOND, 0)
 
+        val cal = Calendar.getInstance()
         fun normalizeTime(original: Date?): Date? {
             if (original == null) return null
-            val cal = Calendar.getInstance().apply { time = original }
+            cal.time = original
             cal.set(Calendar.YEAR, today.get(Calendar.YEAR))
             cal.set(Calendar.MONTH, today.get(Calendar.MONTH))
             cal.set(Calendar.DAY_OF_MONTH, today.get(Calendar.DAY_OF_MONTH))
@@ -172,20 +249,17 @@ class ClockManager(
             val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
             val datePattern = fontManager.getDateFormatPattern().ifBlank { "yyyy-MM-dd" }
 
-            val timeStr = SimpleDateFormat(timePattern, Locale.getDefault()).format(simulatedTime.time)
+            val timeStr = getFormatter(timePattern).format(simulatedTime.time)
             val sunriseStr = dayTimeGetter.sunriseTime?.let {
-                SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
+                getFormatter(timePattern).format(it)
             } ?: "06:00"
             val sunsetStr = dayTimeGetter.sunsetTime?.let {
-                SimpleDateFormat(timePattern, Locale.getDefault()).format(it)
+                getFormatter(timePattern).format(it)
             } ?: "20:05"
             debugCallback(timeStr, sunriseStr, sunsetStr)
             Logger.d("DemoMode"){
                 "Simulated time: $timeStr, date: ${
-                    SimpleDateFormat(
-                        datePattern,
-                        Locale.getDefault()
-                    ).format(simulatedTime.time)
+                    getFormatter(datePattern).format(simulatedTime.time)
                 }"}
             simulatedTime.time
         } else {

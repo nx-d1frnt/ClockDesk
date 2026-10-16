@@ -121,17 +121,53 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
         evaluateOverallState()
     }
 
+    private var currentActiveController: MediaController? = null
+
+    override val canControl: Boolean
+        get() = currentActiveController != null
+
+    override fun play() {
+        currentActiveController?.transportControls?.play()
+    }
+
+    override fun pause() {
+        currentActiveController?.transportControls?.pause()
+    }
+
+    override fun togglePlayPause() {
+        val controller = currentActiveController ?: return
+        val state = controller.playbackState?.state ?: PlaybackState.STATE_NONE
+        if (state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING) {
+            controller.transportControls?.pause()
+        } else {
+            controller.transportControls?.play()
+        }
+    }
+
+    override fun next() {
+        currentActiveController?.transportControls?.skipToNext()
+    }
+
+    override fun previous() {
+        currentActiveController?.transportControls?.skipToPrevious()
+    }
+
     private fun evaluateOverallState() {
         try {
             val controllers = mediaSessionManager.getActiveSessions(componentName)
 
-            val playingController = controllers.firstOrNull {
+            val active = controllers.firstOrNull {
                 val state = it.playbackState?.state ?: PlaybackState.STATE_NONE
                 state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
+            } ?: controllers.firstOrNull {
+                val state = it.playbackState?.state ?: PlaybackState.STATE_NONE
+                state == PlaybackState.STATE_PAUSED && (it.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) != null)
             }
 
-            if (playingController != null) {
-                updateStateFromController(playingController)
+            currentActiveController = active
+
+            if (active != null) {
+                updateStateFromController(active)
             } else {
                 cancelArtworkRetry()
                 currentMissingArtTrackKey = null
@@ -139,6 +175,7 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
                 callback?.invoke(PluginState.Idle)
             }
         } catch (e: Exception) {
+            currentActiveController = null
             cancelArtworkRetry()
             currentMissingArtTrackKey = null
             artRetryCount = 0
@@ -187,8 +224,9 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
         val playbackState = controller.playbackState
         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING ||
                 playbackState?.state == PlaybackState.STATE_BUFFERING
+        val isPaused = playbackState?.state == PlaybackState.STATE_PAUSED
 
-        if (isPlaying) {
+        if (isPlaying || isPaused) {
             val meta = controller.metadata
 
             val (bitmap, artUri) = extractArtwork(controller, meta)
@@ -200,7 +238,7 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
 
             val isArtMissing = bitmap == null && artUri.isNullOrEmpty()
 
-            if (isArtMissing) {
+            if (isArtMissing && isPlaying) {
                 scheduleArtworkRetry(controller, trackKey)
             } else {
                 if (currentMissingArtTrackKey == trackKey) {
@@ -211,7 +249,8 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
                 }
             }
 
-            Logger.d("SystemMediaPlugin"){"Update: ${controller.packageName}, hasBitmap=${bitmap != null}, uri=$artUri"}
+            val duration = meta?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it > 0 }
+            val position = playbackState?.position?.takeIf { it >= 0 }
 
             val track = MusicTrack(
                 title = title,
@@ -220,9 +259,16 @@ class SystemSessionPlugin(private val context: Context) : IMusicPlugin {
                 artworkBitmap = bitmap,
                 artworkUrl = artUri,
                 sourcePackageName = controller.packageName,
-                sourceIconBitmap = displayIcon
+                sourceIconBitmap = displayIcon,
+                durationMs = duration,
+                positionMs = position
             )
-            callback?.invoke(PluginState.Playing(track))
+
+            if (isPlaying) {
+                callback?.invoke(PluginState.Playing(track))
+            } else {
+                callback?.invoke(PluginState.Paused(track))
+            }
         } else {
             cancelArtworkRetry()
             currentMissingArtTrackKey = null

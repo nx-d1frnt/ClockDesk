@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.UpdateManager
 
@@ -57,7 +58,13 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
 
         view.setOnClickListener {
             if (UpdateManager.isUpdateAvailable) {
-                showAppUpdateDialog()
+                if (UpdateManager.downloadState == UpdateManager.DownloadState.READY_TO_INSTALL) {
+                    UpdateManager.installApk(context)
+                } else if (UpdateManager.downloadState == UpdateManager.DownloadState.DOWNLOADING) {
+                    android.widget.Toast.makeText(context, R.string.downloading_update_title, android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    showAppUpdateDialog()
+                }
             }
         }
         return view
@@ -78,6 +85,7 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
         .create()
 
         materialDialog.show()
+        com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager.styleAlertDialog(materialDialog)
     }
 
     override fun update(view: View, sharedPreferences: SharedPreferences): Boolean {
@@ -85,15 +93,40 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
         val textView = view.findViewById<TextView>(R.id.chip_text)
 
         if (UpdateManager.isChecking) {
-            textView.text = context.getString(R.string.checking_updates)
-            iconView.setImageResource(R.drawable.update)
+            val checkText = context.getString(R.string.checking_updates)
+            if (iconView != null && iconView.tag != R.drawable.update) {
+                iconView.setImageResource(R.drawable.update)
+                iconView.tag = R.drawable.update
+            }
+            if (textView != null) {
+                textView.setTextWithFade(checkText)
+            }
             return true
         }
 
         if (!UpdateManager.isUpdateAvailable) return false
 
-        iconView.setImageResource(context.resources.getIdentifier("update", "drawable", context.packageName))
-        textView.text = context.getString(R.string.update_available_text)
+        if (iconView != null && iconView.tag != R.drawable.update) {
+            iconView.setImageResource(R.drawable.update)
+            iconView.tag = R.drawable.update
+        }
+
+        val targetText = when (UpdateManager.downloadState) {
+            UpdateManager.DownloadState.DOWNLOADING -> {
+                val percent = UpdateManager.downloadProgress
+                "${context.getString(R.string.downloading_update_title)}: $percent%"
+            }
+            UpdateManager.DownloadState.READY_TO_INSTALL -> {
+                context.getString(R.string.update_ready_to_install)
+            }
+            else -> {
+                context.getString(R.string.update_available_text)
+            }
+        }
+
+        if (textView != null) {
+            textView.setTextWithFade(targetText)
+        }
 
         return true
     }

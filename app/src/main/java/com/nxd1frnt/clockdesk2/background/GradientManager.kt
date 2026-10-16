@@ -146,7 +146,7 @@ class GradientManager(
         )
     }
 
-    private fun getSkyGradientColors(currentTime: Date): Pair<Int, Int> {
+    fun getSkyGradientColors(currentTime: Date): Pair<Int, Int> {
         val sunrise = sunTimeApi.sunriseTime
             ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
         val sunset =

@@ -5,6 +5,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -30,21 +31,24 @@ import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.animation.TimeInterpolator
 import android.view.WindowManager
-import android.view.animation.OvershootInterpolator
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import android.widget.Button
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
-import java.util.Calendar
-import java.util.Date
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -54,6 +58,7 @@ import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -82,24 +87,32 @@ import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ColorExtractor
 import com.nxd1frnt.clockdesk2.utils.EntranceAnimationManager
 import com.nxd1frnt.clockdesk2.utils.FontManager
-import com.nxd1frnt.clockdesk2.utils.GeocodingHelper
+import com.nxd1frnt.clockdesk2.utils.ForegroundStateDispatcher
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import com.nxd1frnt.clockdesk2.utils.PowerStateManager
 import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import com.nxd1frnt.clockdesk2.utils.getWeatherMatrix
 import com.nxd1frnt.clockdesk2.weathergetter.OpenMeteoAPI
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
+import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
+import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetType
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetController
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetHost
+import com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget
+import java.util.Calendar
+import java.util.Date
 
-class MainActivity : AppCompatActivity(), PowerSaveObserver {
+class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var timeText: TextView
     private lateinit var dateText: TextView
     private lateinit var weatherText: TextView
     private lateinit var weatherIcon: ImageView
     private lateinit var weatherLayout: LinearLayout
-    private lateinit var lastfmLayout: LinearLayout
+    private lateinit var lastfmLayout: FrameLayout
     private lateinit var lastfmIcon: ImageView
     private lateinit var nowPlayingTextView: TextView
     private lateinit var backgroundLayout: LinearLayout
@@ -109,10 +122,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var settingsButton: Button
     private lateinit var debugButton: Button
-    private lateinit var backgroundButton: Button
     private lateinit var backgroundCustomizationTab: FloatingActionButton
     private lateinit var mainLayout: ConstraintLayout
     private lateinit var editModeBlurLayer: ImageView
+    private lateinit var editModeActionBar: MaterialCardView
+    private lateinit var btnAddWidget: Button
+    private lateinit var btnResetLayout: Button
+    private lateinit var btnDoneEdit: Button
+    private lateinit var emptyDeskPrompt: TextView
 
     // UI Elements
     private lateinit var sideSheet: LinearLayout
@@ -125,13 +142,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private lateinit var smartPixelManager: SmartPixelManager
     private lateinit var smartPixelOverlay: View
     private lateinit var customizationSheetManager: CustomizationSheetManager
+    private lateinit var widgetGallerySideSheetManager: WidgetGallerySideSheetManager
     private lateinit var backgroundSheetManager: BackgroundSheetManager
     private lateinit var tutorialManager: TutorialManager
 
     // Core Managers
+    private lateinit var desktopWidgetManager: DesktopWidgetManager
     private lateinit var clockManager: ClockManager
     private lateinit var gradientManager: GradientManager
-    private lateinit var fontManager: FontManager
+    override lateinit var fontManager: FontManager
     private lateinit var locationManager: LocationManager
     private lateinit var weatherGetter: WeatherGetter
     private lateinit var dayTimeGetter: DayTimeGetter
@@ -140,7 +159,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private lateinit var smartChipManager: SmartChipManager
     private lateinit var chipContainer: ConstraintLayout
+    private lateinit var smartChipScrollView: ScrollView
     private lateinit var widgetMover: WidgetMover
+    private lateinit var deskNotificationManager: com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager
+    private lateinit var deskCallOverlay: com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay
+    private var deskConnectDeviceListener: com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener? = null
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var powerStateManager: PowerStateManager
     private lateinit var sensorManager: SensorManager
@@ -148,14 +171,27 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     // State Variables
     private var musicManager: MusicPluginManager? = null
     private var currentMusicState: PluginState = PluginState.Idle
+    private val musicStateUpdates = ForegroundStateDispatcher<PluginState> { applyMusicStateUpdate(it) }
     private var lastTrackInfo: String? = null
     private var wasMusicBackgroundApplied = false
     private var currentAppliedArtworkSource: Any? = null
     private var isUpdatingBackgroundUi = false
-    private var isEditMode = false
+    override var isEditMode: Boolean = false
+    override val hostContext: Context get() = this
+    override fun getRestTranslationX(view: View): Float = if (::widgetMover.isInitialized) widgetMover.getRestTranslationX(view) else 0f
+    override fun getRestTranslationY(view: View): Float = if (::widgetMover.isInitialized) widgetMover.getRestTranslationY(view) else 0f
+    override fun onMusicArtworkChanged(artworkSource: Any?) {}
+    override fun onWidgetClicked(widget: DesktopWidgetController) {
+        widget.rootView?.let {
+            customizationSheetManager.showForView(it)
+            resetEditModeTimeout()
+        }
+    }
+    override fun getPreferences(): SharedPreferences = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
     private var isCropModeActive = false
     private var isScaleAnimating = false
     private var isLaunchingFilePicker = false
+    var isLaunchingExternalActivity = false
     private var isDemoMode = false
     private var isTutorialRunning = false
     private var isNightShiftEnabled = false
@@ -166,6 +202,29 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var previewBackgroundUri: String? = null
     private var lastBackgroundSource: Any? = null
     private var lastBlurIntensity: Int? = null
+    private data class BackgroundLoad(
+        val model: Any,
+        val blurIntensity: Int,
+        val skipAnimation: Boolean,
+        val onComplete: (() -> Unit)?
+    )
+    private val backgroundLoads = ForegroundStateDispatcher<BackgroundLoad> {
+        performBackgroundLoad(it.model, it.blurIntensity, it.skipAnimation, it.onComplete)
+    }
+    private val backgroundProviderListener: (com.nxd1frnt.clockdesk2.background.provider.IBackgroundProvider, com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload) -> Unit = { provider, payload ->
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            val activeId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+            if (activeId == provider.id) {
+                Logger.i("BackgroundFlow") { "BackgroundProvider updated: ${provider.id}, applying payload $payload" }
+                applyBackgroundPayload(payload)
+            }
+        }
+    }
+    private var backgroundRequestId = 0L
+    private var isBackgroundLoading = false
+    private var activeBackgroundTarget: CustomTarget<Bitmap>? = null
+    private var activeEditBackgroundTarget: CustomTarget<Drawable>? = null
     private var isAdvancedGraphicsEnabled = false
     private var isGraphicsTransitionsEnabled = true
     private var isGraphicsTurbulenceEnabled = true
@@ -175,6 +234,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var graphicsWeatherScale = 40
     private var enableAdditionalLogging = false
     private var lastIsNight: Boolean? = null
+    private var lastFilterDimFactor: Float = -1f
+    private var lastFilterWmoCode: Int = -1
+    private var lastFilterNightFactor: Float = -1f
+    private var lastFilterIsNight: Boolean? = null
+    private var lastFilterIsWeatherEnabled: Boolean? = null
+    private var lastFilterVisualIntensity: Float = -1f
+    private var lastFilterIsEditMode: Boolean? = null
 
     private var focusedView: View? = null
     private val editModeTimeout = 10000L // 10 seconds
@@ -208,7 +274,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private var isBackgroundReady = false
     private var entranceAnimationPlayed = false
     private val ENTRANCE_ANIMATION_TIMEOUT = 2500L
-    private val MIN_LOADER_DURATION = 800L
+    private val MIN_LOADER_DURATION = 200L
     private var activityStartTime = 0L
     private var showMediaIcon = false
 
@@ -217,9 +283,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private val editModeTimeoutRunnable = Runnable {
-        if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN ||
-            (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing)
-        ) {
+        if (isAnySheetShowing()) {
             return@Runnable
         }
 
@@ -296,18 +360,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             val delay = if (force) 0L else maxOf(0L, MIN_LOADER_DURATION - timePassed)
 
             mainLayout.postDelayed({
-                entranceAnimationManager.play()
-                handler.postDelayed({
+                entranceAnimationManager.play {
                     setupMusicSystem()
-                    widgetMover.restoreOrderAndPositions()
-                }, 850)
+                    setupDeskConnectSystem()
+                    loadFogTextures()
+                }
             }, delay)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         activityStartTime = System.currentTimeMillis()
-        DynamicColors.applyToActivityIfAvailable(this)
+        UiMonetThemeManager.applyToActivity(this)
         super.onCreate(savedInstanceState)
 
         setupWindowFlags()
@@ -325,22 +389,38 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         setupEntranceAnimation()
         initUIManagers()
         setupListeners()
+        applyLiveMonetTheme()
 
         val skipAnimation = savedInstanceState != null
         loadSavedBackground(skipAnimation)
         checkForFirstLaunchAnimation()
-        setupSideSheet()
         restoreSavedWeatherState()
         startUpdates()
     }
 
+    private fun applyLiveMonetTheme() {
+        UiMonetThemeManager.applyLiveToMainActivity(this)
+        if (::customizationSheetManager.isInitialized) {
+            customizationSheetManager.refreshMonetTheme()
+        }
+        if (::widgetGallerySideSheetManager.isInitialized) {
+            widgetGallerySideSheetManager.refreshMonetTheme()
+        }
+        if (::backgroundSheetManager.isInitialized) {
+            backgroundSheetManager.refreshMonetTheme()
+        }
+    }
+
     private fun setupEntranceAnimation() {
+        val themeColor = fontManager.getDynamicScheme().primary
         entranceAnimationManager = EntranceAnimationManager(
             rootView = mainLayout,
-            widgets = listOf(timeText, dateText, chipContainer, lastfmLayout),
+            widgets = desktopWidgetManager.getViews(),
             turbulenceOverlay = turbulenceOverlay,
             isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled,
-            dynamicBackgroundView = dynamicBackgroundView
+            dynamicBackgroundView = dynamicBackgroundView,
+            targetTranslationYProvider = { view -> widgetMover.getRestTranslationY(view) },
+            themeColor = themeColor
         )
         entranceAnimationManager.prepareViews()
     }
@@ -378,26 +458,34 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         performanceOverlay = findViewById(R.id.performance_overlay)
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
-        backgroundButton = findViewById(R.id.background_button)
         backgroundCustomizationTab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
         sideSheet = findViewById(R.id.side_sheet)
         backgroundBottomSheet = findViewById(R.id.background_bottom_sheet)
+        backgroundBottomSheet.visibility = View.GONE
+
+        val widgetGallerySheet = findViewById<LinearLayout>(R.id.widget_gallery_side_sheet)
+        SideSheetBehavior.from(widgetGallerySheet).state = SideSheetBehavior.STATE_HIDDEN
+
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
         chipContainer = findViewById(R.id.smart_chip_container)
+        smartChipScrollView = findViewById(R.id.smart_chip_scrollview)
         smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
+        editModeActionBar = findViewById(R.id.edit_mode_action_bar)
+        btnAddWidget = findViewById(R.id.btn_add_widget)
+        btnResetLayout = findViewById(R.id.btn_reset_layout)
+        btnDoneEdit = findViewById(R.id.btn_done_edit)
+        emptyDeskPrompt = findViewById(R.id.empty_desk_prompt)
 
         editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
 
-        settingsButton.alpha = 0f
-        settingsButton.visibility = View.GONE
-        debugButton.alpha = 0f
-        debugButton.visibility = View.GONE
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
+        editModeActionBar.visibility = View.GONE
+        emptyDeskPrompt.visibility = View.GONE
     }
 
     private fun initCoreManagers() {
@@ -413,30 +501,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
         graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
 
-        Thread {
-            val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
-            val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
-            handler.post {
-                if (!isDestroyed && !isFinishing) {
-                    dynamicBackgroundView.setFogTextures(fogBitmap, cloudsBitmap)
-                    val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
-                    dynamicBackgroundView.setRenderScale(targetScale)
-                    val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
-                    dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
-                }
-            }
-        }.start()
-
         backgroundManager = BackgroundManager(this)
         locationManager = LocationManager(this, permissionRequestCode)
         dayTimeGetter = SunriseAPI(this, locationManager)
 
         weatherGetter = OpenMeteoAPI(this, locationManager) {
             runOnUiThread {
-//                if (weatherGetter.temperature != null) {
-//                    weatherText.text = "${weatherGetter.temperature}°C"
-//                }
-
                 val code = weatherGetter.weatherCode ?: 0
                 val wind = weatherGetter.windSpeed ?: 0.0
                 val isNight = !dayTimeGetter.isDay()
@@ -467,7 +537,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             locationManager,
             handler,
             isCustomBackgroundActive = {
-                hasCustomImageBackground || (::backgroundSheetManager.isInitialized && 
+                hasCustomImageBackground || wasMusicBackgroundApplied || (::backgroundSheetManager.isInitialized && 
                         backgroundSheetManager.isShowing && 
                         backgroundSheetManager.previewBackgroundUri != null && 
                         backgroundSheetManager.previewBackgroundUri != "__DEFAULT_GRADIENT__")
@@ -486,6 +556,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             chipContainer,
             enableAdditionalLogging
         )
+        fontManager.onDynamicSchemeChanged = {
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    applyLiveMonetTheme()
+                }
+            }
+        }
 
         smartChipManager = SmartChipManager(
             this,
@@ -547,10 +624,41 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             enableAdditionalLogging
         )
 
-        burnInProtectionManager = BurnInProtectionManager(listOf(timeText, dateText, lastfmLayout, chipContainer))
+        desktopWidgetManager = DesktopWidgetManager(this, mainLayout, host = this)
+        desktopWidgetManager.bindExistingViews(
+            timeView = timeText,
+            dateView = dateText,
+            mediaView = lastfmLayout,
+            chipsView = chipContainer,
+            weatherView = weatherLayout
+        )
+        setupMediaWidgetCallbacks()
 
-        widgetMover = WidgetMover(this, listOf(lastfmLayout, dateText, timeText), mainLayout)
+        val activeViews = desktopWidgetManager.getViews()
+        val movableViews = activeViews.filter { it !== smartChipScrollView && it !== chipContainer }
+
+        val burnInShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
+        val burnInShiftPx = (burnInShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+        burnInProtectionManager = BurnInProtectionManager(activeViews, maxShiftPx = burnInShiftPx)
+
+        widgetMover = WidgetMover(this, movableViews, mainLayout)
         widgetMover.burnInProtectionManager = burnInProtectionManager
+
+        desktopWidgetManager.onWidgetsChanged = {
+            desktopWidgetManager.bindExistingViews(
+                timeView = timeText,
+                dateView = dateText,
+                mediaView = lastfmLayout,
+                chipsView = chipContainer,
+                weatherView = weatherLayout
+            )
+            setupMediaWidgetCallbacks()
+            val currentActiveViews = desktopWidgetManager.getViews()
+            widgetMover.setViews(currentActiveViews.filter { it !== smartChipScrollView && it !== chipContainer })
+            burnInProtectionManager.updateViews(currentActiveViews)
+            fontManager.loadFont()
+            updateEmptyDeskPromptVisibility()
+        }
 
         widgetMover.onInitialLayoutComplete = {
             isWidgetLayoutComplete = true
@@ -570,208 +678,349 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         fontManager.loadFont()
         setupPreferencesListener(prefs)
+        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).addListener(backgroundProviderListener)
+    }
+
+    private fun setupDeskConnectSystem() {
+        if (::deskNotificationManager.isInitialized) return
+        val deskConnectManager = com.nxd1frnt.clockdesk2.connect.DeskConnectManager.getInstance(this)
+        val notificationContainer = findViewById<android.view.ViewGroup>(R.id.desk_notification_container)
+        val callContainer = findViewById<android.view.ViewGroup>(R.id.desk_call_container)
+        deskNotificationManager = com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager(this, notificationContainer, deskConnectManager)
+        deskCallOverlay = com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay(this, callContainer, deskConnectManager)
+
+        val listener = object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
+            override fun onDeviceDiscovered(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onDeviceConnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onDeviceDisconnected(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
+            override fun onPairingRequested(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, verificationKey: String) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this@MainActivity))
+                            .setTitle(R.string.deskconnect_pairing_request_title)
+                            .setMessage(getString(R.string.deskconnect_pairing_request_message, device.getDisplayName(), verificationKey))
+                            .setPositiveButton(R.string.deskconnect_accept) { _, _ ->
+                                deskConnectManager.acceptPair(device)
+                            }
+                            .setNegativeButton(R.string.deskconnect_reject) { _, _ ->
+                                deskConnectManager.rejectPair(device)
+                            }
+                            .setCancelable(false)
+                            .show()
+                        UiMonetThemeManager.styleAlertDialog(dialog)
+                    }
+                }
+            }
+            override fun onPairingStateChanged(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice, isPaired: Boolean) {}
+        }
+        deskConnectDeviceListener = listener
+        deskConnectManager.deviceListeners.add(listener)
+    }
+
+    private fun loadFogTextures() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val fogBitmap = BitmapFactory.decodeResource(resources, R.drawable.fog)
+            val cloudsBitmap = BitmapFactory.decodeResource(resources, R.drawable.clouds)
+            withContext(Dispatchers.Main) {
+                if (!isDestroyed && !isFinishing && ::dynamicBackgroundView.isInitialized) {
+                    dynamicBackgroundView.setFogTextures(fogBitmap, cloudsBitmap)
+                    val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+                    dynamicBackgroundView.setRenderScale(targetScale)
+                    val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+                    dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+                }
+            }
+        }
+    }
+
+    private fun isAnySheetShowing(): Boolean {
+        return (::sideSheetBehavior.isInitialized && sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) ||
+               (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) ||
+               (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) ||
+               (::cropController.isInitialized && cropController.isActive())
+    }
+
+    private fun showDock(animate: Boolean = true) {
+        if (!isEditMode || isCropModeActive) return
+        if (isAnySheetShowing()) return
+
+        if (editModeActionBar.visibility == View.VISIBLE &&
+            editModeActionBar.alpha >= 0.99f &&
+            editModeActionBar.translationY == 0f &&
+            editModeActionBar.scaleX >= 0.99f) {
+            return
+        }
+
+        editModeActionBar.animate().cancel()
+        val dockSlideOffset = dpToPx(24f)
+        if (animate) {
+            editModeActionBar.visibility = View.VISIBLE
+            editModeActionBar.alpha = 0f
+            editModeActionBar.translationY = dockSlideOffset
+            editModeActionBar.scaleX = 0.92f
+            editModeActionBar.scaleY = 0.92f
+            editModeActionBar.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                .start()
+        } else {
+            editModeActionBar.visibility = View.VISIBLE
+            editModeActionBar.alpha = 1f
+            editModeActionBar.translationY = 0f
+            editModeActionBar.scaleX = 1f
+            editModeActionBar.scaleY = 1f
+        }
+    }
+
+    private fun hideDock(animate: Boolean = true) {
+        editModeActionBar.animate().cancel()
+        val dockSlideOffset = dpToPx(24f)
+        if (animate && editModeActionBar.visibility == View.VISIBLE) {
+            editModeActionBar.animate()
+                .alpha(0f)
+                .translationY(dockSlideOffset)
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+                .withEndAction {
+                    if (!isEditMode || isAnySheetShowing() || isCropModeActive) {
+                        editModeActionBar.visibility = View.GONE
+                    }
+                }
+                .start()
+        } else {
+            editModeActionBar.visibility = View.GONE
+            editModeActionBar.alpha = 0f
+            editModeActionBar.translationY = dockSlideOffset
+        }
+    }
+
+    private fun handleSheetStateChanged(isHidden: Boolean) {
+        if (isHidden) {
+            resetEditModeTimeout()
+            if (isEditMode && !isAnySheetShowing() && !isCropModeActive) {
+                if (editModeActionBar.visibility != View.VISIBLE) {
+                    showDock(animate = true)
+                }
+            }
+        } else {
+            stopHideUiTimer()
+        }
+    }
+
+    private fun ensureCustomizationSheetManager(): CustomizationSheetManager {
+        if (!::customizationSheetManager.isInitialized) {
+            setupSideSheet()
+            customizationSheetManager = CustomizationSheetManager(
+                sideSheetView = sideSheet,
+                mainLayout = mainLayout,
+                backgroundCustomizationTab = backgroundCustomizationTab,
+                dockView = editModeActionBar,
+                fontManager = fontManager,
+                widgetMover = widgetMover,
+                clockManager = clockManager,
+                dayTimeGetter = dayTimeGetter,
+                widgetManager = desktopWidgetManager,
+                onAddFontRequested = {
+                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
+                        }
+                    } else {
+                        Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
+                    }
+                    try {
+                        isLaunchingFilePicker = true
+                        startActivityForResult(intent, PICK_FONT_REQUEST)
+                    } catch (e: ActivityNotFoundException) { /* Handle error */ }
+                },
+                onSheetStateChanged = { isHidden ->
+                    handleSheetStateChanged(isHidden)
+                }
+            )
+            customizationSheetManager.onRemoveWidgetRequested = { viewToRemove ->
+                removeWidget(viewToRemove)
+            }
+        }
+        return customizationSheetManager
+    }
+
+    private fun ensureWidgetGallerySideSheetManager(): WidgetGallerySideSheetManager {
+        if (!::widgetGallerySideSheetManager.isInitialized) {
+            widgetGallerySideSheetManager = WidgetGallerySideSheetManager(
+                sideSheetView = findViewById(R.id.widget_gallery_side_sheet),
+                mainLayout = mainLayout,
+                backgroundCustomizationTab = backgroundCustomizationTab,
+                dockView = editModeActionBar,
+                widgetManager = desktopWidgetManager,
+                onWidgetAdded = { type ->
+                    onWidgetAdded(type)
+                },
+                onSheetStateChanged = { isHidden ->
+                    handleSheetStateChanged(isHidden)
+                }
+            )
+        }
+        return widgetGallerySideSheetManager
+    }
+
+    private fun ensureCropController(): BackgroundCropController {
+        if (!::cropController.isInitialized) {
+            val overlayView = findViewById<View>(R.id.crop_overlay)
+            cropController = BackgroundCropController(
+                dynamicBackgroundView = dynamicBackgroundView,
+                overlayRoot = overlayView,
+                backgroundManager = backgroundManager,
+                widgetViewsProvider = {
+                    val views = desktopWidgetManager.getViews().toMutableList()
+                    if (emptyDeskPrompt.visibility == View.VISIBLE) {
+                        views.add(emptyDeskPrompt)
+                    }
+                    views
+                },
+                onApply = {
+                    isCropModeActive = false
+                    if (dynamicBackgroundView.visibility == View.VISIBLE) {
+                        updateBackgroundFilters()
+                    }
+                    ensureBackgroundSheetManager().show()
+                    resetEditModeTimeout()
+                },
+                onCancel = {
+                    isCropModeActive = false
+                    ensureBackgroundSheetManager().show()
+                    resetEditModeTimeout()
+                }
+            )
+        }
+        return cropController
+    }
+
+    private fun ensureBackgroundSheetManager(): BackgroundSheetManager {
+        if (!::backgroundSheetManager.isInitialized) {
+            backgroundSheetManager = BackgroundSheetManager(
+                floatingMenuView = backgroundBottomSheet,
+                mainLayout = mainLayout,
+                backgroundCustomizationTab = backgroundCustomizationTab,
+                dockView = editModeActionBar,
+                backgroundManager = backgroundManager,
+                dayTimeGetter = dayTimeGetter,
+                weatherGetter = weatherGetter,
+                weatherView = dynamicBackgroundView,
+                isMusicBackgroundApplied = { wasMusicBackgroundApplied },
+                onAddBackgroundRequested = {
+                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                        }
+                    } else {
+                        Intent(Intent.ACTION_GET_CONTENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                        }
+                    }
+                    try {
+                        isLaunchingFilePicker = true
+                        startActivityForResult(intent, PICK_BG_REQUEST)
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onPreviewImage = { uri, blur ->
+                    applyImageBackground(uri, blur)
+                },
+                onPreviewBlur = { blur ->
+                    previewBlur(blur)
+                },
+                onPreviewGradient = {
+                    previewGradient()
+                },
+                onPreviewSolidColor = { color ->
+                    applySolidColorBackground(color)
+                },
+                onPreviewMusicAlbumArt = { enabled, blur ->
+                    previewMusicAlbumArt(enabled, blur)
+                },
+                onRestoreOriginalState = {
+                    restoreInitialBackgroundState()
+                },
+                onUpdateFilters = { previewMode, previewIntensity, previewMin, previewMax, previewNightShift, previewZoom ->
+                    if (dynamicBackgroundView.visibility == View.VISIBLE) {
+                        updateBackgroundFilters(previewMode, previewIntensity, previewMin, previewMax, previewNightShift, previewZoom)
+                    }
+                },
+                onApplyCompleted = { previewUri, blur ->
+                    applyBackgroundSettingsFromSheet(previewUri, blur)
+                },
+                onClearBackground = {
+                    backgroundManager.setSavedBackgroundUri(null)
+                    setCustomBackground(false)
+                    backgroundImageView.setImageDrawable(null)
+                    fontManager.clearDynamicColors()
+                    fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
+                    }
+                    backgroundImageView.visibility = View.GONE
+                    dynamicBackgroundView.visibility = View.VISIBLE
+                    backgroundManager.clearDim()
+                    gradientManager.startUpdates()
+                    lastBackgroundSource = null
+                    lastBlurIntensity = null
+                    restoreSavedWeatherState()
+                    updateBackgroundFilters()
+                },
+                onSheetStateChanged = { isHidden ->
+                    handleSheetStateChanged(isHidden)
+                },
+                onCropRequested = {
+                    isCropModeActive = true
+                    hideDock(animate = true)
+                    backgroundSheetManager.hide()
+                    ensureCropController().enter()
+                    stopHideUiTimer()
+                }
+            )
+        }
+        return backgroundSheetManager
+    }
+
+    private fun initTutorialManager(prefs: SharedPreferences) {
+        if (!::tutorialManager.isInitialized) {
+            tutorialManager = TutorialManager(
+                tutorialLayout = tutorialLayout,
+                tutorialFinger = tutorialFinger,
+                tutorialText = tutorialText,
+                mainLayout = mainLayout,
+                timeText = timeText,
+                prefs = prefs,
+                toggleEditModeAction = { toggleEditMode() },
+                showCustomizationAction = { view -> ensureCustomizationSheetManager().showForView(view) },
+                hideBottomSheetAction = {
+                    if (::customizationSheetManager.isInitialized) customizationSheetManager.hide()
+                },
+                requestLocationPermissionAction = {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                        permissionRequestCode
+                    )
+                },
+                onTutorialFinished = { checkLocationPermissionsAndLoadData() }
+            )
+        }
     }
 
     private fun initUIManagers() {
-        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-
-        // 1. Customization Sheet
-        customizationSheetManager = CustomizationSheetManager(
-            sideSheetView = sideSheet,
-            mainLayout = mainLayout,
-            backgroundCustomizationTab = backgroundCustomizationTab,
-            fontManager = fontManager,
-            widgetMover = widgetMover,
-            clockManager = clockManager,
-            dayTimeGetter = dayTimeGetter,
-            onAddFontRequested = {
-                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "*/*"
-                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf"))
-                    }
-                } else {
-                    Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
-                }
-                try {
-                    isLaunchingFilePicker = true
-                    startActivityForResult(intent, PICK_FONT_REQUEST)
-                } catch (e: ActivityNotFoundException) { /* Handle error */ }
-            },
-            onSheetStateChanged = { isHidden ->
-                if (isHidden) {
-                    resetEditModeTimeout()
-                } else {
-                    stopHideUiTimer()
-                }
-            }
-        )
-
-        // 2. Background Sheet
-        backgroundSheetManager = BackgroundSheetManager(
-            floatingMenuView = backgroundBottomSheet,
-            mainLayout = mainLayout,
-            backgroundCustomizationTab = backgroundCustomizationTab,
-            backgroundManager = backgroundManager,
-            dayTimeGetter = dayTimeGetter,
-            weatherGetter = weatherGetter,
-            weatherView = dynamicBackgroundView,
-            isMusicBackgroundApplied = { wasMusicBackgroundApplied },
-            onAddBackgroundRequested = {
-                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "image/*"
-                    }
-                } else {
-                    Intent(Intent.ACTION_GET_CONTENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "image/*"
-                    }
-                }
-                try {
-                    isLaunchingFilePicker = true
-                    startActivityForResult(intent, PICK_BG_REQUEST)
-                } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(this, R.string.image_picker_error, Toast.LENGTH_SHORT).show()
-                }
-            },
-            onPreviewImage = { uri, blur ->
-                applyImageBackground(uri, blur)
-            },
-            onRestoreGradient = {
-                restoreGradientBackground()
-                restoreSavedWeatherState()
-            },
-            onRestoreSavedBackground = {
-                restoreUserBackground(backgroundManager.getSavedBackgroundUri())
-                restoreSavedWeatherState()
-            },
-            onUpdateFilters = { previewMode, previewIntensity, previewMin, previewMax ->
-                if (dynamicBackgroundView.visibility == View.VISIBLE) {
-                    updateBackgroundFilters(previewMode, previewIntensity, previewMin, previewMax)
-                }
-            },
-            onApplyCompleted = { previewUri ->
-                if (wasMusicBackgroundApplied) {
-                    when (previewUri) {
-                        "__DEFAULT_GRADIENT__" -> {
-                            backgroundManager.setSavedBackgroundUri(null)
-                            fontManager.clearDynamicColors()
-                            fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
-                        }
-                        null -> { }
-                        else -> backgroundManager.setSavedBackgroundUri(previewUri)
-                    }
-                    restoreSavedWeatherState()
-                    Toast.makeText(this, getString(R.string.settings_saved_music_active), Toast.LENGTH_LONG).show()
-                    return@BackgroundSheetManager
-                }
-
-                val intensity = backgroundManager.getBlurIntensity()
-                when (previewUri) {
-                    "__DEFAULT_GRADIENT__" -> {
-                        backgroundManager.setSavedBackgroundUri(null)
-                        setCustomBackground(false)
-                        fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
-                        dynamicBackgroundView.visibility = View.VISIBLE
-                        backgroundImageView.visibility = View.GONE
-                        backgroundManager.clearDim()
-                        gradientManager.startUpdates()
-                    }
-                    null -> {
-                        backgroundManager.getSavedBackgroundUri()?.let {
-                            try {
-                                applyImageBackground(Uri.parse(it), intensity)
-                                setCustomBackground(true)
-                                updateBackgroundFilters()
-                            } catch (e: Exception) {
-                                Logger.w("MainActivity") { "Failed to re-apply existing background" }
-                            }
-                        }
-                    }
-                    else -> {
-                        backgroundManager.setSavedBackgroundUri(previewUri)
-                        try {
-                            applyImageBackground(Uri.parse(previewUri), intensity)
-                            setCustomBackground(true)
-                            updateBackgroundFilters()
-                        } catch (e: Exception) {
-                            Logger.w("MainActivity") { "Failed to apply new background" }
-                        }
-                    }
-                }
-                restoreSavedWeatherState()
-            },
-            onClearBackground = {
-                backgroundManager.setSavedBackgroundUri(null)
-                setCustomBackground(false)
-                backgroundImageView.setImageDrawable(null)
-                fontManager.clearDynamicColors()
-                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    try { backgroundImageView.setRenderEffect(null) } catch (_: Throwable) {}
-                }
-                backgroundImageView.visibility = View.GONE
-                dynamicBackgroundView.visibility = View.VISIBLE
-                backgroundManager.clearDim()
-                gradientManager.startUpdates()
-                lastBackgroundSource = null
-                lastBlurIntensity = null
-                restoreSavedWeatherState()
-            },
-            onSheetStateChanged = { isHidden ->
-                if (isHidden) resetEditModeTimeout() else stopHideUiTimer()
-            },
-            onCropRequested = {
-                isCropModeActive = true
-                backgroundSheetManager.hide()
-                cropController.enter()
-                stopHideUiTimer()
-            }
-        )
-
-        val overlayView = findViewById<View>(R.id.crop_overlay)
-        cropController = BackgroundCropController(
-            dynamicBackgroundView = dynamicBackgroundView,
-            overlayRoot = overlayView,
-            backgroundManager = backgroundManager,
-            onApply = {
-                isCropModeActive = false
-                if (dynamicBackgroundView.visibility == View.VISIBLE) {
-                    updateBackgroundFilters()
-                }
-                resetEditModeTimeout()
-            },
-            onCancel = {
-                isCropModeActive = false
-                resetEditModeTimeout()
-            }
-        )
-
-    // 3. Tutorial Manager
-        tutorialManager = TutorialManager(
-            tutorialLayout = tutorialLayout,
-            tutorialFinger = tutorialFinger,
-            tutorialText = tutorialText,
-            mainLayout = mainLayout,
-            timeText = timeText,
-            prefs = prefs,
-            toggleEditModeAction = { toggleEditMode() },
-            showCustomizationAction = { view -> customizationSheetManager.showForView(view) },
-            hideBottomSheetAction = { customizationSheetManager.hide() },
-            requestLocationPermissionAction = {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                    permissionRequestCode
-                )
-            },
-            onTutorialFinished = { checkLocationPermissionsAndLoadData() }
-        )
-
         sideSheet.bringToFront()
         backgroundBottomSheet.bringToFront()
     }
@@ -791,31 +1040,37 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         timeText.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         dateText.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         lastfmLayout.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             }
         }
         chipContainer.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
+                resetEditModeTimeout()
+            }
+        }
+        smartChipScrollView.setOnClickListener {
+            if (isEditMode) {
+                ensureCustomizationSheetManager().showForView(chipContainer)
                 resetEditModeTimeout()
             }
         }
         weatherLayout.setOnClickListener {
             if (isEditMode) {
-                customizationSheetManager.showForView(it)
+                ensureCustomizationSheetManager().showForView(it)
                 resetEditModeTimeout()
             } else {
                 com.nxd1frnt.clockdesk2.smartchips.ui.WeatherDialog.show(this)
@@ -823,7 +1078,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
 
         backgroundCustomizationTab.setOnClickListener {
-            backgroundSheetManager.show()
+            ensureBackgroundSheetManager().show()
             if (!isDemoMode) {
                 handler.removeCallbacks(editModeTimeoutRunnable)
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
@@ -863,21 +1118,57 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             exitEditMode()
         }
 
+        btnAddWidget.setOnClickListener {
+            if (::customizationSheetManager.isInitialized && customizationSheetManager.isShowing) {
+                customizationSheetManager.hide()
+            }
+            ensureWidgetGallerySideSheetManager().show()
+            stopHideUiTimer()
+        }
+
+        btnResetLayout.setOnClickListener {
+            val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
+                .setTitle(R.string.confirm_reset_layout_title)
+                .setMessage(R.string.confirm_reset_layout_msg)
+                .setPositiveButton(R.string.reset_layout) { _, _ ->
+                    desktopWidgetManager.resetToDefaults()
+                    Toast.makeText(this, R.string.reset_layout, Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+            UiMonetThemeManager.styleAlertDialog(dialog)
+            resetEditModeTimeout()
+        }
+
+        btnDoneEdit.setOnClickListener {
+            exitEditMode()
+        }
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (::cropController.isInitialized && isCropModeActive) {
+                    cropController.cancelAndExit()
+                    return
+                }
+
                 if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
                     backgroundSheetManager.cancelAndHide()
                     return
                 }
 
-                if (sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) {
+                if (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) {
+                    widgetGallerySideSheetManager.hide()
+                    return
+                }
+
+                if (::customizationSheetManager.isInitialized && sideSheetBehavior.state != SideSheetBehavior.STATE_HIDDEN) {
                     fontManager.loadFont()
                     widgetMover.restoreOrderAndPositions()
                     customizationSheetManager.hide()
                     return
                 }
 
-                if (tutorialManager.handleBackPressed()) {
+                if (::tutorialManager.isInitialized && tutorialManager.handleBackPressed()) {
                     return
                 }
 
@@ -895,23 +1186,52 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
     private fun setupPreferencesListener(prefs: SharedPreferences) {
         preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            val chipKeys = setOf("show_battery_alert") + smartChipManager.externalPlugins.map { it.preferenceKey }
-            if (chipKeys.contains(key)) smartChipManager.onPreferencesChanged()
+            if (::smartChipManager.isInitialized && smartChipManager.isChipRelatedPreference(key)) {
+                smartChipManager.onPreferencesChanged()
+            }
 
             when (key) {
+                "ui_monet_from_background" -> runOnUiThread {
+                    applyLiveMonetTheme()
+                }
                 "show_performance_overlay" -> runOnUiThread {
                     val showOverlay = prefs.getBoolean("show_performance_overlay", false)
                     togglePerformanceOverlay(showOverlay)
                 }
-                "automatic_battery_saver_mode", "battery_saver_trigger", "power_saver_manual", "power_saver_sync_system",
-                "battery_alert_show_low", "battery_alert_low_threshold", "battery_alert_show_charging",
-                "battery_alert_show_full", "battery_alert_show_saver",
-                "weather_alert_enable_storms", "weather_alert_enable_wind", "weather_alert_enable_worsening",
-                "weather_alert_enable_uv", "weather_alert_wind_threshold", "weather_alert_uv_threshold",
-                "weather_alert_forecast_hours" -> smartChipManager.onPreferencesChanged()
                 "additional_logging" -> {
                     enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
                     Logger.isLoggingEnabled = enableAdditionalLogging
+                }
+                "advanced_graphics" -> runOnUiThread {
+                    isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+                    if (::dynamicBackgroundView.isInitialized) {
+                        val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
+                        dynamicBackgroundView.setRenderScale(targetScale)
+                        val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
+                        dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
+                    }
+                    checkAndApplyTurbulenceState(prefs)
+                }
+                "graphics_enable_transitions" -> {
+                    isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
+                }
+                "graphics_enable_edit_blur" -> {
+                    isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
+                }
+                "graphics_enable_turbulence", "graphics_turbulence_music_continuous" -> runOnUiThread {
+                    checkAndApplyTurbulenceState(prefs)
+                }
+                "graphics_turbulence_grid" -> runOnUiThread {
+                    val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
+                    if (::dynamicBackgroundView.isInitialized) {
+                        dynamicBackgroundView.updateTurbulenceLiveConfig(gridScale = gridScale)
+                    }
+                }
+                "graphics_turbulence_speed" -> runOnUiThread {
+                    val speedScale = prefs.getInt("graphics_turbulence_speed", 10) / 10f
+                    if (::dynamicBackgroundView.isInitialized) {
+                        dynamicBackgroundView.updateTurbulenceLiveConfig(speedScale = speedScale)
+                    }
                 }
                 "graphics_render_scale" -> runOnUiThread {
                     graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
@@ -965,14 +1285,65 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                         reEvaluateSmartNightDimming()
                     }
                 }
+                "burn_in_protection" -> runOnUiThread {
+                    if (prefs.getBoolean("burn_in_protection", false)) {
+                        burnInProtectionManager.start()
+                    } else {
+                        burnInProtectionManager.stop()
+                    }
+                }
+                "burn_in_shift_distance_dp" -> runOnUiThread {
+                    val shiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
+                    burnInProtectionManager.setShiftDistanceDp(this, shiftDp)
+                }
+                "smart_pixels_enabled" -> runOnUiThread {
+                    val enableSmartPixels = prefs.getBoolean("power_saver_enable_smart_pixels", true)
+                    val shouldStart = prefs.getBoolean("smart_pixels_enabled", false) || (isPowerSavingMode && enableSmartPixels)
+                    if (shouldStart) smartPixelManager.start() else smartPixelManager.stop()
+                }
+                "smart_pixels_intensity" -> runOnUiThread {
+                    val intensity = prefs.getInt("smart_pixels_intensity", 50)
+                    smartPixelManager.setIntensity(intensity)
+                }
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
     }
 
+    private fun checkAndApplyTurbulenceState(prefs: SharedPreferences) {
+        isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
+        isGraphicsTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
+        isGraphicsTurbulenceContinuousMusicEnabled = prefs.getBoolean("graphics_turbulence_music_continuous", false)
+
+        if (::dynamicBackgroundView.isInitialized) {
+            val shouldPlayContinuous = isAdvancedGraphicsEnabled &&
+                    isGraphicsTurbulenceEnabled &&
+                    isGraphicsTurbulenceContinuousMusicEnabled &&
+                    currentMusicState is PluginState.Playing
+
+            if (shouldPlayContinuous) {
+                if (!dynamicBackgroundView.isTurbulencePlaying) {
+                    val noiseColor = fontManager.getDynamicScheme().primary
+                    dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
+                } else {
+                    dynamicBackgroundView.updateTurbulenceLiveConfig(continuous = true)
+                }
+            } else {
+                if (!isAdvancedGraphicsEnabled || !isGraphicsTurbulenceEnabled || !isGraphicsTurbulenceContinuousMusicEnabled) {
+                    dynamicBackgroundView.finishTurbulence(750L)
+                }
+            }
+        }
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         if (::smartPixelManager.isInitialized) {
             smartPixelManager.onUserInteraction()
+        }
+        if (ev != null && ::smartChipManager.isInitialized && smartChipManager.isStackExpanded) {
+            if (smartChipManager.handleExpandedStackTouch(ev)) {
+                return true
+            }
         }
         return super.dispatchTouchEvent(ev)
     }
@@ -990,11 +1361,37 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     override fun onDestroy() {
+        musicStateUpdates.pause()
+        musicStateUpdates.clear()
+        backgroundLoads.pause()
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
         super.onDestroy()
         weatherGetter.stopUpdates()
         musicManager?.destroy()
+        if (::deskNotificationManager.isInitialized) deskNotificationManager.destroy()
+        if (::deskCallOverlay.isInitialized) deskCallOverlay.destroy()
+        deskConnectDeviceListener?.let {
+            com.nxd1frnt.clockdesk2.connect.DeskConnectManager.getInstance(this).deviceListeners.remove(it)
+            deskConnectDeviceListener = null
+        }
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.unregisterObserver(this)
+            if (::clockManager.isInitialized) {
+                powerStateManager.unregisterObserver(clockManager)
+            }
+            powerStateManager.unregisterObserver(weatherGetter)
+            powerStateManager.destroy()
+        }
+        if (::clockManager.isInitialized) {
+            clockManager.stopUpdates()
+        }
         pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
+        cancelPendingDimTransition()
+        dimDebounceHandler.removeCallbacksAndMessages(null)
+        handler.removeCallbacksAndMessages(null)
         if (::backgroundSheetManager.isInitialized) backgroundSheetManager.onDestroy()
+        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).removeListener(backgroundProviderListener)
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)
     }
@@ -1004,6 +1401,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         musicManager = MusicPluginManager(this, prefs) { state ->
             runOnUiThread {
                 handleMusicStateUpdate(state)
+            }
+        }
+        setupMediaWidgetCallbacks()
+    }
+
+    private fun setupMediaWidgetCallbacks() {
+        if (::desktopWidgetManager.isInitialized) {
+            desktopWidgetManager.getController<com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget>()?.apply {
+                onPlayPauseAction = { musicManager?.togglePlayPause() }
+                onNextAction = { musicManager?.next() }
+                onPrevAction = { musicManager?.previous() }
+                onTimeoutAction = { performMusicIdleState() }
             }
         }
     }
@@ -1030,7 +1439,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     lastfmIcon.clipToOutline = false
                 }
 
-                if (track.sourceIconBitmap != null) {
+                if (track.sourceIconResId != null) {
+                    lastfmIcon.setImageDrawable(ContextCompat.getDrawable(this, track.sourceIconResId))
+
+                    val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
+                    lastfmIcon.setColorFilter(tintColor, PorterDuff.Mode.SRC_IN)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        lastfmIcon.imageAlpha = 255
+                    }
+                    iconApplied = true
+                } else if (track.sourceIconBitmap != null) {
                     lastfmIcon.setImageBitmap(track.sourceIconBitmap)
 
                     val tintColor = fontManager.getFinalColorForView(R.id.lastfm_layout)
@@ -1120,178 +1539,87 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun handleMusicStateUpdate(state: PluginState) {
+        if (isDestroyed || isFinishing) return
         currentMusicState = state
-        if (isEditMode) {
-            if (state is PluginState.Playing) {
-                val track = state.track
-                val trackInfoText = "${track.artist} - ${track.title}"
-                nowPlayingTextView.text = trackInfoText
-                val isTextDifferent = trackInfoText != lastTrackInfo
-                lastTrackInfo = trackInfoText
+        musicStateUpdates.submit(state)
+    }
 
-                val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
-                val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
-                val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
+    private fun applyMusicStateUpdate(state: PluginState) {
+        val isMediaActive = ::desktopWidgetManager.isInitialized && desktopWidgetManager.isWidgetTypeActive(DesktopWidgetType.MEDIA)
 
-                if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
-                    handleBackgroundUpdate(track)
-                }
-                if (isTextDifferent) {
-                    updateSourceIcon(track)
-                }
-            } else {
-                nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
-                lastTrackInfo = null
+        if (state is PluginState.Playing) {
+            val track = state.track
+            val trackInfoText = "${track.artist} - ${track.title}"
+            val isTextDifferent = trackInfoText != lastTrackInfo
+            lastTrackInfo = trackInfoText
+
+            val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
+            val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
+            val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
+
+            Logger.d("MainActivity") {
+                "handleMusicStateUpdate: '${track.artist} - ${track.title}', isTextDiff=$isTextDifferent, isArtChanged=$isArtChanged, wasBgApplied=$wasMusicBackgroundApplied, hasBitmap=$validBitmap"
             }
-            return
+
+            if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
+                handleBackgroundUpdate(track)
+            } else if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isGraphicsTurbulenceContinuousMusicEnabled) {
+                if (!dynamicBackgroundView.isTurbulencePlaying) {
+                    val noiseColor = fontManager.getDynamicScheme().primary
+                    dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
+                }
+            }
+        } else if (state is PluginState.Paused) {
+            val track = state.track
+            lastTrackInfo = "${track.artist} - ${track.title}"
+
+            pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
+            pendingBackgroundRestoreRunnable = null
+
+            if (wasMusicBackgroundApplied) {
+                restoreUserBackground(backgroundManager.getSavedBackgroundUri())
+                wasMusicBackgroundApplied = false
+                currentAppliedArtworkSource = null
+            }
+
+            if (isGraphicsTurbulenceContinuousMusicEnabled || dynamicBackgroundView.isTurbulencePlaying) {
+                dynamicBackgroundView.finishTurbulence(750L)
+            }
+        } else {
+            lastTrackInfo = null
         }
 
-        when (state) {
-            is PluginState.Playing -> {
+        if (isMediaActive) {
+            if (state is PluginState.Playing || state is PluginState.Paused) {
                 pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
                 pendingRestoreRunnable = null
-
-                val track = state.track
-                val trackInfoText = "${track.artist} - ${track.title}"
-                val isTextDifferent = trackInfoText != lastTrackInfo
-
-                val validBitmap = track.artworkBitmap != null && !track.artworkBitmap.isRecycled
-                val newArtSource: Any? = if (validBitmap) track.artworkBitmap else if (!track.artworkUrl.isNullOrEmpty()) track.artworkUrl else null
-                val isArtChanged = !areArtworkSourcesEqual(newArtSource, currentAppliedArtworkSource)
-
-                if (isTextDifferent || isArtChanged || (!wasMusicBackgroundApplied && newArtSource != null)) {
-                    handleBackgroundUpdate(track)
-                } else if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isGraphicsTurbulenceContinuousMusicEnabled) {
-                    if (!dynamicBackgroundView.isTurbulencePlaying) {
-                        val noiseColor = fontManager.getDynamicScheme().primary
-                        dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
-                    }
-                }
-
-                if (isTextDifferent) {
-                    lastTrackInfo = trackInfoText
-
-                    lastfmLayout.animate().cancel()
-                    lastfmLayout.animate().setListener(null)
-                    updateSourceIcon(track)
-
-                    val baseX = widgetMover.getRestTranslationX(lastfmLayout)
-
-                    if (lastfmLayout.visibility != View.VISIBLE || lastfmLayout.alpha < 1f) {
-                        val needsFadeIn = lastfmLayout.visibility != View.VISIBLE
-                        lastfmLayout.visibility = View.VISIBLE
-                        nowPlayingTextView.text = trackInfoText
-                        nowPlayingTextView.isSelected = true
-
-                        if (needsFadeIn) {
-                            lastfmLayout.alpha = 0f
-                            lastfmLayout.translationX = baseX + 10f
-                            lastfmLayout.animate()
-                                .alpha(1f)
-                                .translationX(baseX)
-                                .setDuration(300)
-                                .setListener(object : AnimatorListenerAdapter() {
-                                    override fun onAnimationCancel(animation: Animator) {
-                                        lastfmLayout.translationX = baseX
-                                    }
-                                    override fun onAnimationEnd(animation: Animator) {
-                                        lastfmLayout.animate().setListener(null)
-                                        lastfmLayout.translationX = baseX
-                                    }
-                                })
-                                .start()
-                        } else {
-                            lastfmLayout.alpha = 1f
-                            lastfmLayout.translationX = baseX
-                        }
-                    } else {
-                        var isTransitionCanceled = false
-                        lastfmLayout.animate()
-                            .alpha(0f)
-                            .translationX(baseX - 10f)
-                            .setDuration(250)
-                            .setListener(object : AnimatorListenerAdapter() {
-                                override fun onAnimationCancel(animation: Animator) {
-                                    isTransitionCanceled = true
-                                    lastfmLayout.translationX = baseX
-                                }
-
-                                override fun onAnimationEnd(animation: Animator) {
-                                    lastfmLayout.animate().setListener(null)
-                                    if (!isTransitionCanceled && !isEditMode) {
-                                        nowPlayingTextView.text = trackInfoText
-                                        nowPlayingTextView.isSelected = true
-                                        lastfmLayout.translationX = baseX + 10f
-                                        lastfmLayout.animate()
-                                            .alpha(1f)
-                                            .translationX(baseX)
-                                            .setDuration(250)
-                                            .setListener(object : AnimatorListenerAdapter() {
-                                                override fun onAnimationCancel(animation: Animator) {
-                                                    lastfmLayout.translationX = baseX
-                                                }
-                                                override fun onAnimationEnd(animation: Animator) {
-                                                    lastfmLayout.animate().setListener(null)
-                                                    lastfmLayout.translationX = baseX
-                                                }
-                                            })
-                                            .start()
-                                    } else {
-                                        lastfmLayout.translationX = baseX
-                                    }
-                                }
-                            })
-                            .start()
-                    }
-                }
             }
+            desktopWidgetManager.getController<MediaDesktopWidget>()?.handleMusicStateUpdate(state)
+        } else {
+            lastfmLayout.animate().cancel()
+            lastfmLayout.clearAnimation()
+            lastfmLayout.visibility = View.GONE
+            lastfmLayout.alpha = 0f
+        }
 
-            is PluginState.Idle, is PluginState.Disabled -> {
-                if (pendingRestoreRunnable == null) {
-                    val runnable = Runnable {
-                        performMusicIdleState()
-                        pendingRestoreRunnable = null
-                    }
-                    pendingRestoreRunnable = runnable
-                    handler.postDelayed(runnable, 800) // 800ms delay
+        if (state is PluginState.Idle || state is PluginState.Disabled) {
+            if (pendingRestoreRunnable == null) {
+                val runnable = Runnable {
+                    performMusicIdleState()
+                    pendingRestoreRunnable = null
                 }
+                pendingRestoreRunnable = runnable
+                handler.postDelayed(runnable, 800) // 800ms delay
             }
         }
     }
 
     private fun performMusicIdleState() {
+        if (!isResumed) return
         pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
         pendingBackgroundRestoreRunnable = null
 
-        lastfmLayout.animate().cancel()
-        lastfmLayout.animate().setListener(null)
-
-        val baseX = widgetMover.getRestTranslationX(lastfmLayout)
-
-        if (lastfmLayout.visibility == View.VISIBLE) {
-            var isIdleCanceled = false
-            lastfmLayout.animate()
-                .alpha(0f)
-                .translationX(baseX + 10f)
-                .setDuration(300)
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationCancel(animation: Animator) {
-                        isIdleCanceled = true
-                        lastfmLayout.translationX = baseX
-                    }
-
-                    override fun onAnimationEnd(animation: Animator) {
-                        lastfmLayout.animate().setListener(null)
-                        lastfmLayout.translationX = baseX
-                        if (!isIdleCanceled && !isEditMode) {
-                            lastfmLayout.visibility = View.GONE
-                        }
-                    }
-                })
-                .start()
-        } else {
-            lastfmLayout.translationX = baseX
-        }
+        desktopWidgetManager.getController<MediaDesktopWidget>()?.performIdleTransition()
 
         if (wasMusicBackgroundApplied) {
             restoreUserBackground(backgroundManager.getSavedBackgroundUri())
@@ -1299,10 +1627,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             currentAppliedArtworkSource = null
         }
 
-        if (isGraphicsTurbulenceContinuousMusicEnabled) {
+        if (isGraphicsTurbulenceContinuousMusicEnabled || dynamicBackgroundView.isTurbulencePlaying) {
             dynamicBackgroundView.finishTurbulence(1000L)
         }
-        lastTrackInfo = null
     }
 
     private fun handleBackgroundUpdate(track: MusicTrack) {
@@ -1326,28 +1653,32 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
             pendingBackgroundRestoreRunnable = null
 
-            Logger.d("MainActivity") { "Applying bitmap album art background" }
-            applyBitmapBackground(track.artworkBitmap!!, blurIntensity)
-            wasMusicBackgroundApplied = true
-            currentAppliedArtworkSource = track.artworkBitmap
+            if (!wasMusicBackgroundApplied || currentAppliedArtworkSource !== track.artworkBitmap) {
+                Logger.d("MainActivity") { "Applying bitmap album art background" }
+                applyBitmapBackground(track.artworkBitmap!!, blurIntensity)
+                wasMusicBackgroundApplied = true
+                currentAppliedArtworkSource = track.artworkBitmap
+            }
         } else if (!track.artworkUrl.isNullOrEmpty()) {
             pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
             pendingBackgroundRestoreRunnable = null
 
-            Logger.d("MainActivity") { "Applying URL album art background: ${track.artworkUrl}" }
-            applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
-            wasMusicBackgroundApplied = true
-            currentAppliedArtworkSource = track.artworkUrl
+            if (!wasMusicBackgroundApplied || currentAppliedArtworkSource != track.artworkUrl) {
+                Logger.d("MainActivity") { "Applying URL album art background: ${track.artworkUrl}" }
+                applyImageBackground(Uri.parse(track.artworkUrl), blurIntensity)
+                wasMusicBackgroundApplied = true
+                currentAppliedArtworkSource = track.artworkUrl
+            }
         } else {
             if (wasMusicBackgroundApplied && pendingBackgroundRestoreRunnable == null) {
-                Logger.d("MainActivity") { "No artwork on track, scheduling background restore in 400ms" }
+                Logger.d("MainActivity") { "No artwork on track, scheduling background restore in 4000ms" }
                 val runnable = Runnable {
                     pendingBackgroundRestoreRunnable = null
                     if (wasMusicBackgroundApplied && currentMusicState is PluginState.Playing) {
                         val currentTrack = (currentMusicState as PluginState.Playing).track
                         val isStillMissing = currentTrack.artworkBitmap == null && currentTrack.artworkUrl.isNullOrEmpty()
                         if (isStillMissing) {
-                            Logger.d("MainActivity") { "Restoring user default background after 400ms grace period" }
+                            Logger.d("MainActivity") { "Restoring user default background after 4000ms grace period" }
                             restoreUserBackground(backgroundManager.getSavedBackgroundUri())
                             wasMusicBackgroundApplied = false
                             currentAppliedArtworkSource = null
@@ -1355,7 +1686,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     }
                 }
                 pendingBackgroundRestoreRunnable = runnable
-                handler.postDelayed(runnable, 400)
+                handler.postDelayed(runnable, 4000)
             }
         }
     }
@@ -1369,9 +1700,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
 
         if (isFirstLaunch) {
+            initTutorialManager(prefs)
             tutorialManager.start()
-        } else {
-            checkLocationPermissionsAndLoadData()
         }
     }
 
@@ -1429,7 +1759,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun showLocationRationaleDialog() {
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
             .setTitle(getString(R.string.location_permission_title))
             .setMessage(getString(R.string.location_permission_message))
             .setPositiveButton(getString(R.string.location_permission_grant)) { _, _ ->
@@ -1458,6 +1788,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 showManualLocationOptionDialog()
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showManualLocationOptionDialog() {
@@ -1467,7 +1798,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         prefs.edit().putBoolean("manual_location_prompt_shown", true).apply()
 
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
             .setTitle(getString(R.string.location_permission_title))
             .setMessage(getString(R.string.location_search_city_prompt))
             .setPositiveButton(getString(android.R.string.yes)) { _, _ ->
@@ -1477,6 +1808,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 dialog.dismiss()
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showCitySearchDialog() {
@@ -1550,7 +1882,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         if (requestCode == PICK_FONT_REQUEST && resultCode == RESULT_OK) {
             data?.data?.let { uri ->
                 val newIndex = fontManager.addCustomFont(uri)
-                customizationSheetManager.onFontAdded(newIndex)
+                ensureCustomizationSheetManager().onFontAdded(newIndex)
             }
         }
         if (requestCode == PICK_BG_REQUEST && resultCode == RESULT_OK) {
@@ -1567,14 +1899,42 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
             val uriStr = uri.toString()
             backgroundManager.addSavedUri(uriStr)
-            backgroundSheetManager.onImageAdded(uriStr)
+            ensureBackgroundSheetManager().onImageAdded(uriStr)
         }
     }
 
     private fun loadSavedBackground(skipAnimation: Boolean = false) {
+        val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+        Logger.i("BackgroundFlow") { "loadSavedBackground: activeProviderId=$activeProviderId, skipAnimation=$skipAnimation" }
+        if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+            val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+            applySolidColorBackground(color, skipAnimation) {
+                isBackgroundReady = true
+                checkAndPlayEntranceAnimation()
+            }
+            return
+        }
+
+        if (activeProviderId.startsWith("external:")) {
+            val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+            val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+            val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+            Logger.i("BackgroundFlow") { "loadSavedBackground: external provider=$activeProviderId, payload=$payload" }
+            applyBackgroundPayload(payload, skipAnimation) {
+                isBackgroundReady = true
+                checkAndPlayEntranceAnimation()
+            }
+            if (provider != null) {
+                bpm.requestDataFromPlugin(provider)
+            } else {
+                bpm.requestDataFromPluginId(activeProviderId)
+            }
+            return
+        }
+
         val uriStr = backgroundManager.getSavedBackgroundUri()
         val blurIntensity = backgroundManager.getBlurIntensity()
-        if (uriStr != null) {
+        if (uriStr != null && activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
             try {
                 val uri = Uri.parse(uriStr)
                 try {
@@ -1592,19 +1952,26 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     checkAndPlayEntranceAnimation()
                 }
                 setCustomBackground(true)
-                Logger.d("MainActivity") {"Loaded custom background: $uriStr (blurIntensity=$blurIntensity)"}
+                Logger.i("BackgroundFlow") { "Loaded custom background: $uriStr (blurIntensity=$blurIntensity)" }
                 updateBackgroundFilters()
             } catch (e: Exception) {
                 backgroundManager.setSavedBackgroundUri(null)
                 setCustomBackground(false)
-                Logger.w("MainActivity") {"Failed to load saved background: ${e.message}"}
+                if (!wasMusicBackgroundApplied) {
+                    fontManager.clearDynamicColors()
+                }
+                Logger.w("BackgroundFlow") { "Failed to load saved background: ${e.message}" }
 
                 isBackgroundReady = true
                 checkAndPlayEntranceAnimation()
             }
         } else {
+            Logger.i("BackgroundFlow") { "No saved custom background, reverting to gradient" }
             backgroundImageView.visibility = View.GONE
             setCustomBackground(false)
+            if (!wasMusicBackgroundApplied) {
+                fontManager.clearDynamicColors()
+            }
             gradientManager.startUpdates()
             updateBackgroundFilters()
 
@@ -1613,24 +1980,101 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
     }
 
+    fun applyBackgroundPayload(
+        payload: com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload,
+        skipAnimation: Boolean = false,
+        onComplete: (() -> Unit)? = null
+    ) {
+        Logger.i("BackgroundFlow") { "applyBackgroundPayload: $payload, skipAnimation=$skipAnimation" }
+        when (payload) {
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor -> {
+                applySolidColorBackground(payload.color, skipAnimation, onComplete)
+            }
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                val blur = backgroundManager.getBlurIntensity()
+                applyImageBackground(Uri.parse(payload.uriString), blur, skipAnimation, onComplete)
+            }
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap -> {
+                val blur = backgroundManager.getBlurIntensity()
+                applyBitmapBackground(payload.bitmap, blur, skipAnimation, onComplete)
+            }
+            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient -> {
+                previewGradient()
+                onComplete?.invoke()
+            }
+        }
+    }
+
+    fun applySolidColorBackground(color: Int, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        Logger.i("BackgroundFlow") { "applySolidColorBackground: color=#${String.format("%06X", 0xFFFFFF and color)}, skipAnimation=$skipAnimation" }
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
+        isBackgroundLoading = false
+        lastBackgroundSource = "solid_color:$color"
+        lastBlurIntensity = null
+        gradientManager.stopUpdates()
+        setCustomBackground(true)
+        fontManager.setDynamicScheme(color)
+        fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
+        fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+
+        backgroundImageView.setImageDrawable(null)
+        backgroundImageView.visibility = View.GONE
+        dynamicBackgroundView.visibility = View.VISIBLE
+        val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 1200L
+        dynamicBackgroundView.transitionToSolidColor(color, duration, force = true)
+        updateBackgroundFilters()
+        onComplete?.invoke()
+    }
+
     fun applyImageBackground(uri: Uri, blurIntensity: Int = 0, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        Logger.i("BackgroundFlow") { "applyImageBackground: uri=$uri, blur=$blurIntensity, skipAnimation=$skipAnimation" }
         loadBackgroundInternal(uri, blurIntensity, skipAnimation, onComplete)
     }
 
     fun applyBitmapBackground(bitmap: Bitmap, blurIntensity: Int = 0, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        Logger.i("BackgroundFlow") { "applyBitmapBackground: bitmap=${bitmap.width}x${bitmap.height}, blur=$blurIntensity, skipAnimation=$skipAnimation" }
         loadBackgroundInternal(bitmap, blurIntensity, skipAnimation, onComplete)
     }
 
     private fun loadBackgroundInternal(model: Any, blurIntensity: Int, skipAnimation: Boolean = false, onComplete: (() -> Unit)? = null) {
+        if (isFinishing || isDestroyed) return
+        backgroundLoads.submit(BackgroundLoad(model, blurIntensity, skipAnimation, onComplete))
+    }
+
+    private fun cancelBackgroundLoads(clearEditBackground: Boolean = true) {
+        backgroundRequestId++
+        activeBackgroundTarget?.let {
+            activeBackgroundTarget = null
+            GlideApp.with(this).clear(it)
+        }
+        if (clearEditBackground) {
+            activeEditBackgroundTarget?.let {
+                activeEditBackgroundTarget = null
+                GlideApp.with(this).clear(it)
+            }
+        }
+    }
+
+    private fun isBackgroundRequestCurrent(requestId: Long): Boolean =
+        requestId == backgroundRequestId && isResumed && !isFinishing && !isDestroyed
+
+    private fun performBackgroundLoad(model: Any, blurIntensity: Int, skipAnimation: Boolean, onComplete: (() -> Unit)?) {
         if (isFinishing) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed) return
         
+        Logger.i("BackgroundFlow") { "performBackgroundLoad: model=$model, blur=$blurIntensity, lastSource=$lastBackgroundSource, lastBlur=$lastBlurIntensity" }
         if (areArtworkSourcesEqual(lastBackgroundSource, model) && lastBlurIntensity == blurIntensity) {
+            Logger.i("BackgroundFlow") { "performBackgroundLoad: source and blur unchanged, skipping reload" }
             onComplete?.invoke()
             return
         }
         
         val isSourceChanged = !areArtworkSourcesEqual(lastBackgroundSource, model)
+
+        cancelBackgroundLoads()
+        val requestId = backgroundRequestId
+        isBackgroundLoading = true
         
         lastBackgroundSource = model
         lastBlurIntensity = blurIntensity
@@ -1688,119 +2132,170 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             var req = RequestOptions()
                 .override(targetW, targetH)
                 .downsample(DownsampleStrategy.CENTER_INSIDE)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(if (model is Bitmap) DiskCacheStrategy.NONE else DiskCacheStrategy.AUTOMATIC)
+                .skipMemoryCache(model is Bitmap)
 
             if (blurIntensity > 0) {
                 req = req.transform(
                     BlurTransformation(this, blurIntensity, 1) {
-                        if (!isDestroyed && !isFinishing) {
-                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING)
+                        if (isBackgroundRequestCurrent(requestId)) {
+                            val blurMsg = getString(R.string.stage_blurring_detail, blurIntensity)
+                            updateBackgroundProgress(BackgroundProgressPlugin.Stage.BLURRING, blurMsg)
                         }
                     }
                 )
             }
 
+            val requestManager = GlideApp.with(this)
             val mainTarget = object : CustomTarget<Bitmap>() {
                 override fun onResourceReady(
-                    bitmap: Bitmap,
+                    resource: Bitmap,
                     transition: Transition<in Bitmap>?
                 ) {
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.EXTRACTING_COLORS)
+                    if (!isBackgroundRequestCurrent(requestId)) return
+                    // The renderer and color extractor outlive Glide's target. Own their bitmap
+                    // so clearing a superseded request cannot recycle an image they still use.
+                    val bitmap = resource.copy(Bitmap.Config.ARGB_8888, false)
+                    if (bitmap == null) {
+                        onLoadFailed(null)
+                        return
+                    }
+                    activeBackgroundTarget = null
+                    // Glide forbids clearing the request from inside its own target callback.
+                    handler.post { requestManager.clear(this) }
+                    if (isSourceChanged) {
+                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.EXTRACTING_COLORS)
 
-                    Thread {
-                        ColorExtractor.extractColor(bitmap) { seedColor ->
-                            handler.post {
-                                updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
+                        Thread {
+                            ColorExtractor.extractColor(bitmap) { seedColor ->
+                                handler.post {
+                                    if (!isBackgroundRequestCurrent(requestId)) {
+                                        bitmap.recycle()
+                                        return@post
+                                    }
+                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.APPLYING_THEME)
 
-                                fontManager.setDynamicScheme(seedColor)
-                                fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
+                                    fontManager.setDynamicScheme(seedColor)
+                                    fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
 
-                                val noiseColor = fontManager.getDynamicScheme().primary
+                                    val noiseColor = fontManager.getDynamicScheme().primary
 
-                                if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
-                                    val isContinuous = isGraphicsTurbulenceContinuousMusicEnabled && currentMusicState is PluginState.Playing
-                                    dynamicBackgroundView.playTurbulence(noiseColor, continuous = isContinuous)
-                                }
+                                    if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
+                                        val isContinuous = isGraphicsTurbulenceContinuousMusicEnabled && currentMusicState is PluginState.Playing
+                                        dynamicBackgroundView.playTurbulence(noiseColor, continuous = isContinuous)
+                                    }
 
-                                val bgOffsetX = backgroundManager.getBgOffsetX()
-                                val bgOffsetY = backgroundManager.getBgOffsetY()
-                                val bgScale   = backgroundManager.getBgScale()
+                                    val bgOffsetX = backgroundManager.getBgOffsetX()
+                                    val bgOffsetY = backgroundManager.getBgOffsetY()
+                                    val bgScale   = backgroundManager.getBgScale()
 
-                                // 1. Запускаем кинематографичный GLSL-переход (Crossfade)
-                                val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else if (isSourceChanged) 2000L else 300L
-                                dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
+                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
 
-                                val currentTargetMode = backgroundManager.getDimMode()
-                                val currentTargetIntensity = backgroundManager.getDimIntensity()
-                                val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
-                                val finalZoom = calculateZoom(currentEffectiveIntensity)
+                                    // 1. Запускаем кинематографичный GLSL-переход (Crossfade)
+                                    val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 2000L
+                                    Logger.i("BackgroundFlow") { "onResourceReady: starting crossfade transitionTo bitmap (${bitmap.width}x${bitmap.height}) duration=$duration, scale=$bgScale" }
+                                    dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
 
-                                fontManager.applyNightShiftTransition(
-                                    clockManager.getCurrentTime(),
-                                    dayTimeGetter,
-                                    true
-                                )
+                                    val currentTargetMode = backgroundManager.getDimMode()
+                                    val currentTargetIntensity = backgroundManager.getDimIntensity()
+                                    val currentEffectiveIntensity = getEffectiveDimIntensity(currentTargetMode, currentTargetIntensity)
+                                    val finalZoom = calculateZoom(currentEffectiveIntensity)
 
-                                onComplete?.invoke()
+                                    fontManager.applyNightShiftTransition(
+                                        clockManager.getCurrentTime(),
+                                        dayTimeGetter,
+                                        true
+                                    )
 
-                                updateBackgroundFilters()
+                                    isBackgroundLoading = false
 
-                                if (isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && !skipAnimation) {
-                                    isScaleAnimating = true
-                                    dynamicBackgroundView.animate()
-                                        .scaleX(finalZoom)
-                                        .scaleY(finalZoom)
-                                        .setDuration(1200)
-                                        .setListener(object : AnimatorListenerAdapter() {
-                                            override fun onAnimationEnd(animation: Animator) {
-                                                isScaleAnimating = false
-                                                handler.postDelayed({
-                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-                                                }, 500)
-                                            }
-                                        }).start()
-                                } else {
-                                    dynamicBackgroundView.scaleX = finalZoom
-                                    dynamicBackgroundView.scaleY = finalZoom
-                                    isScaleAnimating = false
-                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                                    updateBackgroundFilters()
+
+                                    if (isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && !skipAnimation) {
+                                        isScaleAnimating = true
+                                        dynamicBackgroundView.animate()
+                                            .scaleX(finalZoom)
+                                            .scaleY(finalZoom)
+                                            .setDuration(1200)
+                                            .setListener(object : AnimatorListenerAdapter() {
+                                                override fun onAnimationEnd(animation: Animator) {
+                                                    if (!isBackgroundRequestCurrent(requestId)) return
+                                                    isScaleAnimating = false
+                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
+                                                }
+                                            }).start()
+                                    } else {
+                                        dynamicBackgroundView.scaleX = finalZoom
+                                        dynamicBackgroundView.scaleY = finalZoom
+                                        isScaleAnimating = false
+                                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
+                                    }
+                                    onComplete?.invoke()
                                 }
                             }
-                        }
-                    }.start()
+                        }.start()
+                    } else {
+                        val bgOffsetX = backgroundManager.getBgOffsetX()
+                        val bgOffsetY = backgroundManager.getBgOffsetY()
+                        val bgScale   = backgroundManager.getBgScale()
+
+                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
+
+                        val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 300L
+                        Logger.i("BackgroundFlow") { "onResourceReady: quick transitionTo bitmap (${bitmap.width}x${bitmap.height}) duration=$duration" }
+                        dynamicBackgroundView.transitionTo(bitmap, duration, bgScale, bgOffsetX, bgOffsetY)
+
+                        updateBackgroundFilters()
+                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
+                        isBackgroundLoading = false
+                        onComplete?.invoke()
+                    }
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
+                    // No borrowed Glide bitmap is retained after onResourceReady.
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
+                    if (!isBackgroundRequestCurrent(requestId)) return
                     super.onLoadFailed(errorDrawable)
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
-                    Logger.w("MainActivity") {"Glide failed to load background: $model"}
+                    activeBackgroundTarget = null
+                    handler.post { requestManager.clear(this) }
+                    isBackgroundLoading = false
+                    lastBackgroundSource = null
+                    lastBlurIntensity = null
+                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
+                    Logger.w("BackgroundFlow") { "Glide failed to load background: $model" }
                     isScaleAnimating = false
-                    handler.postDelayed({
-                        updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-                    }, 2000)
 
                     onComplete?.invoke()
 
-                    try {
-                        val savedUri = backgroundManager.getSavedBackgroundUri()
-                        if (model.toString() != savedUri) {
-                            restoreUserBackground(savedUri)
+                    handler.post {
+                        if (!isBackgroundRequestCurrent(requestId)) return@post
+                        try {
+                            val savedUri = backgroundManager.getSavedBackgroundUri()
+                            if (model.toString() != savedUri) {
+                                restoreUserBackground(savedUri)
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("MainActivity"){"Failed to restore user background: ${e.message}"}
                         }
-                    } catch (e: Exception) {
-                        Logger.e("MainActivity"){"Failed to restore user background: ${e.message}"}
                     }
                 }
 
                 override fun onLoadStarted(placeholder: Drawable?) {
+                    if (!isBackgroundRequestCurrent(requestId)) return
                     super.onLoadStarted(placeholder)
-                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.DOWNLOADING)
+                    val initialStage = when {
+                        model is Uri && (model.scheme == "http" || model.scheme == "https") -> BackgroundProgressPlugin.Stage.DOWNLOADING
+                        model is String && (model.startsWith("http://") || model.startsWith("https://")) -> BackgroundProgressPlugin.Stage.DOWNLOADING
+                        else -> BackgroundProgressPlugin.Stage.LOADING
+                    }
+                    updateBackgroundProgress(initialStage)
                 }
             }
 
+            activeBackgroundTarget = mainTarget
             GlideApp.with(this)
                 .asBitmap()
                 .load(model)
@@ -1815,10 +2310,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
 
         } catch (e: Exception) {
-            updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE, "Failed to load")
-            handler.postDelayed({
-                updateBackgroundProgress(BackgroundProgressPlugin.Stage.IDLE)
-            }, 2000)
+            if (!isBackgroundRequestCurrent(requestId)) return
+            isBackgroundLoading = false
+            updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
             Logger.e("MainActivity"){"loadBackgroundInternal failed: ${e.message}"}
             onComplete?.invoke()
         }
@@ -1836,6 +2330,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 resource: Drawable,
                 transition: Transition<in Drawable>?
             ) {
+                if (activeEditBackgroundTarget !== this || isDestroyed || isFinishing) return
                 editModeBlurLayer.setImageDrawable(resource)
                 updateBackgroundFilters()
             }
@@ -1844,6 +2339,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             }
         }
 
+        activeEditBackgroundTarget = editTarget
         GlideApp.with(this)
             .load(model)
             .apply(ambientReq)
@@ -1876,8 +2372,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         return intensity.coerceIn(0, 50)
     }
 
-    private fun calculateZoom(effectiveIntensity: Int): Float {
-        if (!backgroundManager.getZoomEnabled()) {
+    private fun calculateZoom(effectiveIntensity: Int, previewZoom: Boolean? = null): Float {
+        val zoomEnabled = previewZoom ?: backgroundManager.getZoomEnabled()
+        if (!zoomEnabled) {
             return 1.0f
         }
         return 1.0f + (effectiveIntensity.coerceIn(0, 50) / 50f) * 0.2f
@@ -1887,7 +2384,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         previewDimMode: Int? = null,
         previewDimIntensity: Int? = null,
         previewDimMinIntensity: Int? = null,
-        previewDimMaxIntensity: Int? = null
+        previewDimMaxIntensity: Int? = null,
+        previewNightShift: Boolean? = null,
+        previewZoom: Boolean? = null
     ) {
         if (dynamicBackgroundView.visibility != View.VISIBLE) return
 
@@ -1923,13 +2422,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isNight = !dayTimeGetter.isDay()
-        val baseWeatherMatrix = ColorMatrix()
+        var wmoCode = 0
+        var rawIntensity = 0f
 
         if (isWeatherEnabled) {
             val isManual = backgroundManager.isManualWeatherEnabled()
-            var wmoCode = 0
-            var rawIntensity = 0f
-
             if (isManual) {
                 val typeOrdinal = backgroundManager.getManualWeatherType()
                 val type = DynamicBackgroundView.WeatherType.values()[typeOrdinal]
@@ -1953,14 +2450,44 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                     weatherGetter.visibility
                 )
             }
+        }
 
-            val visualIntensity = rawIntensity * 0.2f
+        val visualIntensity = rawIntensity * 0.2f
+
+        // Night Shift Factor for Background
+        val nightShiftEnabled = previewNightShift ?: backgroundManager.isNightShiftEnabled()
+        val nightFactor = if (nightShiftEnabled) backgroundManager.computeNightShiftFactor(clockManager.getCurrentTime(), dayTimeGetter) else 0f
+
+        val isPreview = previewDimMode != null || previewDimIntensity != null ||
+            previewDimMinIntensity != null || previewDimMaxIntensity != null ||
+            previewNightShift != null || previewZoom != null
+
+        if (!isPreview &&
+            kotlin.math.abs(lastFilterDimFactor - finalDimFactor) < 0.003f &&
+            kotlin.math.abs(lastFilterNightFactor - nightFactor) < 0.005f &&
+            lastFilterWmoCode == wmoCode &&
+            lastFilterIsNight == isNight &&
+            lastFilterIsWeatherEnabled == isWeatherEnabled &&
+            kotlin.math.abs(lastFilterVisualIntensity - visualIntensity) < 0.005f &&
+            lastFilterIsEditMode == isEditMode
+        ) {
+            return
+        }
+
+        lastFilterDimFactor = finalDimFactor
+        lastFilterNightFactor = nightFactor
+        lastFilterWmoCode = wmoCode
+        lastFilterIsNight = isNight
+        lastFilterIsWeatherEnabled = isWeatherEnabled
+        lastFilterVisualIntensity = visualIntensity
+        lastFilterIsEditMode = isEditMode
+
+        val baseWeatherMatrix = ColorMatrix()
+        if (isWeatherEnabled) {
             val weatherMatrix = getWeatherMatrix(wmoCode, isNight, visualIntensity)
             baseWeatherMatrix.postConcat(weatherMatrix)
         }
 
-        // Night Shift Factor for Background
-        val nightFactor = backgroundManager.computeNightShiftFactor(clockManager.getCurrentTime(), dayTimeGetter)
         if (nightFactor > 0f) {
             val nightShiftMatrix = ColorMatrix()
             val rScale = 1.0f
@@ -1990,19 +2517,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         }
 
         if (!isScaleAnimating) {
-            val zoom = calculateZoom(effectiveDim)
+            val zoom = calculateZoom(effectiveDim, previewZoom)
             dynamicBackgroundView.scaleX = zoom
             dynamicBackgroundView.scaleY = zoom
         }
     }
 
     private fun updateBackgroundProgress(stage: BackgroundProgressPlugin.Stage, messageOverride: String? = null) {
-        BackgroundProgressPlugin.Companion.currentStage = stage
-        BackgroundProgressPlugin.Companion.customMessage = messageOverride
-
-        runOnUiThread {
-            BackgroundProgressPlugin.onGlobalStateChanged?.invoke()
-        }
+        BackgroundProgressPlugin.postStage(stage, messageOverride)
     }
 
     private fun setupSideSheet() {
@@ -2014,7 +2536,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
                     resetEditModeTimeout()
-                    customizationSheetManager.hide()
+                    if (::customizationSheetManager.isInitialized) {
+                        customizationSheetManager.hide()
+                    }
                 } else {
                     stopHideUiTimer()
                 }
@@ -2026,7 +2550,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     }
 
     private fun showDeleteConfirmationDialog(title: String, message: String, onConfirm: () -> Unit) {
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(UiMonetThemeManager.wrapContext(this))
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton(getString(R.string.delete)) { dialog, _ ->
@@ -2037,6 +2561,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 dialog.dismiss()
             }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun startUpdates() {
@@ -2052,10 +2577,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
 
-    private fun animateCornerRadius(view: View, fromRadius: Float, toRadius: Float) {
+    private fun animateCornerRadius(
+        view: View,
+        fromRadius: Float,
+        toRadius: Float,
+        duration: Long = animationDuration,
+        interpolator: TimeInterpolator = MotionUtils.EMPHASIZED
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val animator = ValueAnimator.ofFloat(fromRadius, toRadius)
-            animator.duration = animationDuration-100L
+            animator.duration = duration
+            animator.interpolator = interpolator
 
             animator.addUpdateListener { animation ->
                 val value = animation.animatedValue as Float
@@ -2078,53 +2610,44 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     private fun toggleEditMode() {
         isEditMode = !isEditMode
         smartChipManager.setEditMode(isEditMode) { clickedView ->
-            customizationSheetManager.showForView(clickedView)
+            ensureCustomizationSheetManager().showForView(clickedView)
             resetEditModeTimeout()
         }
         widgetMover.setEditMode(isEditMode)
         val targetRadius = dpToPx(36f)
+        val dockSlideOffset = dpToPx(24f)
         if (isEditMode) {
-            settingsButton.visibility = View.VISIBLE
-            debugButton.visibility = View.VISIBLE
             backgroundCustomizationTab.visibility = View.VISIBLE
-            mainLayout.animate()
-                .scaleX(0.90f)
-                .scaleY(0.90f)
+            backgroundCustomizationTab.alpha = 0f
+            backgroundCustomizationTab.scaleX = 0.8f
+            backgroundCustomizationTab.scaleY = 0.8f
+            backgroundCustomizationTab.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
                 .setDuration(animationDuration)
-                .setInterpolator(OvershootInterpolator())
+                .setInterpolator(MotionUtils.EMPHASIZED_DECELERATE)
                 .start()
-            animateCornerRadius(mainLayout, 0f, targetRadius)
+
+            mainLayout.animate()
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EMPHASIZED)
+                .start()
+            animateCornerRadius(mainLayout, 0f, targetRadius, animationDuration, MotionUtils.EMPHASIZED)
+
             if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
                 editModeBlurLayer.visibility = View.VISIBLE
                 editModeBlurLayer.alpha = 1.0f
                 updateBackgroundFilters()
             }
-            settingsButton.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
-            debugButton.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
-            backgroundCustomizationTab.animate()
-                .alpha(1f)
-                .setDuration(animationDuration)
-                .start()
-            timeText.setBackgroundResource(R.drawable.editable_border)
-            dateText.setBackgroundResource(R.drawable.editable_border)
-            lastfmLayout.setBackgroundResource(R.drawable.editable_border)
-            chipContainer.setBackgroundResource(R.drawable.editable_border)
-            lastfmLayout.animate().cancel()
-            lastfmLayout.clearAnimation()
-            lastfmLayout.post {
-                lastfmLayout.visibility = View.VISIBLE
-                lastfmLayout.alpha = 1f
-                lastfmLayout.setBackgroundResource(R.drawable.editable_border)
-            }
-            if (nowPlayingTextView.text.isNullOrEmpty()) {
-                nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
-            }
+
+            showDock(animate = true)
+
+            updateEmptyDeskPromptVisibility()
+
+            desktopWidgetManager.setEditMode(true)
             if (!isDemoMode) {
                 handler.removeCallbacks(editModeTimeoutRunnable)
                 handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
@@ -2149,20 +2672,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         isEditMode = false
         smartChipManager.setEditMode(false) { }
         widgetMover.setEditMode(false)
+        val startRadius = dpToPx(36f)
+
         mainLayout.animate()
             .scaleX(1f)
             .scaleY(1f)
             .translationX(0f)
             .translationY(0f)
             .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
+            .setInterpolator(MotionUtils.EMPHASIZED)
             .start()
-        val startRadius = dpToPx(36f)
-        animateCornerRadius(mainLayout, startRadius, 0f)
+        animateCornerRadius(mainLayout, startRadius, 0f, animationDuration, MotionUtils.EMPHASIZED)
+
         if (editModeBlurLayer.visibility == View.VISIBLE) {
             editModeBlurLayer.animate()
                 .alpha(0f)
                 .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         if (!isEditMode) {
@@ -2172,64 +2698,87 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 })
                 .start()
         }
-        settingsButton.animate()
-            .alpha(0f)
-            .setDuration(animationDuration)
-            .start()
-        debugButton.animate()
-            .alpha(0f)
-            .setDuration(animationDuration)
-            .start()
+
         backgroundCustomizationTab.animate()
             .alpha(0f)
+            .scaleX(0.8f)
+            .scaleY(0.8f)
             .setDuration(animationDuration)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+            .withEndAction {
+                if (!isEditMode) {
+                    backgroundCustomizationTab.visibility = View.GONE
+                }
+            }
             .start()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            timeText.background = null
-        } else
-            timeText.setBackgroundDrawable(null)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            dateText.background = null
-        } else
-            dateText.setBackgroundDrawable(null)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            lastfmLayout.background = null
-        } else
-            lastfmLayout.setBackgroundDrawable(null)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            chipContainer.background = null
-        } else {
-            chipContainer.setBackgroundDrawable(null)
-        }
-        val isMusicPlaying = !nowPlayingTextView.text.isNullOrEmpty() &&
-                lastTrackInfo != null &&
-                lastfmLayout.alpha > 0
+        hideDock(animate = true)
 
-        if (!isMusicPlaying) {
-            lastfmLayout.animate()
-                .alpha(0f)
-                .setDuration(400)
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        if (!isEditMode) {
-                            lastfmLayout.visibility = View.GONE
-                        }
-                    }
-                })
-                .start()
-        } else {
-            lastfmLayout.animate()
-                .alpha(1f)
-                .setDuration(200)
-                .setListener(null)
-                .start()
+        if (::cropController.isInitialized && isCropModeActive) {
+            cropController.cancelAndExit()
         }
 
-        settingsButton.visibility = View.GONE
-        debugButton.visibility = View.GONE
-        backgroundCustomizationTab.visibility = View.GONE
+        if (::customizationSheetManager.isInitialized && customizationSheetManager.isShowing) {
+            customizationSheetManager.hide()
+        }
+
+        if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
+            backgroundSheetManager.cancelAndHide()
+        }
+
+        emptyDeskPrompt.visibility = View.GONE
+        desktopWidgetManager.setEditMode(false)
+
+        chipContainer.background = null
+        smartChipScrollView.background = null
+
         handler.removeCallbacks(editModeTimeoutRunnable)
+    }
+
+    private fun updateEmptyDeskPromptVisibility() {
+        val hasVisibleWidgets = desktopWidgetManager.getActiveInstances().isNotEmpty()
+        emptyDeskPrompt.visibility = if (isEditMode && !hasVisibleWidgets) View.VISIBLE else View.GONE
+    }
+
+    private fun removeWidget(view: View) {
+        val instance = desktopWidgetManager.getInstanceForView(view)
+        if (instance != null) {
+            desktopWidgetManager.removeWidget(instance)
+            view.animate().cancel()
+            view.clearAnimation()
+            view.visibility = View.GONE
+            view.alpha = 0f
+            widgetMover.removeView(view)
+            burnInProtectionManager.updateViews(desktopWidgetManager.getViews())
+            updateEmptyDeskPromptVisibility()
+            Toast.makeText(this, R.string.remove_widget, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun onWidgetAdded(type: DesktopWidgetType) {
+        val view = when (type) {
+            DesktopWidgetType.TIME -> timeText
+            DesktopWidgetType.DATE -> dateText
+            DesktopWidgetType.MEDIA -> lastfmLayout
+            DesktopWidgetType.SMART_CHIPS -> chipContainer
+            DesktopWidgetType.WEATHER -> weatherLayout
+        }
+        view.visibility = View.VISIBLE
+        if (isEditMode) {
+            view.setBackgroundResource(R.drawable.editable_border)
+        }
+        if (type == DesktopWidgetType.MEDIA) {
+            lastfmLayout.alpha = 1f
+            if (nowPlayingTextView.text.isNullOrEmpty()) {
+                nowPlayingTextView.text = getString(R.string.now_playing_placeholder)
+            }
+        }
+        desktopWidgetManager.bindExistingViews(timeText, dateText, lastfmLayout, chipContainer, weatherLayout)
+        val activeViews = desktopWidgetManager.getViews()
+        widgetMover.setViews(activeViews.filter { it !== smartChipScrollView && it !== chipContainer })
+        burnInProtectionManager.updateViews(activeViews)
+        fontManager.loadFont()
+        updateEmptyDeskPromptVisibility()
     }
 
     override fun onResume() {
@@ -2263,8 +2812,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 weatherGetter.startUpdates(lat, lon)
             }
         }
-        if (isEditMode && !isLaunchingFilePicker) exitEditMode()
+        if (isEditMode && !isLaunchingFilePicker && !isLaunchingExternalActivity && !isAnySheetShowing()) {
+            exitEditMode()
+        }
         isLaunchingFilePicker = false
+        isLaunchingExternalActivity = false
         if (isDemoMode) {
             isDemoMode = false
             clockManager.toggleDebugMode(false)
@@ -2295,6 +2847,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         startUpdates()
         val showPerformance = prefs.getBoolean("show_performance_overlay", false)
         togglePerformanceOverlay(showPerformance)
+        // Choose the current music background before resuming any interrupted image load.
+        musicStateUpdates.resume()
+        backgroundLoads.resume()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -2306,8 +2861,252 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
                 or View.SYSTEM_UI_FLAG_FULLSCREEN)
     }
 
-    private fun restoreGradientBackground() {
+    private fun previewBlur(blur: Int) {
+        val previewUri = if (::backgroundSheetManager.isInitialized) backgroundSheetManager.previewBackgroundUri else null
+        if (previewUri != null) {
+            if (previewUri == "__DEFAULT_GRADIENT__") return
+            applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
+        } else if (wasMusicBackgroundApplied && currentAppliedArtworkSource != null) {
+            when (val art = currentAppliedArtworkSource) {
+                is Bitmap -> applyBitmapBackground(art, blur, skipAnimation = true)
+                is String -> applyImageBackground(Uri.parse(art), blur, skipAnimation = true)
+                is Uri -> applyImageBackground(art, blur, skipAnimation = true)
+            }
+        } else {
+            val savedUri = backgroundManager.getSavedBackgroundUri()
+            if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
+                applyImageBackground(Uri.parse(savedUri), blur, skipAnimation = true)
+            }
+        }
+    }
+
+    private fun previewGradient() {
+        Logger.i("BackgroundFlow") { "previewGradient() called" }
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
+        isBackgroundLoading = false
+        lastBackgroundSource = "gradient"
+        lastBlurIntensity = null
+        backgroundImageView.setImageDrawable(null)
+        backgroundImageView.visibility = View.GONE
         dynamicBackgroundView.visibility = View.VISIBLE
+
+        BackgroundProgressPlugin.startSession()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
+        val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
+        dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
+        fontManager.clearDynamicColors()
+        setCustomBackground(false)
+        gradientManager.startUpdates()
+        updateBackgroundFilters()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
+    }
+
+    private fun previewMusicAlbumArt(enabled: Boolean, blur: Int) {
+        if (enabled && wasMusicBackgroundApplied && currentAppliedArtworkSource != null) {
+            when (val art = currentAppliedArtworkSource) {
+                is Bitmap -> applyBitmapBackground(art, blur, skipAnimation = true)
+                is String -> applyImageBackground(Uri.parse(art), blur, skipAnimation = true)
+                is Uri -> applyImageBackground(art, blur, skipAnimation = true)
+            }
+        } else {
+            val previewUri = backgroundSheetManager.previewBackgroundUri ?: backgroundManager.getSavedBackgroundUri()
+            if (previewUri == "__DEFAULT_GRADIENT__" || previewUri == null) {
+                previewGradient()
+            } else {
+                applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
+            }
+        }
+    }
+
+    private fun restoreInitialBackgroundState() {
+        val blurIntensity = backgroundManager.getBlurIntensity()
+        Logger.i("BackgroundFlow") { "restoreInitialBackgroundState() called. blurIntensity=$blurIntensity" }
+        if (backgroundManager.isMusicAlbumArtEnabled() && wasMusicBackgroundApplied && currentAppliedArtworkSource != null) {
+            when (val art = currentAppliedArtworkSource) {
+                is Bitmap -> applyBitmapBackground(art, blurIntensity, skipAnimation = true)
+                is String -> applyImageBackground(Uri.parse(art), blurIntensity, skipAnimation = true)
+                is Uri -> applyImageBackground(art, blurIntensity, skipAnimation = true)
+            }
+            setCustomBackground(true)
+        } else {
+            val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+            Logger.i("BackgroundFlow") { "restoreInitialBackgroundState: activeProviderId=$activeProviderId" }
+            if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                applySolidColorBackground(color, skipAnimation = true)
+                setCustomBackground(true)
+            } else if (activeProviderId.startsWith("external:")) {
+                val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+                val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+                applyBackgroundPayload(payload, skipAnimation = true)
+            } else {
+                val savedUri = backgroundManager.getSavedBackgroundUri()
+                if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__" && activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
+                    applyImageBackground(Uri.parse(savedUri), blurIntensity, skipAnimation = true)
+                    setCustomBackground(true)
+                } else {
+                    restoreGradientBackground()
+                }
+            }
+        }
+        restoreSavedWeatherState()
+        updateBackgroundFilters()
+    }
+
+    private fun applyBackgroundSettingsFromSheet(previewUri: String?, blur: Int) {
+        Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet: previewUri=$previewUri, blur=$blur" }
+        val albumArtEnabled = backgroundManager.isMusicAlbumArtEnabled()
+        if (albumArtEnabled && wasMusicBackgroundApplied) {
+            when (previewUri) {
+                "__DEFAULT_GRADIENT__",
+                com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
+                    backgroundManager.setSavedBackgroundUri(null)
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID, notify = false)
+                }
+                com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
+                    backgroundManager.setSavedBackgroundUri(null)
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID, notify = false)
+                }
+                null -> { }
+                else -> {
+                    if (previewUri.startsWith("external:")) {
+                        backgroundManager.setSavedBackgroundUri(null)
+                        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                            .setActiveProviderId(previewUri, notify = false)
+                    } else {
+                        backgroundManager.setSavedBackgroundUri(previewUri)
+                        com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                            .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID, notify = false)
+                    }
+                }
+            }
+            if (currentAppliedArtworkSource != null) {
+                when (val art = currentAppliedArtworkSource) {
+                    is Bitmap -> applyBitmapBackground(art, blur, skipAnimation = true)
+                    is String -> applyImageBackground(Uri.parse(art), blur, skipAnimation = true)
+                    is Uri -> applyImageBackground(art, blur, skipAnimation = true)
+                }
+            }
+            restoreSavedWeatherState()
+            updateBackgroundFilters()
+            Toast.makeText(this, getString(R.string.settings_saved_music_active), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (!albumArtEnabled) {
+            wasMusicBackgroundApplied = false
+            currentAppliedArtworkSource = null
+        }
+
+        when (previewUri) {
+            com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> SolidColorBackgroundProvider" }
+                backgroundManager.setSavedBackgroundUri(null)
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID, notify = false)
+                val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                applySolidColorBackground(color, skipAnimation = false)
+            }
+            "__DEFAULT_GRADIENT__",
+            com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> DynamicGradientBackgroundProvider" }
+                backgroundManager.setSavedBackgroundUri(null)
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID, notify = false)
+                BackgroundProgressPlugin.startSession()
+                updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
+                setCustomBackground(false)
+                fontManager.clearDynamicColors()
+                fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
+                backgroundLoads.clear()
+                cancelBackgroundLoads()
+                isBackgroundLoading = false
+                lastBackgroundSource = "gradient"
+                lastBlurIntensity = null
+                dynamicBackgroundView.visibility = View.VISIBLE
+                backgroundImageView.setImageDrawable(null)
+                backgroundImageView.visibility = View.GONE
+                backgroundManager.clearDim()
+                val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
+                dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
+                gradientManager.startUpdates()
+                updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
+            }
+            null -> {
+                val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> null previewUri, activeProviderId=$activeProviderId" }
+                if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                    applySolidColorBackground(color, skipAnimation = true)
+                } else if (activeProviderId.startsWith("external:")) {
+                    val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+                    val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+                    applyBackgroundPayload(payload, skipAnimation = true)
+                } else {
+                    val existing = backgroundManager.getSavedBackgroundUri()
+                    if (existing != null) {
+                        try {
+                            applyImageBackground(Uri.parse(existing), blur, skipAnimation = true)
+                            setCustomBackground(true)
+                        } catch (e: Exception) {
+                            Logger.w("BackgroundFlow") { "Failed to re-apply existing background: ${e.message}" }
+                        }
+                    } else {
+                        restoreGradientBackground()
+                    }
+                }
+            }
+            else -> {
+                Logger.i("BackgroundFlow") { "applyBackgroundSettingsFromSheet -> external or image: $previewUri" }
+                if (previewUri.startsWith("external:")) {
+                    backgroundManager.setSavedBackgroundUri(null)
+                    val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                    bpm.setActiveProviderId(previewUri, notify = false)
+                    val provider = bpm.getExternalProviders().firstOrNull { it.id == previewUri }
+                    val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(previewUri)
+                    if (payload !is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient) {
+                        applyBackgroundPayload(payload, skipAnimation = false)
+                    }
+                    if (provider != null) {
+                        bpm.requestDataFromPlugin(provider)
+                    } else {
+                        bpm.requestDataFromPluginId(previewUri)
+                    }
+                } else {
+                    backgroundManager.setSavedBackgroundUri(previewUri)
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                        .setActiveProviderId(com.nxd1frnt.clockdesk2.background.provider.ImageBackgroundProvider.ID, notify = false)
+                    try {
+                        applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
+                        setCustomBackground(true)
+                    } catch (e: Exception) {
+                        Logger.w("BackgroundFlow") { "Failed to apply new background: ${e.message}" }
+                    }
+                }
+            }
+        }
+        restoreSavedWeatherState()
+        updateBackgroundFilters()
+    }
+
+    private fun restoreGradientBackground() {
+        Logger.i("BackgroundFlow") { "restoreGradientBackground() called" }
+        backgroundLoads.clear()
+        cancelBackgroundLoads()
+        isBackgroundLoading = false
+        lastBackgroundSource = "gradient"
+        lastBlurIntensity = null
+        currentAppliedArtworkSource = null
+        wasMusicBackgroundApplied = false
+        BackgroundProgressPlugin.startSession()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.GENERATING_GRADIENT)
+        dynamicBackgroundView.visibility = View.VISIBLE
+        backgroundImageView.setImageDrawable(null)
         backgroundImageView.visibility = View.GONE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
@@ -2318,10 +3117,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
         setCustomBackground(false)
         editModeBlurLayer.setImageDrawable(null)
         editModeBlurLayer.visibility = View.GONE
+        val (topColor, bottomColor) = gradientManager.getSkyGradientColors(Calendar.getInstance().time)
+        dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
         gradientManager.startUpdates()
+        updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
     }
 
     fun restoreUserBackground(savedUriStr: String?) {
+        lastBackgroundSource = null
+        currentAppliedArtworkSource = null
+        wasMusicBackgroundApplied = false
         if (savedUriStr != null) {
             try {
                 val uri = Uri.parse(savedUriStr)
@@ -2344,8 +3149,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver {
     override fun onPause() {
         super.onPause()
         isResumed = false
+        musicStateUpdates.pause(replayLatest = true)
+        backgroundLoads.pause(replayLatest = isBackgroundLoading)
+        if (isBackgroundLoading) {
+            lastBackgroundSource = null
+            lastBlurIntensity = null
+        }
+        isBackgroundLoading = false
+        cancelBackgroundLoads(clearEditBackground = false)
+        pendingRestoreRunnable?.let { handler.removeCallbacks(it) }
+        pendingRestoreRunnable = null
+        pendingBackgroundRestoreRunnable?.let { handler.removeCallbacks(it) }
+        pendingBackgroundRestoreRunnable = null
         updateSensorRegistration()
         if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.animate().setListener(null).cancel()
+            dynamicBackgroundView.alpha = 1f
+            isScaleAnimating = false
             dynamicBackgroundView.onPause()
         }
         burnInProtectionManager.stop()

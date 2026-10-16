@@ -10,6 +10,7 @@ import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 sealed class FontItem {
     abstract val name: String
@@ -46,20 +47,24 @@ class FontAdapter(
         val item = fonts[position]
         val context = holder.itemView.context
         val isSelected = position == selectedPosition
+        val palette = UiMonetThemeManager.getPalette(context)
 
         // Selection background matching ClockStyleAdapter
         if (isSelected) {
             holder.cardContainer.setBackgroundResource(R.drawable.bg_clock_style_selected)
+            (holder.cardContainer.background?.mutate() as? android.graphics.drawable.GradientDrawable)?.setColor(palette.primary)
         } else {
             holder.cardContainer.setBackgroundResource(R.drawable.bg_clock_style_unselected)
+            (holder.cardContainer.background?.mutate() as? android.graphics.drawable.GradientDrawable)?.setColor(palette.surfaceContainer)
         }
 
         val textColor = if (isSelected) {
-            getThemeColor(context, com.google.android.material.R.attr.colorOnPrimary, R.color.clock_style_card_selected_text)
+            palette.onPrimary
         } else {
-            getThemeColor(context, com.google.android.material.R.attr.colorOnSurface, R.color.clock_style_card_unselected_text)
+            palette.onSurface
         }
         holder.fontPreview.setTextColor(textColor)
+        holder.fontName.setTextColor(palette.onSurfaceVariant)
 
         if (isSelected && item !is FontItem.AddNew) {
             holder.fontName.visibility = View.VISIBLE

@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class DraggablePluginAdapter(
     private val items: List<PluginUiModel>,
@@ -62,6 +63,7 @@ class DraggablePluginAdapter(
             item.isEnabled = isChecked
             onSwitchChanged(item.id, isChecked)
         }
+        UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView)
     }
 
     override fun getItemCount() = items.size

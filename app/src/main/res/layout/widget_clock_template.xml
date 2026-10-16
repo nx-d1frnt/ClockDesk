@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.nxd1frnt.clockdesk2.ui.view.ClockTextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/time_text"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/kanit_regular"
+    android:gravity="center_horizontal"
+    android:includeFontPadding="false"
+    android:text="00:00"
+    android:textColor="#DEFFFFFF"
+    android:textSize="145sp"
+    app:autoSizeTextType="none" />

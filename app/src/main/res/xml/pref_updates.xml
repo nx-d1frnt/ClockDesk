@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.PreferenceCategory
+        app:key="update_status_category"
+        app:title="@string/update_status_category_title">
+
+        <androidx.preference.Preference
+            app:key="update_current_version"
+            app:title="@string/update_current_version_title"
+            app:selectable="false" />
+
+        <androidx.preference.Preference
+            app:key="update_status"
+            app:title="@string/update_status_title"
+            app:selectable="false" />
+
+        <androidx.preference.Preference
+            app:key="check_updates_now"
+            app:title="@string/check_for_updates_title"
+            app:summary="@string/check_for_updates_never" />
+
+        <androidx.preference.Preference
+            app:key="install_update_now"
+            app:title="@string/download_and_install_title"
+            app:summary="@string/download_and_install_summary"
+            app:isPreferenceVisible="false" />
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
+        app:key="update_channel_category"
+        app:title="@string/update_channel_category_title">
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="update_nightly_channel"
+            app:title="@string/update_nightly_channel_title"
+            app:summary="@string/update_nightly_channel_summary"
+            app:defaultValue="false" />
+
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="show_updates"
+            app:title="@string/show_updates_chip"
+            app:summary="@string/show_updates_chip_summary"
+            app:defaultValue="true" />
+    </androidx.preference.PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

@@ -13,25 +13,32 @@ class EntranceAnimationManager(
     private val rootView: ViewGroup,
     private val widgets: List<View>,
     private val turbulenceOverlay: TurbulenceView? = null,
-    private val isTurbulenceEnabled: Boolean = true,
-    private val dynamicBackgroundView: DynamicBackgroundView? = null
+    isTurbulenceEnabled: Boolean = true,
+    dynamicBackgroundView: DynamicBackgroundView? = null,
+    targetTranslationYProvider: ((View) -> Float)? = null,
+    private val themeColor: Int? = null
 ) {
     private var hasAnimationPlayed = false
 
-    private val expressiveInterpolator = PathInterpolator(0.2f, 0.0f, 0.0f, 1.0f)
+    private val expressiveInterpolator = MotionUtils.EXPRESSIVE_SPRING
 
     private val targetTranslationsY = mutableMapOf<View, Float>()
 
     private var loaderView: com.google.android.material.loadingindicator.LoadingIndicator? = null
 
+    private val isTurbulenceEnabled = isTurbulenceEnabled
+    private val dynamicBackgroundView = dynamicBackgroundView
+    private val targetTranslationYProvider = targetTranslationYProvider
+
     fun prepareViews() {
         if (hasAnimationPlayed) return
 
+        val activeTurbulenceColor = themeColor ?: Color.parseColor("#5A7184")
         if (isTurbulenceEnabled) {
             if (dynamicBackgroundView != null) {
-                dynamicBackgroundView.playTurbulence(Color.parseColor("#5A7184")) {}
+                dynamicBackgroundView.playTurbulence(activeTurbulenceColor) {}
             } else {
-                turbulenceOverlay?.playAnimation(Color.parseColor("#5A7184")) {}
+                turbulenceOverlay?.playAnimation(activeTurbulenceColor) {}
             }
         }
 
@@ -50,6 +57,9 @@ class EntranceAnimationManager(
                 startToStart = ConstraintLayout.LayoutParams.PARENT_ID
                 endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
             }
+            themeColor?.let { color ->
+                setIndicatorColor(color)
+            }
             alpha = 0f
             id = View.generateViewId()
         }
@@ -58,19 +68,33 @@ class EntranceAnimationManager(
 
         loaderView?.animate()
             ?.alpha(1f)
+            ?.scaleX(1f)
+            ?.scaleY(1f)
             ?.setDuration(200L)
+            ?.setInterpolator(MotionUtils.EMPHASIZED_DECELERATE)
             ?.start()
     }
 
-    fun play() {
-        if (hasAnimationPlayed) return
+    fun play(onAnimationEnd: (() -> Unit)? = null) {
+        if (hasAnimationPlayed) {
+            onAnimationEnd?.invoke()
+            return
+        }
         hasAnimationPlayed = true
 
-        val offset = dpToPx(rootView.context, 40f)
+        if (widgets.isEmpty()) {
+            loaderView?.let { rootView.removeView(it) }
+            loaderView = null
+            onAnimationEnd?.invoke()
+            return
+        }
+
+        val offset = dpToPx(rootView.context, 44f)
 
         widgets.forEach { view ->
-            targetTranslationsY[view] = view.translationY
-            view.translationY = view.translationY + offset
+            val targetY = targetTranslationYProvider?.invoke(view) ?: view.translationY
+            targetTranslationsY[view] = targetY
+            view.translationY = targetY + offset
             view.scaleX = 0.85f
             view.scaleY = 0.85f
             view.visibility = View.VISIBLE
@@ -78,19 +102,28 @@ class EntranceAnimationManager(
 
         loaderView?.animate()
             ?.alpha(0f)
-            ?.scaleX(0.5f)
-            ?.scaleY(0.5f)
-            ?.setDuration(400L)
-            ?.setInterpolator(PathInterpolator(0.4f, 0.0f, 0.2f, 1.0f))
+            ?.scaleX(0.7f)
+            ?.scaleY(0.7f)
+            ?.setDuration(220L)
+            ?.setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
             ?.withEndAction {
                 rootView.removeView(loaderView)
                 loaderView = null
             }
             ?.start()
 
-        var delay = 200L
-        val staggerDelay = 100L
-        val animationDuration = 900L
+        var delay = 40L
+        val staggerDelay = 70L
+        val animationDuration = 650L
+
+        var completedCount = 0
+        var hasNotifiedEnd = false
+        fun notifyEnd() {
+            if (!hasNotifiedEnd) {
+                hasNotifiedEnd = true
+                onAnimationEnd?.invoke()
+            }
+        }
 
         widgets.forEach { view ->
             val targetY = targetTranslationsY[view] ?: 0f
@@ -107,12 +140,22 @@ class EntranceAnimationManager(
                     view.scaleX = 1f
                     view.scaleY = 1f
                     view.alpha = 1f
+                    view.translationY = targetY
                     view.animate().setListener(null)
+                    completedCount++
+                    if (completedCount >= widgets.size) {
+                        notifyEnd()
+                    }
                 }
                 .start()
 
             delay += staggerDelay
         }
+
+        val maxDuration = delay + animationDuration + 80L
+        rootView.postDelayed({
+            notifyEnd()
+        }, maxDuration)
     }
 
     private fun dpToPx(context: Context, dp: Float): Float {

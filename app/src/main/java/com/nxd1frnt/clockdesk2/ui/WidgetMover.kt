@@ -36,9 +36,47 @@ import kotlin.math.roundToInt
  */
 class WidgetMover(
     private val context: Context,
-    private val views: List<View>,
+    initialViews: List<View>,
     private val parentView: View
 ) {
+    private val views = initialViews.toMutableList()
+
+    fun setViews(newViews: List<View>) {
+        views.clear()
+        views.addAll(newViews)
+        if (isEditMode) {
+            views.forEach { view ->
+                view.setOnTouchListener(dragListener)
+                view.setBackgroundResource(R.drawable.editable_border)
+            }
+        }
+        restoreOrderAndPositions()
+    }
+
+    fun addView(view: View) {
+        if (!views.contains(view)) {
+            views.add(view)
+            if (isEditMode) {
+                view.setOnTouchListener(dragListener)
+                view.setBackgroundResource(R.drawable.editable_border)
+            }
+            restoreOrderAndPositions()
+        }
+    }
+
+    fun removeView(view: View) {
+        if (views.remove(view)) {
+            view.setOnTouchListener(null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                view.background = null
+            } else {
+                @Suppress("DEPRECATION")
+                view.setBackgroundDrawable(null)
+            }
+            restoreOrderAndPositions()
+        }
+    }
+
     private val TAG = "WidgetMover"
     private val prefs: SharedPreferences =
         context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
@@ -56,6 +94,9 @@ class WidgetMover(
     // Touch Handling
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var isDragging = false
+    private var activeTouchView: View? = null
+    private var hasMoved = false
+    private val touchPosition = FloatArray(2)
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     private var dX = 0f
@@ -170,20 +211,22 @@ class WidgetMover(
     }
 
     fun getRestTranslationX(view: View): Float {
+        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
         return if (isFreeMovementEnabled(view)) {
             val idName = getResourceName(view.id)
-            prefs.getFloat("${idName}_x", view.translationX)
+            prefs.getFloat("${idName}_x", 0f) + shiftX
         } else {
-            burnInProtectionManager?.currentShiftX ?: 0f
+            shiftX
         }
     }
 
     fun getRestTranslationY(view: View): Float {
+        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
         return if (isFreeMovementEnabled(view)) {
             val idName = getResourceName(view.id)
-            prefs.getFloat("${idName}_y", view.translationY)
+            prefs.getFloat("${idName}_y", 0f) + shiftY
         } else {
-            burnInProtectionManager?.currentShiftY ?: 0f
+            shiftY
         }
     }
 
@@ -199,6 +242,7 @@ class WidgetMover(
     // ============================================================================
 
     private fun checkAndInitializeDefaults() {
+        val moverVersion = prefs.getInt("widget_mover_layout_version", 1)
         if (!prefs.contains("is_layout_initialized")) {
             Logger.d("WidgetMover"){"First run detected! Applying default layout settings."}
             val editor = prefs.edit()
@@ -218,8 +262,20 @@ class WidgetMover(
             }
 
             editor.putBoolean("is_layout_initialized", true)
+            editor.putInt("widget_mover_layout_version", 2)
             editor.apply()
             Logger.d("WidgetMover"){"Default settings initialized"}
+        } else if (moverVersion < 2) {
+            val editor = prefs.edit()
+            val timeOrder = prefs.getInt("time_text_order_index", -1)
+            val lastfmOrder = prefs.getInt("lastfm_layout_order_index", -1)
+            if (timeOrder == 0 && lastfmOrder == 2) {
+                editor.putInt("lastfm_layout_order_index", 0)
+                editor.putInt("date_text_order_index", 1)
+                editor.putInt("time_text_order_index", 2)
+            }
+            editor.putInt("widget_mover_layout_version", 2)
+            editor.apply()
         }
     }
 
@@ -365,6 +421,11 @@ class WidgetMover(
 
         set.applyTo(parentView)
 
+        val isInitialRestore = isFirstRestore
+        if (isFirstRestore) {
+            isFirstRestore = false
+        }
+
         val postRunnable = Runnable {
             stackedViews.forEach { view ->
                 if (isEditMode) {
@@ -376,7 +437,7 @@ class WidgetMover(
                 if (view.visibility == View.VISIBLE && view.alpha < 1f) {
                     view.alpha = 1f
                 }
-                if (isFirstRestore) {
+                if (isInitialRestore) {
                     view.translationX = 0f
                     view.translationY = 0f
                 } else {
@@ -418,17 +479,14 @@ class WidgetMover(
                 val savedY = prefs.getFloat("${idName}_y", 0f)
                 sanitizeAndApplyPosition(view, savedX, savedY)
             }
+
+            if (isInitialRestore) {
+                onInitialLayoutComplete?.invoke()
+            }
         }
 
         pendingPostApplyRunnable = postRunnable
         parentView.post(postRunnable)
-
-        if (isFirstRestore) {
-            isFirstRestore = false
-            parentView.post {
-                onInitialLayoutComplete?.invoke()
-            }
-        }
     }
 
     private fun calculateSmartGap(topView: View, bottomView: View, normalGap: Int, smallGap: Int): Int {
@@ -452,8 +510,30 @@ class WidgetMover(
     // ============================================================================
 
     private fun sanitizeAndApplyPosition(view: View, desiredX: Float, desiredY: Float) {
-        // Чекаємо поки layout буде готовий
+        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
+
+        if (view.visibility == View.GONE) {
+            if (isFreeMovementEnabled(view)) {
+                view.translationX = desiredX + shiftX
+                view.translationY = desiredY + shiftY
+            } else {
+                view.translationX = shiftX
+                view.translationY = shiftY
+            }
+            return
+        }
+
+        // Wait until layout is ready
         if (parentView.width == 0 || parentView.height == 0 || view.width == 0 || view.height == 0) {
+            // Apply desired position directly so translations aren't left at 0f before layout measurement
+            if (isFreeMovementEnabled(view)) {
+                view.translationX = desiredX + shiftX
+                view.translationY = desiredY + shiftY
+            } else {
+                view.translationX = shiftX
+                view.translationY = shiftY
+            }
             parentView.post {
                 sanitizeAndApplyPosition(view, desiredX, desiredY)
             }
@@ -476,9 +556,6 @@ class WidgetMover(
             finalY = 0f
         }
 
-        val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
-        val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
-
         view.translationX = finalX + shiftX
         view.translationY = finalY + shiftY
 
@@ -492,23 +569,38 @@ class WidgetMover(
     private val dragListener = View.OnTouchListener { view, event ->
         if (!isEditMode) return@OnTouchListener false
 
-        val rawX = event.rawX
-        val rawY = event.rawY
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            activeTouchView?.let { handleTouchCancel(it) }
+            activeTouchView = view
+        } else if (activeTouchView !== view) {
+            return@OnTouchListener false
+        }
 
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> handleTouchDown(view, rawX, rawY)
-            MotionEvent.ACTION_MOVE -> handleTouchMove(view, rawX, rawY)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> handleTouchUp(view)
+        // Android has already transformed the event into the child's coordinate space.
+        // Map it back to the desktop, including the child's highlight scale/translation.
+        // This keeps movement correct when the desktop or any ancestor is scaled.
+        touchPosition[0] = event.x
+        touchPosition[1] = event.y
+        view.matrix.mapPoints(touchPosition)
+        val parentX = touchPosition[0] + view.left
+        val parentY = touchPosition[1] + view.top
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> handleTouchDown(view, parentX, parentY)
+            MotionEvent.ACTION_MOVE -> handleTouchMove(view, parentX, parentY)
+            MotionEvent.ACTION_UP -> handleTouchUp(view)
+            MotionEvent.ACTION_CANCEL -> handleTouchCancel(view)
             else -> false
         }
     }
 
-    private fun handleTouchDown(view: View, rawX: Float, rawY: Float): Boolean {
+    private fun handleTouchDown(view: View, parentX: Float, parentY: Float): Boolean {
         isDragging = false
-        initialTouchX = rawX
-        initialTouchY = rawY
-        dX = view.translationX - rawX
-        dY = view.translationY - rawY
+        hasMoved = false
+        initialTouchX = parentX
+        initialTouchY = parentY
+        dX = view.translationX - parentX
+        dY = view.translationY - parentY
 
         // Visual feedback
         view.animate().cancel()
@@ -521,15 +613,17 @@ class WidgetMover(
         return true
     }
 
-    private fun handleTouchMove(view: View, rawX: Float, rawY: Float): Boolean {
+    private fun handleTouchMove(view: View, parentX: Float, parentY: Float): Boolean {
+        hasMoved = hasMoved || abs(parentX - initialTouchX) > touchSlop ||
+            abs(parentY - initialTouchY) > touchSlop
+
         // Check if Free Mode is enabled
         val isIndividualFree = isFreeMovementEnabled(view)
         val canMove = isIndividualFree
 
         if (!canMove) {
             if (!isDragging) {
-                val moved = abs(rawX - initialTouchX) > touchSlop || abs(rawY - initialTouchY) > touchSlop
-                if (moved) {
+                if (hasMoved) {
                     showFreeModeHint()
                 }
             }
@@ -538,21 +632,20 @@ class WidgetMover(
 
         // Start dragging if threshold exceeded
         if (!isDragging) {
-            val moved = abs(rawX - initialTouchX) > touchSlop || abs(rawY - initialTouchY) > touchSlop
-            if (moved) {
-                startDragging(view, rawX, rawY)
+            if (hasMoved) {
+                startDragging(view)
             }
         }
 
         // Update position while dragging
         if (isDragging) {
-            updateDragPosition(view, rawX, rawY)
+            updateDragPosition(view, parentX, parentY)
         }
 
         return true
     }
 
-    private fun startDragging(view: View, rawX: Float, rawY: Float) {
+    private fun startDragging(view: View) {
         isDragging = true
         onInteractionListener?.invoke(true)
 
@@ -564,13 +657,13 @@ class WidgetMover(
         }
 
         // Recalculate delta
-        dX = view.translationX - rawX
-        dY = view.translationY - rawY
+        dX = view.translationX - initialTouchX
+        dY = view.translationY - initialTouchY
     }
 
-    private fun updateDragPosition(view: View, rawX: Float, rawY: Float) {
-        var targetX = rawX + dX
-        var targetY = rawY + dY
+    private fun updateDragPosition(view: View, parentX: Float, parentY: Float) {
+        var targetX = parentX + dX
+        var targetY = parentY + dY
 
         // Apply grid snap
         if (isGridSnapEnabled) {
@@ -579,8 +672,8 @@ class WidgetMover(
         }
 
         // Clamp to bounds
-        val maxTransX = (parentView.width - view.width).toFloat()
-        val maxTransY = (parentView.height - view.height).toFloat()
+        val maxTransX = (parentView.width - view.width).toFloat().coerceAtLeast(0f)
+        val maxTransY = (parentView.height - view.height).toFloat().coerceAtLeast(0f)
         targetX = targetX.coerceIn(0f, maxTransX)
         targetY = targetY.coerceIn(0f, maxTransY)
 
@@ -591,7 +684,7 @@ class WidgetMover(
         updateCollisionFeedback(view)
     }
 
-    private fun handleTouchUp(view: View): Boolean {
+    private fun resetTouchFeedback(view: View) {
         // Reset visual state
         view.animate()
             .scaleX(1f)
@@ -601,16 +694,35 @@ class WidgetMover(
 
         view.setBackgroundResource(R.drawable.editable_border)
         view.background?.clearColorFilter()
+    }
+
+    private fun handleTouchUp(view: View): Boolean {
+        resetTouchFeedback(view)
+        activeTouchView = null
 
         if (isDragging) {
             handleDragEnd(view)
             onInteractionListener?.invoke(false)
-        } else {
+        } else if (!hasMoved) {
             // This was a click
             view.performClick()
         }
 
         isDragging = false
+        return true
+    }
+
+    private fun handleTouchCancel(view: View): Boolean {
+        resetTouchFeedback(view)
+        activeTouchView = null
+        val wasDragging = isDragging
+        isDragging = false
+        hasMoved = false
+        if (wasDragging) {
+            // Return to the last committed layout without saving or treating cancellation as a tap.
+            restoreOrderAndPositions()
+            onInteractionListener?.invoke(false)
+        }
         return true
     }
 
@@ -931,6 +1043,7 @@ class WidgetMover(
     // ============================================================================
 
     fun setEditMode(enabled: Boolean) {
+        if (!enabled) activeTouchView?.let { handleTouchCancel(it) }
         isEditMode = enabled
         Logger.d("WidgetMover"){"Edit mode: $enabled"}
 

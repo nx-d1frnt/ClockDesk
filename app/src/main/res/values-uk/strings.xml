@@ -44,6 +44,12 @@
     <string name="clock_style_analog">Аналоговий циферблат</string>
     <string name="clock_style_analog_minimal">Мінімалістичний аналоговий</string>
 
+    <!-- Date Widget Styles -->
+    <string name="date_style">Стиль віджета дати</string>
+    <string name="date_style_standard">Стандартний</string>
+    <string name="date_style_two_line">Дворядковий</string>
+    <string name="date_style_calendar_badge">Календарний бейдж</string>
+
     <!-- New strings for background selection -->
     <string name="choose_background">Обрати фон</string>
     <string name="clear_background">Очистити фон</string>
@@ -75,6 +81,8 @@
     <string name="onboarding_customization_desc">Утримуйте натискання в будь-якому місці екрана для входу в Режим редагування. Змінюйте шрифт, налаштовуйте динамічні фони та розміщуйте модульні інфо-чипи.</string>
     <string name="onboarding_widgets_title">Віджети та музика</string>
     <string name="onboarding_widgets_desc">Відображайте обкладинку альбому треку, що зараз грає, та додавайте розумні чипи для показу заряду батареї, оновлень або прогресу у фоні.</string>
+    <string name="onboarding_deskconnect_title">Завжди на зв\'язку</string>
+    <string name="onboarding_deskconnect_desc">Підключайте телефон або ПК через DeskConnect, щоб відстежувати рівень заряду, синхронізувати сповіщення та бачити виклики прямо на екрані.</string>
     <string name="onboarding_weather_title">Динамічний режим</string>
     <string name="onboarding_weather_desc">Насолоджуйтеся анімованими ефектами дощу, снігу або туману та градієнтами кольорів, які природно змінюються відповідно до сходу й заходу сонця.</string>
     <string name="onboarding_permission_title">Готові почати?</string>
@@ -83,6 +91,7 @@
     <string name="onboarding_permission_granted">Дозвіл надано</string>
     <string name="onboarding_next_btn">Далі</string>
     <string name="onboarding_back_btn">Назад</string>
+    <string name="back">Назад</string>
     <string name="onboarding_finish_btn">Почати роботу</string>
     <string name="onboarding_skip_btn">Пропустити</string>
     <string name="onboarding_try_guide_btn">Показати як</string>
@@ -163,9 +172,33 @@
     <string name="power_saver_dim_level_summary">Налаштуйте відсоток затемнення фону при економії батареї</string>
     <string name="power_saver_brightness_level_title">Яскравість екрана</string>
     <string name="power_saver_brightness_level_summary">Налаштуйте рівень яскравості екрана в режимі економії батареї</string>
+    <string name="power_saver_trigger_rules_category">Умови активації</string>
+    <string name="power_saver_display_category">Екран та яскравість</string>
+    <string name="power_saver_visual_effects_category">Анімації та ефекти</string>
+    <string name="power_saver_background_activity_category">Датчики та фон</string>
+    <string name="battery_status_active">Економія енергії активна</string>
+    <string name="battery_status_inactive">Економія енергії вимкнена</string>
+    <string name="battery_status_charging">Заряджається (%1$d%%)</string>
+    <string name="battery_status_discharging">Залишилося %1$d%%</string>
+    <string name="battery_status_full">Повністю заряджено</string>
+    <string name="battery_status_reason_manual">Увімкнено вручну</string>
+    <string name="battery_status_reason_system">Увімкнено системним режимом економії</string>
+    <string name="battery_status_reason_auto">Увімкнено за порогом заряду (%1$d%% або нижче)</string>
+    <string name="graphics_visual_effects_category">Візуальні ефекти</string>
+    <string name="graphics_optimization_category">Роздільна здатність та оптимізація</string>
+    <string name="performance_diagnostics_category">Діагностика та інструменти</string>
+    <string name="turbulence_preview_title">Попередній перегляд турбулентності</string>
+    <string name="turbulence_preview_summary">Попередній перегляд спотворення рідкого хроматичного шуму</string>
+    <string name="turbulence_preview_play">Запустити тест</string>
     <string name="smart_chips_settings_title">Налаштування розумних чіпів</string>
     <string name="show_battery_alert_chip">Показувати чіп сповіщення про батарею</string>
     <string name="show_battery_alert_chip_summary">Показує чіп, коли батарея розряджена або увімкнено економію батареї додатку</string>
+    <string name="show_companion_battery_chip">Акумулятор підключеного пристрою</string>
+    <string name="show_companion_battery_chip_summary">Оповіщення про низький заряд акумулятора телефона або ПК</string>
+    <string name="show_device_connection_chip">Статус підключення пристроїв</string>
+    <string name="show_device_connection_chip_summary">Коротке сповіщення при підключенні або відключенні спарених пристроїв</string>
+    <string name="device_connected_notice">%1$s: підключено</string>
+    <string name="device_disconnected_notice">%1$s: відключено</string>
     <string name="battery_low">Низький заряд</string>
     <string name="battery_saver_on">Економія ввімк</string>
     <string name="battery_alert_settings_title">Налаштування сповіщень про батарею</string>
@@ -228,6 +261,9 @@
     <string name="send_backward">Відправити назад</string>
     <string name="bring_forward">Вивести вперед</string>
     <string name="display_settings_title">Налаштування відображення</string>
+    <string name="screensaver_settings_title">Системна заставка</string>
+    <string name="screensaver_settings_summary">Налаштування системного скрінсейвера Android</string>
+    <string name="screensaver_settings_not_found">Не вдалося відкрити налаштування заставки</string>
     <string name="burn_in_protection_title">Захист від вигорання</string>
     <string name="burn_in_protection_summary">Запобігти вигоранню на екранах OLED, періодично переміщуючи елементи інтерфейсу</string>
     <string name="system_media_plugin_name">Системні медіа</string>
@@ -249,19 +285,42 @@
     <string name="show_updates_chip">Показувати оновлення додатку</string>
     <string name="show_updates_chip_summary">Показувати сповіщення про оновлення додатку</string>
     <string name="customize_smart_chips">Налаштувати розумні чіпи</string>
+    <string name="chip_stack_overflow_title">Згортати при переповненні</string>
+    <string name="chip_stack_overflow_desc">Складати зайві чіпи в розкривний стос</string>
+    <string name="chip_stack_badge_format">+%d</string>
     <string name="edit_background">Змінити колір фону</string>
     <string name="ignore_collision">Перевіряти зіткнення</string>
     <string name="music_sources_title">Джерела музики</string>
     <string name="music_sources_summary">Сортувати джерела музики та налаштовувати провайдерів</string>
     <string name="smart_pixels_title">Розумні пікселі</string>
     <string name="smart_pixels_summary">Затемнює пікселі у шаховому порядку після бездіяльності для економії заряду батареї та екрану</string>
+    <string name="burn_in_shift_distance_title">Дистанція зміщення</string>
+    <string name="burn_in_shift_distance_summary">Максимальна відстань періодичного зсуву елементів</string>
+    <string name="burn_in_shift_preset_subtle">М\'яке</string>
+    <string name="burn_in_shift_preset_normal">Звичайне</string>
+    <string name="burn_in_shift_preset_aggressive">Агресивне</string>
+    <string name="burn_in_shift_distance_format">%d dp</string>
+    <string name="smart_pixels_intensity_title">Інтенсивність розумних пікселів</string>
+    <string name="smart_pixels_intensity_summary">Відсоток пікселів, що вимикаються під час бездіяльності</string>
+    <string name="smart_pixels_preset_light">Легка (25%)</string>
+    <string name="smart_pixels_preset_balanced">Баланс (50%)</string>
+    <string name="smart_pixels_preset_strong">Макс (75%)</string>
+    <string name="smart_pixels_loupe_title">OLED-сітка (Збільшено 8x)</string>
+    <string name="smart_pixels_intensity_format">%d%%</string>
     <string name="max_width">Максимальна ширина</string>
     <string name="show_background_progress_chip">Індикатор завантаження фону</string>
     <string name="show_background_progress_chip_summary">Показувати чип зі статусом завантаження або обробки фонового зображення</string>
-    <string name="stage_downloading">Завантаження зображення…</string>
+    <string name="stage_downloading">Завантаження шпалер…</string>
+    <string name="stage_loading">Завантаження шпалер…</string>
+    <string name="stage_gradient">Генерація градієнта…</string>
     <string name="stage_blurring">Застосування розмиття…</string>
-    <string name="stage_colors">Вилучення палітри…</string>
+    <string name="stage_blurring_detail">Застосування розмиття (%1$d%%)…</string>
+    <string name="stage_colors">Аналіз палітри…</string>
     <string name="stage_theme">Застосування теми…</string>
+    <string name="stage_rendering">Застосування фону…</string>
+    <string name="stage_completed">Фон застосовано</string>
+    <string name="stage_gradient_applied">Градієнт застосовано</string>
+    <string name="stage_failed">Не вдалося завантажити фон</string>
     <string name="delete_font_title">Видалити шрифт?</string>
     <string name="delete_font_msg">Цей файл шрифту буде видалено назавжди.</string>
     <string name="delete_background_title">Видалити фон?</string>
@@ -279,6 +338,8 @@
     <string name="error_opening_settings">Не вдалося відкрити налаштування</string>
 
     <string name="backup_restore_title">Бекап та відновлення</string>
+    <string name="backup_connected_devices_title">Включати підключені пристрої</string>
+    <string name="backup_connected_devices_summary">Зберігати спарені пристрої DeskConnect та дані підключення</string>
     <string name="export_settings">Бекап налаштувань</string>
     <string name="import_settings">Імпорт налаштувань</string>
     <string name="export_success">Бекап успішно збережено</string>
@@ -390,6 +451,10 @@
     <string name="smart_night_min_brightness_summary">Бажаний рівень яскравості при затемненні вночі</string>
     <string name="smart_night_lux_threshold_title">Поріг освітленості (lux)</string>
     <string name="smart_night_lux_threshold_summary">Рівень освітленості (люкс), нижче якого вмикається нічне затемнення</string>
+    <string name="current_light_level_title">Поточний рівень освітленості</string>
+    <string name="current_light_level_summary">Показники датчика освітленості в реальному часі</string>
+    <string name="light_sensor_unavailable">Датчик недоступний</string>
+    <string name="light_sensor_measuring">Вимірювання…</string>
 
     <!-- Weather Details Dialog -->
     <string name="weather_dialog_title">Деталі погоди</string>
@@ -466,4 +531,206 @@
     <string name="color_green">Зелений</string>
     <string name="color_blue">Синій</string>
     <string name="color_hex">HEX</string>
+
+    <!-- Desktop Widgets -->
+    <string name="add_widget">Додати віджет</string>
+    <string name="remove_widget">Видалити віджет</string>
+    <string name="reset_layout">Скинути макет</string>
+    <string name="done">Готово</string>
+    <string name="widget_clock_title">Годинник</string>
+    <string name="widget_clock_desc">Основне відображення часу з налаштовуваними шрифтами та стилями</string>
+    <string name="widget_date_title">Дата</string>
+    <string name="widget_date_desc">Дата календаря з налаштовуваними форматами та типографікою</string>
+    <string name="widget_media_title">Зараз грає</string>
+    <string name="widget_media_desc">Назва треку та виконавець з активних медіаплеєрів</string>
+    <string name="widget_smart_chips_title">Розумні чіпи</string>
+    <string name="widget_smart_chips_desc">Контекстні бейджі для заряду, погоди, будильників та сповіщень</string>
+    <string name="widget_weather_title">Погода</string>
+    <string name="widget_weather_desc">Поточна температура та значок погоди</string>
+    <string name="widget_gallery_title">Галерея віджетів</string>
+    <string name="widget_gallery_subtitle">Оберіть віджет для додавання на стіл</string>
+    <string name="widget_already_added">Вже додано на стіл</string>
+    <string name="empty_desk_prompt">Ваш стіл порожній. Натисніть +, щоб додати віджет.</string>
+    <string name="confirm_reset_layout_title">Скинути макет?</string>
+    <string name="confirm_reset_layout_msg">Це відновить віджети та їх розташування за замовчуванням.</string>
+
+    <!-- DeskConnect -->
+    <string name="deskconnect_settings_title">DeskConnect</string>
+    <string name="deskconnect_settings_subtitle">Підключення телефонів та ПК за протоколом KDE Connect</string>
+    <string name="deskconnect_enable_title">Увімкнути DeskConnect</string>
+    <string name="deskconnect_enable_summary">Дозволити спареним пристроям передавати сповіщення, музику та стан акумулятора</string>
+    <string name="deskconnect_device_name_title">Назва пристрою</string>
+    <string name="deskconnect_device_name_summary">Назва, що транслюється іншим пристроям у локальній мережі</string>
+    <string name="deskconnect_paired_devices_title">З\'єднані пристрої</string>
+    <string name="deskconnect_discovered_devices_title">Доступні пристрої</string>
+    <string name="deskconnect_no_devices_found">Пошук пристроїв у тій самій мережі Wi-Fi…</string>
+    <string name="deskconnect_no_paired_devices">Немає з\'єднаних пристроїв</string>
+    <string name="deskconnect_pair">З\'єднати</string>
+    <string name="deskconnect_unpair">Від\'єднати</string>
+    <string name="deskconnect_refresh">Оновити</string>
+    <string name="deskconnect_refreshing">Пошук пристроїв…</string>
+    <string name="deskconnect_status_connected">Підключено</string>
+    <string name="deskconnect_status_paired_offline">З\'єднано (не в мережі)</string>
+    <string name="deskconnect_battery_charging">Заряджання</string>
+    <string name="deskconnect_pairing_request_title">Запит на з\'єднання</string>
+    <string name="deskconnect_pairing_request_message">Пристрій \"%1$s\" запитує з\'єднання з ClockDesk.\nКлюч перевірки: %2$s</string>
+    <string name="deskconnect_accept">Прийняти</string>
+    <string name="deskconnect_reject">Відхилити</string>
+    <string name="incoming_call">Вхідний виклик</string>
+    <string name="show_companion_battery_title">Акумулятор телефона-компаньйона</string>
+    <string name="show_companion_battery_summary">Показувати рівень заряду підключеного компаньйона DeskConnect</string>
+
+    <!-- Credits & Open Source Acknowledgments -->
+    <string name="about_credits_title">Подяки та автори</string>
+    <string name="about_kde_connect_title">KDE Connect</string>
+    <string name="about_kde_connect_desc">Протокол синхронізації пристроїв та MPRIS від KDE Community</string>
+    <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
+    <string name="deskconnect_credits_text">DeskConnect використовує протокол із відкритим вихідним кодом, розроблений проєктом KDE Connect. Щира подяка спільноті KDE!</string>
+
+    <!-- Notification Smart Chip & Shade -->
+    <string name="show_notifications_chip">Сповіщення</string>
+    <string name="show_notifications_chip_summary">Значок з іконками сповіщень та шторка швидкого доступу</string>
+    <string name="notification_shade_title">Сповіщення</string>
+    <string name="notification_shade_clear_all">Очистити все</string>
+    <string name="no_notifications">Немає сповіщень</string>
+    <string name="no_notifications_subtitle">Усе прочитано</string>
+    <string name="notification_time_just_now">Щойно</string>
+
+    <!-- Notification Settings & Chip Settings -->
+    <string name="notifications_settings_title">Сповіщення</string>
+    <string name="notifications_settings_subtitle">Банери, дзвінки та розумний чип</string>
+    <string name="pref_cat_floating_banners">Спливаючі банери</string>
+    <string name="desk_notification_popup_title">Спливаючі сповіщення</string>
+    <string name="desk_notification_popup_summary">Показувати спливаючий банер при надходженні сповіщень</string>
+    <string name="desk_notification_preview_title">Передперегляд банера</string>
+    <string name="desk_notification_preview_summary">Передперегляд відображення спливаючих сповіщень на годиннику</string>
+    <string name="desk_notification_preview_replay">Анімація</string>
+    <string name="desk_notification_preview_sample_app">Повідомлення</string>
+    <string name="desk_notification_preview_sample_device">Pixel 9</string>
+    <string name="desk_notification_preview_sample_title">Аліса Сміт</string>
+    <string name="desk_notification_preview_sample_body">Привіт! Ми все ще зустрічаємося сьогодні на каву о 16:00?</string>
+    <string name="desk_notification_font_summary">Оберіть шрифт або імпортуйте власний для сповіщень</string>
+    <string name="desk_notification_color_summary">Налаштуйте кольори тексту, акцентів та фону картки сповіщень</string>
+    <string name="desk_notification_color_mode_text">Текст і акцент</string>
+    <string name="desk_notification_color_mode_bg">Фон картки</string>
+    <string name="desk_notification_reset_colors">Скинути</string>
+    <string name="desk_notification_style_title">Стиль банера</string>
+    <string name="desk_notification_style_summary">Оберіть щільність компонування спливаючого банера</string>
+    <string name="desk_notification_position_title">Позиція банера</string>
+    <string name="desk_notification_position_summary">Де спливаючі сповіщення з’являються на екрані</string>
+    <string name="desk_notification_scale_title">Розмір банера</string>
+    <string name="desk_notification_scale_summary">Масштаб загального розміру та тексту банера</string>
+    <string name="desk_notification_bg_opacity_title">Непрозорість фону</string>
+    <string name="desk_notification_bg_opacity_summary">Налаштування прозорості картки поверх екрана годинника</string>
+    <string name="desk_notification_monochrome_icon_title">Монохромна іконка</string>
+    <string name="desk_notification_monochrome_icon_summary">Фарбувати іконки додатків в акцентний колір сповіщення</string>
+    <string name="desk_notification_show_device_title">Показувати ім’я пристрою</string>
+    <string name="desk_notification_show_device_summary">Відображати ім’я пристрою поруч із назвою додатка</string>
+    <string name="desk_notification_show_dismiss_title">Показувати кнопку закриття</string>
+    <string name="desk_notification_show_dismiss_summary">Показувати кнопку закриття на банерах (свайп завжди працює)</string>
+    <string name="desk_notification_duration_title">Тривалість показу</string>
+    <string name="desk_notification_duration_summary">Скільки секунд банер залишається на екрані</string>
+    <string name="desk_notification_hide_sensitive_title">Приховувати приватні дані</string>
+    <string name="desk_notification_hide_sensitive_summary">Приховувати текст повідомлення на спливаючих банерах</string>
+    <string name="notification_hidden_content">Нове сповіщення</string>
+
+    <string-array name="desk_notification_style_entries">
+        <item>Стандартна картка</item>
+        <item>Компактний рядок</item>
+        <item>Розширена картка</item>
+    </string-array>
+
+    <string-array name="desk_notification_position_entries">
+        <item>Зверху по центру</item>
+        <item>Зверху ліворуч</item>
+        <item>Зверху праворуч</item>
+        <item>Знизу по центру</item>
+    </string-array>
+
+    <string name="pref_cat_phone_calls">Телефонні виклики</string>
+    <string name="desk_call_overlay_title">Екран вхідного дзвінка</string>
+    <string name="desk_call_overlay_summary">Показувати екран вхідного дзвінка при виклику на пристрій</string>
+    <string name="desk_call_missed_notification_title">Сповіщення про пропущені</string>
+    <string name="desk_call_missed_notification_summary">Додавати пропущені дзвінки до сповіщень та розумного чипа</string>
+    <string name="missed_call">Пропущений виклик</string>
+
+    <string name="pref_cat_smart_chip">Розумний чип</string>
+    <string name="pref_notification_chip_settings_title">Налаштування розумного чипа</string>
+    <string name="pref_notification_chip_settings_summary">Формат тексту, іконки та дії при натисканні</string>
+    <string name="pref_notification_shade_shortcut_title">Відкрити шторку сповіщень</string>
+    <string name="pref_notification_shade_shortcut_summary">Перегляд усіх активних сповіщень</string>
+
+    <string name="notification_chip_settings_title">Чип сповіщень</string>
+    <string name="notification_chip_behavior_category">Поведінка та взаємодія</string>
+    <string name="notification_chip_display_category">Відображення та формат</string>
+    <string name="notification_chip_tap_action_title">Дія при натисканні</string>
+    <string name="notification_chip_tap_action_summary">Дія при натисканні на чип</string>
+    <string name="notification_chip_single_format_title">Формат одного сповіщення</string>
+    <string name="notification_chip_single_format_summary">Текст, що відображається при одному сповіщенні</string>
+    <string name="notification_chip_multi_format_title">Формат кількох сповіщень</string>
+    <string name="notification_chip_multi_format_summary">Текст, що відображається при кількох сповіщеннях</string>
+    <string name="notification_chip_use_app_icon_title">Використовувати іконку додатка</string>
+    <string name="notification_chip_use_app_icon_summary">Показувати значок додатка замість стандартного дзвіночка</string>
+    <string name="notifications_cleared">Сповіщення очищено</string>
+
+    <string-array name="notification_chip_single_format_entries">
+        <item>Відправник / Заголовок</item>
+        <item>Назва додатка</item>
+        <item>Лічильник (1)</item>
+    </string-array>
+
+    <string-array name="notification_chip_multi_format_entries">
+        <item>Компактний лічильник (+N)</item>
+        <item>Лічильник з текстом</item>
+    </string-array>
+
+    <string-array name="notification_chip_tap_action_entries">
+        <item>Відкрити шторку сповіщень</item>
+        <item>Очистити всі сповіщення</item>
+    </string-array>
+
+    <plurals name="notification_count">
+        <item quantity="one">%d сповіщення</item>
+        <item quantity="few">%d сповіщення</item>
+        <item quantity="many">%d сповіщень</item>
+        <item quantity="other">%d сповіщення</item>
+    </plurals>
+
+    <!-- Updates Settings -->
+    <string name="updates_settings_title">Оновлення</string>
+    <string name="updates_settings_subtitle">Канали оновлень та перевірка версій</string>
+    <string name="update_status_category_title">Статус</string>
+    <string name="update_current_version_title">Встановлена версія</string>
+    <string name="update_status_title">Статус оновлення</string>
+    <string name="update_status_up_to_date">Встановлено останню версію</string>
+    <string name="update_status_available">Доступна нова версія: %s</string>
+    <string name="update_status_checking">Пошук оновлень…</string>
+    <string name="update_status_error">Не вдалося перевірити оновлення</string>
+    <string name="check_for_updates_title">Перевірити оновлення</string>
+    <string name="check_for_updates_never">Перевірка не проводилася</string>
+    <string name="check_for_updates_last_checked">Остання перевірка: %s</string>
+    <string name="download_and_install_title">Завантажити оновлення</string>
+    <string name="download_and_install_summary">Відкрити сторінку релізу на GitHub</string>
+    <string name="update_channel_category_title">Канали та сповіщення</string>
+    <string name="update_nightly_channel_title">Канал Nightly</string>
+    <string name="update_nightly_channel_summary">Отримувати попередні збірки з гілок розробки</string>
+    <string name="channel_nightly">Nightly</string>
+    <string name="channel_stable">Стабільний</string>
+    <string name="downloading_update_title">Завантаження оновлення ClockDesk</string>
+    <string name="downloading_update_progress">Завантаження: %1$d%% (%2$s / %3$s)</string>
+    <string name="update_ready_to_install">Оновлення готове до встановлення</string>
+    <string name="install_update_action">Встановити оновлення</string>
+    <string name="download_failed">Помилка завантаження. Натисніть для повтору</string>
+    <string name="permission_unknown_apps_required">Дозвольте ClockDesk встановлювати додатки для оновлення.</string>
+    <string name="ui_monet_from_background_title">Кольори інтерфейсу з фону</string>
+    <string name="ui_monet_from_background_summary">Фарбувати меню та налаштування в кольори Monet, витягнуті з поточного фону або обкладинки треку</string>
+    <string name="background_provider_solid_color">Суцільний колір</string>
+    <string name="background_provider_solid_color_desc">AMOLED чорний або власний колір</string>
+    <string name="background_provider_gradient">Динамічний градієнт</string>
+    <string name="background_provider_gradient_desc">Градієнт дня і ночі за положенням сонця</string>
+    <string name="background_provider_image">Власні фото</string>
+    <string name="background_provider_image_desc">Фотографії з вашої галереї</string>
+    <string name="background_plugins_title">Плагіни фону</string>
+    <string name="manage_background_plugins">Керування плагінами фону</string>
+    <string name="manage_background_plugins_summary">Налаштування та вибір джерел фону</string>
 </resources>

@@ -12,8 +12,10 @@ import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import android.hardware.Sensor
@@ -54,7 +56,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var weatherText: TextView
     private lateinit var weatherIcon: ImageView
     private lateinit var weatherLayout: LinearLayout
-    private lateinit var lastfmLayout: LinearLayout
+    private lateinit var lastfmLayout: FrameLayout
     private lateinit var lastfmIcon: ImageView
     private lateinit var nowPlayingText: TextView
     private lateinit var backgroundLayout: LinearLayout
@@ -63,6 +65,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var dynamicBackgroundView: DynamicBackgroundView
     private lateinit var performanceOverlay: PerformanceOverlayView
     private lateinit var smartChipContainer: ConstraintLayout
+    private lateinit var smartChipScrollView: ScrollView
     // endregion
 
     // region Managers
@@ -301,13 +304,12 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
         performanceOverlay = findViewById(R.id.performance_overlay)
         smartChipContainer = findViewById(R.id.smart_chip_container)
+        smartChipScrollView = findViewById(R.id.smart_chip_scrollview)
     }
 
     private fun hideUIControls() {
         listOf(
-            R.id.settings_button,
-            R.id.demo_button,
-            R.id.background_button,
+            R.id.edit_mode_action_bar,
             R.id.background_customization_fab,
             R.id.tutorial_overlay_root,
             R.id.side_sheet_container,
@@ -413,8 +415,11 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         smartChipManager = SmartChipManager(themedContext, smartChipContainer, prefs, fontManager)
 
         // Burn-in (object created here; start/stop driven by prefs in lifecycle methods)
+        val dreamShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
+        val dreamShiftPx = (dreamShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
         burnInProtectionManager = BurnInProtectionManager(
-            listOf(timeText, dateText, lastfmLayout, smartChipContainer)
+            listOf(timeText, dateText, lastfmLayout, smartChipScrollView),
+            maxShiftPx = dreamShiftPx
         )
 
         val mainLayout = findViewById<ConstraintLayout>(R.id.main_layout)

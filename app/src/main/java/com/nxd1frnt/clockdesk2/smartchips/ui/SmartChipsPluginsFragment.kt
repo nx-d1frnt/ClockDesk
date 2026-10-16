@@ -60,7 +60,7 @@ class SmartChipsPluginsFragment : Fragment() {
 
         val savedOrderString = prefs.getString(
             "smart_chip_order",
-            "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip"
+            "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip"
         ) ?: ""
         val savedOrderList = savedOrderString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         Logger.d("SmartChipsFragment") { "Saved order: $savedOrderList" }
@@ -191,6 +191,31 @@ class SmartChipsPluginsFragment : Fragment() {
             isInternal = true,
             iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_battery_alert),
             settingsActivityClassName = "com.nxd1frnt.clockdesk2.smartchips.ui.BatteryAlertSettingsActivity"
+        )
+        map["show_companion_battery"] = ChipDef(
+            id = "show_companion_battery",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_companion_battery_chip),
+            desc = getString(R.string.show_companion_battery_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_battery_alert)
+        )
+        map["show_device_connection_chip"] = ChipDef(
+            id = "show_device_connection_chip",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_device_connection_chip),
+            desc = getString(R.string.show_device_connection_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_devices)
+        )
+        map["show_notifications_chip"] = ChipDef(
+            id = "show_notifications_chip",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_notifications_chip),
+            desc = getString(R.string.show_notifications_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_notifications),
+            settingsActivityClassName = "com.nxd1frnt.clockdesk2.smartchips.ui.NotificationChipSettingsActivity"
         )
         map["system_bg_progress"] = ChipDef(
             id = "system_bg_progress",

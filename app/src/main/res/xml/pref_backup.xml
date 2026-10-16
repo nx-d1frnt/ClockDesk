@@ -6,6 +6,12 @@
         app:key="backup_restore_category"
         app:title="@string/backup_restore_title">
 
+        <androidx.preference.SwitchPreferenceCompat
+            app:key="backup_connected_devices"
+            app:title="@string/backup_connected_devices_title"
+            app:summary="@string/backup_connected_devices_summary"
+            app:defaultValue="true" />
+
         <androidx.preference.Preference
             app:key="export_settings"
             app:title="@string/export_settings" />

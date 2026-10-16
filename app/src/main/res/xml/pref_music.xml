@@ -11,10 +11,5 @@
             app:title="@string/music_sources_title"
             app:summary="@string/music_sources_summary"
             app:fragment="com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment" />
-
-        <androidx.preference.SwitchPreferenceCompat
-            app:key="lastfm_albumart_background"
-            app:title="@string/set_album_art_as_background"
-            app:summary="@string/set_album_art_as_background_summary" />
     </androidx.preference.PreferenceCategory>
 </androidx.preference.PreferenceScreen>

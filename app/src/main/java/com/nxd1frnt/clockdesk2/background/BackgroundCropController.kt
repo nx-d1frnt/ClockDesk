@@ -4,15 +4,15 @@ import android.animation.ValueAnimator
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
-import android.view.animation.AnticipateInterpolator
-import android.view.animation.OvershootInterpolator
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 
 class BackgroundCropController(
     private val dynamicBackgroundView: DynamicBackgroundView,
     private val overlayRoot: View,
     private val backgroundManager: BackgroundManager,
+    private val widgetViewsProvider: (() -> List<View>)? = null,
     private val onApply: () -> Unit,
     private val onCancel: () -> Unit
 ) {
@@ -22,6 +22,8 @@ class BackgroundCropController(
     private var savedScale = 1f
     private var savedOffsetX = 0f
     private var savedOffsetY = 0f
+
+    private val savedWidgetAlphas = mutableMapOf<View, Float>()
 
     // Ленивые ссылки на дочерние view оверлея
     private val hintCard   by lazy { overlayRoot.findViewById<View>(R.id.crop_hint_card) }
@@ -102,29 +104,43 @@ class BackgroundCropController(
         overlayRoot.visibility = View.VISIBLE
         overlayRoot.alpha = 1f
 
-        val interpolator = OvershootInterpolator(0.8f)
+        val enterInterpolator = MotionUtils.EMPHASIZED_DECELERATE
+        val springInterpolator = MotionUtils.EXPRESSIVE_SPRING
 
-        hintCard?.apply { alpha = 0f; translationY = -60f; scaleX = 0.95f; scaleY = 0.95f }
-        navCard?.apply  { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
-        applyBtn?.apply { alpha = 0f; translationY = -50f }
-        cancelBtn?.apply { alpha = 0f; translationY = -50f }
-        resetBtn?.apply { alpha = 0f; translationY = -50f }
+        hintCard?.apply { alpha = 0f; translationY = -40f; scaleX = 0.94f; scaleY = 0.94f }
+        navCard?.apply  { alpha = 0f; translationY = 60f; scaleX = 0.94f; scaleY = 0.94f }
+        applyBtn?.apply { alpha = 0f; translationY = -30f }
+        cancelBtn?.apply { alpha = 0f; translationY = -30f }
+        resetBtn?.apply { alpha = 0f; translationY = -30f }
 
-        applyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(DURATION_IN)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
-        cancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(DURATION_IN)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
-        resetBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(DURATION_IN)?.setStartDelay(150)?.setInterpolator(interpolator)?.start()
+        applyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(DURATION_IN)?.setStartDelay(0)?.setInterpolator(enterInterpolator)?.start()
+        cancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(DURATION_IN)?.setStartDelay(0)?.setInterpolator(enterInterpolator)?.start()
+        resetBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(DURATION_IN)?.setStartDelay(80)?.setInterpolator(enterInterpolator)?.start()
 
         hintCard?.animate()
             ?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
-            ?.setDuration(DURATION_IN)?.setStartDelay(50)
-            ?.setInterpolator(interpolator)?.start()
+            ?.setDuration(DURATION_IN)?.setStartDelay(40)
+            ?.setInterpolator(springInterpolator)?.start()
 
         navCard?.animate()
             ?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
-            ?.setDuration(DURATION_IN)?.setStartDelay(100)
-            ?.setInterpolator(interpolator)?.start()
+            ?.setDuration(DURATION_IN)?.setStartDelay(60)
+            ?.setInterpolator(springInterpolator)?.start()
 
         overlayRoot.setOnTouchListener(touchListener)
+
+        savedWidgetAlphas.clear()
+        val widgets = widgetViewsProvider?.invoke() ?: emptyList()
+        widgets.forEach { view ->
+            savedWidgetAlphas[view] = view.alpha
+            val targetAlpha = (view.alpha * CROP_WIDGET_ALPHA_FACTOR).coerceIn(0.1f, 0.25f)
+            view.animate()?.cancel()
+            view.animate()
+                .alpha(targetAlpha)
+                .setDuration(DURATION_IN)
+                .setInterpolator(MotionUtils.EMPHASIZED)
+                .start()
+        }
     }
 
     fun isActive(): Boolean = overlayRoot.visibility == View.VISIBLE
@@ -189,7 +205,7 @@ class BackgroundCropController(
         exitOverlay { onApply() }
     }
 
-    private fun cancelAndExit() {
+    fun cancelAndExit() {
         curScale   = savedScale
         curOffsetX = savedOffsetX
         curOffsetY = savedOffsetY
@@ -200,19 +216,29 @@ class BackgroundCropController(
     private fun exitOverlay(onDone: () -> Unit) {
         overlayRoot.setOnTouchListener(null)
 
-        val interpolator = AnticipateInterpolator(0.8f)
+        val exitInterpolator = MotionUtils.EMPHASIZED_ACCELERATE
 
-        applyBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
-        cancelBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
-        resetBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
+        savedWidgetAlphas.forEach { (view, originalAlpha) ->
+            view.animate()?.cancel()
+            view.animate()
+                .alpha(originalAlpha)
+                .setDuration(DURATION_OUT)
+                .setInterpolator(MotionUtils.EMPHASIZED)
+                .start()
+        }
+        savedWidgetAlphas.clear()
+
+        applyBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
+        cancelBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
+        resetBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
 
         hintCard?.animate()
-            ?.alpha(0f)?.translationY(-60f)?.scaleX(0.95f)?.scaleY(0.95f)
-            ?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
+            ?.alpha(0f)?.translationY(-40f)?.scaleX(0.94f)?.scaleY(0.94f)
+            ?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
 
         navCard?.animate()
-            ?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
-            ?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(interpolator)
+            ?.alpha(0f)?.translationY(60f)?.scaleX(0.94f)?.scaleY(0.94f)
+            ?.setDuration(DURATION_OUT)?.setStartDelay(0)?.setInterpolator(exitInterpolator)
             ?.withEndAction {
                 overlayRoot.visibility = View.GONE
 
@@ -231,5 +257,6 @@ class BackgroundCropController(
     companion object {
         private const val MIN_SCALE = 1f
         private const val MAX_SCALE = 4f
+        private const val CROP_WIDGET_ALPHA_FACTOR = 0.25f
     }
 }

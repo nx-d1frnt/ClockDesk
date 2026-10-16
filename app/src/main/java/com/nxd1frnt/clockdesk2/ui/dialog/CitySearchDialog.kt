@@ -17,10 +17,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.color.DynamicColors
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.GeocodingHelper
 import com.nxd1frnt.clockdesk2.utils.GeocodingResult
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import java.util.Locale
 
 object CitySearchDialog {
@@ -31,7 +31,7 @@ object CitySearchDialog {
             activityContext = activityContext.baseContext
         }
         val targetContext = activityContext ?: context
-        val dialogContext = DynamicColors.wrapContextIfAvailable(targetContext)
+        val dialogContext = UiMonetThemeManager.wrapContext(targetContext)
 
         val view = LayoutInflater.from(dialogContext).inflate(R.layout.dialog_city_search, null, false)
 
@@ -44,7 +44,7 @@ object CitySearchDialog {
             onCitySelected(result)
         }
 
-        recyclerView.layoutManager = LinearLayoutManager(targetContext)
+        recyclerView.layoutManager = LinearLayoutManager(dialogContext)
         recyclerView.adapter = adapter
 
         var alertDialog: AlertDialog? = null
@@ -111,6 +111,9 @@ object CitySearchDialog {
             alertDialog?.dismiss()
         }
 
+        val palette = UiMonetThemeManager.getPalette(targetContext)
+        UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
+
         alertDialog = MaterialAlertDialogBuilder(dialogContext)
             .setTitle(targetContext.getString(R.string.city_search_title))
             .setView(view)
@@ -118,6 +121,7 @@ object CitySearchDialog {
             .create()
 
         alertDialog.show()
+        UiMonetThemeManager.styleAlertDialog(alertDialog, palette)
     }
 
     private class CityResultAdapter(
@@ -140,6 +144,7 @@ object CitySearchDialog {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
             holder.bind(item, onItemClickListener)
+            UiMonetThemeManager.applyLiveToViewHierarchy(holder.itemView)
         }
 
         override fun getItemCount(): Int = items.size

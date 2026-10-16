@@ -17,8 +17,11 @@ glideTransformations = "4.3.0"
 preferenceKtx = "1.2.1"
 cardview = "1.0.0"
 uiGraphics = "1.10.0"
+bouncyCastle = "1.78.1"
 
 [libraries]
+bouncycastle-prov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncyCastle" }
+bouncycastle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncyCastle" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-palette-ktx = { module = "androidx.palette:palette-ktx", version.ref = "paletteKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

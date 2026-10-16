@@ -38,6 +38,7 @@ class BackgroundManager(private val context: Context) {
         private const val KEY_MANUAL_WEATHER_ENABLED = "manual_weather_enabled"
         private const val KEY_MANUAL_WEATHER_TYPE = "manual_weather_type"
         private const val KEY_MANUAL_WEATHER_INTENSITY = "manual_weather_intensity"
+        const val KEY_MUSIC_ALBUMART_BACKGROUND = "lastfm_albumart_background"
     }
 
     fun getSavedBackgroundUri(): String? = prefs.getString(KEY_BACKGROUND_URI, null)
@@ -202,5 +203,10 @@ class BackgroundManager(private val context: Context) {
 
     fun clearDim() {
         prefs.edit().putInt(KEY_DIM_MODE, DIM_MODE_OFF).putInt(KEY_DIM_INTENSITY, 0).putInt(KEY_DIM_ENABLED, 0).apply()
+    }
+
+    fun isMusicAlbumArtEnabled(): Boolean = prefs.getBoolean(KEY_MUSIC_ALBUMART_BACKGROUND, true)
+    fun setMusicAlbumArtEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_MUSIC_ALBUMART_BACKGROUND, enabled).apply()
     }
 }

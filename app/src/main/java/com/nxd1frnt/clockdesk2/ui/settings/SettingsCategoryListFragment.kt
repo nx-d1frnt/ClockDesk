@@ -1,17 +1,20 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
-import android.content.Context
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.shape.ShapeAppearanceModel
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class SettingsCategoryListFragment : Fragment() {
 
@@ -56,22 +59,36 @@ class SettingsCategoryListFragment : Fragment() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
+            val context = holder.itemView.context
+            val palette = UiMonetThemeManager.getPalette(context)
+
             holder.title.text = item.title
             holder.subtitle.text = item.subtitle
             holder.icon.setImageResource(item.iconResId)
-            
-            // Set unselected styling for phone list items since there is no dual-pane highlighting
-            holder.cardContainer.setCardBackgroundColor(
-                holder.itemView.context.getColor(android.R.color.transparent)
-            )
-            val context = holder.itemView.context
-            val colorOnSurface = context.getThemeColor(com.google.android.material.R.attr.colorOnSurface)
-            val colorOnSurfaceVariant = context.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-            val colorPrimary = context.getThemeColor(android.R.attr.colorPrimary)
 
-            holder.title.setTextColor(colorOnSurface)
-            holder.subtitle.setTextColor(colorOnSurfaceVariant)
-            holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(colorPrimary)
+            holder.cardContainer.setCardBackgroundColor(palette.surfaceContainerLow)
+            holder.cardContainer.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+            holder.iconBadge.setCardBackgroundColor(palette.surfaceContainerHigh)
+            holder.icon.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
+            holder.title.setTextColor(palette.onSurface)
+            holder.subtitle.setTextColor(palette.onSurfaceVariant)
+
+            val isFirst = position == 0 || items[position - 1].groupId != item.groupId
+            val isLast = position == items.lastIndex || items[position + 1].groupId != item.groupId
+
+            val shapeRes = when {
+                isFirst && isLast -> R.style.ShapeAppearance_ClockDesk_Single
+                isFirst -> R.style.ShapeAppearance_ClockDesk_Top
+                isLast -> R.style.ShapeAppearance_ClockDesk_Bottom
+                else -> R.style.ShapeAppearance_ClockDesk_Middle
+            }
+            holder.cardContainer.shapeAppearanceModel = ShapeAppearanceModel.builder(context, shapeRes, 0).build()
+
+            val marginBottomDp = if (isLast) 16 else 4
+            (holder.cardContainer.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+                lp.bottomMargin = (marginBottomDp * context.resources.displayMetrics.density).toInt()
+                holder.cardContainer.layoutParams = lp
+            }
 
             holder.itemView.setOnClickListener { onClick(item) }
         }
@@ -80,15 +97,10 @@ class SettingsCategoryListFragment : Fragment() {
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val cardContainer: MaterialCardView = view.findViewById(R.id.card_container)
+            val iconBadge: MaterialCardView = view.findViewById(R.id.icon_badge)
             val icon: ImageView = view.findViewById(R.id.category_icon)
             val title: TextView = view.findViewById(R.id.category_title)
             val subtitle: TextView = view.findViewById(R.id.category_subtitle)
         }
     }
-}
-
-private fun Context.getThemeColor(attr: Int): Int {
-    val typedValue = android.util.TypedValue()
-    theme.resolveAttribute(attr, typedValue, true)
-    return typedValue.data
 }

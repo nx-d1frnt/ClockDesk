@@ -28,41 +28,79 @@ class SmartPixelManager(
         enableEffect()
     }
 
+    var intensity: Int = DEFAULT_INTENSITY
+        private set
+
     init {
-        // Создаем паттерн шахматной доски 2x2 пикселя
+        try {
+            val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+            intensity = prefs.getInt(PREF_KEY_INTENSITY, DEFAULT_INTENSITY).coerceIn(10, 90)
+        } catch (e: Exception) {
+            intensity = DEFAULT_INTENSITY
+        }
         setupPattern()
     }
 
-    private fun setupPattern() {
-        val blockSize = 2
-        val patternSize = blockSize * 2
-
-        val bitmap = Bitmap.createBitmap(patternSize, patternSize, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-
-        val paint = Paint().apply {
-            color = Color.BLACK
-            alpha = 255
+    fun setIntensity(newIntensity: Int) {
+        val clamped = newIntensity.coerceIn(10, 90)
+        if (intensity != clamped) {
+            intensity = clamped
+            setupPattern()
         }
+    }
 
-        canvas.drawRect(0f, 0f, blockSize.toFloat(), blockSize.toFloat(), paint)
-
-        canvas.drawRect(
-            blockSize.toFloat(),
-            blockSize.toFloat(),
-            patternSize.toFloat(),
-            patternSize.toFloat(),
-            paint
-        )
-
-        val shader = BitmapShader(bitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
-
-        val drawable = PaintDrawable()
-        drawable.paint.shader = shader
+    private fun setupPattern() {
+        val shader = createPatternShader(intensity, blockSize = 2)
+        val drawable = PaintDrawable().apply {
+            paint.shader = shader
+        }
         overlayView.background = drawable
 
         overlayView.isClickable = false
         overlayView.isFocusable = false
+    }
+
+    companion object {
+        const val PREF_KEY_INTENSITY = "smart_pixels_intensity"
+        const val DEFAULT_INTENSITY = 50
+
+        val BAYER_4X4 = intArrayOf(
+             0,  8,  2, 10,
+            12,  4, 14,  6,
+             3, 11,  1,  9,
+            15,  7, 13,  5
+        )
+
+        fun createPatternBitmap(intensityPercent: Int, blockSize: Int = 2): Bitmap {
+            val clamped = intensityPercent.coerceIn(5, 95)
+            val blackCells = Math.round((clamped * 16f) / 100f).coerceIn(1, 15)
+            val patternDimension = 4 * blockSize
+
+            val bitmap = Bitmap.createBitmap(patternDimension, patternDimension, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+
+            val paint = Paint().apply {
+                color = Color.BLACK
+                alpha = 255
+            }
+
+            for (y in 0 until 4) {
+                for (x in 0 until 4) {
+                    val threshold = BAYER_4X4[y * 4 + x]
+                    if (threshold < blackCells) {
+                        val left = (x * blockSize).toFloat()
+                        val top = (y * blockSize).toFloat()
+                        canvas.drawRect(left, top, left + blockSize, top + blockSize, paint)
+                    }
+                }
+            }
+            return bitmap
+        }
+
+        fun createPatternShader(intensityPercent: Int, blockSize: Int = 2): BitmapShader {
+            val bitmap = createPatternBitmap(intensityPercent, blockSize)
+            return BitmapShader(bitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+        }
     }
 
     fun onUserInteraction() {

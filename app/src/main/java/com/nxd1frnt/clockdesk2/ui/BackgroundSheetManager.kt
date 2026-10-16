@@ -1,8 +1,11 @@
 package com.nxd1frnt.clockdesk2.ui.settings
 
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import android.os.Build
 import android.transition.AutoTransition
+import com.nxd1frnt.clockdesk2.ui.MainActivity
 import android.transition.TransitionManager
 import android.view.View
 import android.view.ViewGroup
@@ -19,14 +22,19 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.background.BackgroundsAdapter
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
+import android.util.TypedValue
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
+import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import com.nxd1frnt.clockdesk2.utils.Logger
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 
 class BackgroundSheetManager(
     private val floatingMenuView: View,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
+    private val dockView: View? = null,
     private val backgroundManager: BackgroundManager,
     private val dayTimeGetter: DayTimeGetter,
     private val weatherGetter: WeatherGetter,
@@ -34,10 +42,13 @@ class BackgroundSheetManager(
     private val isMusicBackgroundApplied: () -> Boolean,
     private val onAddBackgroundRequested: () -> Unit,
     private val onPreviewImage: (Uri, blur: Int) -> Unit,
-    private val onRestoreGradient: () -> Unit,
-    private val onRestoreSavedBackground: () -> Unit,
-    private val onUpdateFilters: (Int?, Int?, Int?, Int?) -> Unit,
-    private val onApplyCompleted: (previewUri: String?) -> Unit,
+    private val onPreviewBlur: (blur: Int) -> Unit,
+    private val onPreviewGradient: () -> Unit,
+    private val onPreviewSolidColor: ((Int) -> Unit)? = null,
+    private val onPreviewMusicAlbumArt: (enabled: Boolean, blur: Int) -> Unit,
+    private val onRestoreOriginalState: () -> Unit,
+    private val onUpdateFilters: (Int?, Int?, Int?, Int?, Boolean?, Boolean?) -> Unit,
+    private val onApplyCompleted: (previewUri: String?, blur: Int) -> Unit,
     private val onClearBackground: () -> Unit,
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit,
     private val onCropRequested: () -> Unit,
@@ -47,14 +58,18 @@ class BackgroundSheetManager(
         private set
     private var isUpdatingBackgroundUi = false
     private var isApplying = false
+    private var isSwitchingToCrop = false
+    private var initialMusicAlbumArtEnabled = true
     private val animationDuration = 350L
     private var backgroundsAdapter: BackgroundsAdapter? = null
 
     private var previewTask: Runnable? = null
     private var filterTask: Runnable? = null
+    private var blurTask: Runnable? = null
 
     private val bgRecycler by lazy { floatingMenuView.findViewById<RecyclerView>(R.id.background_recycler_view) }
     private val bgBlurSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.blur_intensity_seekbar) }
+    private val bgMusicAlbumArtSwitch: MaterialSwitch? by lazy { floatingMenuView.findViewById(R.id.music_albumart_switch) }
     private val bgDimToggleGroup by lazy { floatingMenuView.findViewById<MaterialButtonToggleGroup>(R.id.dimming_toggle_group) }
     private val bgDimSeek by lazy { floatingMenuView.findViewById<Slider>(R.id.dimming_intensity_seekbar) }
     private val bgDimRangeSeek by lazy { floatingMenuView.findViewById<RangeSlider>(R.id.dimming_intensity_range_slider) }
@@ -94,30 +109,90 @@ class BackgroundSheetManager(
         setupListeners()
     }
 
+    private fun getHostActivity(): MainActivity? {
+        var ctx: Context? = floatingMenuView.context
+        while (ctx is ContextWrapper) {
+            if (ctx is MainActivity) return ctx
+            ctx = ctx.baseContext
+        }
+        return null
+    }
+
     private fun setupAdapter() {
         backgroundsAdapter = BackgroundsAdapter(
             floatingMenuView.context,
             mutableListOf(),
             onClick = { id ->
+                Logger.i("BackgroundSheet") { "Background item clicked: id='$id', previousPreview='$previewBackgroundUri'" }
                 if (id == "__ADD__") {
                     onAddBackgroundRequested()
                     return@BackgroundsAdapter
                 }
-                previewBackgroundUri = id
 
-                if (isMusicBackgroundApplied()) return@BackgroundsAdapter
+                if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val isAlreadySelected = (previewBackgroundUri == id)
+                    previewBackgroundUri = id
+                    updateProviderCapabilities(id)
+                    val solidProvider = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+                    val currentColor = solidProvider.getColor(floatingMenuView.context)
+                    Logger.i("BackgroundSheet") { "Solid color item clicked. isAlreadySelected=$isAlreadySelected, currentColor=#${String.format("%06X", 0xFFFFFF and currentColor)}" }
+                    if (isAlreadySelected) {
+                        com.nxd1frnt.clockdesk2.ui.dialog.SolidColorPickerDialog.show(
+                            floatingMenuView.context,
+                            currentColor
+                        ) { newColor ->
+                            Logger.i("BackgroundSheet") { "New solid color selected from dialog: #${String.format("%06X", 0xFFFFFF and newColor)}" }
+                            solidProvider.setColor(floatingMenuView.context, newColor)
+                            onPreviewSolidColor?.invoke(newColor)
+                            backgroundsAdapter?.notifyDataSetChanged()
+                        }
+                    } else {
+                        onPreviewSolidColor?.invoke(currentColor)
+                    }
+                    updateCropButtonVisibility(false)
+                    return@BackgroundsAdapter
+                }
+
+                previewBackgroundUri = id
+                updateProviderCapabilities(id)
 
                 when (id) {
-                    "__DEFAULT_GRADIENT__" -> {
+                    "__DEFAULT_GRADIENT__",
+                    com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
+                        Logger.i("BackgroundSheet") { "onItemClick: Default gradient selected" }
                         previewTask?.let { floatingMenuView.removeCallbacks(it) }
-                        onRestoreGradient()
+                        onPreviewGradient()
                         updateCropButtonVisibility(false)
                     }
                     else -> {
-                        debouncePreview {
+                        if (id.startsWith("external:")) {
+                            Logger.i("BackgroundSheet") { "onItemClick: External provider selected: $id" }
+                            updateCropButtonVisibility(false)
+                            previewTask?.let { floatingMenuView.removeCallbacks(it) }
+                            val plugin = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                                .getExternalProviders().firstOrNull { it.id == id }
+                            if (plugin != null) {
+                                when (val payload = plugin.getCurrentPayload(floatingMenuView.context)) {
+                                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor -> onPreviewSolidColor?.invoke(payload.color)
+                                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                                        try {
+                                            onPreviewImage(Uri.parse(payload.uriString), bgBlurSeek.value.toInt())
+                                        } catch (e: Exception) {
+                                            Logger.e("BackgroundSheetManager") { "Failed to preview plugin image: ${e.message}" }
+                                        }
+                                    }
+                                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient -> onPreviewGradient()
+                                    else -> {}
+                                }
+                                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                                    .requestDataFromPlugin(plugin)
+                            }
+                        } else {
+                            previewTask?.let { floatingMenuView.removeCallbacks(it) }
                             try {
                                 val uri = Uri.parse(id)
                                 val intensity = bgBlurSeek.value.toInt()
+                                Logger.i("BackgroundSheet") { "onItemClick: Image selected: $id, blur=$intensity" }
                                 onPreviewImage(uri, intensity)
                                 updateCropButtonVisibility(true)
                             } catch (e: Exception) {
@@ -128,8 +203,52 @@ class BackgroundSheetManager(
                 }
             },
             onLongClick = { id ->
-                val context = floatingMenuView.context
-                MaterialAlertDialogBuilder(context)
+                if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val solidProvider = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+                    com.nxd1frnt.clockdesk2.ui.dialog.SolidColorPickerDialog.show(
+                        floatingMenuView.context,
+                        solidProvider.getColor(floatingMenuView.context)
+                    ) { newColor ->
+                        solidProvider.setColor(floatingMenuView.context, newColor)
+                        previewBackgroundUri = id
+                        backgroundsAdapter?.selectedId = id
+                        onPreviewSolidColor?.invoke(newColor)
+                        backgroundsAdapter?.notifyDataSetChanged()
+                    }
+                    return@BackgroundsAdapter
+                }
+
+                if (id.startsWith("external:")) {
+                    val plugin = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                        .getExternalProviders().firstOrNull { it.id == id }
+                    if (plugin != null) {
+                        val context = UiMonetThemeManager.wrapContext(floatingMenuView.context)
+                        val builder = MaterialAlertDialogBuilder(context)
+                            .setTitle(plugin.displayName)
+                            .setMessage(plugin.description)
+                            .setPositiveButton(context.getString(android.R.string.ok)) { d, _ -> d.dismiss() }
+                        if (!plugin.settingsActivity.isNullOrEmpty()) {
+                            builder.setNeutralButton(R.string.settings_title) { d, _ ->
+                                try {
+                                    val intent = plugin.getSettingsIntent()
+                                    if (intent != null) {
+                                        getHostActivity()?.isLaunchingExternalActivity = true
+                                        context.startActivity(intent)
+                                    }
+                                } catch (e: Exception) {
+                                    Logger.e("BackgroundSheetManager") { "Failed to launch plugin settings: ${e.message}" }
+                                }
+                                d.dismiss()
+                            }
+                        }
+                        val dialog = builder.show()
+                        UiMonetThemeManager.styleAlertDialog(dialog)
+                    }
+                    return@BackgroundsAdapter
+                }
+
+                val context = UiMonetThemeManager.wrapContext(floatingMenuView.context)
+                val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_background_title))
                     .setMessage(context.getString(R.string.delete_background_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -145,21 +264,71 @@ class BackgroundSheetManager(
                     }
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
+                UiMonetThemeManager.styleAlertDialog(dialog)
+            },
+            onSettingsClick = { id ->
+                Logger.i("BackgroundSheet") { "onSettingsClick: id='$id'" }
+                if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                    val solidProvider = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+                    com.nxd1frnt.clockdesk2.ui.dialog.SolidColorPickerDialog.show(
+                        floatingMenuView.context,
+                        solidProvider.getColor(floatingMenuView.context)
+                    ) { newColor ->
+                        solidProvider.setColor(floatingMenuView.context, newColor)
+                        previewBackgroundUri = id
+                        backgroundsAdapter?.selectedId = id
+                        onPreviewSolidColor?.invoke(newColor)
+                        backgroundsAdapter?.notifyDataSetChanged()
+                    }
+                } else if (id.startsWith("external:")) {
+                    val plugin = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                        .getExternalProviders().firstOrNull { it.id == id }
+                    if (plugin != null && !plugin.settingsActivity.isNullOrEmpty()) {
+                        try {
+                            val intent = plugin.getSettingsIntent()
+                            if (intent != null) {
+                                getHostActivity()?.isLaunchingExternalActivity = true
+                                floatingMenuView.context.startActivity(intent)
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("BackgroundSheetManager") { "Failed to launch plugin settings: ${e.message}" }
+                        }
+                    }
+                }
             }
         )
         bgRecycler.adapter = backgroundsAdapter
     }
 
+    private fun triggerFilterUpdate() {
+        debounceFilterUpdate {
+            onUpdateFilters(
+                getPreviewDimMode(),
+                getPreviewDimIntensity(),
+                getPreviewDimMin(),
+                getPreviewDimMax(),
+                bgNightShiftSwitch?.isChecked,
+                bgZoomSwitch?.isChecked
+            )
+        }
+    }
+
     private fun setupListeners() {
+        bgBlurSeek.addOnChangeListener { _, value, fromUser ->
+            if (fromUser && !isUpdatingBackgroundUi) {
+                debounceBlur {
+                    onPreviewBlur(value.toInt())
+                }
+            }
+        }
+
         bgBlurSeek.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: Slider) {}
             override fun onStopTrackingTouch(slider: Slider) {
-                previewBackgroundUri?.let { id ->
-                    if (id != "__DEFAULT_GRADIENT__" && !isMusicBackgroundApplied()) {
-                        debouncePreview {
-                            onPreviewImage(Uri.parse(id), slider.value.toInt())
-                        }
-                    }
+                blurTask?.let {
+                    floatingMenuView.removeCallbacks(it)
+                    it.run()
+                    blurTask = null
                 }
             }
         })
@@ -178,35 +347,30 @@ class BackgroundSheetManager(
                 bgDimRangeSeek.visibility = View.GONE
                 bgDimSeek.isEnabled = (mode != BackgroundManager.DIM_MODE_OFF)
             }
-            debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+            triggerFilterUpdate()
         }
 
         bgDimSeek.addOnChangeListener { _, _, fromUser ->
-            if (fromUser) debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+            if (fromUser) triggerFilterUpdate()
         }
 
         bgDimRangeSeek.addOnChangeListener { _, _, fromUser ->
-            if (fromUser) debounceFilterUpdate { onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax()) }
+            if (fromUser) triggerFilterUpdate()
         }
 
         bgNightShiftSwitch?.setOnCheckedChangeListener { _, _ ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            val wasEnabledBefore = backgroundManager.isNightShiftEnabled()
-            backgroundManager.setNightShiftEnabled(bgNightShiftSwitch?.isChecked == true)
-            debounceFilterUpdate {
-                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
-                backgroundManager.setNightShiftEnabled(wasEnabledBefore)
-            }
+            triggerFilterUpdate()
         }
 
         bgZoomSwitch?.setOnCheckedChangeListener { _, _ ->
             if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
-            val wasEnabledBefore = backgroundManager.getZoomEnabled()
-            backgroundManager.setZoomEnabled(bgZoomSwitch?.isChecked == true)
-            debounceFilterUpdate {
-                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
-                backgroundManager.setZoomEnabled(wasEnabledBefore)
-            }
+            triggerFilterUpdate()
+        }
+
+        bgMusicAlbumArtSwitch?.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingBackgroundUi) return@setOnCheckedChangeListener
+            onPreviewMusicAlbumArt(isChecked, bgBlurSeek.value.toInt())
         }
 
         bgIntensitySeek.addOnChangeListener { _, _, fromUser ->
@@ -226,7 +390,7 @@ class BackgroundSheetManager(
 
             if (!isChecked) {
                 weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, !dayTimeGetter.isDay(), dayTimeGetter.getDayFactor())
-                onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+                triggerFilterUpdate()
             } else {
                 applyWeatherPreview()
             }
@@ -242,14 +406,14 @@ class BackgroundSheetManager(
         }
 
         bgCropBtn?.setOnClickListener {
-            val uri = previewBackgroundUri
+            val uri = previewBackgroundUri ?: if (!isMusicBackgroundApplied()) backgroundManager.getSavedBackgroundUri() else null
             if (uri != null && uri != "__DEFAULT_GRADIENT__") {
-                // Фикс: Если мы пытаемся кропнуть новую (еще не примененную) картинку,
-                // нужно сбросить старый сдвиг, чтобы не переносить его на новое изображение.
                 if (uri != backgroundManager.getSavedBackgroundUri()) {
                     backgroundManager.resetBgTransform()
                 }
+                isSwitchingToCrop = true
                 onCropRequested()
+                isSwitchingToCrop = false
             }
         }
 
@@ -269,13 +433,19 @@ class BackgroundSheetManager(
 
             val transition = AutoTransition().apply {
                 duration = 250L
-                interpolator = OvershootInterpolator(0.8f)
+                interpolator = com.nxd1frnt.clockdesk2.utils.MotionUtils.EMPHASIZED
             }
             TransitionManager.beginDelayedTransition(contentContainer, transition)
             tabStyle.visibility = if (checkedId == R.id.nav_style) View.VISIBLE else View.GONE
             tabWeather.visibility = if (checkedId == R.id.nav_weather) View.VISIBLE else View.GONE
             tabEffects.visibility = if (checkedId == R.id.nav_effects) View.VISIBLE else View.GONE
         }
+    }
+
+    private fun debounceBlur(action: () -> Unit) {
+        blurTask?.let { floatingMenuView.removeCallbacks(it) }
+        blurTask = Runnable { action() }
+        floatingMenuView.postDelayed(blurTask, 60)
     }
 
     private fun debouncePreview(action: () -> Unit) {
@@ -291,10 +461,13 @@ class BackgroundSheetManager(
     }
 
     fun show() {
+        Logger.i("BackgroundSheet") { "show() called. ActiveProvider='${com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getActiveProviderId()}', SavedUri='${backgroundManager.getSavedBackgroundUri()}'" }
         isApplying = false
+        initialMusicAlbumArtEnabled = backgroundManager.isMusicAlbumArtEnabled()
         loadCurrentSettings()
         scaleDownMainLayout()
         hideBackgroundTab()
+        hideDock()
 
         floatingMenuView.visibility = View.VISIBLE
         floatingMenuView.alpha = 1f
@@ -302,24 +475,25 @@ class BackgroundSheetManager(
         val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
         val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
 
-        val interpolator = OvershootInterpolator(0.8f)
+        val enterInterpolator = MotionUtils.EMPHASIZED_DECELERATE
+        val springInterpolator = MotionUtils.EXPRESSIVE_SPRING
 
-        bgApplyBtn?.apply { alpha = 0f; translationY = -50f }
-        bgCancelBtn?.apply { alpha = 0f; translationY = -50f }
-        settingsCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
-        navCard?.apply { alpha = 0f; translationY = 100f; scaleX = 0.95f; scaleY = 0.95f }
-        bgCropBtn?.apply { alpha = 0f; translationY = -50f }
+        bgApplyBtn?.apply { alpha = 0f; translationY = -30f }
+        bgCancelBtn?.apply { alpha = 0f; translationY = -30f }
+        settingsCard?.apply { alpha = 0f; translationY = 60f; scaleX = 0.94f; scaleY = 0.94f }
+        navCard?.apply { alpha = 0f; translationY = 60f; scaleX = 0.94f; scaleY = 0.94f }
+        bgCropBtn?.apply { alpha = 0f; translationY = -30f }
 
-        bgApplyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
-        bgCancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(interpolator)?.start()
+        bgApplyBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(enterInterpolator)?.start()
+        bgCancelBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setInterpolator(enterInterpolator)?.start()
 
         settingsCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
-            ?.setDuration(animationDuration)?.setStartDelay(50)?.setInterpolator(interpolator)?.start()
+            ?.setDuration(animationDuration)?.setStartDelay(40)?.setInterpolator(springInterpolator)?.start()
 
-        bgCropBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setStartDelay(150)?.setInterpolator(interpolator)?.start()
+        bgCropBtn?.animate()?.alpha(1f)?.translationY(0f)?.setDuration(animationDuration)?.setStartDelay(80)?.setInterpolator(enterInterpolator)?.start()
 
         navCard?.animate()?.alpha(1f)?.translationY(0f)?.scaleX(1f)?.scaleY(1f)
-            ?.setDuration(animationDuration)?.setStartDelay(100)?.setInterpolator(interpolator)?.start()
+            ?.setDuration(animationDuration)?.setStartDelay(60)?.setInterpolator(springInterpolator)?.start()
 
         onSheetStateChanged(false)
     }
@@ -328,36 +502,33 @@ class BackgroundSheetManager(
         val settingsCard = floatingMenuView.findViewById<View>(R.id.settings_main_card)
         val navCard = floatingMenuView.findViewById<View>(R.id.bottom_nav_card)
 
-        val interpolator = android.view.animation.AnticipateInterpolator(0.8f)
+        val exitInterpolator = MotionUtils.EMPHASIZED_ACCELERATE
 
-        bgApplyBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
-        bgCancelBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
+        bgApplyBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(220)?.setInterpolator(exitInterpolator)?.setStartDelay(0)?.start()
+        bgCancelBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(220)?.setInterpolator(exitInterpolator)?.setStartDelay(0)?.start()
 
-        settingsCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
-            ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.start()
+        settingsCard?.animate()?.alpha(0f)?.translationY(60f)?.scaleX(0.94f)?.scaleY(0.94f)
+            ?.setDuration(220)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.start()
 
-        navCard?.animate()?.alpha(0f)?.translationY(100f)?.scaleX(0.95f)?.scaleY(0.95f)
-            ?.setDuration(250)?.setStartDelay(0)?.setInterpolator(interpolator)?.withEndAction {
+        navCard?.animate()?.alpha(0f)?.translationY(60f)?.scaleX(0.94f)?.scaleY(0.94f)
+            ?.setDuration(220)?.setStartDelay(0)?.setInterpolator(exitInterpolator)?.withEndAction {
                 floatingMenuView.visibility = View.GONE
                 settingsCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
                 navCard?.animate()?.setStartDelay(0)?.setInterpolator(null)
             }?.start()
-        bgCropBtn?.animate()?.alpha(0f)?.translationY(-50f)?.setDuration(250)?.setInterpolator(interpolator)?.setStartDelay(0)?.start()
+        bgCropBtn?.animate()?.alpha(0f)?.translationY(-30f)?.setDuration(220)?.setInterpolator(exitInterpolator)?.setStartDelay(0)?.start()
 
         restoreMainLayoutState()
+        restoreDock()
         onSheetStateChanged(true)
     }
 
     fun cancelAndHide() {
+        Logger.i("BackgroundSheet") { "cancelAndHide() called. isApplying=$isApplying, previewBackgroundUri=$previewBackgroundUri" }
         if (!isApplying) {
-            if (!isMusicBackgroundApplied()) {
-                val savedUri = backgroundManager.getSavedBackgroundUri()
-                if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
-                    onRestoreSavedBackground()
-                } else {
-                    onRestoreGradient()
-                }
-            }
+            backgroundManager.setMusicAlbumArtEnabled(initialMusicAlbumArtEnabled)
+            onRestoreOriginalState()
+            BackgroundProgressPlugin.reset()
         }
         previewBackgroundUri = null
         isApplying = false
@@ -367,8 +538,12 @@ class BackgroundSheetManager(
     fun onImageAdded(uriStr: String) {
         updateAdapterItems()
         previewBackgroundUri = uriStr
-        if (!isMusicBackgroundApplied()) {
+        backgroundsAdapter?.updateSelection(uriStr)
+        try {
             onPreviewImage(Uri.parse(uriStr), bgBlurSeek.value.toInt())
+            updateCropButtonVisibility(true)
+        } catch (e: Exception) {
+            Logger.e("BackgroundSheetManager") { "Error previewing added image: $uriStr - ${e.message}" }
         }
     }
 
@@ -379,17 +554,34 @@ class BackgroundSheetManager(
         isUpdatingBackgroundUi = true
         updateAdapterItems()
 
+        val isMusic = isMusicBackgroundApplied()
         val savedUri = backgroundManager.getSavedBackgroundUri()
 
-        // Фикс: Обновляем previewBackgroundUri при загрузке UI,
-        // чтобы кнопка кропа понимала, что изображение уже выбрано
-        previewBackgroundUri = savedUri
+        val currentPreview = previewBackgroundUri
+        if (currentPreview != null) {
+            backgroundsAdapter?.selectedId = currentPreview
+            updateCropButtonVisibility(currentPreview != "__DEFAULT_GRADIENT__" && currentPreview != com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID && !currentPreview.startsWith("external:"))
+            updateProviderCapabilities(currentPreview)
+        } else if (isMusic) {
+            backgroundsAdapter?.selectedId = null
+            updateCropButtonVisibility(false)
+            updateProviderCapabilities(null)
+        } else {
+            val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getActiveProviderId()
+            val selected = when {
+                activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> activeProviderId
+                activeProviderId == com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> "__DEFAULT_GRADIENT__"
+                activeProviderId.startsWith("external:") -> activeProviderId
+                else -> savedUri ?: "__DEFAULT_GRADIENT__"
+            }
+            backgroundsAdapter?.selectedId = selected
+            val hasCustom = selected != "__DEFAULT_GRADIENT__" && selected != com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID && !selected.startsWith("external:")
+            updateCropButtonVisibility(hasCustom)
+            updateProviderCapabilities(selected)
+        }
 
-        backgroundsAdapter?.selectedId = savedUri ?: "__DEFAULT_GRADIENT__"
-        bgRecycler.scrollToPosition(0)
-
-        val hasCustom = savedUri != null && savedUri != "__DEFAULT_GRADIENT__"
-        updateCropButtonVisibility(hasCustom)
+        val targetIndex = backgroundsAdapter?.items?.indexOf(backgroundsAdapter?.selectedId) ?: 0
+        bgRecycler.scrollToPosition(if (targetIndex >= 0) targetIndex else 0)
 
         val blurInt = backgroundManager.getBlurIntensity()
         bgBlurSeek.value = blurInt.toFloat()
@@ -418,6 +610,7 @@ class BackgroundSheetManager(
 
         bgNightShiftSwitch?.isChecked = backgroundManager.isNightShiftEnabled()
         bgZoomSwitch?.isChecked = backgroundManager.getZoomEnabled()
+        bgMusicAlbumArtSwitch?.isChecked = backgroundManager.isMusicAlbumArtEnabled()
 
         val isWeatherEnabled = backgroundManager.isWeatherEffectsEnabled()
         val isManual = backgroundManager.isManualWeatherEnabled()
@@ -446,7 +639,9 @@ class BackgroundSheetManager(
     }
 
     private fun applyBackgroundSettings() {
-        backgroundManager.setBlurIntensity(bgBlurSeek.value.toInt())
+        Logger.i("BackgroundSheet") { "applyBackgroundSettings() called. previewBackgroundUri=$previewBackgroundUri" }
+        val blur = bgBlurSeek.value.toInt()
+        backgroundManager.setBlurIntensity(blur)
 
         val dimMode = when (bgDimToggleGroup.checkedButtonId) {
             R.id.off_button -> BackgroundManager.DIM_MODE_OFF
@@ -458,6 +653,7 @@ class BackgroundSheetManager(
 
         bgNightShiftSwitch?.let { backgroundManager.setNightShiftEnabled(it.isChecked) }
         bgZoomSwitch?.let { backgroundManager.setZoomEnabled(it.isChecked) }
+        bgMusicAlbumArtSwitch?.let { backgroundManager.setMusicAlbumArtEnabled(it.isChecked) }
 
         backgroundManager.setWeatherEffectsEnabled(bgWeatherSwitch.isChecked)
         backgroundManager.setManualWeatherEnabled(bgManualWeatherSwitch.isChecked)
@@ -476,7 +672,7 @@ class BackgroundSheetManager(
             else -> DynamicBackgroundView.WeatherType.RAIN.ordinal
         })
 
-        onApplyCompleted(previewBackgroundUri)
+        onApplyCompleted(previewBackgroundUri, blur)
         hide()
     }
 
@@ -515,7 +711,7 @@ class BackgroundSheetManager(
 
         if (!bgWeatherSwitch.isChecked) {
             weatherView.forceWeather(DynamicBackgroundView.WeatherType.NONE, 0f, 0f, isNight, dayFactor)
-            onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+            triggerFilterUpdate()
             return
         }
 
@@ -548,7 +744,7 @@ class BackgroundSheetManager(
                 dayFactor
             )
         }
-        onUpdateFilters(getPreviewDimMode(), getPreviewDimIntensity(), getPreviewDimMin(), getPreviewDimMax())
+        triggerFilterUpdate()
     }
 
     private fun updateAutoWeatherCard() {
@@ -583,10 +779,32 @@ class BackgroundSheetManager(
     private fun updateAdapterItems() {
         val items = mutableListOf<String>().apply {
             add("__DEFAULT_GRADIENT__")
+            add(com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID)
+            val externalPlugins = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getExternalProviders()
+            externalPlugins.forEach { add(it.id) }
             addAll(backgroundManager.getSavedUriSet())
             add("__ADD__")
         }
         backgroundsAdapter?.updateItems(items)
+    }
+
+    private fun updateProviderCapabilities(providerId: String?) {
+        val provider = when (providerId) {
+            com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID ->
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).solidColorProvider
+            "__DEFAULT_GRADIENT__",
+            com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID ->
+                com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).gradientProvider
+            else ->
+                if (providerId != null && providerId.startsWith("external:")) {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context)
+                        .getExternalProviders().firstOrNull { it.id == providerId }
+                } else {
+                    com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).imageProvider
+                }
+        }
+        val caps = provider?.capabilities ?: com.nxd1frnt.clockdesk2.background.provider.ProviderCapabilities()
+        bgBlurSeek.isEnabled = caps.supportsBlur
     }
 
     fun updateCropButtonVisibility(hasCustomBackground: Boolean) {
@@ -604,25 +822,27 @@ class BackgroundSheetManager(
             .translationY(translationY)
             .translationX(0f)
             .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
+            .setInterpolator(com.nxd1frnt.clockdesk2.utils.MotionUtils.EMPHASIZED)
             .start()
     }
 
     private fun restoreMainLayoutState() {
         mainLayout.animate()
-            .scaleX(0.90f)
-            .scaleY(0.90f)
+            .scaleX(0.92f)
+            .scaleY(0.92f)
             .translationY(0f)
             .translationX(0f)
             .setDuration(animationDuration)
-            .setInterpolator(OvershootInterpolator())
+            .setInterpolator(MotionUtils.EMPHASIZED)
             .start()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            backgroundCustomizationTab.visibility = View.VISIBLE
-            backgroundCustomizationTab.animate().alpha(1f).setDuration(200).start()
-        } else {
-            backgroundCustomizationTab.visibility = View.VISIBLE
+        if (!isSwitchingToCrop) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                backgroundCustomizationTab.visibility = View.VISIBLE
+                backgroundCustomizationTab.animate().alpha(1f).setDuration(200).start()
+            } else {
+                backgroundCustomizationTab.visibility = View.VISIBLE
+            }
         }
     }
 
@@ -630,12 +850,61 @@ class BackgroundSheetManager(
         backgroundCustomizationTab.animate().alpha(0f).setDuration(200).withEndAction {
             backgroundCustomizationTab.visibility = View.GONE
         }.start()
+    }
 
+    private fun restoreDock() {
+        if (isSwitchingToCrop) return
+        dockView?.let { dock ->
+            dock.animate().cancel()
+            val dockSlideOffset = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+            )
+            dock.visibility = View.VISIBLE
+            dock.alpha = 0f
+            dock.translationY = dockSlideOffset
+            dock.scaleX = 0.92f
+            dock.scaleY = 0.92f
+            dock.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(animationDuration)
+                .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                .start()
+        }
+    }
+
+    private fun hideDock() {
+        dockView?.let { dock ->
+            dock.animate().cancel()
+            val dockSlideOffset = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+            )
+            dock.animate()
+                .alpha(0f)
+                .translationY(dockSlideOffset)
+                .scaleX(0.92f)
+                .scaleY(0.92f)
+                .setDuration(220)
+                .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+                .withEndAction {
+                    dock.visibility = View.GONE
+                }
+                .start()
+        }
+    }
+
+    fun refreshMonetTheme() {
+        val palette = UiMonetThemeManager.getPalette(floatingMenuView.context)
+        UiMonetThemeManager.applyLiveToViewHierarchy(floatingMenuView, palette)
+        backgroundsAdapter?.notifyDataSetChanged()
     }
 
     fun onDestroy() {
         previewTask?.let { floatingMenuView.removeCallbacks(it) }
         filterTask?.let { floatingMenuView.removeCallbacks(it) }
+        blurTask?.let { floatingMenuView.removeCallbacks(it) }
 
         bgRecycler.adapter = null
         backgroundsAdapter = null

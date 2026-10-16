@@ -5,21 +5,28 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.PorterDuff
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import android.content.res.ColorStateList
+import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import android.util.TypedValue
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.utilities.Scheme
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontItem
+import com.nxd1frnt.clockdesk2.ui.view.SquigglyProgressBar
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
@@ -59,7 +66,7 @@ class FontManager(
     private val context: Context,
     private val timeText: TextView,
     private val dateText: TextView,
-    private val lastfmLayout: LinearLayout,
+    private val lastfmLayout: ViewGroup,
     private val lastfmText: TextView,
     private val lastfmIcon: ImageView,
     private val weatherText: TextView,
@@ -80,31 +87,234 @@ class FontManager(
     private val customColors: MutableList<Int> = mutableListOf()
     @SuppressLint("RestrictedApi")
     private var currentScheme: Scheme? = null
-    private val resourceFontIds = listOf(
-        R.font.googlesansflex,
-        R.font.anton_regular,
-        R.font.kanit_regular,
-        R.font.sigmar_regular,
-        R.font.monomakh_regular,
-        R.font.orbitron_regular,
-        R.font.dancingscript_regular,
-        R.font.grapenuts_regular,
-        R.font.madimione_regular,
-        R.font.montserrat_regular,
-        R.font.pressstart2p_regular,
-        R.font.shafarik_regular,
-        R.font.alexandria_bold,
-        R.font.m_plus_1_bold,
-        R.font.knewave,
-        R.font.chewy,
-        R.font.capriola,
-        R.font.cherry_bomb_one,
-        R.font.comfortaa_bold,
-        R.font.autour_one,
-        R.font.fascinate,
-        R.font.instrument_sans_bold,
-        R.font.googlesans_bold
-    )
+    var onDynamicSchemeChanged: ((Int?) -> Unit)? = null
+    companion object {
+        val resourceFontIds = listOf(
+            R.font.googlesansflex,
+            R.font.anton_regular,
+            R.font.kanit_regular,
+            R.font.sigmar_regular,
+            R.font.monomakh_regular,
+            R.font.orbitron_regular,
+            R.font.dancingscript_regular,
+            R.font.grapenuts_regular,
+            R.font.madimione_regular,
+            R.font.montserrat_regular,
+            R.font.pressstart2p_regular,
+            R.font.shafarik_regular,
+            R.font.alexandria_bold,
+            R.font.m_plus_1_bold,
+            R.font.knewave,
+            R.font.chewy,
+            R.font.capriola,
+            R.font.cherry_bomb_one,
+            R.font.comfortaa_bold,
+            R.font.autour_one,
+            R.font.fascinate,
+            R.font.instrument_sans_bold,
+            R.font.googlesans_bold
+        )
+
+        val staticResourceFontKeys = mapOf(
+            R.font.googlesansflex to "res:googlesansflex",
+            R.font.anton_regular to "res:anton_regular",
+            R.font.kanit_regular to "res:kanit_regular",
+            R.font.sigmar_regular to "res:sigmar_regular",
+            R.font.monomakh_regular to "res:monomakh_regular",
+            R.font.orbitron_regular to "res:orbitron_regular",
+            R.font.dancingscript_regular to "res:dancingscript_regular",
+            R.font.grapenuts_regular to "res:grapenuts_regular",
+            R.font.madimione_regular to "res:madimione_regular",
+            R.font.montserrat_regular to "res:montserrat_regular",
+            R.font.pressstart2p_regular to "res:pressstart2p_regular",
+            R.font.shafarik_regular to "res:shafarik_regular",
+            R.font.alexandria_bold to "res:alexandria_bold",
+            R.font.m_plus_1_bold to "res:m_plus_1_bold",
+            R.font.knewave to "res:knewave",
+            R.font.chewy to "res:chewy",
+            R.font.capriola to "res:capriola",
+            R.font.cherry_bomb_one to "res:cherry_bomb_one",
+            R.font.comfortaa_bold to "res:comfortaa_bold",
+            R.font.autour_one to "res:autour_one",
+            R.font.fascinate to "res:fascinate",
+            R.font.instrument_sans_bold to "res:instrument_sans_bold",
+            R.font.googlesans_bold to "res:googlesans_bold"
+        )
+
+        val staticResourceFontNames = mapOf(
+            R.font.googlesansflex to "Google Sans Flex",
+            R.font.anton_regular to "Anton",
+            R.font.kanit_regular to "Kanit",
+            R.font.sigmar_regular to "Sigmar",
+            R.font.monomakh_regular to "Monomakh",
+            R.font.orbitron_regular to "Orbitron",
+            R.font.dancingscript_regular to "Dancing Script",
+            R.font.grapenuts_regular to "Grape Nuts",
+            R.font.madimione_regular to "Madimi One",
+            R.font.montserrat_regular to "Montserrat",
+            R.font.pressstart2p_regular to "Press Start 2P",
+            R.font.shafarik_regular to "Shafarik",
+            R.font.alexandria_bold to "Alexandria",
+            R.font.m_plus_1_bold to "M PLUS 1",
+            R.font.knewave to "Knewave",
+            R.font.chewy to "Chewy",
+            R.font.capriola to "Capriola",
+            R.font.cherry_bomb_one to "Cherry Bomb One",
+            R.font.comfortaa_bold to "Comfortaa",
+            R.font.autour_one to "Autour One",
+            R.font.fascinate to "Fascinate",
+            R.font.instrument_sans_bold to "Instrument Sans",
+            R.font.googlesans_bold to "Google Sans Bold"
+        )
+
+        fun buildFontsList(context: Context): List<FontItem> {
+            val list = mutableListOf<FontItem>()
+            list.add(FontItem.AddNew)
+
+            val fontDir = File(context.filesDir, "custom_fonts")
+            if (fontDir.exists()) {
+                val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+                fontDir.listFiles()
+                    ?.filter {
+                        it.isFile && (
+                            it.extension.equals("ttf", ignoreCase = true) ||
+                            it.extension.equals("otf", ignoreCase = true) ||
+                            it.extension.equals("ttc", ignoreCase = true) ||
+                            it.length() > 0L
+                        )
+                    }
+                    ?.sortedBy { it.name.lowercase() }
+                    ?.forEach { file ->
+                        val cachedName = prefs.getString("custom_font_name_${file.name}", null)
+                        val displayName = if (!cachedName.isNullOrBlank()) {
+                            cachedName
+                        } else {
+                            val parsed = FontNameUtils.getFontName(file) ?: file.nameWithoutExtension
+                            prefs.edit().putString("custom_font_name_${file.name}", parsed).apply()
+                            parsed
+                        }
+                        list.add(FontItem.CustomFont(file.absolutePath, displayName))
+                    }
+            }
+
+            list.addAll(resourceFontIds.map { resId ->
+                val displayName = staticResourceFontNames[resId] ?: run {
+                    try {
+                        context.resources.getResourceEntryName(resId)
+                            .replace("_", " ")
+                            .split(" ")
+                            .joinToString(" ") { word -> word.replaceFirstChar { c -> c.uppercase() } }
+                    } catch (e: Exception) {
+                        "Font"
+                    }
+                }
+                FontItem.ResourceFont(resId, displayName)
+            })
+            return list
+        }
+
+        fun getFontIdentifier(context: Context, item: FontItem): String {
+            return when (item) {
+                is FontItem.ResourceFont -> {
+                    staticResourceFontKeys[item.resId] ?: try {
+                        "res:${context.resources.getResourceEntryName(item.resId)}"
+                    } catch (e: Exception) {
+                        "res:${item.resId}"
+                    }
+                }
+                is FontItem.CustomFont -> "file:${File(item.path).name}"
+                is FontItem.AddNew -> "add_new"
+            }
+        }
+
+        fun importCustomFontToStorage(context: Context, uri: Uri): String? {
+            return try {
+                val fontDir = File(context.filesDir, "custom_fonts")
+                if (!fontDir.exists()) fontDir.mkdirs()
+
+                val rawName = resolveFileName(context, uri)
+                    ?.replace(Regex("[^a-zA-Z0-9._\\- ]"), "_")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: "custom_${System.currentTimeMillis()}.ttf"
+
+                val normalizedName = if (
+                    rawName.endsWith(".ttf", ignoreCase = true) ||
+                    rawName.endsWith(".otf", ignoreCase = true) ||
+                    rawName.endsWith(".ttc", ignoreCase = true)
+                ) {
+                    rawName
+                } else {
+                    "$rawName.ttf"
+                }
+
+                val destFile = File(fontDir, normalizedName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: return null
+
+                val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+                val parsed = FontNameUtils.getFontName(destFile) ?: destFile.nameWithoutExtension
+                prefs.edit().putString("custom_font_name_${destFile.name}", parsed).apply()
+
+                "file:${destFile.name}"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+
+        fun deleteCustomFontFile(context: Context, item: FontItem): Boolean {
+            if (item is FontItem.CustomFont) {
+                return try {
+                    val file = File(item.path)
+                    val deleted = file.exists() && file.delete()
+                    if (deleted) {
+                        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+                        prefs.edit().remove("custom_font_name_${file.name}").apply()
+                    }
+                    deleted
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            return false
+        }
+
+        fun getFontAxesDetailsForItem(context: Context, item: FontItem): List<FontAxis> {
+            return FontVariationUtils.scanAxesDetails {
+                try {
+                    when (item) {
+                        is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
+                        is FontItem.CustomFont -> File(item.path).inputStream()
+                        is FontItem.AddNew -> null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+
+        private fun resolveFileName(context: Context, uri: Uri): String? {
+            var result: String? = null
+            if (uri.scheme == "content") {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (index != -1) result = cursor.getString(index)
+                    }
+                }
+            }
+            if (result == null) {
+                result = uri.path
+                val cut = result?.lastIndexOf('/')
+                if (cut != null && cut != -1) result = result?.substring(cut + 1)
+            }
+            return result
+        }
+    }
 
     private var isNightShiftEnabled = false
     private var lastNightFactor = 0f
@@ -114,6 +324,8 @@ class FontManager(
     private var timeFormatPattern: String = "HH:mm"
     private var dateFormatPattern: String = "EEE, MMM dd"
     private var clockStyle: ClockStyle = ClockStyle.STANDARD
+    private var dateStyle: DateStyle = DateStyle.STANDARD
+    private var mediaStyle: MediaStyle = MediaStyle.MINIMAL_TICKER
 
     private val baseChipContainerSizeDp = 165f
     private val baseChipFontSizeSp = 14f
@@ -255,58 +467,21 @@ class FontManager(
         }
     }
 
-    private fun rebuildFontList() {
+    fun rebuildFontList() {
         fonts.clear()
-        fonts.add(FontItem.AddNew)
-
-        val fontDir = File(context.filesDir, "custom_fonts")
-        if (fontDir.exists()) {
-            fontDir.listFiles()
-                ?.filter { it.extension.equals("ttf", ignoreCase = true) || it.extension.equals("otf", ignoreCase = true) }
-                ?.sortedBy { it.name }
-                ?.forEach { file ->
-                    val parsedName = FontNameUtils.getFontName(file)
-                    val displayName = parsedName ?: file.nameWithoutExtension
-                    fonts.add(FontItem.CustomFont(file.absolutePath, displayName))
-                }
-        }
-
-        fonts.addAll(resourceFontIds.map { resId ->
-            val parsedName = FontNameUtils.getFontName {
-                context.resources.openRawResource(resId)
-            }
-            val fallbackName = context.resources.getResourceEntryName(resId)
-                .replace("_", " ")
-                .capitalizeWords()
-
-            FontItem.ResourceFont(resId, parsedName ?: fallbackName)
-        })
-    }
-
-    private fun String.capitalizeWords(): String = split(" ").joinToString(" ") {
-        it.replaceFirstChar { char -> char.uppercase() }
+        fonts.addAll(buildFontsList(context))
     }
 
     fun addCustomFont(uri: Uri): Int {
         return try {
-            val fontDir = File(context.filesDir, "custom_fonts")
-            if (!fontDir.exists()) fontDir.mkdirs()
-
-            val fileName = getFileName(uri) ?: "custom_${System.currentTimeMillis()}.ttf"
-            val destFile = File(fontDir, fileName)
-
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
-                }
-            }
-
             val viewFontMap = mutableMapOf<Int, String>()
             settingsMap.forEach { (viewId, settings) ->
                 if (settings.fontIndex in fonts.indices) {
                     viewFontMap[viewId] = getFontIdentifier(fonts[settings.fontIndex])
                 }
             }
+
+            val newFontId = importCustomFontToStorage(context, uri) ?: return -1
 
             rebuildFontList()
 
@@ -325,9 +500,7 @@ class FontManager(
             saveSettings()
             applyAll()
 
-            val newFontId = "file:$fileName"
             val newlyAddedIndex = fonts.indexOfFirst { getFontIdentifier(it) == newFontId }
-
             if (newlyAddedIndex != -1) newlyAddedIndex else 1
         } catch (e: Exception) {
             e.printStackTrace()
@@ -341,7 +514,6 @@ class FontManager(
 
         if (item is FontItem.CustomFont) {
             try {
-                val file = File(item.path)
                 val deletedId = getFontIdentifier(item)
 
                 val viewFontMap = mutableMapOf<Int, String>()
@@ -351,55 +523,34 @@ class FontManager(
                     }
                 }
 
-                if (file.exists()) {
-                    val deleted = file.delete()
-                    if (deleted) {
-                        rebuildFontList()
+                if (deleteCustomFontFile(context, item)) {
+                    rebuildFontList()
 
-                        viewFontMap.forEach { (viewId, oldFontId) ->
-                            val settings = settingsMap[viewId]
-                            if (settings != null) {
-                                if (oldFontId == deletedId) {
-                                    settings.fontIndex = 1
+                    viewFontMap.forEach { (viewId, oldFontId) ->
+                        val settings = settingsMap[viewId]
+                        if (settings != null) {
+                            if (oldFontId == deletedId) {
+                                settings.fontIndex = 1
+                            } else {
+                                val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
+                                if (newIndex != -1) {
+                                    settings.fontIndex = newIndex
                                 } else {
-                                    val newIndex = fonts.indexOfFirst { getFontIdentifier(it) == oldFontId }
-                                    if (newIndex != -1) {
-                                        settings.fontIndex = newIndex
-                                    } else {
-                                        settings.fontIndex = 1
-                                    }
+                                    settings.fontIndex = 1
                                 }
                             }
                         }
-
-                        saveSettings()
-                        applyAll()
-                        return true
                     }
+
+                    saveSettings()
+                    applyAll()
+                    return true
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
         return false
-    }
-
-    private fun getFileName(uri: Uri): String? {
-        var result: String? = null
-        if (uri.scheme == "content") {
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index != -1) result = cursor.getString(index)
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.path
-            val cut = result?.lastIndexOf('/')
-            if (cut != null && cut != -1) result = result?.substring(cut + 1)
-        }
-        return result
     }
 
     private fun getTypeface(index: Int): Typeface {
@@ -418,13 +569,25 @@ class FontManager(
     fun loadFont() {
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
+        rebuildFontList()
         loadCustomColors()
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
+        val savedSeed = prefs.getInt("dynamic_seed_color", -1)
+        if (savedSeed != -1) {
+            this.currentScheme = Scheme.dark(savedSeed)
+            this.dynamicColor = this.currentScheme?.secondary
+        } else {
+            this.currentScheme = null
+            this.dynamicColor = null
+        }
         timeFormatPattern = prefs.getString("timeFormatPattern", "HH:mm") ?: "HH:mm"
         dateFormatPattern = prefs.getString("dateFormatPattern", "EEE, MMM dd") ?: "EEE, MMM dd"
         clockStyle = ClockStyle.fromId(prefs.getString("clockStyle", ClockStyle.STANDARD.id))
         applyClockStyleToTimeView()
+        dateStyle = DateStyle.fromId(prefs.getString("dateStyle", DateStyle.STANDARD.id))
+        applyDateStyleToDateView()
+        mediaStyle = MediaStyle.fromId(prefs.getString("mediaStyle", MediaStyle.MINIMAL_TICKER.id))
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val defaults = getDefaultSettingsFor(viewId)
@@ -478,20 +641,11 @@ class FontManager(
         }
 
         applyAll()
+        onDynamicSchemeChanged?.invoke(if (savedSeed != -1) savedSeed else null)
     }
 
     private fun getFontIdentifier(item: FontItem): String {
-        return when (item) {
-            is FontItem.ResourceFont -> {
-                try {
-                    "res:${context.resources.getResourceEntryName(item.resId)}"
-                } catch (e: Exception) {
-                    "res:${item.resId}"
-                }
-            }
-            is FontItem.CustomFont -> "file:${File(item.path).name}"
-            else -> "unknown"
-        }
+        return getFontIdentifier(context, item)
     }
 
     fun saveSettings() {
@@ -503,6 +657,8 @@ class FontManager(
         editor.putString("timeFormatPattern", timeFormatPattern)
         editor.putString("dateFormatPattern", dateFormatPattern)
         editor.putString("clockStyle", clockStyle.id)
+        editor.putString("dateStyle", dateStyle.id)
+        editor.putString("mediaStyle", mediaStyle.id)
 
         keyPrefixMap.forEach { (viewId, prefix) ->
             val settings = settingsMap[viewId] ?: return@forEach
@@ -529,7 +685,10 @@ class FontManager(
         editor.apply()
     }
 
-    fun getSettings(view: View): FontSettings? = settingsMap[view.id]
+    fun getSettings(view: View): FontSettings? {
+        val targetId = if (view.id == R.id.smart_chip_scrollview) R.id.smart_chip_container else view.id
+        return settingsMap[targetId]
+    }
 
     fun setFontIndex(view: View, index: Int) {
         if (index !in fonts.indices || fonts[index] is FontItem.AddNew) return
@@ -565,16 +724,7 @@ class FontManager(
         val index = settings.fontIndex
         if (index !in fonts.indices) return emptyList()
 
-        val item = fonts[index]
-        return FontVariationUtils.scanAxesDetails {
-            try {
-                when (item) {
-                    is FontItem.ResourceFont -> context.resources.openRawResource(item.resId)
-                    is FontItem.CustomFont -> context.contentResolver.openInputStream(Uri.fromFile(File(item.path)))
-                    is FontItem.AddNew -> null
-                }
-            } catch (e: Exception) { null }
-        }
+        return getFontAxesDetailsForItem(context, fonts[index])
     }
 
     fun getSupportedAxesForCurrentIndex(view: View): List<String> {
@@ -582,9 +732,10 @@ class FontManager(
     }
 
     private inline fun updateSettings(viewId: Int, block: (FontSettings) -> Unit) {
-        val settings = settingsMap[viewId] ?: return
+        val targetId = if (viewId == R.id.smart_chip_scrollview) R.id.smart_chip_container else viewId
+        val settings = settingsMap[targetId] ?: return
         block(settings)
-        applyToView(viewId)
+        applyToView(targetId)
         saveSettings()
     }
 
@@ -612,13 +763,130 @@ class FontManager(
                 applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
                 applyClockStyleToTimeView()
             }
-            R.id.date_text -> applyStyleToTextView(dateText, settings, typeface, finalColor, colorOnly)
+            R.id.date_text -> {
+                applyStyleToTextView(dateText, settings, typeface, finalColor, colorOnly)
+                applyDateStyleToDateView()
+            }
             R.id.lastfm_layout -> {
                 applyStyleToTextView(lastfmText, settings, typeface, finalColor, colorOnly)
                 if (!colorOnly) {
-                    lastfmIcon.alpha = settings.alpha
+                    lastfmLayout.findViewById<View>(R.id.media_ticker_layout)?.alpha = settings.alpha
+                    lastfmText.alpha = 1.0f
+                    lastfmIcon.alpha = 1.0f
                 }
                 lastfmIcon.setColorFilter(finalColor)
+
+                // Night shift warm color for cards and secondary elements
+                val typedValue = TypedValue()
+                val theme = context.theme
+                val defaultSurfaceColor = if (theme.resolveAttribute(com.google.android.material.R.attr.colorSurfaceContainerHighest, typedValue, true)) {
+                    if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                        typedValue.data
+                    } else if (typedValue.resourceId != 0) {
+                        ContextCompat.getColor(context, typedValue.resourceId)
+                    } else {
+                        ContextCompat.getColor(context, R.color.md_theme_surfaceContainerHighest)
+                    }
+                } else {
+                    ContextCompat.getColor(context, R.color.md_theme_surfaceContainerHighest)
+                }
+
+                val baseBgColor = if (settings.useDynamicBackgroundColor) {
+                    if (currentScheme != null) {
+                        getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+                    } else {
+                        getColorfromRole(settings.dynamicBackgroundColorRole)
+                    }
+                } else if (settings.backgroundColor != Color.DKGRAY && settings.backgroundColor != 0) {
+                    settings.backgroundColor
+                } else {
+                    defaultSurfaceColor
+                }
+
+                val finalCardBgColor = if (effectiveFactor > 0f) {
+                    val redShiftedBg = Color.argb(
+                        Color.alpha(baseBgColor),
+                        Color.red(baseBgColor),
+                        (Color.green(baseBgColor) * 0.4f).toInt(),
+                        (Color.blue(baseBgColor) * 0.3f).toInt()
+                    )
+                    interpolateColor(baseBgColor, redShiftedBg, effectiveFactor)
+                } else {
+                    baseBgColor
+                }
+
+                // Apply style to compact card views if present
+                val compactCard = lastfmLayout.findViewById<MaterialCardView>(R.id.media_compact_card)
+                compactCard?.setCardBackgroundColor(finalCardBgColor)
+                if (!colorOnly) {
+                    compactCard?.alpha = settings.alpha
+                }
+                lastfmLayout.findViewById<ImageView>(R.id.compact_source_icon)?.let { iconView ->
+                    iconView.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
+                    iconView.setColorFilter(finalColor, PorterDuff.Mode.SRC_IN)
+                }
+                lastfmLayout.findViewById<TextView>(R.id.compact_title_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 1.0f
+                    }
+                }
+                lastfmLayout.findViewById<TextView>(R.id.compact_artist_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 0.8f
+                    }
+                }
+
+                // Apply style to expanded player views if present
+                val expandedCard = lastfmLayout.findViewById<MaterialCardView>(R.id.media_expanded_card)
+                expandedCard?.setCardBackgroundColor(finalCardBgColor)
+                if (!colorOnly) {
+                    expandedCard?.alpha = settings.alpha
+                }
+                lastfmLayout.findViewById<ImageView>(R.id.expanded_source_icon)?.let { iconView ->
+                    iconView.backgroundTintList = ColorStateList.valueOf(finalCardBgColor)
+                    iconView.setColorFilter(finalColor, PorterDuff.Mode.SRC_IN)
+                }
+                lastfmLayout.findViewById<TextView>(R.id.expanded_title_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 1.0f
+                    }
+                }
+                lastfmLayout.findViewById<TextView>(R.id.expanded_artist_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 0.8f
+                    }
+                }
+
+                // Apply colors to squiggly progress bar
+                lastfmLayout.findViewById<SquigglyProgressBar>(R.id.expanded_progress_bar)?.let { bar ->
+                    bar.setWaveColor(finalColor)
+                    val unplayedTrackColor = Color.argb(
+                        70,
+                        Color.red(finalColor),
+                        Color.green(finalColor),
+                        Color.blue(finalColor)
+                    )
+                    bar.setTrackColor(unplayedTrackColor)
+                }
+
+                // Apply color filter to transport buttons
+                val btnPrev = lastfmLayout.findViewById<ImageView>(R.id.btn_media_prev)
+                val btnPlay = lastfmLayout.findViewById<ImageView>(R.id.btn_media_play_pause)
+                val btnNext = lastfmLayout.findViewById<ImageView>(R.id.btn_media_next)
+
+                btnPrev?.setColorFilter(finalColor)
+                btnPlay?.setColorFilter(finalColor)
+                btnNext?.setColorFilter(finalColor)
+
+                if (!colorOnly) {
+                    btnPrev?.alpha = 1.0f
+                    btnPlay?.alpha = 1.0f
+                    btnNext?.alpha = 1.0f
+                }
             }
             R.id.smart_chip_container -> {
                 for (i in 0 until smartChipContainer.childCount) {
@@ -645,7 +913,21 @@ class FontManager(
     }
 
     fun getColorfromRole(role: String?): Int {
-        if (currentScheme == null) return context.getColor(R.color.md_theme_primary)
+        if (currentScheme == null) {
+            return when (role) {
+                "primary" -> ContextCompat.getColor(context, R.color.md_theme_primary)
+                "primary_container" -> ContextCompat.getColor(context, R.color.md_theme_primaryContainer)
+                "secondary" -> ContextCompat.getColor(context, R.color.md_theme_secondary)
+                "secondary_container" -> ContextCompat.getColor(context, R.color.md_theme_secondaryContainer)
+                "tertiary" -> ContextCompat.getColor(context, R.color.md_theme_tertiary)
+                "tertiary_container" -> ContextCompat.getColor(context, R.color.md_theme_tertiaryContainer)
+                "surface_variant" -> ContextCompat.getColor(context, R.color.md_theme_surfaceVariant)
+                "outline" -> ContextCompat.getColor(context, R.color.md_theme_outline)
+                "surface" -> ContextCompat.getColor(context, R.color.md_theme_surface)
+                "inverse_surface" -> ContextCompat.getColor(context, R.color.md_theme_inverseSurface)
+                else -> ContextCompat.getColor(context, R.color.md_theme_primary)
+            }
+        }
         return when (role) {
             "primary" -> currentScheme!!.primary
             "primary_container" -> currentScheme!!.primaryContainer
@@ -655,6 +937,8 @@ class FontManager(
             "tertiary_container" -> currentScheme!!.tertiaryContainer
             "surface_variant" -> currentScheme!!.surfaceVariant
             "outline" -> currentScheme!!.outline
+            "surface" -> currentScheme!!.surface
+            "inverse_surface" -> currentScheme!!.inverseSurface
             else -> currentScheme!!.primary
         } as Int
     }
@@ -662,7 +946,10 @@ class FontManager(
     @SuppressLint("RestrictedApi")
     fun setDynamicScheme(seedColor: Int) {
         this.currentScheme = Scheme.dark(seedColor)
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt("dynamic_seed_color", seedColor).apply()
         applyAll()
+        onDynamicSchemeChanged?.invoke(seedColor)
     }
 
     fun getDynamicScheme(): Scheme {
@@ -706,7 +993,7 @@ class FontManager(
         }
 
         if (iconView != null) {
-            iconView.setColorFilter(color)
+            iconView.setColorFilter(color, PorterDuff.Mode.SRC_IN)
             if (!colorOnly) {
                 iconView.alpha = 1.0f
 
@@ -714,11 +1001,31 @@ class FontManager(
                 val newIconSize = (baseIconSize * scaleFactor).toInt()
 
                 val params = iconView.layoutParams
-                if (params.width != newIconSize) {
+                if (params != null && (params.width != newIconSize || params.height != newIconSize)) {
                     params.width = newIconSize
                     params.height = newIconSize
                     iconView.layoutParams = params
                 }
+            }
+        }
+
+        val badgeView = view.findViewById<TextView>(R.id.chip_stack_badge)
+        if (badgeView != null) {
+            val density = context.resources.displayMetrics.density
+            val badgeBg = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 12f * density
+                val bgAlpha = (0.24f * 255).toInt()
+                setColor(Color.argb(bgAlpha, Color.red(color), Color.green(color), Color.blue(color)))
+            }
+            badgeView.background = badgeBg
+            badgeView.setTextColor(color)
+            if (!colorOnly) {
+                badgeView.typeface = typeface
+                badgeView.textSize = (11f * scaleFactor).coerceAtLeast(8f)
+                val padH = (6 * density * scaleFactor).toInt().coerceAtLeast(4)
+                val padV = (1 * density * scaleFactor).toInt().coerceAtLeast(1)
+                badgeView.setPadding(padH, padV, padH, padV)
             }
         }
 
@@ -749,8 +1056,12 @@ class FontManager(
         }
 
         val cardView = view as? MaterialCardView
-        val baseBgColor = if (settings.useDynamicBackgroundColor && currentScheme != null) {
-            getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+        val baseBgColor = if (settings.useDynamicBackgroundColor) {
+            if (currentScheme != null) {
+                getColorFromScheme(currentScheme!!, settings.dynamicBackgroundColorRole)
+            } else {
+                getColorfromRole(settings.dynamicBackgroundColorRole)
+            }
         } else {
             settings.backgroundColor
         }
@@ -800,6 +1111,8 @@ class FontManager(
 
                     textView.fontVariationSettings = variationSettings
                     if (textView is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
+                        textView.customFontVariationSettings = variationSettings
+                    } else if (textView is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
                         textView.customFontVariationSettings = variationSettings
                     }
                 } catch (e: Throwable) {
@@ -853,9 +1166,63 @@ class FontManager(
         }
     }
 
+    fun getDateStyle(): DateStyle = dateStyle
+    fun setDateStyle(style: DateStyle) {
+        dateStyle = style
+        applyToView(R.id.date_text)
+        saveSettings()
+    }
+
+    fun applyDateStyleToDateView() {
+        if (dateText is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
+            dateText.dateStyle = dateStyle
+            dateText.isBadgeMode = dateStyle.isBadge
+            dateText.isTwoLineMode = dateStyle.isTwoLine
+        }
+
+        if (dateStyle.isTwoLine) {
+            dateText.isSingleLine = false
+            dateText.maxLines = 2
+            dateText.maxWidth = Int.MAX_VALUE
+            dateText.setLineSpacing(0f, 0.85f)
+            dateText.gravity = android.view.Gravity.START or (dateText.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                dateText.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                dateText.letterSpacing = -0.01f
+            }
+        } else if (dateStyle.isBadge || dateStyle.isHeroDay) {
+            dateText.isSingleLine = false
+            dateText.maxLines = 1
+        } else if (dateStyle.isChipPill) {
+            dateText.isSingleLine = true
+            dateText.maxLines = 1
+            dateText.setLineSpacing(0f, 1.0f)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                dateText.letterSpacing = 0.04f
+            }
+        } else {
+            dateText.isSingleLine = true
+            dateText.maxLines = 1
+            dateText.setLineSpacing(0f, 1.0f)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                dateText.letterSpacing = 0.0f
+            }
+        }
+    }
+
+    fun getMediaStyle(): MediaStyle = mediaStyle
+    fun setMediaStyle(style: MediaStyle) {
+        mediaStyle = style
+        applyToView(R.id.lastfm_layout)
+        saveSettings()
+    }
+
     fun setNightShiftEnabledForView(view: View, enabled: Boolean) {
         val settings = getOrCreateSettings(view)
         settings.isNightShiftEnabled = enabled
+        applyToView(view.id, colorOnly = true)
         saveSettings()
     }
 
@@ -911,13 +1278,17 @@ class FontManager(
     fun getDynamicColor(): Int? = dynamicColor
 
     fun clearDynamicColors() {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        prefs.edit().remove("dynamic_seed_color").apply()
         currentScheme = null
         dynamicColor = null
         applyAll()
+        onDynamicSchemeChanged?.invoke(null)
     }
 
     private fun getTargetColorForView(viewId: Int): Int {
-        val settings = settingsMap[viewId] ?: return Color.WHITE
+        val targetId = if (viewId == R.id.smart_chip_scrollview) R.id.smart_chip_container else viewId
+        val settings = settingsMap[targetId] ?: return Color.WHITE
 
         if (settings.useDynamicColor && currentScheme != null) {
             return getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
@@ -926,7 +1297,8 @@ class FontManager(
     }
 
     fun getFinalColorForView(viewId: Int): Int {
-        val settings = settingsMap[viewId] ?: return Color.WHITE
+        val targetId = if (viewId == R.id.smart_chip_scrollview) R.id.smart_chip_container else viewId
+        val settings = settingsMap[targetId] ?: return Color.WHITE
         var finalColor = if (settings.useDynamicColor && currentScheme != null) {
             getColorFromScheme(currentScheme!!, settings.dynamicColorRole)
         } else {
@@ -942,32 +1314,37 @@ class FontManager(
 
     fun applyNightShiftTransition(currentTime: Date, sunTimeApi: DayTimeGetter, enabled: Boolean) {
         if (!enabled) {
-            lastNightFactor = 0f
-            applyAll(colorOnly = true)
+            if (lastNightFactor != 0f) {
+                lastNightFactor = 0f
+                applyAll(colorOnly = true)
+            }
             return
         }
 
-        val sunrise = sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }
-        val sunset = sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }
+        val sunriseMs = (sunTimeApi.sunriseTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunriseTime!! }).time
+        val sunsetMs = (sunTimeApi.sunsetTime ?: run { sunTimeApi.setDefault(); sunTimeApi.sunsetTime!! }).time
 
-        val preSunrise = Calendar.getInstance().apply { time = sunrise; add(Calendar.MINUTE, -40) }.time
-        val postSunset = Calendar.getInstance().apply { time = sunset; add(Calendar.MINUTE, 30) }.time
-        val fullNight = Calendar.getInstance().apply { time = postSunset; add(Calendar.MINUTE, 40) }.time
+        val preSunriseMs = sunriseMs - 40 * 60 * 1000L
+        val postSunsetMs = sunsetMs + 30 * 60 * 1000L
+        val fullNightMs = postSunsetMs + 40 * 60 * 1000L
+        val currentMs = currentTime.time
 
         val nightFactor = when {
-            currentTime.before(preSunrise) -> 1.0f
-            currentTime.before(sunrise) -> {
-                1.0f - ((currentTime.time - preSunrise.time).toFloat() / (sunrise.time - preSunrise.time))
+            currentMs < preSunriseMs -> 1.0f
+            currentMs < sunriseMs -> {
+                1.0f - ((currentMs - preSunriseMs).toFloat() / (sunriseMs - preSunriseMs).coerceAtLeast(1L))
             }
-            currentTime.before(postSunset) -> 0.0f
-            currentTime.before(fullNight) -> {
-                (currentTime.time - postSunset.time).toFloat() / (fullNight.time - postSunset.time)
+            currentMs < postSunsetMs -> 0.0f
+            currentMs < fullNightMs -> {
+                (currentMs - postSunsetMs).toFloat() / (fullNightMs - postSunsetMs).coerceAtLeast(1L)
             }
             else -> 1.0f
         }
 
-        lastNightFactor = nightFactor
-        applyAll(colorOnly = true)
+        if (kotlin.math.abs(lastNightFactor - nightFactor) >= 0.005f) {
+            lastNightFactor = nightFactor
+            applyAll(colorOnly = true)
+        }
     }
 
     private fun interpolateColor(color1: Int, color2: Int, factor: Float): Int {

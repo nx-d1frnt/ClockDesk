@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
+import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,8 +75,13 @@ class AlarmChipPlugin(private val context: Context) : ISmartChip {
             val format = SimpleDateFormat(pattern, Locale.getDefault())
             val timeString = format.format(date)
 
-            iconView.setImageResource(R.drawable.ic_alarm)
-            textView.text = timeString
+            if (iconView != null && iconView.tag != R.drawable.ic_alarm) {
+                iconView.setImageResource(R.drawable.ic_alarm)
+                iconView.tag = R.drawable.ic_alarm
+            }
+            if (textView != null) {
+                textView.setTextWithFade(timeString)
+            }
             return true
         }
 

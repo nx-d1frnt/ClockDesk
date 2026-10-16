@@ -2,8 +2,8 @@ package com.nxd1frnt.clockdesk2.ui.settings
 
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.res.ColorStateList
 import android.os.Bundle
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,22 +12,21 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.DynamicColors
+import com.google.android.material.shape.ShapeAppearanceModel
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.ui.LastFmSettingsFragment
 import com.nxd1frnt.clockdesk2.music.ui.MusicSourcesFragment
 import com.nxd1frnt.clockdesk2.smartchips.ui.SmartChipsPluginsFragment
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
-class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
+class SettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var collapsingToolbar: CollapsingToolbarLayout
 
@@ -37,8 +36,8 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
     private var selectedCategoryId: String = "general"
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply dynamic colors for Material You
-        DynamicColors.applyToActivityIfAvailable(this)
+        // Apply dynamic colors for Material You / Background Monet
+        UiMonetThemeManager.applyToActivity(this)
         super.onCreate(savedInstanceState)
 
         // Enable Edge-to-Edge
@@ -47,6 +46,7 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
         setContentView(R.layout.activity_settings)
         toolbar = findViewById(R.id.toolbar)
         collapsingToolbar = findViewById(R.id.collapsingToolbar)
+        UiMonetThemeManager.applyToSettingsActivity(this)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // Keep landscape for desk clock consistency
@@ -71,13 +71,16 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
 
     private fun setupToolbar() {
         setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        toolbar.navigationIcon = null
 
         supportFragmentManager.addOnBackStackChangedListener {
             updateToolbarTitle()
         }
 
-        toolbar.setNavigationOnClickListener {
+        findViewById<View>(R.id.btn_back)?.setOnClickListener {
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
             if (supportFragmentManager.backStackEntryCount > 0) {
                 supportFragmentManager.popBackStack()
             } else {
@@ -98,9 +101,13 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
             is PerformanceSettingsFragment -> getString(R.string.performance_settings)
             is BackupSettingsFragment -> getString(R.string.backup_restore_title)
             is SmartChipsPluginsFragment -> getString(R.string.smart_chips_plugins_title)
+            is com.nxd1frnt.clockdesk2.background.ui.BackgroundPluginsFragment -> getString(R.string.background_plugins_title)
+            is com.nxd1frnt.clockdesk2.notifications.ui.NotificationsSettingsFragment -> getString(R.string.notifications_settings_title)
             is MusicSourcesFragment -> getString(R.string.music_sources_title)
             is LastFmSettingsFragment -> getString(R.string.lastfm_plugin_name)
+            is UpdatesSettingsFragment -> getString(R.string.updates_settings_title)
             is AboutFragment -> getString(R.string.about_title)
+            is com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment -> getString(R.string.deskconnect_settings_title)
             else -> getString(R.string.settings_title)
         }
         collapsingToolbar.title = newTitle
@@ -147,25 +154,6 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
         outState.putString("selected_category", selectedCategoryId)
     }
 
-    override fun onPreferenceStartFragment(caller: PreferenceFragmentCompat, pref: Preference): Boolean {
-        // Instantiate the new Fragment
-        val args = pref.extras
-        val fragment = supportFragmentManager.fragmentFactory.instantiate(
-            classLoader,
-            pref.fragment!!
-        ).apply {
-            arguments = args
-        }
-        
-        // Replace current fragment and add to backstack
-        supportFragmentManager.beginTransaction()
-            .setTransition(androidx.fragment.app.FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
-            .replace(R.id.settings_container, fragment)
-            .addToBackStack(null)
-            .commit()
-        return true
-    }
-
     private class TabletCategoryAdapter(
         private val items: List<SettingsCategory>,
         private var selectedId: String,
@@ -194,35 +182,42 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
             holder.subtitle.text = item.subtitle
             holder.icon.setImageResource(item.iconResId)
 
+            val isFirst = position == 0 || items[position - 1].groupId != item.groupId
+            val isLast = position == items.lastIndex || items[position + 1].groupId != item.groupId
+
+            val shapeRes = when {
+                isFirst && isLast -> R.style.ShapeAppearance_ClockDesk_Single
+                isFirst -> R.style.ShapeAppearance_ClockDesk_Top
+                isLast -> R.style.ShapeAppearance_ClockDesk_Bottom
+                else -> R.style.ShapeAppearance_ClockDesk_Middle
+            }
+            holder.cardContainer.shapeAppearanceModel = ShapeAppearanceModel.builder(holder.itemView.context, shapeRes, 0).build()
+
+            val marginBottomDp = if (isLast) 16 else 4
+            (holder.cardContainer.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+                lp.bottomMargin = (marginBottomDp * holder.itemView.context.resources.displayMetrics.density).toInt()
+                holder.cardContainer.layoutParams = lp
+            }
+
             val isSelected = item.id == selectedId
             val ctx = holder.itemView.context
+            val palette = UiMonetThemeManager.getPalette(ctx)
 
+            holder.cardContainer.rippleColor = ColorStateList.valueOf(
+                androidx.core.graphics.ColorUtils.setAlphaComponent(palette.primary, 32)
+            )
             if (isSelected) {
-                holder.cardContainer.setCardBackgroundColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
-                )
-                holder.title.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
-                )
-                holder.subtitle.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
-                )
-                holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
-                )
+                holder.cardContainer.setCardBackgroundColor(palette.secondaryContainer)
+                holder.iconBadge.setCardBackgroundColor(palette.secondary)
+                holder.title.setTextColor(palette.onSecondaryContainer)
+                holder.subtitle.setTextColor(palette.onSecondaryContainer)
+                holder.icon.imageTintList = ColorStateList.valueOf(palette.onSecondary)
             } else {
-                holder.cardContainer.setCardBackgroundColor(
-                    ctx.getColor(android.R.color.transparent)
-                )
-                holder.title.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurface)
-                )
-                holder.subtitle.setTextColor(
-                    ctx.getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-                )
-                holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(
-                    ctx.getThemeColor(android.R.attr.colorPrimary)
-                )
+                holder.cardContainer.setCardBackgroundColor(palette.surfaceContainerLow)
+                holder.iconBadge.setCardBackgroundColor(palette.surfaceContainerHigh)
+                holder.title.setTextColor(palette.onSurface)
+                holder.subtitle.setTextColor(palette.onSurfaceVariant)
+                holder.icon.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
             }
 
             holder.itemView.setOnClickListener { onSelected(item) }
@@ -232,16 +227,10 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val cardContainer: MaterialCardView = view.findViewById(R.id.card_container)
+            val iconBadge: MaterialCardView = view.findViewById(R.id.icon_badge)
             val icon: ImageView = view.findViewById(R.id.category_icon)
             val title: TextView = view.findViewById(R.id.category_title)
             val subtitle: TextView = view.findViewById(R.id.category_subtitle)
         }
     }
-}
-
-// Extension function to load colors from active theme attributes
-private fun Context.getThemeColor(attr: Int): Int {
-    val typedValue = TypedValue()
-    theme.resolveAttribute(attr, typedValue, true)
-    return typedValue.data
 }

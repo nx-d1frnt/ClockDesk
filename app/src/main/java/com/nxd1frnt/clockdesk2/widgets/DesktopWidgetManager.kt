@@ -1,0 +1,341 @@
+package com.nxd1frnt.clockdesk2.widgets
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.view.View
+import android.view.ViewGroup
+import androidx.constraintlayout.widget.ConstraintLayout
+import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.Logger
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetController
+import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetHost
+import com.nxd1frnt.clockdesk2.widgets.impl.DateDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.SmartChipsDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.TimeDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.WeatherDesktopWidget
+import org.json.JSONArray
+import org.json.JSONObject
+
+class DesktopWidgetManager(
+    private val context: Context,
+    private val mainLayout: ConstraintLayout,
+    var host: DesktopWidgetHost? = null
+) {
+    private val TAG = "DesktopWidgetManager"
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("DesktopLayout", Context.MODE_PRIVATE)
+    private val legacyPrefs: SharedPreferences =
+        context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
+
+    private val activeInstances = mutableListOf<WidgetInstance>()
+    private val instanceViewMap = mutableMapOf<String, View>()
+    @PublishedApi
+    internal val activeControllers = mutableMapOf<String, DesktopWidgetController>()
+
+    var onWidgetsChanged: (() -> Unit)? = null
+
+    init {
+        loadLayout()
+    }
+
+    fun getActiveInstances(): List<WidgetInstance> = activeInstances.toList()
+
+    fun getControllers(): List<DesktopWidgetController> = activeControllers.values.toList()
+
+    inline fun <reified T : DesktopWidgetController> getController(): T? {
+        return activeControllers.values.filterIsInstance<T>().firstOrNull()
+    }
+
+    fun getControllerForView(view: View): DesktopWidgetController? {
+        return activeControllers.values.firstOrNull { it.rootView === view }
+    }
+
+    fun getViewForInstance(instanceId: String): View? = instanceViewMap[instanceId]
+
+    fun getViewForInstance(instance: WidgetInstance): View? = instanceViewMap[instance.instanceId]
+
+    fun getInstanceForView(view: View): WidgetInstance? {
+        val entry = instanceViewMap.entries.firstOrNull { it.value === view } ?: return null
+        return activeInstances.firstOrNull { it.instanceId == entry.key }
+    }
+
+    fun getViews(): List<View> {
+        return activeInstances.sortedBy { it.orderIndex }.mapNotNull { instanceViewMap[it.instanceId] }
+    }
+
+    fun isWidgetTypeActive(type: DesktopWidgetType): Boolean {
+        return activeInstances.any { it.type == type }
+    }
+
+    var isEditMode: Boolean = false
+        private set
+
+    fun setEditMode(isEditMode: Boolean) {
+        this.isEditMode = isEditMode
+        activeControllers.values.forEach { it.setEditMode(isEditMode) }
+    }
+
+    private fun loadLayout() {
+        activeInstances.clear()
+        val jsonString = prefs.getString("active_widgets_json", null)
+        if (jsonString != null) {
+            try {
+                val array = JSONArray(jsonString)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val instanceId = obj.getString("instanceId")
+                    val typeId = obj.getString("typeId")
+                    val type = DesktopWidgetType.fromTypeId(typeId) ?: continue
+                    val orderIndex = obj.optInt("orderIndex", i)
+                    val isFreeMode = obj.optBoolean("isFreeMode", false)
+                    val posX = obj.optDouble("posX", 0.0).toFloat()
+                    val posY = obj.optDouble("posY", 0.0).toFloat()
+                    val alignH = obj.optInt("alignH", 1)
+                    val alignV = obj.optInt("alignV", 2)
+                    val internalGravity = obj.optInt("internalGravity", 1)
+                    val isVisible = obj.optBoolean("isVisible", true)
+
+                    val instance = WidgetInstance(
+                        instanceId = instanceId,
+                        type = type,
+                        orderIndex = orderIndex,
+                        isFreeMode = isFreeMode,
+                        posX = posX,
+                        posY = posY,
+                        alignH = alignH,
+                        alignV = alignV,
+                        internalGravity = internalGravity,
+                        isVisible = isVisible
+                    )
+                    activeInstances.add(instance)
+                }
+            } catch (e: Exception) {
+                Logger.e(TAG) { "Failed to parse active_widgets_json: ${e.message}" }
+            }
+        }
+
+        if (activeInstances.isEmpty()) {
+            val hasConfigured = prefs.getBoolean("has_configured_desktop", false)
+            if (!hasConfigured) {
+                migrateOrInitDefaults()
+                prefs.edit().putBoolean("has_configured_desktop", true).apply()
+            }
+        }
+
+        val layoutVersion = prefs.getInt("desktop_layout_version", 1)
+        if (layoutVersion < 2) {
+            val mediaInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.MEDIA }
+            val timeInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.TIME }
+            val dateInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.DATE }
+
+            if (mediaInstance != null && timeInstance != null && (timeInstance.orderIndex < mediaInstance.orderIndex || (timeInstance.orderIndex == 0 && mediaInstance.orderIndex == 2))) {
+                mediaInstance.orderIndex = 0
+                dateInstance?.orderIndex = 1
+                timeInstance.orderIndex = 2
+                saveLayout()
+            }
+            prefs.edit().putInt("desktop_layout_version", 2).apply()
+        }
+    }
+
+    private fun migrateOrInitDefaults() {
+        Logger.d(TAG) { "Initializing default desktop widgets..." }
+        activeInstances.clear()
+
+        // 1. Media (Top, orderIndex 0)
+        activeInstances.add(
+            WidgetInstance(
+                instanceId = "widget_media_main",
+                type = DesktopWidgetType.MEDIA,
+                orderIndex = legacyPrefs.getInt("lastfm_layout_order_index", 0),
+                isFreeMode = legacyPrefs.getBoolean("lastfm_layout_individual_free_mode", false),
+                posX = legacyPrefs.getFloat("lastfm_layout_x", 0f),
+                posY = legacyPrefs.getFloat("lastfm_layout_y", 0f),
+                alignH = legacyPrefs.getInt("lastfm_layout_align_h", 1),
+                alignV = legacyPrefs.getInt("lastfm_layout_align_v", 2),
+                internalGravity = legacyPrefs.getInt("lastfm_layout_internal_gravity", 1)
+            )
+        )
+
+        // 2. Date (Middle, orderIndex 1)
+        activeInstances.add(
+            WidgetInstance(
+                instanceId = "widget_date_main",
+                type = DesktopWidgetType.DATE,
+                orderIndex = legacyPrefs.getInt("date_text_order_index", 1),
+                isFreeMode = legacyPrefs.getBoolean("date_text_individual_free_mode", false),
+                posX = legacyPrefs.getFloat("date_text_x", 0f),
+                posY = legacyPrefs.getFloat("date_text_y", 0f),
+                alignH = legacyPrefs.getInt("date_text_align_h", 1),
+                alignV = legacyPrefs.getInt("date_text_align_v", 2),
+                internalGravity = legacyPrefs.getInt("date_text_internal_gravity", 1)
+            )
+        )
+
+        // 3. Time (Bottom, orderIndex 2)
+        activeInstances.add(
+            WidgetInstance(
+                instanceId = "widget_time_main",
+                type = DesktopWidgetType.TIME,
+                orderIndex = legacyPrefs.getInt("time_text_order_index", 2),
+                isFreeMode = legacyPrefs.getBoolean("time_text_individual_free_mode", false),
+                posX = legacyPrefs.getFloat("time_text_x", 0f),
+                posY = legacyPrefs.getFloat("time_text_y", 0f),
+                alignH = legacyPrefs.getInt("time_text_align_h", 1),
+                alignV = legacyPrefs.getInt("time_text_align_v", 2),
+                internalGravity = legacyPrefs.getInt("time_text_internal_gravity", 1)
+            )
+        )
+
+        // 4. Smart Chips
+        activeInstances.add(
+            WidgetInstance(
+                instanceId = "widget_chips_main",
+                type = DesktopWidgetType.SMART_CHIPS,
+                orderIndex = 3,
+                isFreeMode = false
+            )
+        )
+
+        saveLayout()
+    }
+
+    fun saveLayout() {
+        val array = JSONArray()
+        for (instance in activeInstances) {
+            val obj = JSONObject().apply {
+                put("instanceId", instance.instanceId)
+                put("typeId", instance.type.typeId)
+                put("orderIndex", instance.orderIndex)
+                put("isFreeMode", instance.isFreeMode)
+                put("posX", instance.posX.toDouble())
+                put("posY", instance.posY.toDouble())
+                put("alignH", instance.alignH)
+                put("alignV", instance.alignV)
+                put("internalGravity", instance.internalGravity)
+                put("isVisible", instance.isVisible)
+            }
+            array.put(obj)
+        }
+        prefs.edit()
+            .putString("active_widgets_json", array.toString())
+            .putBoolean("has_configured_desktop", true)
+            .apply()
+        Logger.d(TAG) { "Desktop layout saved with ${activeInstances.size} widgets" }
+    }
+
+    private fun createController(instance: WidgetInstance, currentHost: DesktopWidgetHost): DesktopWidgetController {
+        val definition = DesktopWidgetRegistry.get(instance.type) ?: throw IllegalArgumentException("Unknown type: ${instance.type}")
+        return when (instance.type) {
+            DesktopWidgetType.TIME -> TimeDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.DATE -> DateDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.MEDIA -> MediaDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.SMART_CHIPS -> SmartChipsDesktopWidget(instance, definition, currentHost)
+            DesktopWidgetType.WEATHER -> WeatherDesktopWidget(instance, definition, currentHost)
+        }
+    }
+
+    fun bindExistingViews(
+        timeView: View?,
+        dateView: View?,
+        mediaView: View?,
+        chipsView: View?,
+        weatherView: View?
+    ) {
+        instanceViewMap.clear()
+        val allTypesWithViews = listOf(
+            DesktopWidgetType.TIME to timeView,
+            DesktopWidgetType.DATE to dateView,
+            DesktopWidgetType.MEDIA to mediaView,
+            DesktopWidgetType.SMART_CHIPS to chipsView,
+            DesktopWidgetType.WEATHER to weatherView
+        )
+
+        val currentHost = host
+        for ((type, view) in allTypesWithViews) {
+            if (view == null) continue
+            val instance = activeInstances.firstOrNull { it.type == type }
+            if (instance != null) {
+                instanceViewMap[instance.instanceId] = view
+                view.visibility = if (instance.isVisible) View.VISIBLE else View.GONE
+                if (currentHost != null) {
+                    val controller = activeControllers.getOrPut(instance.instanceId) {
+                        createController(instance, currentHost)
+                    }
+                    controller.bindView(view)
+                }
+            } else {
+                view.animate()?.cancel()
+                view.clearAnimation()
+                view.visibility = View.GONE
+                view.alpha = 0f
+            }
+        }
+    }
+
+    fun addWidget(type: DesktopWidgetType): WidgetInstance? {
+        val definition = DesktopWidgetRegistry.get(type) ?: return null
+        if (!definition.allowMultipleInstances && isWidgetTypeActive(type)) {
+            Logger.w(TAG) { "Widget type ${type.name} does not allow multiple instances and already exists" }
+            return null
+        }
+
+        val instanceId = "widget_${type.typeId}_${System.currentTimeMillis()}"
+        val maxOrder = activeInstances.maxOfOrNull { it.orderIndex } ?: -1
+        val newInstance = WidgetInstance(
+            instanceId = instanceId,
+            type = type,
+            orderIndex = maxOrder + 1,
+            isFreeMode = false,
+            alignH = 1,
+            alignV = 2,
+            internalGravity = 1,
+            isVisible = true
+        )
+
+        activeInstances.add(newInstance)
+        host?.let {
+            val controller = createController(newInstance, it)
+            activeControllers[newInstance.instanceId] = controller
+        }
+        saveLayout()
+        onWidgetsChanged?.invoke()
+        return newInstance
+    }
+
+    fun removeWidget(instanceId: String): Boolean {
+        val instance = activeInstances.firstOrNull { it.instanceId == instanceId } ?: return false
+        return removeWidget(instance)
+    }
+
+    fun removeWidget(instance: WidgetInstance): Boolean {
+        val removed = activeInstances.remove(instance)
+        if (removed) {
+            val controller = activeControllers.remove(instance.instanceId)
+            controller?.onDestroy()
+            val view = instanceViewMap.remove(instance.instanceId)
+            view?.let {
+                it.animate()?.cancel()
+                it.clearAnimation()
+                it.visibility = View.GONE
+                it.alpha = 0f
+            }
+            saveLayout()
+            onWidgetsChanged?.invoke()
+        }
+        return removed
+    }
+
+    fun resetToDefaults() {
+        activeControllers.values.forEach { it.onDestroy() }
+        activeControllers.clear()
+        legacyPrefs.edit()
+            .putInt("lastfm_layout_order_index", 0)
+            .putInt("date_text_order_index", 1)
+            .putInt("time_text_order_index", 2)
+            .apply()
+        migrateOrInitDefaults()
+        onWidgetsChanged?.invoke()
+    }
+}

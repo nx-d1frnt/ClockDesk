@@ -140,4 +140,11 @@
     <color name="md_theme_surfaceContainer_highContrast">#ECEEF4</color>
     <color name="md_theme_surfaceContainerHigh_highContrast">#E6E8EE</color>
     <color name="md_theme_surfaceContainerHighest_highContrast">#E1E2E8</color>
+
+    <!-- Launcher Icon Colors (Default / Fallback) -->
+    <color name="ic_launcher_bg">#FEF7FF</color>
+    <color name="ic_launcher_pattern">#ECE6F0</color>
+    <color name="ic_launcher_tablet">#D0BCFF</color>
+    <color name="ic_launcher_hour_hand">#6750A4</color>
+    <color name="ic_launcher_minute_hand">#4F378A</color>
 </resources>

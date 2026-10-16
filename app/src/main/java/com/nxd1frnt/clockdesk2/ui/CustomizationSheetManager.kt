@@ -10,9 +10,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AccelerateInterpolator
-import android.view.animation.DecelerateInterpolator
-import android.view.animation.OvershootInterpolator
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import android.widget.Button
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
@@ -34,13 +32,22 @@ import com.google.android.material.textfield.TextInputLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.daytimegetter.DayTimeGetter
 import com.nxd1frnt.clockdesk2.ui.adapters.ClockStyleAdapter
+import com.nxd1frnt.clockdesk2.ui.adapters.DateStyleAdapter
+import com.nxd1frnt.clockdesk2.ui.adapters.MediaStyleAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.utils.ClockManager
 import com.nxd1frnt.clockdesk2.utils.ClockStyle
+import com.nxd1frnt.clockdesk2.utils.DateStyle
+import com.nxd1frnt.clockdesk2.utils.MediaStyle
 import com.nxd1frnt.clockdesk2.utils.ColorItem
 import com.nxd1frnt.clockdesk2.utils.FontAxis
 import com.nxd1frnt.clockdesk2.utils.FontManager
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
+import com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager
+import com.nxd1frnt.clockdesk2.widgets.WidgetFeature
+import com.nxd1frnt.clockdesk2.widgets.impl.DateDesktopWidget
+import com.nxd1frnt.clockdesk2.widgets.impl.MediaDesktopWidget
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -48,10 +55,12 @@ class CustomizationSheetManager(
     private val sideSheetView: LinearLayout,
     private val mainLayout: View,
     private val backgroundCustomizationTab: View,
+    private val dockView: View? = null,
     private val fontManager: FontManager,
     private val widgetMover: WidgetMover,
     private val clockManager: ClockManager,
     private val dayTimeGetter: DayTimeGetter,
+    private val widgetManager: DesktopWidgetManager? = null,
     private val onAddFontRequested: () -> Unit,
     private val onSheetStateChanged: (isHidden: Boolean) -> Unit
 ) {
@@ -83,15 +92,25 @@ class CustomizationSheetManager(
     private val bsClockStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_clock_style) }
     private var clockStyleAdapter: ClockStyleAdapter? = null
 
+    private val bsDateStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.date_style_recycler_view) }
+    private val bsDateStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_date_style) }
+    private var dateStyleAdapter: DateStyleAdapter? = null
+
+    private val bsMediaStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.media_style_recycler_view) }
+    private val bsMediaStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_media_style) }
+    private var mediaStyleAdapter: MediaStyleAdapter? = null
+
     private val bsApplyButton by lazy { sideSheetView.findViewById<Button>(R.id.apply_button) }
     private val bsCancelButton by lazy { sideSheetView.findViewById<Button>(R.id.cancel_button) }
 
     private val bsNightShiftSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.night_shift_switch) }
-    private val bsEditBackgroundSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.edit_background_switch) }
+    private val bsColorModeGroup by lazy { sideSheetView.findViewById<MaterialButtonToggleGroup>(R.id.color_mode_toggle_group) }
     private val bsFreeModeSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.free_mode_switch) }
     private val bsGridSnapSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.grid_snap_switch) }
     private val bsIgnoreCollisionSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.ignore_collision_switch) }
     private val bsShowMediaIconSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_media_icon) }
+    private val bsChipStackOverflowCard by lazy { sideSheetView.findViewById<View>(R.id.card_chip_stack_overflow) }
+    private val bsChipStackOverflowSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.chip_stack_overflow_switch) }
 
     private val bsTimeFormatGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.time_format_radio_group) }
     private val bsShowAMPMSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.show_am_pm_switch) }
@@ -118,6 +137,10 @@ class CustomizationSheetManager(
 
     private val bsMoveUpBtn by lazy { sideSheetView.findViewById<Button>(R.id.move_up_button) }
     private val bsMoveDownBtn by lazy { sideSheetView.findViewById<Button>(R.id.move_down_button) }
+    private val bsRemoveWidgetBtn by lazy { sideSheetView.findViewById<Button>(R.id.remove_widget_button) }
+    private val bsRemoveWidgetCard by lazy { sideSheetView.findViewById<View>(R.id.card_remove_widget) }
+
+    var onRemoveWidgetRequested: ((View) -> Unit)? = null
 
     private val bsVarTitle by lazy { sideSheetView.findViewById<TextView>(R.id.variable_properties_title) }
 
@@ -208,7 +231,7 @@ class CustomizationSheetManager(
             mainLayout.animate()
                 .translationX(calculatedTargetTx)
                 .setDuration(350)
-                .setInterpolator(DecelerateInterpolator(1.5f))
+                .setInterpolator(MotionUtils.EMPHASIZED)
                 .start()
         }
     }
@@ -228,16 +251,26 @@ class CustomizationSheetManager(
         behavior.addCallback(object : SideSheetCallback() {
             override fun onStateChanged(sheet: View, newState: Int) {
                 if (newState == SideSheetBehavior.STATE_HIDDEN) {
-                    onSheetStateChanged(true)
                     sideSheetView.removeCallbacks(focusUpdateRunnable)
-                    mainLayout.scaleX = 0.90f
-                    mainLayout.scaleY = 0.90f
+                    mainLayout.scaleX = 0.92f
+                    mainLayout.scaleY = 0.92f
                     mainLayout.translationX = 0f
                     mainLayout.translationY = 0f
                     backgroundCustomizationTab.alpha = 1f
                     backgroundCustomizationTab.visibility = View.VISIBLE
+                    dockView?.let { dock ->
+                        dock.alpha = 1f
+                        dock.translationY = 0f
+                        dock.scaleX = 1f
+                        dock.scaleY = 1f
+                        dock.visibility = View.VISIBLE
+                    }
                     highlightFocusedView(false)
                     focusedView = null
+                    onSheetStateChanged(true)
+                } else if (newState == SideSheetBehavior.STATE_EXPANDED) {
+                    dockView?.visibility = View.GONE
+                    onSheetStateChanged(false)
                 } else {
                     onSheetStateChanged(false)
                 }
@@ -245,7 +278,7 @@ class CustomizationSheetManager(
 
             override fun onSlide(sheet: View, slideOffset: Float) {
                 val safeOffset = slideOffset.coerceIn(0f, 1f)
-                val baseScale = 0.90f
+                val baseScale = 0.92f
 
                 sheet.alpha = safeOffset
                 val sheetScale = 0.95f + (0.05f * safeOffset)
@@ -263,6 +296,22 @@ class CustomizationSheetManager(
                     backgroundCustomizationTab.visibility = View.VISIBLE
                 } else if (safeOffset == 1f && backgroundCustomizationTab.visibility == View.VISIBLE) {
                     backgroundCustomizationTab.visibility = View.GONE
+                }
+
+                dockView?.let { dock ->
+                    val dockSlideOffset = TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, 24f, dock.resources.displayMetrics
+                    )
+                    dock.alpha = 1f - safeOffset
+                    dock.translationY = dockSlideOffset * safeOffset
+                    val dockScale = 1f - (0.08f * safeOffset)
+                    dock.scaleX = dockScale
+                    dock.scaleY = dockScale
+                    if (safeOffset < 1f && dock.visibility == View.GONE) {
+                        dock.visibility = View.VISIBLE
+                    } else if (safeOffset == 1f && dock.visibility == View.VISIBLE) {
+                        dock.visibility = View.GONE
+                    }
                 }
             }
         })
@@ -285,15 +334,20 @@ class CustomizationSheetManager(
         setupButtons()
         setupFontAdapter()
         setupClockStyleAdapter()
+        setupDateStyleAdapter()
+        setupMediaStyleAdapter()
     }
 
     fun showForView(viewToCustomize: View) {
+        dockView?.animate()?.cancel()
         focusedView = viewToCustomize
         isEditingBackground = false
+        bsColorModeGroup.check(R.id.btn_sheet_color_mode_text)
 
         highlightFocusedView(true)
         configureVisibilityForView(viewToCustomize)
         loadSettingsForView(viewToCustomize)
+        UiMonetThemeManager.applyLiveToViewHierarchy(sideSheetView)
 
         calculateHorizontalFocus(viewToCustomize)
 
@@ -303,8 +357,8 @@ class CustomizationSheetManager(
                 .scaleY(dynamicTargetScale)
                 .translationX(calculatedTargetTx)
                 .translationY(0f)
-                .setDuration(250)
-                .setInterpolator(DecelerateInterpolator(1.2f))
+                .setDuration(300)
+                .setInterpolator(MotionUtils.EMPHASIZED)
                 .start()
         }
 
@@ -394,6 +448,10 @@ class CustomizationSheetManager(
 
         preventSheetDragForSlider(slider)
         container.addView(nameText); container.addView(slider); container.addView(valueText)
+        val palette = UiMonetThemeManager.getPalette(context)
+        nameText.setTextColor(palette.onSurfaceVariant)
+        valueText.setTextColor(palette.primary)
+        UiMonetThemeManager.applyLiveToViewHierarchy(slider, palette)
         return container
     }
 
@@ -415,37 +473,63 @@ class CustomizationSheetManager(
         focusedView?.let { view ->
             val scale = if (isHighlighted) 1.05f else 1.0f
             view.animate().scaleX(scale).scaleY(scale).setDuration(animationDuration).start()
-            if (isHighlighted) view.setBackgroundResource(R.drawable.editable_border)
+            if (isHighlighted) {
+                view.setBackgroundResource(R.drawable.editable_border)
+            } else {
+                val inEditMode = widgetManager?.isEditMode == true
+                val isManagedWidget = widgetManager?.getControllerForView(view) != null
+                if (!inEditMode || !isManagedWidget) {
+                    view.background = null
+                }
+            }
         }
     }
 
     private fun configureVisibilityForView(view: View) {
-        val isTime = view.id == R.id.time_text
-        val isDate = view.id == R.id.date_text
-        val isLastFm = view.id == R.id.lastfm_layout
-        val isSmartChip = view.id == R.id.smart_chip_container
-        val showLayoutControls = isTime || isDate || isLastFm
+        val controller = widgetManager?.getControllerForView(view)
+        val features = controller?.definition?.supportedFeatures
 
-        bsTitle.text = sideSheetView.context.getString(
-            when {
-                isTime -> R.string.customize_time
-                isDate -> R.string.customize_date
-                isLastFm -> R.string.customize_now_playing
-                isSmartChip -> R.string.customize_smart_chips
-                else -> R.string.app_name
-            }
-        )
+        val isTime = if (features != null) features.contains(WidgetFeature.TIME_FORMAT) else view.id == R.id.time_text
+        val isDate = if (features != null) features.contains(WidgetFeature.DATE_FORMAT) else view.id == R.id.date_text
+        val isLastFm = if (features != null) features.contains(WidgetFeature.MEDIA_ICON) else view.id == R.id.lastfm_layout
+        val isSmartChip = if (features != null) {
+            features.contains(WidgetFeature.CHIP_STACK_OVERFLOW) || controller?.type == com.nxd1frnt.clockdesk2.widgets.DesktopWidgetType.SMART_CHIPS
+        } else {
+            view.id == R.id.smart_chip_container || view.id == R.id.smart_chip_scrollview
+        }
+        val isWeather = view.id == R.id.weather_layout
+        val showLayoutControls = if (features != null) {
+            features.contains(WidgetFeature.HORIZONTAL_ALIGNMENT) || features.contains(WidgetFeature.VERTICAL_ALIGNMENT)
+        } else {
+            isTime || isDate || isLastFm || isWeather
+        }
 
-        bsClockStyleCard.visibility = if (isTime) View.VISIBLE else View.GONE
+        bsTitle.text = controller?.definition?.titleRes?.let { sideSheetView.context.getString(it) }
+            ?: sideSheetView.context.getString(
+                when {
+                    isTime -> R.string.customize_time
+                    isDate -> R.string.customize_date
+                    isLastFm -> R.string.customize_now_playing
+                    isSmartChip -> R.string.customize_smart_chips
+                    isWeather -> R.string.widget_weather_title
+                    else -> R.string.app_name
+                }
+            )
+
+        bsClockStyleCard.visibility = if (features?.contains(WidgetFeature.CLOCK_STYLE) ?: isTime) View.VISIBLE else View.GONE
+        bsDateStyleCard.visibility = if (features?.contains(WidgetFeature.DATE_STYLE) ?: isDate) View.VISIBLE else View.GONE
+        bsMediaStyleCard.visibility = if (features?.contains(WidgetFeature.MEDIA_STYLE) ?: isLastFm) View.VISIBLE else View.GONE
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeFormatLabel.visibility = if (isTime) View.VISIBLE else View.GONE
         bsTimeCustomInputLayout.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId == R.id.time_custom_radio) View.VISIBLE else View.GONE
         bsShowAMPMSwitch.visibility = if (isTime && bsTimeFormatGroup.checkedRadioButtonId != R.id.time_custom_radio) View.VISIBLE else View.GONE
 
-        bsDateFormatGroup.visibility = if (isDate) View.VISIBLE else View.GONE
-        bsDateFormatLabel.visibility = if (isDate) View.VISIBLE else View.GONE
-        sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (isDate) View.VISIBLE else View.GONE
-        bsDateCustomInputLayout.visibility = if (isDate && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
+        val currentStyle = fontManager.getDateStyle()
+        val showDateFormat = isDate && (currentStyle == DateStyle.STANDARD || currentStyle == DateStyle.TWO_LINE || currentStyle == DateStyle.CHIP_PILL)
+        bsDateFormatGroup.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+        bsDateFormatLabel.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+        sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+        bsDateCustomInputLayout.visibility = if (showDateFormat && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
 
         val positioningVisibility = if (showLayoutControls) View.VISIBLE else View.GONE
         sideSheetView.findViewById<View>(R.id.block_positioning_title)?.visibility = positioningVisibility
@@ -463,13 +547,15 @@ class CustomizationSheetManager(
         sideSheetView.findViewById<View>(R.id.card_grid_snap)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
         sideSheetView.findViewById<View>(R.id.card_ignore_collision)?.visibility = if (showLayoutControls) View.VISIBLE else View.GONE
 
-        // Last.fm Specific
-        sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (isLastFm) View.VISIBLE else View.GONE
-        bsMaxWidthContainer.visibility = if (isLastFm) View.VISIBLE else View.GONE
-        bsBlockFormatsTitle.visibility = if (isTime || isDate) View.VISIBLE else View.GONE
-        bsDateFormatCard.visibility = if (isDate) View.VISIBLE else View.GONE
+        // Last.fm / Media Specific
+        sideSheetView.findViewById<View>(R.id.card_show_media_icon)?.visibility = if (features?.contains(WidgetFeature.MEDIA_ICON) ?: isLastFm) View.VISIBLE else View.GONE
+        bsChipStackOverflowCard.visibility = if (features?.contains(WidgetFeature.CHIP_STACK_OVERFLOW) ?: isSmartChip) View.VISIBLE else View.GONE
+        bsMaxWidthContainer.visibility = if (features?.contains(WidgetFeature.MAX_WIDTH) ?: isLastFm) View.VISIBLE else View.GONE
+        bsBlockFormatsTitle.visibility = if (isTime || showDateFormat) View.VISIBLE else View.GONE
+        bsDateFormatCard.visibility = if (showDateFormat) View.VISIBLE else View.GONE
         bsTimeFormatCard.visibility = if (isTime) View.VISIBLE else View.GONE
-        bsEditBackgroundSwitch.visibility = if (isSmartChip) View.VISIBLE else View.GONE
+        bsColorModeGroup.visibility = if (features?.contains(WidgetFeature.BACKGROUND_COLOR) ?: (isSmartChip || isLastFm)) View.VISIBLE else View.GONE
+        bsRemoveWidgetCard.visibility = View.VISIBLE
     }
 
     private fun loadSettingsForView(view: View) {
@@ -532,6 +618,7 @@ class CustomizationSheetManager(
 
         // Загрузка формата даты
         if (view.id == R.id.date_text) {
+            dateStyleAdapter?.setSelectedStyle(fontManager.getDateStyle())
             val datePattern = fontManager.getDateFormatPattern()
             bsDateFormatGroup.setOnCheckedChangeListener(null)
             when (datePattern) {
@@ -544,6 +631,11 @@ class CustomizationSheetManager(
                 }
             }
             setupSwitchesAndToggles() // Перепривязываем листенеры
+        }
+
+        // Загрузка стиля Now Playing
+        if (view.id == R.id.lastfm_layout) {
+            mediaStyleAdapter?.setSelectedStyle(fontManager.getMediaStyle())
         }
 
         bsNightShiftSwitch.setOnCheckedChangeListener(null)
@@ -598,6 +690,15 @@ class CustomizationSheetManager(
         bsShowMediaIconSwitch.isChecked = prefs.getBoolean("show_media_icon", true)
         bsShowMediaIconSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("show_media_icon", isChecked).apply()
+        }
+
+        bsChipStackOverflowSwitch.setOnCheckedChangeListener(null)
+        bsChipStackOverflowSwitch.isChecked = prefs.getBoolean("smart_chips_stack_overflow", false)
+        bsChipStackOverflowSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("smart_chips_stack_overflow", isChecked).apply()
+        }
+        bsChipStackOverflowCard.setOnClickListener {
+            bsChipStackOverflowSwitch.toggle()
         }
 
         isUpdatingUIFromSettings = true
@@ -657,9 +758,11 @@ class CustomizationSheetManager(
     }
 
     private fun setupSwitchesAndToggles() {
-        bsEditBackgroundSwitch.setOnCheckedChangeListener { _, isChecked ->
-            isEditingBackground = isChecked
-            focusedView?.let { bsColorRecyclerView.adapter = createColorAdapter(it) }
+        bsColorModeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                isEditingBackground = (checkedId == R.id.btn_sheet_color_mode_bg)
+                focusedView?.let { bsColorRecyclerView.adapter = createColorAdapter(it) }
+            }
         }
 
         bsGridSnapSwitch.setOnCheckedChangeListener { _, isChecked -> widgetMover.setGridSnapEnabled(isChecked) }
@@ -741,7 +844,8 @@ class CustomizationSheetManager(
         })
 
         bsDateFormatGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (focusedView?.id == R.id.date_text) {
+            val view = focusedView
+            if (view?.id == R.id.date_text) {
                 if (checkedId == R.id.date_custom_radio) {
                     bsDateCustomInputLayout.visibility = View.VISIBLE
                     bsDateCustomInputLayout.requestFocus()
@@ -757,6 +861,7 @@ class CustomizationSheetManager(
                     })
                 }
                 clockManager.updateDateText()
+                (widgetManager?.getControllerForView(view) as? DateDesktopWidget)?.updateDate(clockManager.getCurrentTime())
                 applyRealTimeFocusUpdate(true)
             }
         }
@@ -765,13 +870,16 @@ class CustomizationSheetManager(
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                if (focusedView?.id == R.id.date_text && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) {
-                    val pattern = s?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
+                val view = focusedView
+                if (view?.id == R.id.date_text && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) {
+                    val rawPattern = s?.toString()?.takeIf { it.isNotBlank() } ?: "MMM dd"
+                    val testPattern = rawPattern.replace("\\n", "\n")
                     try {
-                        SimpleDateFormat(pattern, Locale.getDefault()) // Валидация
+                        SimpleDateFormat(testPattern, Locale.getDefault()) // Валидация
                         bsDateCustomInputLayout.error = null
-                        fontManager.setDateFormatPattern(pattern)
+                        fontManager.setDateFormatPattern(rawPattern)
                         clockManager.updateDateText()
+                        (widgetManager?.getControllerForView(view) as? DateDesktopWidget)?.updateDate(clockManager.getCurrentTime())
                         applyRealTimeFocusUpdate(false)
                     } catch (e: Exception) {
                         bsDateCustomInputLayout.error = "Invalid format"
@@ -784,6 +892,12 @@ class CustomizationSheetManager(
     private fun setupButtons() {
         bsMoveUpBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, true); applyRealTimeFocusUpdate(true) } }
         bsMoveDownBtn.setOnClickListener { focusedView?.let { widgetMover.moveWidgetOrder(it, false); applyRealTimeFocusUpdate(true) } }
+        bsRemoveWidgetBtn.setOnClickListener {
+            focusedView?.let { v ->
+                onRemoveWidgetRequested?.invoke(v)
+                hide()
+            }
+        }
 
         bsApplyButton.setOnClickListener { fontManager.saveSettings(); hide() }
         bsCancelButton.setOnClickListener { fontManager.loadFont(); widgetMover.restoreOrderAndPositions(); hide() }
@@ -801,8 +915,8 @@ class CustomizationSheetManager(
             },
             onAddFontClicked = { onAddFontRequested() },
             onFontLongClick = { fontIndex ->
-                val context = sideSheetView.context
-                MaterialAlertDialogBuilder(context)
+                val context = UiMonetThemeManager.wrapContext(sideSheetView.context)
+                val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_font_title))
                     .setMessage(context.getString(R.string.delete_font_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -814,6 +928,7 @@ class CustomizationSheetManager(
                     }
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
+                UiMonetThemeManager.styleAlertDialog(dialog)
             }
         )
         bsFontRecyclerView.adapter = adapter
@@ -856,8 +971,8 @@ class CustomizationSheetManager(
                 }
             },
             onColorLongClick = { item ->
-                val context = sideSheetView.context
-                MaterialAlertDialogBuilder(context)
+                val context = UiMonetThemeManager.wrapContext(sideSheetView.context)
+                val dialog = MaterialAlertDialogBuilder(context)
                     .setTitle(context.getString(R.string.delete_color_title))
                     .setMessage(context.getString(R.string.delete_color_msg))
                     .setPositiveButton(context.getString(R.string.delete)) { dialog, _ ->
@@ -868,6 +983,7 @@ class CustomizationSheetManager(
                     }
                     .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
                     .show()
+                UiMonetThemeManager.styleAlertDialog(dialog)
             }
         )
     }
@@ -898,7 +1014,8 @@ class CustomizationSheetManager(
     }
 
     private fun showColorPickerDialog(view: View) {
-        val context = sideSheetView.context
+        val context = UiMonetThemeManager.wrapContext(sideSheetView.context)
+        val palette = UiMonetThemeManager.getPalette(sideSheetView.context)
         val settings = fontManager.getSettings(view)
         val initialColor = if (isEditingBackground) {
             if (settings?.useDynamicBackgroundColor == true) {
@@ -919,6 +1036,7 @@ class CustomizationSheetManager(
         val brightnessSlideBar = dialogView.findViewById<com.skydoves.colorpickerview.sliders.BrightnessSlideBar>(R.id.brightness_slide_bar)
         val previewBox = dialogView.findViewById<View>(R.id.color_preview_box)
         val hexText = dialogView.findViewById<TextView>(R.id.hex_text)
+        hexText.setTextColor(palette.onSurface)
 
         colorPickerView.attachBrightnessSlider(brightnessSlideBar)
         colorPickerView.setInitialColor(initialColor)
@@ -945,7 +1063,7 @@ class CustomizationSheetManager(
             hexText.text = String.format("#%06X", 0xFFFFFF and selectedColor)
         })
 
-        MaterialAlertDialogBuilder(context)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(context.getString(R.string.custom_color))
             .setView(dialogView)
             .setPositiveButton(context.getString(R.string.apply)) { dialog, _ ->
@@ -961,6 +1079,7 @@ class CustomizationSheetManager(
             }
             .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
             .show()
+        UiMonetThemeManager.styleAlertDialog(dialog, palette)
     }
 
     private fun setupClockStyleAdapter() {
@@ -988,11 +1107,11 @@ class CustomizationSheetManager(
         val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
 
         view.animate()
-            .scaleX(0.82f)
-            .scaleY(0.82f)
+            .scaleX(0.88f)
+            .scaleY(0.88f)
             .alpha(0.2f)
-            .setDuration(130)
-            .setInterpolator(AccelerateInterpolator())
+            .setDuration(120)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
             .withEndAction {
                 if (view.parent is ViewGroup) {
                     try {
@@ -1000,7 +1119,7 @@ class CustomizationSheetManager(
                             view.parent as ViewGroup,
                             AutoTransition().apply {
                                 duration = 220
-                                interpolator = DecelerateInterpolator(1.5f)
+                                interpolator = MotionUtils.EMPHASIZED
                             }
                         )
                     } catch (e: Exception) {}
@@ -1014,8 +1133,141 @@ class CustomizationSheetManager(
                     .scaleX(1.0f)
                     .scaleY(1.0f)
                     .alpha(targetAlpha)
-                    .setDuration(240)
-                    .setInterpolator(OvershootInterpolator(1.2f))
+                    .setDuration(280)
+                    .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun setupDateStyleAdapter() {
+        dateStyleAdapter = DateStyleAdapter(
+            styles = DateStyle.values().toList(),
+            onStyleSelected = { selectedStyle ->
+                animateDateStyleChange(selectedStyle)
+            }
+        )
+        bsDateStyleRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsDateStyleRecyclerView.adapter = dateStyleAdapter
+        preventSheetDragForRecyclerView(bsDateStyleRecyclerView)
+    }
+
+    private fun animateDateStyleChange(newStyle: DateStyle) {
+        if (fontManager.getDateStyle() == newStyle) return
+
+        val view = focusedView ?: run {
+            fontManager.setDateStyle(newStyle)
+            clockManager.updateDateText()
+            return
+        }
+
+        view.animate().cancel()
+        val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
+
+        view.animate()
+            .scaleX(0.88f)
+            .scaleY(0.88f)
+            .alpha(0.2f)
+            .setDuration(120)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+            .withEndAction {
+                if (view.parent is ViewGroup) {
+                    try {
+                        TransitionManager.beginDelayedTransition(
+                            view.parent as ViewGroup,
+                            AutoTransition().apply {
+                                duration = 220
+                                interpolator = MotionUtils.EMPHASIZED
+                            }
+                        )
+                    } catch (e: Exception) {}
+                }
+
+                fontManager.setDateStyle(newStyle)
+                if (newStyle == DateStyle.TWO_LINE && view is TextView) {
+                    view.gravity = android.view.Gravity.START or (view.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                        view.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                    }
+                }
+                clockManager.updateDateText()
+                val controller = widgetManager?.getControllerForView(view) as? DateDesktopWidget
+                controller?.updateDate(clockManager.getCurrentTime())
+                applyRealTimeFocusUpdate(true)
+
+                val isDate = focusedView?.id == R.id.date_text || controller != null
+                val showDateFormat = isDate && (newStyle == DateStyle.STANDARD || newStyle == DateStyle.TWO_LINE || newStyle == DateStyle.CHIP_PILL)
+                bsDateFormatCard.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                sideSheetView.findViewById<View>(R.id.card_date_format)?.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                bsDateFormatGroup.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                bsDateFormatLabel.visibility = if (showDateFormat) View.VISIBLE else View.GONE
+                bsDateCustomInputLayout.visibility = if (showDateFormat && bsDateFormatGroup.checkedRadioButtonId == R.id.date_custom_radio) View.VISIBLE else View.GONE
+                bsBlockFormatsTitle.visibility = if (focusedView?.id == R.id.time_text || showDateFormat) View.VISIBLE else View.GONE
+
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .alpha(targetAlpha)
+                    .setDuration(280)
+                    .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun setupMediaStyleAdapter() {
+        mediaStyleAdapter = MediaStyleAdapter(
+            styles = MediaStyle.values().toList(),
+            onStyleSelected = { selectedStyle ->
+                animateMediaStyleChange(selectedStyle)
+            }
+        )
+        bsMediaStyleRecyclerView.layoutManager = LinearLayoutManager(sideSheetView.context, LinearLayoutManager.HORIZONTAL, false)
+        bsMediaStyleRecyclerView.adapter = mediaStyleAdapter
+        preventSheetDragForRecyclerView(bsMediaStyleRecyclerView)
+    }
+
+    private fun animateMediaStyleChange(newStyle: MediaStyle) {
+        if (fontManager.getMediaStyle() == newStyle) return
+
+        val view = focusedView ?: run {
+            fontManager.setMediaStyle(newStyle)
+            return
+        }
+
+        view.animate().cancel()
+        val targetAlpha = fontManager.getSettings(view)?.alpha ?: 1.0f
+
+        view.animate()
+            .scaleX(0.88f)
+            .scaleY(0.88f)
+            .alpha(0.2f)
+            .setDuration(120)
+            .setInterpolator(MotionUtils.EMPHASIZED_ACCELERATE)
+            .withEndAction {
+                if (view.parent is ViewGroup) {
+                    try {
+                        TransitionManager.beginDelayedTransition(
+                            view.parent as ViewGroup,
+                            AutoTransition().apply {
+                                duration = 220
+                                interpolator = MotionUtils.EMPHASIZED
+                            }
+                        )
+                    } catch (e: Exception) {}
+                }
+
+                fontManager.setMediaStyle(newStyle)
+                val controller = widgetManager?.getControllerForView(view) as? MediaDesktopWidget
+                controller?.updateMediaStyle(newStyle)
+                applyRealTimeFocusUpdate(true)
+
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .alpha(targetAlpha)
+                    .setDuration(280)
+                    .setInterpolator(MotionUtils.EXPRESSIVE_SPRING)
                     .start()
             }
             .start()
@@ -1039,5 +1291,15 @@ class CustomizationSheetManager(
                 setViewsEnabledRecursive(view.getChildAt(i), enabled)
             }
         }
+    }
+
+    fun refreshMonetTheme() {
+        val palette = UiMonetThemeManager.getPalette(sideSheetView.context)
+        UiMonetThemeManager.applyLiveToViewHierarchy(sideSheetView, palette)
+        focusedView?.let { refreshColorAdapter(it) }
+        bsFontRecyclerView.adapter?.notifyDataSetChanged()
+        clockStyleAdapter?.notifyDataSetChanged()
+        dateStyleAdapter?.notifyDataSetChanged()
+        mediaStyleAdapter?.notifyDataSetChanged()
     }
 }

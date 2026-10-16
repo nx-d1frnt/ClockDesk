@@ -47,6 +47,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
 
     private val renderer: BackgroundRenderer
     private var transitionAnimator: ValueAnimator? = null
+    @Volatile private var transitionVersion = 0L
+    private var isPaused = false
     private var fadeAnimator: ValueAnimator? = null
     private var lastTopColor: Int? = null
     private var lastBottomColor: Int? = null
@@ -129,11 +131,15 @@ class DynamicBackgroundView @JvmOverloads constructor(
             lastBottomColor = null
         }
         currentBitmap = bitmap
+        val version = ++transitionVersion
+        transitionAnimator?.cancel()
         queueEvent {
+            if (version != transitionVersion) return@queueEvent
             val shouldAnimate = renderer.setNextTexture(bitmap, durationMs <= 0, isGradient, scale, offsetX, offsetY)
 
             post {
-                if (shouldAnimate && durationMs > 0) {
+                if (version != transitionVersion) return@post
+                if (shouldAnimate && durationMs > 0 && !isPaused) {
                     transitionAnimator?.cancel()
                     transitionAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
                         duration = durationMs
@@ -162,14 +168,28 @@ class DynamicBackgroundView @JvmOverloads constructor(
     /**
      * Генерация градиента в Bitmap и плавный переход к нему на GPU.
      */
-    fun transitionToGradient(topColor: Int, bottomColor: Int, durationMs: Long = 1800L) {
-        if (lastTopColor == topColor && lastBottomColor == bottomColor) {
+    fun transitionToGradient(topColor: Int, bottomColor: Int, durationMs: Long = 1800L, force: Boolean = false) {
+        if (!force && lastTopColor == topColor && lastBottomColor == bottomColor) {
+            com.nxd1frnt.clockdesk2.utils.Logger.d("BackgroundFlow") { "DynamicBackgroundView.transitionToGradient: colors unchanged, ignoring" }
             return
         }
+        com.nxd1frnt.clockdesk2.utils.Logger.i("BackgroundFlow") { "DynamicBackgroundView.transitionToGradient: top=#${String.format("%06X", 0xFFFFFF and topColor)}, bottom=#${String.format("%06X", 0xFFFFFF and bottomColor)}, durationMs=$durationMs" }
         lastTopColor = topColor
         lastBottomColor = bottomColor
         val bitmap = createGradientBitmap(topColor, bottomColor, 256, 256)
         transitionToInternal(bitmap, durationMs, true)
+    }
+
+    /**
+     * Smooth transition to a uniform solid color on GPU.
+     */
+    fun transitionToSolidColor(color: Int, durationMs: Long = 1800L, force: Boolean = true) {
+        com.nxd1frnt.clockdesk2.utils.Logger.i("BackgroundFlow") { "DynamicBackgroundView.transitionToSolidColor: color=#${String.format("%06X", 0xFFFFFF and color)}, durationMs=$durationMs, force=$force" }
+        if (force) {
+            lastTopColor = null
+            lastBottomColor = null
+        }
+        transitionToGradient(color, color, durationMs, force)
     }
 
     private fun createGradientBitmap(topColor: Int, bottomColor: Int, width: Int, height: Int): Bitmap {
@@ -365,6 +385,30 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Немедленное обновление параметров турбулентности на лету.
+     */
+    fun updateTurbulenceLiveConfig(
+        gridScale: Float? = null,
+        speedScale: Float? = null,
+        continuous: Boolean? = null
+    ) {
+        queueEvent {
+            renderer.updateTurbulenceLiveConfig(gridScale, speedScale, continuous)
+        }
+    }
+
+    /**
+     * Перезагрузка параметров турбулентности из SharedPreferences на лету.
+     */
+    fun reloadTurbulencePreferences() {
+        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
+        val speedScale = prefs.getInt("graphics_turbulence_speed", 10) / 10f
+        val continuous = prefs.getBoolean("graphics_turbulence_music_continuous", false)
+        updateTurbulenceLiveConfig(gridScale, speedScale, continuous)
+    }
+
     val isTurbulencePlaying: Boolean
         get() = renderer.isTurbulencePlaying()
 
@@ -394,9 +438,19 @@ class DynamicBackgroundView @JvmOverloads constructor(
     }
 
     override fun onPause() {
-        transitionAnimator?.cancel()
+        isPaused = true
+        transitionAnimator?.end()
+        transitionVersion++
+        queueEvent {
+            renderer.setTransitionProgress(1f)
+        }
         fadeAnimator?.cancel()
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isPaused = false
     }
 
     private class Particle {
@@ -2027,6 +2081,26 @@ class DynamicBackgroundView @JvmOverloads constructor(
             }
         }
 
+        fun updateTurbulenceLiveConfig(
+            gridScale: Float? = null,
+            speedScale: Float? = null,
+            continuous: Boolean? = null
+        ) {
+            if (gridScale != null) {
+                turbGridCount = 1.0f * gridScale
+            }
+            if (speedScale != null) {
+                turbSpeedZ = 0.45f * speedScale
+            }
+            if (continuous != null) {
+                turbIsContinuous = continuous
+                if (!continuous && (turbulencePhase == TurbulencePhase.CONTINUOUS || turbulencePhase == TurbulencePhase.TRANSITION_TO_CONTINUOUS)) {
+                    finishTurbulence(750L)
+                }
+            }
+            requestRender()
+        }
+
         fun isTurbulencePlaying(): Boolean = turbulencePhase != TurbulencePhase.IDLE
 
         private fun drawTurbulence(w: Int, h: Int) {
@@ -2305,7 +2379,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             const float TAU = 6.28318530717959;
 
             float idGenerator(vec2 point) {
-                vec2 p = fract(point * vec2(723.123, 236.209));
+                vec2 p = fract(mod(point, 1024.0) * vec2(723.123, 236.209));
                 p += dot(p, p + 17.1512);
                 return fract(p.x * p.y);
             }
@@ -2587,6 +2661,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 
                 float verticalGridPos = 0.4 * time * colSpeed;
                 gridUv.y += verticalGridPos + columnId * 2.6;
+                gridUv.y = mod(gridUv.y, 256.0);
 
                 float cellId = idGenerator(floor(gridUv));
                 vec2 cellUv = fract(gridUv) - 0.5;
@@ -2594,7 +2669,6 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 float intensity2 = idGenerator(floor(vec2(cellId * 8.16, 27.2)));
                 if (intensity2 < 1.0 - rainIntensity) return Rain(0.0, cellUv);
 
-                time += columnId * 7.1203;
                 float scaleVariation  = 1.0 - 0.3 * cellId;
 
                 float horizontalStart = 0.8 * (cellId - 0.5);
@@ -2629,25 +2703,29 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 gridUv.y = 1.0 - gridUv.y;
                 gridUv += vec2(10.0); 
                 
-                float verticalGridPos = 2.4 * time / 5.0;
-                gridUv.y += verticalGridPos;
+                float columnId = idGenerator(floor(gridUv.x));
+                float colSpeed = 0.85 + 0.3 * idGenerator(floor(gridUv.x) + 73.1);
+                float verticalGridPos = (2.4 * time / 5.0) * colSpeed;
+                gridUv.y += verticalGridPos + columnId * 3.4;
+                gridUv.y = mod(gridUv.y, 128.0);
 
                 float cellId = idGenerator(floor(gridUv));
                 vec2 cellUv  = fract(gridUv) - 0.5;
 
-                time += cellId * 7.1203;
+                float wrappedTime = mod(time + cellId * 7.1203, 30.0);
                 uv.y += cellId * 3.83027;
                 float scaleVariation = 1.0 + 0.7 * cellId;
 
                 if (cellId < 1.0 - rainIntensity) return GlassRain(dropPos, cellMainDropMask, trailDropsPos, cellDroppletsMask, cellTrailMask, cellUv);
 
                 float verticalSpeed = TAU / 5.0;
-                float verticalPosVariation = 0.45 * 0.63 * (-1.2 * sin(verticalSpeed * time) - 0.5 * sin(2.0 * verticalSpeed * time) - 0.3333 * sin(3.0 * verticalSpeed * time));
+                float verticalPosVariation = 0.45 * 0.63 * (-1.2 * sin(verticalSpeed * wrappedTime) - 0.5 * sin(2.0 * verticalSpeed * wrappedTime) - 0.3333 * sin(3.0 * verticalSpeed * wrappedTime));
 
                 float wiggleSpeed = 6.0, wiggleAmp = 0.5, horizontalStartAmp = 0.5;
                 float horizontalStart = (cellId - 0.5) * 2.0 * horizontalStartAmp / cellAspectRatio;
+                float wiggleFactor = max(horizontalStartAmp - abs(horizontalStart), 0.15);
                 float horizontalWiggle = wiggle(uv.y, wiggleSpeed);
-                horizontalWiggle = horizontalStart + (horizontalStartAmp - abs(horizontalStart)) * wiggleAmp * horizontalWiggle;
+                horizontalWiggle = horizontalStart + wiggleFactor * wiggleAmp * horizontalWiggle;
 
                 float dropPosUncorrected = cellUv.x - horizontalWiggle;
                 dropPos.x = dropPosUncorrected / cellAspectRatio;
@@ -2657,12 +2735,20 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 
                 cellMainDropMask = 1.0 - smoothstep(0.04, 0.06, length(dropPos));
 
-                trailDropsPos.x = (cellUv.x - horizontalWiggle) / cellAspectRatio;
-                trailDropsPos.y = cellUv.y - verticalGridPos;
-                trailDropsPos.y = (fract(trailDropsPos.y * 4.0) - 0.5) / 4.0;
+                float rawTrailY = cellUv.y - mod(verticalGridPos, 25.0);
+                float trailSubIndex = floor(rawTrailY * 5.0);
+                float subDropId = idGenerator(vec2(cellId * 17.31 + trailSubIndex * 7.19, trailSubIndex));
+                float subDropChance = smoothstep(0.55, 0.68, subDropId);
+
+                float xJitter = (idGenerator(vec2(trailSubIndex * 31.7, cellId * 13.9)) - 0.5) * 0.022 / cellAspectRatio;
+                float yJitter = (idGenerator(vec2(trailSubIndex * 47.3, cellId * 23.1)) - 0.5) * 0.05;
+
+                trailDropsPos.x = (cellUv.x - horizontalWiggle) / cellAspectRatio + xJitter;
+                trailDropsPos.y = (fract(rawTrailY * 5.0) - 0.5) / 5.0 + yJitter;
                 trailDropsPos *= scaleVariation;
                 
-                cellDroppletsMask = 1.0 - smoothstep(0.02, 0.03, length(trailDropsPos));
+                float dropRadius = 0.012 + 0.012 * subDropId;
+                cellDroppletsMask = (1.0 - smoothstep(dropRadius * 0.7, dropRadius, length(trailDropsPos))) * subDropChance;
                 
                 float verticalFading = 1.2 * (1.0 - smoothstep(verticalPosVariation, 0.5, cellUv.y));
                 cellDroppletsMask *= verticalFading;
@@ -2688,14 +2774,19 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 if (cellId < 0.8) return vec3(0.0);
 
                 vec2 cellUv = fract(gridUv) - 0.5;
+                vec2 dropOffset = vec2(
+                    idGenerator(floor(gridUv) + vec2(7.13, 13.91)) - 0.5,
+                    idGenerator(floor(gridUv) + vec2(19.37, 41.73)) - 0.5
+                ) * 0.7;
+                vec2 centeredUv = cellUv - dropOffset;
                 float delay = 3.5173, duration = 8.2;
-                float t = time + 100.0 * cellId;
+                float t = mod(time + 100.0 * cellId, 3600.0);
                 float circletime = floor(t / (duration + delay));
-                float delayOffset = idGenerator(floor(gridUv) + vec2(circletime, 43.14 * cellId));
+                float delayOffset = idGenerator(floor(gridUv) + vec2(mod(circletime, 100.0), 43.14 * cellId));
                 float normalizedTime = map(mod(t, duration + delay) - delay * delayOffset, 0.0, duration, 0.0, 1.0);
                 normalizedTime *= normalizedTime;
 
-                vec2 pos = cellUv * (1.5 - 0.5 * cellId + normalizedTime * 50.0);
+                vec2 pos = centeredUv * (1.5 - 0.5 * cellId + normalizedTime * 50.0);
                 
                 float mask = (1.0 - smoothstep(0.2, 0.3, length(pos))) * (1.0 - smoothstep(0.06, 0.2, normalizedTime)) * smoothstep(0.0, 0.45, intensity);
 

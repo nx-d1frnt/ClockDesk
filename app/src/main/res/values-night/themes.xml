@@ -28,12 +28,24 @@
         <item name="colorSurfaceVariant">@color/md_theme_surfaceVariant</item>
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorOutline">@color/md_theme_outline</item>
+
+        <!-- Surface Containers for Material 3 Expressive UI -->
+        <item name="colorSurfaceContainerLowest">@color/md_theme_surfaceContainerLowest</item>
+        <item name="colorSurfaceContainerLow">@color/md_theme_surfaceContainerLow</item>
+        <item name="colorSurfaceContainer">@color/md_theme_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/md_theme_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item>
         
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item> 
+        <item name="android:windowSharedElementsUseOverlay">false</item>
+
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
         <item name="materialButtonToggleGroupStyle">@style/Theme.ClockDesk.Button.ToggleGroup</item>
+        <item name="selectableItemBackgroundBorderless">?android:attr/selectableItemBackgroundBorderless</item>
+        <item name="selectableItemBackground">?android:attr/selectableItemBackground</item>
     </style>
 
     <style name="Theme.ClockDesk.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
@@ -46,6 +58,10 @@
         <item name="materialButtonOutlinedStyle">@style/Theme.ClockDesk.Button.Outlined</item>
     </style>
 
+    <style name="Theme.ClockDesk" parent="Base.Theme.ClockDesk" />
+
+    <style name="Theme.ClockDesk.Settings" parent="Theme.ClockDesk" />
+
     <style name="ClockDesk.Dialog.Theme" parent="Theme.Material3.DayNight.Dialog">
         <item name="dialogCornerRadius">28dp</item>
         <item name="colorSurface">?attr/colorSurfaceContainerLowest</item>
@@ -55,5 +71,18 @@
     <style name="ClockDesk.Type.Headline" parent="TextAppearance.Material3.HeadlineSmall">
         <item name="android:fontFamily">@font/googlesansflex</item>
         <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <style name="ClockDesk.Shape.Circle" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerSize">50%</item>
+        <item name="cornerFamily">rounded</item>
+    </style>
+
+    <style name="ClockDesk.Shape.RoundedSmall" parent="">
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <style name="ClockDesk.Shape.RoundedMedium" parent="">
+        <item name="cornerSize">20dp</item>
     </style>
 </resources>

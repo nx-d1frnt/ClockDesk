@@ -6,28 +6,44 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
-    android:layout_marginVertical="6dp"
-    app:cardCornerRadius="16dp"
+    android:layout_marginBottom="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
     app:cardElevation="0dp"
     app:strokeWidth="0dp"
-    app:rippleColor="?attr/colorControlHighlight"
-    android:clickable="true"
-    android:focusable="true">
+    app:cardPreventCornerOverlap="false"
+    app:rippleColor="?attr/colorControlHighlight">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp"
+        android:minHeight="72dp"
         android:gravity="center_vertical">
 
-        <ImageView
-            android:id="@+id/category_icon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+        <!-- Circular Icon Badge -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/icon_badge"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:layout_marginEnd="16dp"
-            android:contentDescription="@null"
-            app:tint="?attr/colorPrimary" />
+            app:cardCornerRadius="22dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+            <ImageView
+                android:id="@+id/category_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                app:tint="?attr/colorOnSurfaceVariant" />
+
+        </com.google.android.material.card.MaterialCardView>
 
         <LinearLayout
             android:layout_width="0dp"
@@ -39,7 +55,7 @@
                 android:id="@+id/category_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="16sp"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnSurface" />
 
@@ -47,9 +63,9 @@
                 android:id="@+id/category_subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:layout_marginTop="4dp" />
+                android:layout_marginTop="2dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
         </LinearLayout>
 

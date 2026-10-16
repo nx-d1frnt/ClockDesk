@@ -86,6 +86,166 @@ class SmartChipManager(
     private var isFirstLoad = true
     private val springInterpolator = PathInterpolator(0.2f, 1.0f, 0.3f, 1.0f)
 
+    var isStackExpanded: Boolean = false
+        private set
+
+    private val autoCollapseHandler = Handler(Looper.getMainLooper())
+    private val autoCollapseRunnable = Runnable {
+        if (isStackExpanded) {
+            collapseStack()
+        }
+    }
+
+    private var activeTouchedChip: View? = null
+
+    fun expandStack() {
+        if (isStackExpanded) return
+        isStackExpanded = true
+        autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+        autoCollapseHandler.postDelayed(autoCollapseRunnable, 8000L)
+        sortAndRedrawChips(contentChanged = true)
+    }
+
+    fun collapseStack() {
+        if (!isStackExpanded) return
+        isStackExpanded = false
+        activeTouchedChip = null
+        autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+        (chipContainer.parent as? android.widget.ScrollView)?.smoothScrollTo(0, 0)
+        sortAndRedrawChips(contentChanged = true)
+    }
+
+    fun resetAutoCollapseTimer() {
+        if (isStackExpanded) {
+            autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+            autoCollapseHandler.postDelayed(autoCollapseRunnable, 8000L)
+        }
+    }
+
+    fun setStackOverflowEnabled(enabled: Boolean) {
+        sharedPreferences.edit().putBoolean("smart_chips_stack_overflow", enabled).apply()
+        if (!enabled && isStackExpanded) {
+            isStackExpanded = false
+            activeTouchedChip = null
+            autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+        }
+        onPreferencesChanged()
+    }
+
+    fun handleExpandedStackTouch(ev: MotionEvent): Boolean {
+        if (!isStackExpanded || isEditMode) {
+            activeTouchedChip = null
+            return false
+        }
+
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val hitChip = findHitChip(ev.rawX, ev.rawY)
+                if (hitChip != null) {
+                    activeTouchedChip = hitChip
+                    dispatchToChip(hitChip, ev)
+                    return true
+                } else {
+                    activeTouchedChip = null
+                    collapseStack()
+                    return false
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val target = activeTouchedChip
+                if (target != null) {
+                    dispatchToChip(target, ev)
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                val target = activeTouchedChip
+                activeTouchedChip = null
+                if (target != null) {
+                    dispatchToChip(target, ev)
+                    return true
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                val target = activeTouchedChip
+                activeTouchedChip = null
+                if (target != null) {
+                    dispatchToChip(target, ev)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun findHitChip(rawX: Float, rawY: Float): View? {
+        val visibleChips = getOrderedVisibleChips()
+        if (visibleChips.isEmpty()) return null
+
+        val loc = IntArray(2)
+        val density = context.resources.displayMetrics.density
+        val gapSlopPx = (6 * density).toInt()
+
+        var bestChip: View? = null
+        var bestDistance = Float.MAX_VALUE
+
+        // First pass: exact hit inside view bounds
+        for (chipInfo in visibleChips) {
+            val v = chipInfo.view
+            if (v.visibility != View.VISIBLE || !ViewCompat.isAttachedToWindow(v) || v.alpha < 0.1f) continue
+            v.getLocationOnScreen(loc)
+            val left = loc[0].toFloat()
+            val top = loc[1].toFloat()
+            val right = left + v.width
+            val bottom = top + v.height
+
+            if (rawX in left..right && rawY in top..bottom) {
+                return v
+            }
+
+            // Candidate for vertical gap match if X is within bounds and Y is within gapSlop
+            if (rawX in left..right && rawY >= top - gapSlopPx && rawY <= bottom + gapSlopPx) {
+                val centerY = (top + bottom) / 2f
+                val dist = kotlin.math.abs(rawY - centerY)
+                if (dist < bestDistance) {
+                    bestDistance = dist
+                    bestChip = v
+                }
+            }
+        }
+
+        return bestChip
+    }
+
+    private fun dispatchToChip(target: View, ev: MotionEvent): Boolean {
+        if (!ViewCompat.isAttachedToWindow(target)) return false
+        val loc = IntArray(2)
+        target.getLocationOnScreen(loc)
+        val density = context.resources.displayMetrics.density
+        val gapSlopPx = (6 * density).toInt()
+
+        val rawLocalX = ev.rawX - loc[0].toFloat()
+        val rawLocalY = ev.rawY - loc[1].toFloat()
+
+        val localX = if (rawLocalX in -gapSlopPx.toFloat()..(target.width + gapSlopPx).toFloat()) {
+            rawLocalX.coerceIn(0f, target.width.toFloat().coerceAtLeast(1f))
+        } else {
+            rawLocalX
+        }
+
+        val localY = if (rawLocalY in -gapSlopPx.toFloat()..(target.height + gapSlopPx).toFloat()) {
+            rawLocalY.coerceIn(0f, target.height.toFloat().coerceAtLeast(1f))
+        } else {
+            rawLocalY
+        }
+
+        val childEvent = MotionEvent.obtain(ev)
+        childEvent.setLocation(localX, localY)
+        val handled = target.dispatchTouchEvent(childEvent)
+        childEvent.recycle()
+        return handled
+    }
+
 //    private val periodicUpdateRunnable = object : Runnable {
 //        override fun run() {
 //            updateAllChips()
@@ -95,6 +255,9 @@ class SmartChipManager(
 
     private val internalPlugins: List<ISmartChip> = listOf(
         BatteryAlertPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.CompanionBatteryChipPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.DeviceConnectionNoticeChipPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.NotificationSmartChipPlugin(context),
         UpdatePlugin(context),
         BackgroundProgressPlugin(context),
         AlarmChipPlugin(context),
@@ -307,14 +470,19 @@ class SmartChipManager(
     }
 
     init {
+        chipContainer.viewTreeObserver.addOnScrollChangedListener {
+            resetAllChipsScale()
+        }
         internalPlugins.forEach { plugin ->
-            val view = plugin.createView(context).apply {
-                visibility = View.GONE
-                tag = plugin.preferenceKey
+            if (plugin !is IMultiSmartChip) {
+                val view = plugin.createView(context).apply {
+                    visibility = View.GONE
+                    tag = plugin.preferenceKey
+                }
+                allChips.add(ChipInfo(plugin.preferenceKey, plugin.preferenceKey, view))
             }
-            allChips.add(ChipInfo(plugin.preferenceKey, plugin.preferenceKey, view))
             plugin.setOnStateChangeListener {
-                updateAllChips()
+                updateSinglePlugin(plugin)
             }
         }
         discoverExternalPlugins()
@@ -339,6 +507,12 @@ class SmartChipManager(
         timeoutRunnables.clear()
         pluginTimeoutCounts.clear()
 
+        autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+        if (isStackExpanded) {
+            isStackExpanded = false
+        }
+        activeTouchedChip = null
+
         unregisterReceiver()
         Logger.d("SmartChipManager") { "Stopped listening. App is sleeping." }
     }
@@ -346,6 +520,7 @@ class SmartChipManager(
     // Вызывается при полном уничтожении экрана (защита от утечек)
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
+        activeTouchedChip = null
         unregisterReceiver() // На всякий случай
     }
 
@@ -378,16 +553,20 @@ class SmartChipManager(
 
         // Обновляем внутренние плагины (они читают статус мгновенно)
         internalPlugins.forEach { plugin ->
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
-
-            if (!isEnabled) {
-                if (chipInfo.isVisible) isContentChanged = true
-                chipInfo.isVisible = false
+            if (plugin is IMultiSmartChip) {
+                if (updateMultiChipPlugin(plugin)) isContentChanged = true
             } else {
-                val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
-                if (chipInfo.isVisible != newIsVisible) isContentChanged = true
-                chipInfo.isVisible = newIsVisible
+                val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
+                val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
+
+                if (!isEnabled) {
+                    if (chipInfo.isVisible) isContentChanged = true
+                    chipInfo.isVisible = false
+                } else {
+                    val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+                    if (chipInfo.isVisible != newIsVisible) isContentChanged = true
+                    chipInfo.isVisible = newIsVisible
+                }
             }
         }
 
@@ -571,45 +750,7 @@ class SmartChipManager(
     }
 
     private fun animateTextChange(textView: TextView, newText: String) {
-        if (textView.text.toString() == newText) return
-
-        textView.animate().cancel()
-
-        if (textView.text.isNullOrEmpty() || textView.visibility != View.VISIBLE) {
-            textView.text = newText
-            textView.isSelected = true
-            return
-        }
-
-        val container = chipContainer as? ViewGroup
-
-        textView.animate()
-            .alpha(0f)
-            .setDuration(100)
-            .setInterpolator(FastOutSlowInInterpolator())
-            .withEndAction {
-                if (container != null) {
-                    val boundsTransition = TransitionSet().apply {
-                        ordering = TransitionSet.ORDERING_TOGETHER
-                        duration = 350L
-                        interpolator = springInterpolator
-                        addTransition(ChangeBounds().apply {
-                            resizeClip = false
-                        })
-                    }
-                    TransitionManager.beginDelayedTransition(container, boundsTransition)
-                }
-
-                textView.text = newText
-                textView.isSelected = true
-
-                textView.animate()
-                    .alpha(1f)
-                    .setDuration(150)
-                    .setInterpolator(FastOutSlowInInterpolator())
-                    .start()
-            }
-            .start()
+        textView.setTextWithFade(newText)
     }
 
     private fun updateExternalChipView(view: View, pkg: String, text: String, iconName: String): Boolean {
@@ -621,10 +762,8 @@ class SmartChipManager(
             if (iconId != 0) {
                 iconView.setImageDrawable(ResourcesCompat.getDrawable(pluginRes, iconId, null))
 
-                if (textView.text.toString() != text) {
-                    animateTextChange(textView, text)
-                } else {
-                    textView.isSelected = true
+                if (textView != null) {
+                    textView.setTextWithFade(text)
                 }
 
                 return true
@@ -635,45 +774,140 @@ class SmartChipManager(
         return false
     }
 
-    fun updateAllChips() {
+    private fun updateMultiChipPlugin(plugin: IMultiSmartChip): Boolean {
         var isContentChanged = false
+        val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
 
-        val container = chipContainer as? ViewGroup
-        if (container != null) {
-            val boundsTransition = TransitionSet().apply {
-                ordering = TransitionSet.ORDERING_TOGETHER
-                duration = 350L
-                interpolator = springInterpolator
-                addTransition(ChangeBounds().apply {
-                    resizeClip = false
-                })
+        if (!isEnabled) {
+            allChips.filter { it.channelId == plugin.preferenceKey }.forEach { chipInfo ->
+                if (chipInfo.isVisible) isContentChanged = true
+                chipInfo.isVisible = false
             }
-            TransitionManager.beginDelayedTransition(container, boundsTransition)
+            return isContentChanged
         }
+
+        val items = plugin.getChips(sharedPreferences)
+        val activeIds = items.filter { it.isVisible }.map { it.chipId }.toSet()
+
+        // Hide any chips that are no longer active
+        allChips.filter { it.channelId == plugin.preferenceKey }.forEach { chipInfo ->
+            if (chipInfo.id !in activeIds) {
+                if (chipInfo.isVisible) isContentChanged = true
+                chipInfo.isVisible = false
+            }
+        }
+
+        // Add or update active chips
+        items.forEach { item ->
+            var chipInfo = allChips.find { it.id == item.chipId }
+            if (chipInfo == null && item.isVisible) {
+                val view = LayoutInflater.from(context)
+                    .inflate(R.layout.smart_chip_layout, chipContainer, false)
+                    .apply {
+                        visibility = View.GONE
+                        tag = item.chipId
+                    }
+                chipInfo = ChipInfo(item.chipId, plugin.preferenceKey, view)
+                allChips.add(chipInfo)
+                isContentChanged = true
+            }
+
+            if (chipInfo != null) {
+                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                val iconView = chipInfo.view.findViewById<ImageView>(R.id.chip_icon)
+                val oldText = textView?.text?.toString()
+
+                if (item.iconRes != null && iconView != null && iconView.tag != item.iconRes) {
+                    iconView.setImageResource(item.iconRes)
+                    iconView.tag = item.iconRes
+                }
+                if (textView != null) {
+                    textView.setTextWithFade(item.text)
+                }
+
+                if (chipInfo.isVisible != item.isVisible) isContentChanged = true
+                if (item.isVisible && oldText != item.text) isContentChanged = true
+                chipInfo.isVisible = item.isVisible
+                chipInfo.currentText = item.text
+            }
+        }
+
+        val allPluginChipIds = items.map { it.chipId }.toSet()
+        val toRemove = allChips.filter { it.channelId == plugin.preferenceKey && it.id !in allPluginChipIds && !it.isVisible }
+        toRemove.forEach { deadChip ->
+            (deadChip.view.parent as? ViewGroup)?.removeView(deadChip.view)
+        }
+        allChips.removeAll(toRemove.toSet())
+
+        return isContentChanged
+    }
+
+    fun updateSinglePlugin(plugin: ISmartChip) {
+        if (plugin is IMultiSmartChip) {
+            val isContentChanged = updateMultiChipPlugin(plugin)
+            if (isContentChanged) {
+                sortAndRedrawChips(contentChanged = true)
+            }
+            return
+        }
+
+        val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return
+        val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
+
+        if (!isEnabled) {
+            if (chipInfo.isVisible) {
+                chipInfo.isVisible = false
+                sortAndRedrawChips(contentChanged = true)
+            }
+            return
+        }
+
+        val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+        val oldText = textView?.text?.toString() ?: ""
+        val wasVisible = chipInfo.isVisible
+
+        val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+        val newText = textView?.text?.toString() ?: ""
+
+        if (wasVisible != newIsVisible) {
+            chipInfo.isVisible = newIsVisible
+            chipInfo.currentText = newText
+            sortAndRedrawChips(contentChanged = true)
+        } else if (newIsVisible && oldText != newText) {
+            chipInfo.currentText = newText
+        }
+    }
+
+    fun updateAllChips(forceContentChanged: Boolean = false) {
+        var isContentChanged = forceContentChanged
 
         // Internal chips
         internalPlugins.forEach { plugin ->
-            val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-            val isSystemChip = plugin.preferenceKey == "system_bg_progress"
-            val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
-            if (!isEnabled) {
-                if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
-                chipInfo.isVisible = false
+            if (plugin is IMultiSmartChip) {
+                if (updateMultiChipPlugin(plugin)) isContentChanged = true
             } else {
-                val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
-                val oldText = textView.text.toString()
+                val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
+                val isSystemChip = plugin.preferenceKey == "system_bg_progress"
+                val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
+                if (!isEnabled) {
+                    if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
+                    chipInfo.isVisible = false
+                } else {
+                    val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
+                    val oldText = textView.text.toString()
 
-                val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
-                
-                val newText = textView.text.toString()
+                    val newIsVisible = plugin.update(chipInfo.view, sharedPreferences)
+                    
+                    val newText = textView.text.toString()
 
-                if (chipInfo.isVisible != newIsVisible) {
-                    isContentChanged = true
-                } else if (newIsVisible && oldText != newText) {
-                    isContentChanged = true
+                    if (chipInfo.isVisible != newIsVisible) {
+                        isContentChanged = true
+                    } else if (newIsVisible && oldText != newText) {
+                        isContentChanged = true
+                    }
+                    
+                    chipInfo.isVisible = newIsVisible
                 }
-                
-                chipInfo.isVisible = newIsVisible
             }
         }
 
@@ -716,13 +950,11 @@ class SmartChipManager(
         handler.post(redrawRunnable)
     }
 
-    private fun executeSortAndRedrawChips(contentChanged: Boolean = false) {
-        // Читаем порядок, заданный пользователем в настройках
-        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_battery_alert,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
+    private fun getOrderedVisibleChips(): List<ChipInfo> {
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
         val orderList = orderString.split(",").map { it.trim() }
 
-        // Фильтруем видимые чипы и сортируем их по индексу в orderList
-        val visibleChips = allChips
+        return allChips
             .filter { chipInfo ->
                 val isChannelEnabled = sharedPreferences.getBoolean(chipInfo.channelId, true)
                 chipInfo.isVisible && isChannelEnabled
@@ -731,14 +963,256 @@ class SmartChipManager(
                 val index = orderList.indexOf(chipInfo.channelId)
                 if (index != -1) index else Int.MAX_VALUE
             }
+    }
 
-        val container = chipContainer as? ConstraintLayout
-            ?: throw IllegalStateException("chipContainer must be ConstraintLayout")
+    private fun getUsableHeight(): Int {
+        val parentView = chipContainer.parent as? View
+        val availableHeight = if (parentView != null && parentView.height > 0) {
+            parentView.height - parentView.paddingTop - parentView.paddingBottom
+        } else {
+            (165 * context.resources.displayMetrics.density).toInt()
+        }
+        return (availableHeight - chipContainer.paddingTop - chipContainer.paddingBottom).coerceAtLeast(0)
+    }
 
-        val currentTags = (0 until container.childCount).map { container.getChildAt(it).tag }
-        val newTags = visibleChips.map { it.id }
+    private fun getChipHeight(view: View): Int {
+        if (view.height > 0) return view.height
+        if (view.measuredHeight > 0) return view.measuredHeight
+        val widthSpec = View.MeasureSpec.makeMeasureSpec(
+            if (chipContainer.width > 0) chipContainer.width else (165 * context.resources.displayMetrics.density).toInt(),
+            View.MeasureSpec.AT_MOST
+        )
+        val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        view.measure(widthSpec, heightSpec)
+        return if (view.measuredHeight > 0) view.measuredHeight else (36 * context.resources.displayMetrics.density).toInt()
+    }
 
-        val transition = TransitionSet().apply {
+    private fun calculateStackAnchor(visibleChips: List<ChipInfo>, usableHeight: Int): Int {
+        if (visibleChips.size <= 1) return -1
+        val chipMargin = (6 * context.resources.displayMetrics.density).toInt()
+        val peekReserve = (16 * context.resources.displayMetrics.density).toInt()
+
+        var totalHeight = 0
+        visibleChips.forEachIndexed { index, chipInfo ->
+            val h = getChipHeight(chipInfo.view)
+            totalHeight += h
+            if (index < visibleChips.size - 1) totalHeight += chipMargin
+        }
+
+        if (totalHeight <= usableHeight) {
+            return -1
+        }
+
+        var accumulatedHeight = 0
+        var anchorIndex = 0
+        for (i in visibleChips.indices) {
+            val h = getChipHeight(visibleChips[i].view)
+            val nextTotal = accumulatedHeight + h + peekReserve
+            if (nextTotal <= usableHeight || i == 0) {
+                anchorIndex = i
+                accumulatedHeight += h + chipMargin
+            } else {
+                break
+            }
+        }
+        return anchorIndex.coerceAtMost(visibleChips.size - 2)
+    }
+
+    private fun applyLayoutAndTransforms(container: ConstraintLayout, visibleChips: List<ChipInfo>) {
+        val isStackOverflowEnabled = sharedPreferences.getBoolean("smart_chips_stack_overflow", false)
+        val usableHeight = getUsableHeight()
+        val anchorIndex = if (isStackOverflowEnabled) calculateStackAnchor(visibleChips, usableHeight) else -1
+        val hasOverflow = anchorIndex != -1
+
+        if (!hasOverflow && isStackExpanded) {
+            isStackExpanded = false
+            autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+        }
+
+        val density = context.resources.displayMetrics.density
+        val spacingPx = (6 * density).toInt()
+
+        val constraintSet = ConstraintSet().apply {
+            clone(container)
+            if (hasOverflow && !isStackExpanded) {
+                for (i in 0 until anchorIndex) {
+                    val id = visibleChips[i].view.id
+                    constrainWidth(id, ConstraintSet.WRAP_CONTENT)
+                    constrainHeight(id, ConstraintSet.WRAP_CONTENT)
+                    constrainedWidth(id, true)
+                    setMargin(id, ConstraintSet.BOTTOM, 0)
+                    connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
+                    connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                    setHorizontalBias(id, 1.0f)
+                    if (i == 0) {
+                        connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                    } else {
+                        val prevId = visibleChips[i - 1].view.id
+                        connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
+                    }
+                }
+
+                val anchorId = visibleChips[anchorIndex].view.id
+                constrainWidth(anchorId, ConstraintSet.WRAP_CONTENT)
+                constrainHeight(anchorId, ConstraintSet.WRAP_CONTENT)
+                constrainedWidth(anchorId, true)
+                setMargin(anchorId, ConstraintSet.BOTTOM, 0)
+                connect(anchorId, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
+                connect(anchorId, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                setHorizontalBias(anchorId, 1.0f)
+                if (anchorIndex == 0) {
+                    connect(anchorId, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                } else {
+                    val prevId = visibleChips[anchorIndex - 1].view.id
+                    connect(anchorId, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
+                }
+
+                for (i in (anchorIndex + 1) until visibleChips.size) {
+                    val id = visibleChips[i].view.id
+                    constrainWidth(id, ConstraintSet.WRAP_CONTENT)
+                    constrainHeight(id, ConstraintSet.WRAP_CONTENT)
+                    constrainedWidth(id, true)
+                    setMargin(id, ConstraintSet.BOTTOM, 0)
+                    connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
+                    connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                    setHorizontalBias(id, 1.0f)
+                    connect(id, ConstraintSet.TOP, anchorId, ConstraintSet.TOP)
+                }
+            } else {
+                visibleChips.forEachIndexed { index, chipInfo ->
+                    val id = chipInfo.view.id
+                    constrainWidth(id, ConstraintSet.WRAP_CONTENT)
+                    constrainHeight(id, ConstraintSet.WRAP_CONTENT)
+                    constrainedWidth(id, true)
+                    setMargin(id, ConstraintSet.BOTTOM, 0)
+                    connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
+                    connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+                    setHorizontalBias(id, 1.0f)
+                    if (index == 0) {
+                        connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                    } else {
+                        val prevId = visibleChips[index - 1].view.id
+                        connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
+                    }
+                }
+            }
+        }
+        constraintSet.applyTo(container)
+        if (hasOverflow && !isStackExpanded) {
+            for (i in 0 until anchorIndex) {
+                val v = visibleChips[i].view
+                val targetAlpha = (v.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
+                v.visibility = View.VISIBLE
+                v.findViewById<TextView>(R.id.chip_stack_badge)?.visibility = View.GONE
+                ViewCompat.setTranslationZ(v, 0f)
+                if (v.translationY != 0f || v.scaleX != 1.0f || v.scaleY != 1.0f || v.alpha != targetAlpha) {
+                    v.animate()
+                        .translationY(0f)
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .alpha(targetAlpha)
+                        .setDuration(350L)
+                        .setInterpolator(springInterpolator)
+                        .start()
+                }
+            }
+
+            val anchorView = visibleChips[anchorIndex].view
+            val anchorAlpha = (anchorView.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
+            anchorView.visibility = View.VISIBLE
+            ViewCompat.setTranslationZ(anchorView, 12f)
+            if (anchorView.translationY != 0f || anchorView.scaleX != 1.0f || anchorView.scaleY != 1.0f || anchorView.alpha != anchorAlpha) {
+                anchorView.animate()
+                    .translationY(0f)
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .alpha(anchorAlpha)
+                    .setDuration(350L)
+                    .setInterpolator(springInterpolator)
+                    .start()
+            }
+
+            val overflowCount = visibleChips.size - 1 - anchorIndex
+            val anchorBadge = anchorView.findViewById<TextView>(R.id.chip_stack_badge)
+            if (anchorBadge != null && overflowCount > 0) {
+                if (anchorBadge.visibility != View.VISIBLE) {
+                    fontManager.applyStyleToSmartChip(anchorView)
+                }
+                anchorBadge.text = String.format(context.getString(R.string.chip_stack_badge_format), overflowCount)
+                anchorBadge.visibility = View.VISIBLE
+            }
+
+            val overflowChips = visibleChips.subList(anchorIndex + 1, visibleChips.size)
+            overflowChips.forEachIndexed { i, chipInfo ->
+                val v = chipInfo.view
+                val targetAlpha = (v.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
+                v.findViewById<TextView>(R.id.chip_stack_badge)?.visibility = View.GONE
+                when (i) {
+                    0 -> {
+                        v.visibility = View.VISIBLE
+                        ViewCompat.setTranslationZ(v, 8f)
+                        v.animate()
+                            .translationY(8f * density)
+                            .scaleX(0.94f)
+                            .scaleY(0.94f)
+                            .alpha(targetAlpha * 0.85f)
+                            .setDuration(350L)
+                            .setInterpolator(springInterpolator)
+                            .start()
+                    }
+                    1 -> {
+                        v.visibility = View.VISIBLE
+                        ViewCompat.setTranslationZ(v, 4f)
+                        v.animate()
+                            .translationY(16f * density)
+                            .scaleX(0.88f)
+                            .scaleY(0.88f)
+                            .alpha(targetAlpha * 0.65f)
+                            .setDuration(350L)
+                            .setInterpolator(springInterpolator)
+                            .start()
+                    }
+                    else -> {
+                        ViewCompat.setTranslationZ(v, 0f)
+                        v.animate()
+                            .translationY(16f * density)
+                            .scaleX(0.82f)
+                            .scaleY(0.82f)
+                            .alpha(0f)
+                            .setDuration(350L)
+                            .setInterpolator(springInterpolator)
+                            .withEndAction {
+                                if (!isStackExpanded) v.visibility = View.INVISIBLE
+                            }
+                            .start()
+                    }
+                }
+            }
+        } else {
+            visibleChips.forEach { chipInfo ->
+                val v = chipInfo.view
+                val targetAlpha = (v.getTag(R.id.tag_target_alpha) as? Float) ?: 1.0f
+                v.visibility = View.VISIBLE
+                ViewCompat.setTranslationZ(v, 0f)
+                v.findViewById<TextView>(R.id.chip_stack_badge)?.visibility = View.GONE
+                if (v.translationY != 0f || v.scaleX != 1.0f || v.scaleY != 1.0f || v.alpha != targetAlpha) {
+                    v.animate()
+                        .translationY(0f)
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .alpha(targetAlpha)
+                        .setDuration(350L)
+                        .setInterpolator(springInterpolator)
+                        .start()
+                }
+            }
+        }
+    }
+
+    private var currentActiveChipIds: List<String> = emptyList()
+
+    private fun createChipTransition(): TransitionSet {
+        return TransitionSet().apply {
             ordering = TransitionSet.ORDERING_TOGETHER
             duration = 350L
             interpolator = springInterpolator
@@ -748,20 +1222,33 @@ class SmartChipManager(
             })
             addTransition(ScaleAndFade())
         }
+    }
 
-        if (currentTags == newTags) {
+    private fun executeSortAndRedrawChips(contentChanged: Boolean = false) {
+        val visibleChips = getOrderedVisibleChips()
+
+        val container = chipContainer as? ConstraintLayout
+            ?: throw IllegalStateException("chipContainer must be ConstraintLayout")
+
+        val newTags = visibleChips.map { it.id }
+        val isStructureSame = currentActiveChipIds == newTags
+
+        if (isStructureSame) {
             visibleChips.forEach { chipInfo ->
                 val textView = chipInfo.view.findViewById<TextView>(R.id.chip_text)
-                if (!textView.isSelected) textView.isSelected = true
+                if (textView != null && !textView.isSelected) textView.isSelected = true
             }
-            
+
             if (contentChanged) {
-                TransitionManager.beginDelayedTransition(container, transition)
+                TransitionManager.beginDelayedTransition(container, createChipTransition())
+                applyLayoutAndTransforms(container, visibleChips)
             }
             return
         }
 
-        TransitionManager.beginDelayedTransition(container, transition)
+        currentActiveChipIds = newTags
+
+        TransitionManager.beginDelayedTransition(container, createChipTransition())
 
         val visibleViews = visibleChips.map { it.view }.toSet()
         val childrenToRemove = mutableListOf<View>()
@@ -780,44 +1267,26 @@ class SmartChipManager(
             if (v.id == View.NO_ID) {
                 v.id = ViewCompat.generateViewId()
             }
-            if (v.parent != container) {
+            val isNewlyAttached = v.parent != container
+            if (isNewlyAttached) {
                 (v.parent as? ViewGroup)?.removeView(v)
                 v.visibility = View.VISIBLE
                 v.tag = chipInfo.id
                 container.addView(v)
+                setupChipTouchFeedback(v)
+                fontManager.applyStyleToSmartChip(v)
             } else {
                 v.visibility = View.VISIBLE
-                if (!isEditMode && v.getTag(R.id.tag_pulse_animator) == null) {
-                    v.scaleX = 1.0f
-                    v.scaleY = 1.0f
-                }
             }
-
-            setupChipTouchFeedback(v)
 
             val textView = v.findViewById<TextView>(R.id.chip_text)
-            textView?.isSelected = true
-
-            fontManager.applyStyleToSmartChip(v)
-        }
-        Logger.d("SmartChipManager"){"Chips updated"}
-
-        val constraintSet = ConstraintSet().apply {
-            clone(container)
-            visibleChips.forEachIndexed { index, chipInfo ->
-                val id = chipInfo.view.id
-                constrainWidth(id, ConstraintSet.WRAP_CONTENT)
-                constrainHeight(id, ConstraintSet.WRAP_CONTENT)
-                connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
-                if (index == 0) {
-                    connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
-                } else {
-                    val prevId = visibleChips[index - 1].view.id
-                    connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, 8)
-                }
+            if (textView != null && !textView.isSelected) {
+                textView.isSelected = true
             }
         }
-        constraintSet.applyTo(container)
+        Logger.d("SmartChipManager") { "Chips updated" }
+
+        applyLayoutAndTransforms(container, visibleChips)
         updateChipsClickability()
 
         if (isFirstLoad && visibleChips.isNotEmpty()) {
@@ -826,25 +1295,126 @@ class SmartChipManager(
         }
     }
 
+    private fun resetAllChipsScale() {
+        for (i in 0 until chipContainer.childCount) {
+            val child = chipContainer.getChildAt(i)
+            if (child.scaleX != 1.0f || child.scaleY != 1.0f) {
+                child.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(150)
+                    .setInterpolator(OvershootInterpolator(1.4f))
+                    .start()
+            }
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun setupChipTouchFeedback(view: View) {
         if (view.getTag(R.id.tag_touch_listener_set) == true) return
         view.setTag(R.id.tag_touch_listener_set, true)
 
+        view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {
+                val isStackOverflowEnabled = sharedPreferences.getBoolean("smart_chips_stack_overflow", false)
+                if (!isStackOverflowEnabled && (v.scaleX != 1.0f || v.scaleY != 1.0f)) {
+                    v.scaleX = 1.0f
+                    v.scaleY = 1.0f
+                }
+            }
+
+            override fun onViewDetachedFromWindow(v: View) {
+                v.animate().cancel()
+                v.scaleX = 1.0f
+                v.scaleY = 1.0f
+                v.translationY = 0f
+            }
+        })
+
         view.setOnTouchListener { v, event ->
-            when (event.action) {
+            if (!v.isClickable && !isEditMode) {
+                return@setOnTouchListener false
+            }
+
+            val isStackOverflowEnabled = sharedPreferences.getBoolean("smart_chips_stack_overflow", false)
+            val usableHeight = getUsableHeight()
+            val currentVisibleChips = getOrderedVisibleChips()
+            val anchorIndex = if (isStackOverflowEnabled) calculateStackAnchor(currentVisibleChips, usableHeight) else -1
+            val hasOverflow = anchorIndex != -1
+            val chipIndex = currentVisibleChips.indexOfFirst { it.view == v }
+            val isStackedChild = hasOverflow && chipIndex >= anchorIndex
+
+            when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    if (isStackExpanded) {
+                        resetAutoCollapseTimer()
+                    }
+                    val targetPressScale = if (isStackedChild && !isStackExpanded) 0.90f else 0.95f
                     v.animate()
-                        .scaleX(0.95f)
-                        .scaleY(0.95f)
+                        .scaleX(targetPressScale)
+                        .scaleY(targetPressScale)
                         .setDuration(120)
                         .setInterpolator(FastOutSlowInInterpolator())
                         .start()
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_MOVE -> {
+                    val x = event.x
+                    val y = event.y
+                    val isInside = x >= 0 && x <= v.width && y >= 0 && y <= v.height
+                    if (!isInside) {
+                        val baseScale = if (isStackedChild && !isStackExpanded) {
+                            when (chipIndex - anchorIndex) {
+                                1 -> 0.94f
+                                2 -> 0.88f
+                                else -> 1.0f
+                            }
+                        } else 1.0f
+                        v.animate()
+                            .scaleX(baseScale)
+                            .scaleY(baseScale)
+                            .setDuration(150)
+                            .setInterpolator(OvershootInterpolator(1.4f))
+                            .start()
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    val x = event.x
+                    val y = event.y
+                    val isInside = x >= 0 && x <= v.width && y >= 0 && y <= v.height
+                    val baseScale = if (isStackedChild && !isStackExpanded) {
+                        when (chipIndex - anchorIndex) {
+                            1 -> 0.94f
+                            2 -> 0.88f
+                            else -> 1.0f
+                        }
+                    } else 1.0f
                     v.animate()
-                        .scaleX(1.0f)
-                        .scaleY(1.0f)
+                        .scaleX(baseScale)
+                        .scaleY(baseScale)
+                        .setDuration(220)
+                        .setInterpolator(OvershootInterpolator(1.4f))
+                        .start()
+
+                    if (isInside) {
+                        if (!isEditMode && isStackedChild && !isStackExpanded) {
+                            expandStack()
+                            return@setOnTouchListener true
+                        } else if (isStackExpanded) {
+                            handler.postDelayed({ collapseStack() }, 200L)
+                        }
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    val baseScale = if (isStackedChild && !isStackExpanded) {
+                        when (chipIndex - anchorIndex) {
+                            1 -> 0.94f
+                            2 -> 0.88f
+                            else -> 1.0f
+                        }
+                    } else 1.0f
+                    v.animate()
+                        .scaleX(baseScale)
+                        .scaleY(baseScale)
                         .setDuration(220)
                         .setInterpolator(OvershootInterpolator(1.4f))
                         .start()
@@ -881,8 +1451,31 @@ class SmartChipManager(
         }
     }
 
+    fun isChipRelatedPreference(key: String?): Boolean {
+        if (key == null) return false
+        if (key == "smart_chips_stack_overflow" || key == "smart_chip_order") return true
+        if (internalPlugins.any { it.preferenceKey == key }) return true
+        if (externalPlugins.any { it.preferenceKey == key }) return true
+        if (key.startsWith("weather_alert_") || key.startsWith("battery_alert_")) return true
+        if (key.contains("battery_saver") || key.contains("power_saver")) return true
+        return false
+    }
+
     fun onPreferencesChanged() {
-        updateAllChips()
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { onPreferencesChanged() }
+            return
+        }
+        val isStackOverflowEnabled = sharedPreferences.getBoolean("smart_chips_stack_overflow", false)
+        if (!isStackOverflowEnabled && isStackExpanded) {
+            isStackExpanded = false
+            autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+        }
+        for (i in 0 until chipContainer.childCount) {
+            val child = chipContainer.getChildAt(i)
+            fontManager.applyStyleToSmartChip(child)
+        }
+        updateAllChips(forceContentChanged = true)
     }
 }
 

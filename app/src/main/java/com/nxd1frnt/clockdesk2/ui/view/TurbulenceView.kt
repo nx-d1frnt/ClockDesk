@@ -59,6 +59,13 @@ class TurbulenceView @JvmOverloads constructor(
         addView(legacyTurbulenceView)
     }
 
+    val isPlaying: Boolean
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            nativeController?.state != TurbulenceNoiseController.Companion.AnimationState.NOT_PLAYING
+        } else {
+            legacyTurbulenceView?.isPlaying == true
+        }
+
     fun playAnimation(color: Int? = null, onReadyCallback: () -> Unit) {
         val targetColor = color ?: Color.parseColor("#5A7184")
 
@@ -66,8 +73,10 @@ class TurbulenceView @JvmOverloads constructor(
         readyRunnable?.let { removeCallbacks(it) }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            nativeController?.forceFinish()
             playNative(targetColor, onReadyCallback)
         } else {
+            legacyTurbulenceView?.stopAnimation()
             playLegacy(targetColor, onReadyCallback)
         }
     }
@@ -81,6 +90,7 @@ class TurbulenceView @JvmOverloads constructor(
             }
             visibility = View.VISIBLE
             bringToFront()
+            nativeView?.visibility = View.VISIBLE
 
             val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
             val gridScale = prefs.getInt("graphics_turbulence_grid", 10) / 10f
@@ -96,6 +106,7 @@ class TurbulenceView @JvmOverloads constructor(
                 luminosityMultiplier = 0.6f
             )
 
+            nativeController?.forceFinish()
             nativeController?.play(TurbulenceNoiseShader.Companion.Type.SIMPLEX_NOISE, config)
             readyRunnable = Runnable { onReadyCallback() }
             postDelayed(readyRunnable, 400)
@@ -144,8 +155,13 @@ class TurbulenceView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        nativeController?.finish()
-        legacyTurbulenceView?.cleanUp()
+        finishRunnable?.let { removeCallbacks(it) }
+        readyRunnable?.let { removeCallbacks(it) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            nativeController?.forceFinish()
+        } else {
+            legacyTurbulenceView?.stopAnimation()
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -216,27 +232,45 @@ class TurbulenceView @JvmOverloads constructor(
             val octaves: Int = 1
         )
 
+        val isPlaying: Boolean
+            get() = animator?.isRunning == true || isGenerating
+
+        private fun ensureBitmaps() {
+            synchronized(this) {
+                val w = width
+                val h = height
+                if (w > 0 && h > 0) {
+                    val scaledW = (w * scaleFactor).toInt().coerceAtLeast(1)
+                    val scaledH = (h * scaleFactor).toInt().coerceAtLeast(1)
+                    val front = frontBitmap
+                    val back = backBitmap
+                    if (front == null || front.isRecycled ||
+                        back == null || back.isRecycled ||
+                        front.width != scaledW || front.height != scaledH
+                    ) {
+                        val oldFront = frontBitmap
+                        val oldBack = backBitmap
+                        frontBitmap = Bitmap.createBitmap(scaledW, scaledH, Bitmap.Config.ARGB_8888)
+                        backBitmap  = Bitmap.createBitmap(scaledW, scaledH, Bitmap.Config.ARGB_8888)
+                        noiseBitmap = frontBitmap
+                        oldFront?.let { if (!it.isRecycled) it.recycle() }
+                        oldBack?.let { if (!it.isRecycled) it.recycle() }
+                        pixelBuffer = IntArray(scaledW * scaledH)
+                    }
+                }
+            }
+        }
+
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
             super.onSizeChanged(w, h, oldw, oldh)
-            if (w > 0 && h > 0) {
-                val scaledW = (w * scaleFactor).toInt().coerceAtLeast(1)
-                val scaledH = (h * scaleFactor).toInt().coerceAtLeast(1)
-
-                frontBitmap?.recycle()
-                backBitmap?.recycle()
-                frontBitmap = Bitmap.createBitmap(scaledW, scaledH, Bitmap.Config.ARGB_8888)
-                backBitmap  = Bitmap.createBitmap(scaledW, scaledH, Bitmap.Config.ARGB_8888)
-                noiseBitmap = frontBitmap
-
-                pixelBuffer = IntArray(scaledW * scaledH)
-            }
+            ensureBitmaps()
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             // Always read from frontBitmap (the last completed frame from the bg thread).
             val bitmap = frontBitmap ?: return
-            if (opacity <= 0f) return
+            if (bitmap.isRecycled || opacity <= 0f) return
 
             paint.alpha = (opacity * 255).toInt().coerceIn(0, 255)
             val scaleX = width.toFloat() / bitmap.width
@@ -251,6 +285,9 @@ class TurbulenceView @JvmOverloads constructor(
         // --- Public animation API --------------------------------------------
 
         fun playEaseIn(config: NoiseConfig, onEnd: (() -> Unit)? = null) {
+            animator?.cancel()
+            ensureThreadRunning()
+            ensureBitmaps()
             this.config = config
             resetNoiseOffsets()
             // Capture base at phase start so elapsedSec drives offsets from here.
@@ -302,16 +339,29 @@ class TurbulenceView @JvmOverloads constructor(
             })
         }
 
-        fun cleanUp() {
+        fun stopAnimation() {
             animator?.cancel()
+            animator = null
+            opacity = 0f
+            isGenerating = false
+            visibility = GONE
+        }
+
+        fun cleanUp() {
+            stopAnimation()
             noiseHandler?.removeCallbacksAndMessages(null)
             noiseThread?.quitSafely()
             noiseThread = null
             noiseHandler = null
-            isGenerating = false
-            frontBitmap?.recycle(); frontBitmap = null
-            backBitmap?.recycle();  backBitmap  = null
-            noiseBitmap = null
+            synchronized(this) {
+                val f = frontBitmap
+                val b = backBitmap
+                frontBitmap = null
+                backBitmap = null
+                noiseBitmap = null
+                f?.let { if (!it.isRecycled) it.recycle() }
+                b?.let { if (!it.isRecycled) it.recycle() }
+            }
         }
 
         // --- Internals -------------------------------------------------------
@@ -334,8 +384,10 @@ class TurbulenceView @JvmOverloads constructor(
             if (isGenerating) return   // Drop frame – bg thread still busy.
 
             val cfg = config ?: return
+            ensureBitmaps()
             // Capture backBitmap reference on the main thread before posting.
             val back = backBitmap ?: return
+            if (back.isRecycled) return
 
             ensureThreadRunning()
             val handler = noiseHandler ?: return
@@ -349,15 +401,19 @@ class TurbulenceView @JvmOverloads constructor(
 
             isGenerating = true
             handler.post {
-                generateNoiseTo(back, cfg, ox, oy, oz)
+                if (!back.isRecycled) {
+                    generateNoiseTo(back, cfg, ox, oy, oz)
+                }
                 // Swap on the main thread, then clear the flag so the next frame
                 // only begins after the freshly written bitmap is safely in front.
                 post {
-                    val tmp = frontBitmap
-                    frontBitmap = back
-                    backBitmap  = tmp
+                    if (!back.isRecycled) {
+                        val tmp = frontBitmap
+                        frontBitmap = back
+                        backBitmap  = tmp
+                        invalidate()
+                    }
                     isGenerating = false
-                    invalidate()
                 }
             }
         }

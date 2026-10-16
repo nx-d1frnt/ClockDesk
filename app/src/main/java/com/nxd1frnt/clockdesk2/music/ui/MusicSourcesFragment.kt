@@ -52,7 +52,7 @@ class MusicSourcesFragment : Fragment() {
 
         val availablePluginsMap = loadAvailablePluginsMap()
 
-        val savedOrderString = prefs.getString("music_provider_order", "system_media,lastfm") ?: "system_media,lastfm"
+        val savedOrderString = prefs.getString("music_provider_order", "system_media,deskconnect_mpris,lastfm") ?: "system_media,deskconnect_mpris,lastfm"
         val savedOrderList = savedOrderString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
         val finalIdList = ArrayList<String>()
@@ -102,6 +102,12 @@ class MusicSourcesFragment : Fragment() {
                     }
                     "system_media" -> {
                         checkAndRequestNotificationPermission()
+                    }
+                    "deskconnect_mpris" -> {
+                        parentFragmentManager.beginTransaction()
+                            .replace(R.id.settings_container, com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment())
+                            .addToBackStack(null)
+                            .commit()
                     }
                     else -> {
                         if (info?.settingsActivityClassName != null) {
@@ -160,6 +166,12 @@ class MusicSourcesFragment : Fragment() {
             "system_media",
             getString(R.string.system_media_plugin_name),
             getString(R.string.system_media_plugin_description),
+            settingsActivityClassName = null
+        )
+        map["deskconnect_mpris"] = PluginInfo(
+            "deskconnect_mpris",
+            getString(R.string.deskconnect_plugin_name),
+            getString(R.string.deskconnect_plugin_description),
             settingsActivityClassName = null
         )
         map["lastfm"] = PluginInfo(
