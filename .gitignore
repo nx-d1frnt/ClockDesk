@@ -16,9 +16,12 @@ local.properties
 gradle.properties
 .gitignore
 .stfolder/syncthing-folder-b8a200.txt
+/app/nightly/*
+/app/release/*
+/.kotlin/errors/*
+/.idea/*
 
 # Keystore and signing files
 *.jks
 *.keystore
 signing-keystore.jks
-/app/nightly/ClockDesk-nightly-arm64-v8a-v2.0.0-rc2-nightly-515e939.apk
