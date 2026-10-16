@@ -9,14 +9,14 @@ on:
       branch:
         description: 'Branch to build'
         required: true
-        default: 'experimental-clockdesk-connect'
+        default: 'master'
 
 concurrency:
   group: nightly-build
   cancel-in-progress: true
 
 env:
-  TARGET_BRANCH: ${{ github.event.inputs.branch || 'experimental-clockdesk-connect' }}
+  TARGET_BRANCH: ${{ github.event.inputs.branch || 'master' }}
 
 jobs:
   check_commits:
