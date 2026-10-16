@@ -571,6 +571,9 @@
     <string name="deskconnect_unpair">Отключить</string>
     <string name="deskconnect_refresh">Обновить</string>
     <string name="deskconnect_refreshing">Поиск устройств…</string>
+    <string name="deskconnect_status_connected">Подключено</string>
+    <string name="deskconnect_status_paired_offline">Сопряжено (не в сети)</string>
+    <string name="deskconnect_battery_charging">Зарядка</string>
     <string name="deskconnect_pairing_request_title">Запрос на сопряжение</string>
     <string name="deskconnect_pairing_request_message">Устройство \"%1$s\" запрашивает сопряжение с ClockDesk.\nКлюч проверки: %2$s</string>
     <string name="deskconnect_accept">Принять</string>

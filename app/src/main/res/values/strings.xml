@@ -584,6 +584,9 @@
     <string name="deskconnect_unpair">Unpair</string>
     <string name="deskconnect_refresh">Refresh</string>
     <string name="deskconnect_refreshing">Searching for devices…</string>
+    <string name="deskconnect_status_connected">Connected</string>
+    <string name="deskconnect_status_paired_offline">Paired (Offline)</string>
+    <string name="deskconnect_battery_charging">Charging</string>
     <string name="deskconnect_pairing_request_title">Pairing Request</string>
     <string name="deskconnect_pairing_request_message">Device \"%1$s\" wants to pair with ClockDesk.\nVerification key: %2$s</string>
     <string name="deskconnect_accept">Accept</string>

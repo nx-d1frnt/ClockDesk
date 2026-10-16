@@ -569,6 +569,9 @@
     <string name="deskconnect_unpair">Від\'єднати</string>
     <string name="deskconnect_refresh">Оновити</string>
     <string name="deskconnect_refreshing">Пошук пристроїв…</string>
+    <string name="deskconnect_status_connected">Підключено</string>
+    <string name="deskconnect_status_paired_offline">З\'єднано (не в мережі)</string>
+    <string name="deskconnect_battery_charging">Заряджання</string>
     <string name="deskconnect_pairing_request_title">Запит на з\'єднання</string>
     <string name="deskconnect_pairing_request_message">Пристрій \"%1$s\" запитує з\'єднання з ClockDesk.\nКлюч перевірки: %2$s</string>
     <string name="deskconnect_accept">Прийняти</string>

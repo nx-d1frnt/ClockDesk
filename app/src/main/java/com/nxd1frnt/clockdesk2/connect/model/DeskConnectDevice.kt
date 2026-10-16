@@ -16,7 +16,9 @@ data class DeskConnectDevice(
     var isPaired: Boolean = false,
     var isConnected: Boolean = false,
     var lastSeenTimestamp: Long = System.currentTimeMillis(),
-    var certificate: X509Certificate? = null
+    var certificate: X509Certificate? = null,
+    var batteryLevel: Int = -1,
+    var isCharging: Boolean = false
 ) {
     fun getDisplayName(): String {
         return if (deviceName.isNotBlank()) deviceName else deviceId

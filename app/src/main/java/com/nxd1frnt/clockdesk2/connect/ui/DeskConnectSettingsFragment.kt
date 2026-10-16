@@ -2,6 +2,8 @@ package com.nxd1frnt.clockdesk2.connect.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -38,6 +40,12 @@ class DeskConnectSettingsFragment : Fragment() {
     private lateinit var layoutPaired: LinearLayout
     private lateinit var layoutAvailable: LinearLayout
     private var btnRefreshDevices: MaterialButton? = null
+
+    private val batteryListener = object : DeskConnectManager.BatteryListener {
+        override fun onBatteryUpdated(deviceId: String, currentCharge: Int, isCharging: Boolean, thresholdEvent: Int) {
+            activity?.runOnUiThread { refreshDeviceLists() }
+        }
+    }
 
     private val deviceListener = object : DeskConnectManager.DeviceListener {
         override fun onDeviceDiscovered(device: DeskConnectDevice) {
@@ -149,19 +157,23 @@ class DeskConnectSettingsFragment : Fragment() {
         Toast.makeText(context, R.string.deskconnect_refreshing, Toast.LENGTH_SHORT).show()
 
         deskConnectManager.refreshDiscovery()
+        deskConnectManager.requestAllBatteries()
         refreshDeviceLists()
     }
 
     override fun onResume() {
         super.onResume()
         deskConnectManager.deviceListeners.add(deviceListener)
+        deskConnectManager.batteryListeners.add(batteryListener)
         deskConnectManager.broadcastDiscovery()
+        deskConnectManager.requestAllBatteries()
         refreshDeviceLists()
     }
 
     override fun onPause() {
         super.onPause()
         deskConnectManager.deviceListeners.remove(deviceListener)
+        deskConnectManager.batteryListeners.remove(batteryListener)
     }
 
     private fun refreshDeviceLists() {
@@ -185,19 +197,60 @@ class DeskConnectSettingsFragment : Fragment() {
             val iconView = itemView.findViewById<ImageView>(R.id.device_icon)
             val nameView = itemView.findViewById<TextView>(R.id.device_name)
             val statusView = itemView.findViewById<TextView>(R.id.device_status)
+            val batteryLayout = itemView.findViewById<View>(R.id.layout_device_battery)
+            val batteryIcon = itemView.findViewById<ImageView>(R.id.device_battery_icon)
+            val batteryText = itemView.findViewById<TextView>(R.id.device_battery_text)
             val btnAction = itemView.findViewById<MaterialButton>(R.id.btn_action)
 
             iconView.setImageResource(dev.getDeviceTypeIconRes())
             nameView.text = dev.getDisplayName()
             val typeText = dev.getDeviceTypeDisplayName()
-            val statusText = if (dev.isConnected) "Connected" else "Paired (Offline)"
             val ipText = dev.ipAddress?.hostAddress
+
+            val statusText = if (dev.isConnected) {
+                if (dev.batteryLevel >= 0) {
+                    val chargingStr = if (dev.isCharging) " • ${getString(R.string.deskconnect_battery_charging)}" else ""
+                    "${getString(R.string.deskconnect_status_connected)} • ${dev.batteryLevel}%$chargingStr"
+                } else {
+                    getString(R.string.deskconnect_status_connected)
+                }
+            } else {
+                getString(R.string.deskconnect_status_paired_offline)
+            }
             statusView.text = if (ipText != null) "$typeText • $statusText • $ipText" else "$typeText • $statusText"
+
+            if (dev.isConnected && dev.batteryLevel >= 0) {
+                batteryLayout.visibility = View.VISIBLE
+                batteryText.text = "${dev.batteryLevel}%"
+                batteryText.setTextColor(palette.onSurface)
+                (batteryLayout.background?.mutate() as? GradientDrawable)?.setColor(palette.surfaceContainerHigh)
+                when {
+                    dev.isCharging -> {
+                        batteryIcon.setImageResource(R.drawable.ic_battery_charging)
+                        batteryIcon.imageTintList = ColorStateList.valueOf(palette.primary)
+                    }
+                    dev.batteryLevel <= 20 -> {
+                        batteryIcon.setImageResource(R.drawable.ic_battery_alert)
+                        batteryIcon.imageTintList = ColorStateList.valueOf(palette.error)
+                    }
+                    else -> {
+                        batteryIcon.setImageResource(R.drawable.ic_battery_full)
+                        batteryIcon.imageTintList = ColorStateList.valueOf(palette.primary)
+                    }
+                }
+            } else {
+                batteryLayout.visibility = View.GONE
+            }
 
             itemView.setOnClickListener {
                 if (dev.isConnected) {
+                    val batteryInfo = if (dev.batteryLevel >= 0) {
+                        if (dev.isCharging) "${dev.batteryLevel}% (${getString(R.string.deskconnect_battery_charging)})" else "${dev.batteryLevel}%"
+                    } else null
+                    val dialogTitle = if (batteryInfo != null) "${dev.getDisplayName()} • $batteryInfo" else dev.getDisplayName()
+
                     val dialog = MaterialAlertDialogBuilder(requireContext())
-                        .setTitle(dev.getDisplayName())
+                        .setTitle(dialogTitle)
                         .setItems(arrayOf("Send Ping", "Unpair")) { _, which ->
                             when (which) {
                                 0 -> {
@@ -229,8 +282,10 @@ class DeskConnectSettingsFragment : Fragment() {
             val iconView = itemView.findViewById<ImageView>(R.id.device_icon)
             val nameView = itemView.findViewById<TextView>(R.id.device_name)
             val statusView = itemView.findViewById<TextView>(R.id.device_status)
+            val batteryLayout = itemView.findViewById<View>(R.id.layout_device_battery)
             val btnAction = itemView.findViewById<MaterialButton>(R.id.btn_action)
 
+            batteryLayout.visibility = View.GONE
             iconView.setImageResource(dev.getDeviceTypeIconRes())
             nameView.text = dev.getDisplayName()
             val typeText = dev.getDeviceTypeDisplayName()

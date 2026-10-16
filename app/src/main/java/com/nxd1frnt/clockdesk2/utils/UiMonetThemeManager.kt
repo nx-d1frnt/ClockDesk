@@ -799,7 +799,8 @@ object UiMonetThemeManager {
             R.id.dialog_weather_icon,
             R.id.forecast_item_icon,
             R.id.shade_item_app_icon,
-            R.id.notification_app_icon -> return
+            R.id.notification_app_icon,
+            R.id.device_battery_icon -> return
 
             R.id.widget_icon -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.primary)

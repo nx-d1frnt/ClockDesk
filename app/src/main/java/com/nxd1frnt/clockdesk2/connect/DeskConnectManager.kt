@@ -275,7 +275,16 @@ class DeskConnectManager private constructor(private val context: Context) {
         if (!isEnabled) return
         val toRemove = discoveredDevices.filter { (_, dev) -> !dev.isPaired && !dev.isConnected }.keys
         toRemove.forEach { discoveredDevices.remove(it) }
+        requestAllBatteries()
         discovery?.forceRefresh()
+    }
+
+    fun requestAllBatteries() {
+        activeConnections.values.forEach { conn ->
+            if (conn.device.isPaired && conn.isAlive()) {
+                conn.sendPacket(DeskConnectPacket.createBatteryRequest())
+            }
+        }
     }
 
     fun restart() {
@@ -386,6 +395,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
         if (device.isPaired) {
             connection.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+            connection.sendPacket(DeskConnectPacket.createBatteryRequest())
         }
 
         Logger.i("DeskConnect/Connection") {
@@ -433,6 +443,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
             if (device.isPaired) {
                 connection.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                connection.sendPacket(DeskConnectPacket.createBatteryRequest())
             }
 
             Logger.i("DeskConnect/Connection") {
@@ -486,6 +497,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
                 if (device.isPaired) {
                     conn.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                    conn.sendPacket(DeskConnectPacket.createBatteryRequest())
                 }
 
                 Logger.i("DeskConnect/Connection") {
@@ -656,6 +668,12 @@ class DeskConnectManager private constructor(private val context: Context) {
                 val threshold = body.optInt("thresholdEvent", 0)
 
                 if (charge >= 0) {
+                    conn.device.batteryLevel = charge
+                    conn.device.isCharging = isCharging
+                    discoveredDevices[conn.device.deviceId]?.let { dev ->
+                        dev.batteryLevel = charge
+                        dev.isCharging = isCharging
+                    }
                     mainHandler.post {
                         batteryListeners.forEach {
                             it.onBatteryUpdated(conn.device.deviceId, charge, isCharging, threshold)
@@ -843,6 +861,13 @@ class DeskConnectManager private constructor(private val context: Context) {
                 val currentConn = activeConnections[dev.deviceId]
                 if (currentConn == null || !currentConn.isAlive()) {
                     dev.isConnected = false
+                    dev.batteryLevel = -1
+                    dev.isCharging = false
+                    discoveredDevices[dev.deviceId]?.let {
+                        it.isConnected = false
+                        it.batteryLevel = -1
+                        it.isCharging = false
+                    }
                     Logger.i("DeskConnect/Connection") {
                         "Device disconnected: ${dev.deviceName} (${dev.deviceId}) [ip=${dev.ipAddress?.hostAddress ?: "unknown"}]"
                     }
