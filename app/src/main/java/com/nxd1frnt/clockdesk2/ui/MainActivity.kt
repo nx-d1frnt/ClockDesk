@@ -215,7 +215,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
             val activeId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
-            if (activeId == provider.id) {
+            if (activeId == provider.id || activeId.endsWith("/${provider.id}") || provider.id.endsWith("/$activeId")) {
                 Logger.i("BackgroundFlow") { "BackgroundProvider updated: ${provider.id}, applying payload $payload" }
                 applyBackgroundPayload(payload)
             }
@@ -537,10 +537,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             locationManager,
             handler,
             isCustomBackgroundActive = {
-                hasCustomImageBackground || wasMusicBackgroundApplied || (::backgroundSheetManager.isInitialized && 
-                        backgroundSheetManager.isShowing && 
-                        backgroundSheetManager.previewBackgroundUri != null && 
-                        backgroundSheetManager.previewBackgroundUri != "__DEFAULT_GRADIENT__")
+                !isDynamicGradientActive()
             }
         )
 
@@ -1843,7 +1840,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             // Load coordinates for daytime calculations anyway (using fallback)
             locationManager.loadCoordinates { lat, lon ->
                 dayTimeGetter.fetch(lat, lon) {
-                    if (!hasCustomImageBackground) gradientManager.updateGradient()
+                    if (isDynamicGradientActive()) gradientManager.updateGradient()
                     if (isNightShiftEnabled) {
                         fontManager.applyNightShiftTransition(
                             clockManager.getCurrentTime(),
@@ -1861,7 +1858,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         locationManager.loadCoordinates { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
-                if (!hasCustomImageBackground) gradientManager.updateGradient()
+                if (isDynamicGradientActive()) gradientManager.updateGradient()
                 if (isNightShiftEnabled) {
                     fontManager.applyNightShiftTransition(
                         clockManager.getCurrentTime(),
@@ -2566,7 +2563,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun startUpdates() {
         clockManager.startUpdates()
-        if (!hasCustomImageBackground) gradientManager.startUpdates()
+        if (isDynamicGradientActive()) gradientManager.startUpdates()
         if (getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).getBoolean("burn_in_protection", false)) burnInProtectionManager.start()
         else burnInProtectionManager.stop()
     }
@@ -2798,7 +2795,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val disableWeather = isPowerSavingMode && prefs.getBoolean("power_saver_disable_weather", true)
         locationManager.loadCoordinates { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
-                if (!hasCustomImageBackground) gradientManager.updateGradient()
+                if (isDynamicGradientActive()) gradientManager.updateGradient()
                 if (isNightShiftEnabled) fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, isNightShiftEnabled)
                 if (dynamicBackgroundView.visibility == View.VISIBLE) updateBackgroundFilters()
                 updateSensorRegistration()
@@ -2844,6 +2841,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
         smartChipManager.updateAllChips()
+        val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+        val activeProviderId = bpm.getActiveProviderId()
+        if (activeProviderId.startsWith("external:")) {
+            val plugin = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+            val payload = plugin?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+            if (payload !is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient) {
+                applyBackgroundPayload(payload, skipAnimation = true)
+            }
+            if (plugin != null) {
+                bpm.requestDataFromPlugin(plugin)
+            } else {
+                bpm.requestDataFromPluginId(activeProviderId)
+            }
+        }
         startUpdates()
         val showPerformance = prefs.getBoolean("show_performance_overlay", false)
         togglePerformanceOverlay(showPerformance)
@@ -2861,10 +2872,45 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 or View.SYSTEM_UI_FLAG_FULLSCREEN)
     }
 
+    fun isDynamicGradientActive(): Boolean {
+        if (wasMusicBackgroundApplied) return false
+        if (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) {
+            val preview = backgroundSheetManager.previewBackgroundUri
+            if (preview != null) {
+                return preview == "__DEFAULT_GRADIENT__" ||
+                        preview == com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID
+            }
+        }
+        val activeId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+        if (activeId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
+            return false
+        }
+        return !hasCustomImageBackground
+    }
+
     private fun previewBlur(blur: Int) {
         val previewUri = if (::backgroundSheetManager.isInitialized) backgroundSheetManager.previewBackgroundUri else null
         if (previewUri != null) {
-            if (previewUri == "__DEFAULT_GRADIENT__") return
+            if (previewUri == "__DEFAULT_GRADIENT__" ||
+                previewUri == com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID ||
+                previewUri == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                return
+            }
+            if (previewUri.startsWith("external:")) {
+                val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                val provider = bpm.getExternalProviders().firstOrNull { it.id == previewUri }
+                val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(previewUri)
+                when (payload) {
+                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                        applyImageBackground(Uri.parse(payload.uriString), blur, skipAnimation = true)
+                    }
+                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap -> {
+                        applyBitmapBackground(payload.bitmap, blur, skipAnimation = true)
+                    }
+                    else -> return
+                }
+                return
+            }
             applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
         } else if (wasMusicBackgroundApplied && currentAppliedArtworkSource != null) {
             when (val art = currentAppliedArtworkSource) {
@@ -2873,9 +2919,28 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 is Uri -> applyImageBackground(art, blur, skipAnimation = true)
             }
         } else {
-            val savedUri = backgroundManager.getSavedBackgroundUri()
-            if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
-                applyImageBackground(Uri.parse(savedUri), blur, skipAnimation = true)
+            val activeProviderId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
+            if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID ||
+                activeProviderId == com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
+                return
+            } else if (activeProviderId.startsWith("external:")) {
+                val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+                val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+                when (payload) {
+                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                        applyImageBackground(Uri.parse(payload.uriString), blur, skipAnimation = true)
+                    }
+                    is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap -> {
+                        applyBitmapBackground(payload.bitmap, blur, skipAnimation = true)
+                    }
+                    else -> return
+                }
+            } else {
+                val savedUri = backgroundManager.getSavedBackgroundUri()
+                if (savedUri != null && savedUri != "__DEFAULT_GRADIENT__") {
+                    applyImageBackground(Uri.parse(savedUri), blur, skipAnimation = true)
+                }
             }
         }
     }
@@ -2911,8 +2976,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             }
         } else {
             val previewUri = backgroundSheetManager.previewBackgroundUri ?: backgroundManager.getSavedBackgroundUri()
-            if (previewUri == "__DEFAULT_GRADIENT__" || previewUri == null) {
+            if (previewUri == "__DEFAULT_GRADIENT__" || 
+                previewUri == null || 
+                previewUri == com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
                 previewGradient()
+            } else if (previewUri == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+                val color = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).solidColorProvider.getColor(this)
+                applySolidColorBackground(color, skipAnimation = true)
+            } else if (previewUri.startsWith("external:")) {
+                val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+                val provider = bpm.getExternalProviders().firstOrNull { it.id == previewUri }
+                val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(previewUri)
+                applyBackgroundPayload(payload, skipAnimation = true)
             } else {
                 applyImageBackground(Uri.parse(previewUri), blur, skipAnimation = true)
             }
@@ -3127,9 +3202,29 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         lastBackgroundSource = null
         currentAppliedArtworkSource = null
         wasMusicBackgroundApplied = false
-        if (savedUriStr != null) {
+        val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
+        val activeProviderId = bpm.getActiveProviderId()
+        if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
+            val color = bpm.solidColorProvider.getColor(this)
+            applySolidColorBackground(color, skipAnimation = true)
+            return
+        }
+        if (activeProviderId.startsWith("external:")) {
+            val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+            val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
+            applyBackgroundPayload(payload, skipAnimation = true)
+            if (provider != null) {
+                bpm.requestDataFromPlugin(provider)
+            } else {
+                bpm.requestDataFromPluginId(activeProviderId)
+            }
+            return
+        }
+        val effectiveUri = savedUriStr ?: backgroundManager.getSavedBackgroundUri()
+        if (effectiveUri != null && effectiveUri != "__DEFAULT_GRADIENT__" &&
+            activeProviderId != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID) {
             try {
-                val uri = Uri.parse(savedUriStr)
+                val uri = Uri.parse(effectiveUri)
                 val blur = backgroundManager.getBlurIntensity()
                 applyImageBackground(uri, blur) {
                     setCustomBackground(true)
@@ -3138,7 +3233,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     backgroundSheetManager.updateCropButtonVisibility(true)
                 }
             } catch (e: Exception) {
-                Logger.e("MainActivity"){"Failed to restore user background"}
+                Logger.e("MainActivity") { "Failed to restore user background: ${e.message}" }
                 restoreGradientBackground()
             }
         } else {

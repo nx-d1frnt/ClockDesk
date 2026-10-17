@@ -316,9 +316,17 @@ class BackgroundProviderManager private constructor(private val context: Context
                         }
                         requestDataFromPlugin(activePlugin)
                     } else if (discovered.isNotEmpty()) {
-                        // The external plugin was uninstalled
-                        Logger.w("BackgroundProvider") { "Active external plugin $activeId is no longer installed, reverting to gradient" }
-                        setActiveProviderId(DynamicGradientBackgroundProvider.ID)
+                        val pkg = activeId.removePrefix("external:").substringBefore("/")
+                        val isInstalled = try {
+                            pm.getPackageInfo(pkg, 0)
+                            true
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (!isInstalled) {
+                            Logger.w("BackgroundProvider") { "Active external plugin $activeId is no longer installed, reverting to gradient" }
+                            setActiveProviderId(DynamicGradientBackgroundProvider.ID)
+                        }
                     }
                 }
             }
