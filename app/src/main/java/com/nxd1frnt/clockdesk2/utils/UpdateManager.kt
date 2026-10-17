@@ -69,7 +69,7 @@ object UpdateManager {
         private set
 
     private var activeDownloadId: Long = -1L
-    private val pollHandler = Handler(Looper.getMainLooper())
+    private val pollHandler by lazy { Handler(Looper.getMainLooper()) }
     private var appContext: Context? = null
 
     var onUpdateStateChanged: (() -> Unit)? = null
@@ -407,36 +407,103 @@ object UpdateManager {
         }
     }
 
-    private fun isNewer(server: String, current: String): Boolean {
-        val sClean = server.removePrefix("v").lowercase()
-        val cClean = current.removePrefix("v").lowercase()
+    internal fun isNewer(server: String, current: String): Boolean {
+        val sClean = server.trim().removePrefix("v").removePrefix("V")
+        val cClean = current.trim().removePrefix("v").removePrefix("V")
 
-        if (sClean == cClean) return false
+        if (sClean.equals(cClean, ignoreCase = true)) return false
 
-        val sParts = sClean.split("[.-]".toRegex())
-        val cParts = cClean.split("[.-]".toRegex())
+        // Normalize versions: strip build metadata (+...) and strip nightly tags from current if needed
+        val sNormalized = sClean.substringBefore('+')
+        val cNormalized = cClean.substringBefore('+').replace(Regex("-nightly.*", RegexOption.IGNORE_CASE), "")
 
-        val length = maxOf(sParts.size, cParts.size)
+        if (sNormalized.equals(cNormalized, ignoreCase = true)) {
+            // If current was a nightly snapshot of the exact same version, the release is considered newer
+            return current.contains("nightly", ignoreCase = true) && !server.contains("nightly", ignoreCase = true)
+        }
 
-        for (i in 0 until length) {
-            val sPart = sParts.getOrElse(i) { "" }
-            val cPart = cParts.getOrElse(i) { "" }
+        // Split Core and Pre-release (e.g. "2.0.0-rc2.1" -> core "2.0.0", pre "rc2.1")
+        val sCore = sNormalized.substringBefore('-')
+        val sPre = if (sNormalized.contains('-')) sNormalized.substringAfter('-') else null
 
-            if (sPart == cPart) continue
+        val cCore = cNormalized.substringBefore('-')
+        val cPre = if (cNormalized.contains('-')) cNormalized.substringAfter('-') else null
 
-            val sNum = sPart.toIntOrNull()
-            val cNum = cPart.toIntOrNull()
+        // 1. Compare Core version numbers: e.g. [2, 0, 0] vs [2, 0, 0]
+        val sCoreParts = sCore.split('.').mapNotNull { it.toIntOrNull() }
+        val cCoreParts = cCore.split('.').mapNotNull { it.toIntOrNull() }
+        val maxCoreLen = maxOf(sCoreParts.size, cCoreParts.size)
 
-            if (sNum != null && cNum != null) {
-                if (sNum > cNum) return true
-                if (sNum < cNum) return false
-            } else {
-                if (sPart.isEmpty()) return true
-                if (cPart.isEmpty()) return false
-                return sPart > cPart
+        for (i in 0 until maxCoreLen) {
+            val sNum = sCoreParts.getOrElse(i) { 0 }
+            val cNum = cCoreParts.getOrElse(i) { 0 }
+            if (sNum > cNum) return true
+            if (sNum < cNum) return false
+        }
+
+        // 2. Core versions are equal. In SemVer, stable (no pre-release) > pre-release
+        if (sPre == null && cPre != null) return true
+        if (sPre != null && cPre == null) return false
+        if (sPre == null || cPre == null) return false
+
+        // 3. Both have pre-releases: e.g. "rc2.1" vs "rc2"
+        return comparePreReleases(sPre, cPre) > 0
+    }
+
+    private fun comparePreReleases(sPre: String, cPre: String): Int {
+        val sTokens = tokenizePreRelease(sPre)
+        val cTokens = tokenizePreRelease(cPre)
+        val minLen = minOf(sTokens.size, cTokens.size)
+
+        for (i in 0 until minLen) {
+            val s = sTokens[i]
+            val c = cTokens[i]
+
+            if (s == c) continue
+
+            return when {
+                s is Int && c is Int -> s.compareTo(c)
+                s is String && c is String -> {
+                    val rankS = preReleaseRank(s)
+                    val rankC = preReleaseRank(c)
+                    if (rankS != rankC) {
+                        rankS.compareTo(rankC)
+                    } else {
+                        s.compareTo(c)
+                    }
+                }
+                s is Int && c is String -> -1
+                s is String && c is Int -> 1
+                else -> 0
             }
         }
-        return false
+
+        return sTokens.size.compareTo(cTokens.size)
+    }
+
+    private fun tokenizePreRelease(pre: String): List<Any> {
+        val tokens = mutableListOf<Any>()
+        val rawParts = pre.lowercase().split('.', '-')
+        val chunkRegex = Regex("([0-9]+|[a-zA-Z]+)")
+        for (part in rawParts) {
+            for (match in chunkRegex.findAll(part)) {
+                val str = match.value
+                val num = str.toIntOrNull()
+                if (num != null) {
+                    tokens.add(num)
+                } else {
+                    tokens.add(str)
+                }
+            }
+        }
+        return tokens
+    }
+
+    private fun preReleaseRank(str: String): Int = when (str.lowercase()) {
+        "alpha", "a" -> 1
+        "beta", "b" -> 2
+        "rc", "preview", "pre" -> 3
+        else -> 0
     }
 
     fun openReleasePage(context: Context) {
