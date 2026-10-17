@@ -17,6 +17,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Outline
 import android.graphics.PorterDuff
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.hardware.Sensor
@@ -479,9 +480,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         btnResetLayout = findViewById(R.id.btn_reset_layout)
         btnDoneEdit = findViewById(R.id.btn_done_edit)
         emptyDeskPrompt = findViewById(R.id.empty_desk_prompt)
-
-        editModeBlurLayer.setColorFilter(Color.parseColor("#C5000000"), PorterDuff.Mode.SRC_OVER)
-
+        androidx.core.widget.ImageViewCompat.setImageTintList(editModeBlurLayer, null)
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
         editModeActionBar.visibility = View.GONE
@@ -1214,6 +1213,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 }
                 "graphics_enable_edit_blur" -> {
                     isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
+                    if (!isGraphicsEditBlurEnabled) {
+                        editModeBlurLayer.setImageDrawable(null)
+                        editModeBlurLayer.visibility = View.GONE
+                    } else if (isEditMode && hasCustomImageBackground) {
+                        editModeBlurLayer.visibility = View.VISIBLE
+                        editModeBlurLayer.alpha = 1.0f
+                    }
+                    updateBackgroundFilters(force = true)
                 }
                 "graphics_enable_turbulence", "graphics_turbulence_music_continuous" -> runOnUiThread {
                     checkAndApplyTurbulenceState(prefs)
@@ -1988,10 +1995,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 applySolidColorBackground(payload.color, skipAnimation, onComplete)
             }
             is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri -> {
+                setCustomBackground(true)
                 val blur = backgroundManager.getBlurIntensity()
                 applyImageBackground(Uri.parse(payload.uriString), blur, skipAnimation, onComplete)
             }
             is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap -> {
+                setCustomBackground(true)
                 val blur = backgroundManager.getBlurIntensity()
                 applyBitmapBackground(payload.bitmap, blur, skipAnimation, onComplete)
             }
@@ -2015,12 +2024,23 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
         fontManager.applyNightShiftTransition(clockManager.getCurrentTime(), dayTimeGetter, true)
 
+        if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled) {
+            editModeBlurLayer.setImageDrawable(ColorDrawable(color))
+            if (isEditMode) {
+                editModeBlurLayer.visibility = View.VISIBLE
+                editModeBlurLayer.alpha = 1.0f
+            }
+        } else {
+            editModeBlurLayer.setImageDrawable(null)
+            editModeBlurLayer.visibility = View.GONE
+        }
+
         backgroundImageView.setImageDrawable(null)
         backgroundImageView.visibility = View.GONE
         dynamicBackgroundView.visibility = View.VISIBLE
         val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 1200L
         dynamicBackgroundView.transitionToSolidColor(color, duration, force = true)
-        updateBackgroundFilters()
+        updateBackgroundFilters(force = true)
         onComplete?.invoke()
     }
 
@@ -2072,6 +2092,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         cancelBackgroundLoads()
         val requestId = backgroundRequestId
         isBackgroundLoading = true
+        setCustomBackground(true)
         
         lastBackgroundSource = model
         lastBlurIntensity = blurIntensity
@@ -2316,7 +2337,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun applyEditModeBlurLayer(model: Any) {
-        editModeBlurLayer.visibility = View.VISIBLE
+        if (isEditMode) {
+            editModeBlurLayer.visibility = View.VISIBLE
+            editModeBlurLayer.alpha = 1.0f
+        }
         val ambientReq = RequestOptions()
             .transform(FitCenter(), BlurTransformation(this, 20, 3))
             .override(200, 400)
@@ -2329,7 +2353,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             ) {
                 if (activeEditBackgroundTarget !== this || isDestroyed || isFinishing) return
                 editModeBlurLayer.setImageDrawable(resource)
-                updateBackgroundFilters()
+                if (isEditMode) {
+                    editModeBlurLayer.visibility = View.VISIBLE
+                    editModeBlurLayer.alpha = 1.0f
+                }
+                updateBackgroundFilters(force = true)
             }
             override fun onLoadCleared(placeholder: Drawable?) {
                 editModeBlurLayer.setImageDrawable(null)
@@ -2383,7 +2411,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         previewDimMinIntensity: Int? = null,
         previewDimMaxIntensity: Int? = null,
         previewNightShift: Boolean? = null,
-        previewZoom: Boolean? = null
+        previewZoom: Boolean? = null,
+        force: Boolean = false
     ) {
         if (dynamicBackgroundView.visibility != View.VISIBLE) return
 
@@ -2459,7 +2488,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             previewDimMinIntensity != null || previewDimMaxIntensity != null ||
             previewNightShift != null || previewZoom != null
 
-        if (!isPreview &&
+        if (!force && !isPreview &&
             kotlin.math.abs(lastFilterDimFactor - finalDimFactor) < 0.003f &&
             kotlin.math.abs(lastFilterNightFactor - nightFactor) < 0.005f &&
             lastFilterWmoCode == wmoCode &&
@@ -2635,9 +2664,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             animateCornerRadius(mainLayout, 0f, targetRadius, animationDuration, MotionUtils.EMPHASIZED)
 
             if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
+                editModeBlurLayer.animate().cancel()
                 editModeBlurLayer.visibility = View.VISIBLE
                 editModeBlurLayer.alpha = 1.0f
-                updateBackgroundFilters()
+                updateBackgroundFilters(force = true)
             }
 
             showDock(animate = true)
@@ -2667,6 +2697,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun exitEditMode() {
         isEditMode = false
+        //updateBackgroundFilters(force = true)
         smartChipManager.setEditMode(false) { }
         widgetMover.setEditMode(false)
         val startRadius = dpToPx(36f)
@@ -2682,6 +2713,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         animateCornerRadius(mainLayout, startRadius, 0f, animationDuration, MotionUtils.EMPHASIZED)
 
         if (editModeBlurLayer.visibility == View.VISIBLE) {
+            editModeBlurLayer.animate().cancel()
             editModeBlurLayer.animate()
                 .alpha(0f)
                 .setDuration(animationDuration)
@@ -2962,8 +2994,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         dynamicBackgroundView.transitionToGradient(topColor, bottomColor, 300L, force = true)
         fontManager.clearDynamicColors()
         setCustomBackground(false)
+        editModeBlurLayer.setImageDrawable(null)
+        editModeBlurLayer.visibility = View.GONE
         gradientManager.startUpdates()
-        updateBackgroundFilters()
+        updateBackgroundFilters(force = true)
         updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED, getString(R.string.stage_gradient_applied))
     }
 

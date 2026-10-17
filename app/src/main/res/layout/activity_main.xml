@@ -16,8 +16,6 @@
             android:visibility="gone"
             android:importantForAccessibility="no"
             android:contentDescription="@null"
-            app:tint="#C5000000"
-            app:tintMode="src_over"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
