@@ -133,8 +133,8 @@ class BackgroundProviderManager private constructor(private val context: Context
                         settingsActivity = if (obj.isNull("settingsActivity")) null else obj.getString("settingsActivity"),
                         capabilities = ProviderCapabilities(
                             supportsBlur = obj.optBoolean("supportsBlur", true),
-                            supportsCrop = obj.optBoolean("supportsCrop", true),
-                            supportsDimming = obj.optBoolean("supportsDimming", true),
+                            supportsCrop = obj.optBoolean("supportsCrop", obj.optBoolean("supportsCropping", true)),
+                            supportsDimming = obj.optBoolean("supportsDimming", obj.optBoolean("supportsDim", true)),
                             supportsWeather = obj.optBoolean("supportsWeather", true)
                         )
                     )
@@ -163,6 +163,7 @@ class BackgroundProviderManager private constructor(private val context: Context
                     if (p.settingsActivity != null) put("settingsActivity", p.settingsActivity)
                     put("supportsBlur", p.capabilities.supportsBlur)
                     put("supportsCrop", p.capabilities.supportsCrop)
+                    put("supportsCropping", p.capabilities.supportsCrop)
                     put("supportsDimming", p.capabilities.supportsDimming)
                     put("supportsWeather", p.capabilities.supportsWeather)
                 }
@@ -262,9 +263,21 @@ class BackgroundProviderManager private constructor(private val context: Context
                                 description = resolveXmlString(parser, pluginRes, "description")
                                 settingsActivity = parser.getAttributeValue(null, "settingsActivity")
                                 supportsBlur = parser.getAttributeBooleanValue(null, "supportsBlur", true)
-                                supportsCrop = parser.getAttributeBooleanValue(null, "supportsCrop", true)
+                                val hasCropAttr = parser.getAttributeValue(null, "supportsCrop") != null
+                                val hasCroppingAttr = parser.getAttributeValue(null, "supportsCropping") != null
+                                supportsCrop = when {
+                                    hasCropAttr -> parser.getAttributeBooleanValue(null, "supportsCrop", true)
+                                    hasCroppingAttr -> parser.getAttributeBooleanValue(null, "supportsCropping", true)
+                                    else -> true
+                                }
                                 supportsWeather = parser.getAttributeBooleanValue(null, "supportsWeather", true)
-                                supportsDim = parser.getAttributeBooleanValue(null, "supportsDimming", true)
+                                val hasDimmingAttr = parser.getAttributeValue(null, "supportsDimming") != null
+                                val hasDimAttr = parser.getAttributeValue(null, "supportsDim") != null
+                                supportsDim = when {
+                                    hasDimmingAttr -> parser.getAttributeBooleanValue(null, "supportsDimming", true)
+                                    hasDimAttr -> parser.getAttributeBooleanValue(null, "supportsDim", true)
+                                    else -> true
+                                }
                             }
                         }
 

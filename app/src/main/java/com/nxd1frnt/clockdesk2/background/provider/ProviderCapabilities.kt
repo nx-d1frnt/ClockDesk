@@ -7,4 +7,6 @@ data class ProviderCapabilities(
     val supportsWeather: Boolean = true,
     val supportsCustomColor: Boolean = false,
     val supportsConfig: Boolean = false
-)
+) {
+    val supportsCropping: Boolean get() = supportsCrop
+}
