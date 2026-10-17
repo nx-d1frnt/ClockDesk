@@ -67,6 +67,26 @@ class BackgroundCropTest {
         assertEquals("Landscape Dx must be 0.0", 0f, landscapeDx, 0.0001f)
         assertTrue("Landscape U coords within bounds", landscapeDx >= 0f && landscapeDx + landscapeScaleX <= 1.0001f)
         assertTrue("Landscape V coords within bounds", landscapeDy >= 0f && landscapeDy + landscapeScaleY <= 1.0001f)
+
+        // 3. Now switch back to 9:16 image (1080x1920) with the preserved offset.
+        // The clamped position from the 16:9 image MUST NOT persist - it should return to the original top crop!
+        val cropPortraitAgain = DynamicBackgroundView.computeCenterCrop(
+            imgW = 1080,
+            imgH = 1920,
+            vw = screenW,
+            vh = screenH,
+            isGradient = false,
+            scale = 1f,
+            offsetX = 0f,
+            offsetY = offsetTopY,
+            unscaledViewWidth = screenW.toFloat(),
+            unscaledViewHeight = screenH.toFloat()
+        )
+
+        assertEquals("Returning to portrait must restore original Dy", portraitDy, cropPortraitAgain[3], 0.0001f)
+        assertEquals("Returning to portrait must restore original Dx", portraitDx, cropPortraitAgain[2], 0.0001f)
+        assertEquals("Returning to portrait must restore original ScaleY", portraitScaleY, cropPortraitAgain[1], 0.0001f)
+        assertEquals("Returning to portrait must restore original ScaleX", portraitScaleX, cropPortraitAgain[0], 0.0001f)
     }
 
     @Test

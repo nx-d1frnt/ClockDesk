@@ -100,9 +100,6 @@ class BackgroundCropController(
         curOffsetY = savedOffsetY
 
         clampOffset()
-        savedScale = curScale
-        savedOffsetX = curOffsetX
-        savedOffsetY = curOffsetY
 
         if (dynamicBackgroundView.width > 0 && dynamicBackgroundView.height > 0) {
             applyMatrix()

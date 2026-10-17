@@ -132,11 +132,6 @@ class BackgroundSheetManager(
                     return@BackgroundsAdapter
                 }
 
-                val isNewSelection = (id != previewBackgroundUri && id != backgroundManager.getSavedBackgroundUri())
-                if (isNewSelection) {
-                    backgroundManager.resetBgTransform()
-                }
-
                 if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
                     val isAlreadySelected = (previewBackgroundUri == id)
                     previewBackgroundUri = id
@@ -550,7 +545,6 @@ class BackgroundSheetManager(
     }
 
     fun onImageAdded(uriStr: String) {
-        backgroundManager.resetBgTransform()
         updateAdapterItems()
         previewBackgroundUri = uriStr
         backgroundsAdapter?.updateSelection(uriStr)
