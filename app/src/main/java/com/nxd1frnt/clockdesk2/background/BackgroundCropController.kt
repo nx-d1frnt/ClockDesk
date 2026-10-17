@@ -99,7 +99,16 @@ class BackgroundCropController(
         curOffsetX = savedOffsetX
         curOffsetY = savedOffsetY
 
-        dynamicBackgroundView.post { applyMatrix() }
+        clampOffset()
+        savedScale = curScale
+        savedOffsetX = curOffsetX
+        savedOffsetY = curOffsetY
+
+        if (dynamicBackgroundView.width > 0 && dynamicBackgroundView.height > 0) {
+            applyMatrix()
+        } else {
+            dynamicBackgroundView.post { applyMatrix() }
+        }
 
         overlayRoot.visibility = View.VISIBLE
         overlayRoot.alpha = 1f

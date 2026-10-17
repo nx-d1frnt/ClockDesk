@@ -60,6 +60,9 @@ class BackgroundSheetManager(
     private var isApplying = false
     private var isSwitchingToCrop = false
     private var initialMusicAlbumArtEnabled = true
+    private var initialScale = 1f
+    private var initialOffsetX = 0f
+    private var initialOffsetY = 0f
     private val animationDuration = 350L
     private var backgroundsAdapter: BackgroundsAdapter? = null
 
@@ -127,6 +130,11 @@ class BackgroundSheetManager(
                 if (id == "__ADD__") {
                     onAddBackgroundRequested()
                     return@BackgroundsAdapter
+                }
+
+                val isNewSelection = (id != previewBackgroundUri && id != backgroundManager.getSavedBackgroundUri())
+                if (isNewSelection) {
+                    backgroundManager.resetBgTransform()
                 }
 
                 if (id == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
@@ -413,10 +421,6 @@ class BackgroundSheetManager(
                 currentTarget != "__DEFAULT_GRADIENT__" &&
                 currentTarget != com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID &&
                 currentTarget != com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
-                val isAlreadyActive = (currentTarget == activeId || currentTarget == backgroundManager.getSavedBackgroundUri())
-                if (!isAlreadyActive) {
-                    backgroundManager.resetBgTransform()
-                }
                 isSwitchingToCrop = true
                 onCropRequested()
                 isSwitchingToCrop = false
@@ -470,6 +474,9 @@ class BackgroundSheetManager(
         Logger.i("BackgroundSheet") { "show() called. ActiveProvider='${com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(floatingMenuView.context).getActiveProviderId()}', SavedUri='${backgroundManager.getSavedBackgroundUri()}'" }
         isApplying = false
         initialMusicAlbumArtEnabled = backgroundManager.isMusicAlbumArtEnabled()
+        initialScale = backgroundManager.getBgScale()
+        initialOffsetX = backgroundManager.getBgOffsetX()
+        initialOffsetY = backgroundManager.getBgOffsetY()
         loadCurrentSettings()
         scaleDownMainLayout()
         hideBackgroundTab()
@@ -533,6 +540,7 @@ class BackgroundSheetManager(
         Logger.i("BackgroundSheet") { "cancelAndHide() called. isApplying=$isApplying, previewBackgroundUri=$previewBackgroundUri" }
         if (!isApplying) {
             backgroundManager.setMusicAlbumArtEnabled(initialMusicAlbumArtEnabled)
+            backgroundManager.setBgTransform(initialOffsetX, initialOffsetY, initialScale)
             onRestoreOriginalState()
             BackgroundProgressPlugin.reset()
         }
@@ -542,6 +550,7 @@ class BackgroundSheetManager(
     }
 
     fun onImageAdded(uriStr: String) {
+        backgroundManager.resetBgTransform()
         updateAdapterItems()
         previewBackgroundUri = uriStr
         backgroundsAdapter?.updateSelection(uriStr)

@@ -85,10 +85,10 @@ class DynamicBackgroundView @JvmOverloads constructor(
         }
 
     val imageWidth: Int
-        get() = renderer.getImageWidth()
+        get() = currentBitmap?.width?.takeIf { it > 0 } ?: renderer.getImageWidth()
 
     val imageHeight: Int
-        get() = renderer.getImageHeight()
+        get() = currentBitmap?.height?.takeIf { it > 0 } ?: renderer.getImageHeight()
 
     init {
         // Настройка EGL для поддержки полупрозрачности и аппаратного сглаживания
@@ -2214,38 +2214,13 @@ class DynamicBackgroundView @JvmOverloads constructor(
             isGradient: Boolean,
             scale: Float, offsetX: Float, offsetY: Float
         ): FloatArray {
-            if (isGradient) {
-                return floatArrayOf(1f, 1f, 0f, 0f)
-            }
-            if (imgW == 0 || imgH == 0 || vw == 0 || vh == 0) {
-                return floatArrayOf(1f, 1f, 0f, 0f)
-            }
-
-            val viewAspect = vw.toFloat() / vh.toFloat()
-            val imgAspect = imgW.toFloat() / imgH.toFloat()
-
-            var scaleX = 1f
-            var scaleY = 1f
-            var dx = 0f
-            var dy = 0f
-
-            if (imgAspect > viewAspect) {
-                scaleX = viewAspect / imgAspect
-                dx = (1f - scaleX) / 2f
-            } else {
-                scaleY = imgAspect / viewAspect
-                dy = (1f - scaleY) / 2f
-            }
-
-            val unscaledVw = this@DynamicBackgroundView.width.toFloat().let { if (it > 0f) it else vw.toFloat() }
-            val unscaledVh = this@DynamicBackgroundView.height.toFloat().let { if (it > 0f) it else vh.toFloat() }
-
-            val finalScaleX = scaleX / scale
-            val finalScaleY = scaleY / scale
-            val finalDx = (dx - 0.5f) / scale + 0.5f - (offsetX / unscaledVw) * (scaleX / scale)
-            val finalDy = (dy - 0.5f) / scale + 0.5f - (offsetY / unscaledVh) * (scaleY / scale)
-
-            return floatArrayOf(finalScaleX, finalScaleY, finalDx, finalDy)
+            return computeCenterCrop(
+                imgW, imgH, vw, vh,
+                isGradient,
+                scale, offsetX, offsetY,
+                this@DynamicBackgroundView.width.toFloat(),
+                this@DynamicBackgroundView.height.toFloat()
+            )
         }
 
         private fun loadTexture(bitmap: Bitmap): Int {
@@ -2317,6 +2292,55 @@ class DynamicBackgroundView @JvmOverloads constructor(
     }
 
     companion object {
+        internal fun computeCenterCrop(
+            imgW: Int, imgH: Int, vw: Int, vh: Int,
+            isGradient: Boolean,
+            scale: Float, offsetX: Float, offsetY: Float,
+            unscaledViewWidth: Float = vw.toFloat(),
+            unscaledViewHeight: Float = vh.toFloat()
+        ): FloatArray {
+            if (isGradient) {
+                return floatArrayOf(1f, 1f, 0f, 0f)
+            }
+            if (imgW == 0 || imgH == 0 || vw == 0 || vh == 0) {
+                return floatArrayOf(1f, 1f, 0f, 0f)
+            }
+
+            val viewAspect = vw.toFloat() / vh.toFloat()
+            val imgAspect = imgW.toFloat() / imgH.toFloat()
+
+            var scaleX = 1f
+            var scaleY = 1f
+            var dx = 0f
+            var dy = 0f
+
+            if (imgAspect > viewAspect) {
+                scaleX = viewAspect / imgAspect
+                dx = (1f - scaleX) / 2f
+            } else {
+                scaleY = imgAspect / viewAspect
+                dy = (1f - scaleY) / 2f
+            }
+
+            val unscaledVw = if (unscaledViewWidth > 0f) unscaledViewWidth else vw.toFloat()
+            val unscaledVh = if (unscaledViewHeight > 0f) unscaledViewHeight else vh.toFloat()
+
+            val safeScale = scale.coerceAtLeast(1f)
+            val finalScaleX = (scaleX / safeScale).coerceIn(0f, 1f)
+            val finalScaleY = (scaleY / safeScale).coerceIn(0f, 1f)
+
+            val maxDx = maxOf(0f, 1f - finalScaleX)
+            val maxDy = maxOf(0f, 1f - finalScaleY)
+
+            val rawDx = (dx - 0.5f) / safeScale + 0.5f - (offsetX / unscaledVw) * (scaleX / safeScale)
+            val rawDy = (dy - 0.5f) / safeScale + 0.5f - (offsetY / unscaledVh) * (scaleY / safeScale)
+
+            val finalDx = rawDx.coerceIn(0f, maxDx)
+            val finalDy = rawDy.coerceIn(0f, maxDy)
+
+            return floatArrayOf(finalScaleX, finalScaleY, finalDx, finalDy)
+        }
+
         private const val POINT_VERTEX_SHADER = """
             uniform mat4 u_Matrix;
             attribute vec4 a_Position;

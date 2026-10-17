@@ -2203,9 +2203,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                         dynamicBackgroundView.playTurbulence(noiseColor, continuous = isContinuous)
                                     }
 
-                                    val bgOffsetX = backgroundManager.getBgOffsetX()
-                                    val bgOffsetY = backgroundManager.getBgOffsetY()
-                                    val bgScale   = backgroundManager.getBgScale()
+                                    val isBitmap = model is Bitmap
+                                    val bgOffsetX = if (isBitmap) 0f else backgroundManager.getBgOffsetX()
+                                    val bgOffsetY = if (isBitmap) 0f else backgroundManager.getBgOffsetY()
+                                    val bgScale   = if (isBitmap) 1f else backgroundManager.getBgScale()
 
                                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
 
@@ -2253,9 +2254,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                             }
                         }.start()
                     } else {
-                        val bgOffsetX = backgroundManager.getBgOffsetX()
-                        val bgOffsetY = backgroundManager.getBgOffsetY()
-                        val bgScale   = backgroundManager.getBgScale()
+                        val isBitmap = model is Bitmap
+                        val bgOffsetX = if (isBitmap) 0f else backgroundManager.getBgOffsetX()
+                        val bgOffsetY = if (isBitmap) 0f else backgroundManager.getBgOffsetY()
+                        val bgScale   = if (isBitmap) 1f else backgroundManager.getBgScale()
 
                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.RENDERING)
 
