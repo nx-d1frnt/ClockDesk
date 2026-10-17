@@ -62,6 +62,10 @@ class ExternalBackgroundPlugin(
         BackgroundProviderManager.getInstance(context).savePayloadForId(id, payload)
     }
 
+    override fun getIconDrawable(context: Context): Drawable? {
+        return getPluginIcon(context)
+    }
+
     override fun getPreviewDrawable(context: Context): Drawable? {
         if (previewResId != 0 || !previewResName.isNullOrEmpty()) {
             try {
@@ -86,7 +90,7 @@ class ExternalBackgroundPlugin(
                 setColor(payload.color)
             }
         }
-        return ContextCompat.getDrawable(context, iconResId)
+        return getPluginIcon(context)
     }
 
     fun getPreviewModel(context: Context): Any? {

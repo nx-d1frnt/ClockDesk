@@ -146,8 +146,15 @@ class BackgroundPluginsFragment : Fragment() {
                 )
             } else {
                 holder.icon.background = null
-                holder.icon.setImageResource(provider.iconResId)
-                holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(palette.primary)
+                val iconDrawable = provider.getIconDrawable(context)
+                    ?: androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_layers)
+                holder.icon.setImageDrawable(iconDrawable)
+                if (iconDrawable is android.graphics.drawable.BitmapDrawable ||
+                    (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && iconDrawable is android.graphics.drawable.AdaptiveIconDrawable)) {
+                    holder.icon.imageTintList = null
+                } else {
+                    holder.icon.imageTintList = android.content.res.ColorStateList.valueOf(palette.primary)
+                }
             }
 
             val hasConfig = provider.capabilities.supportsConfig ||
