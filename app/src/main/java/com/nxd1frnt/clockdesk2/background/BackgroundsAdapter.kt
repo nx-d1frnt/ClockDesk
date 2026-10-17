@@ -27,6 +27,7 @@ class BackgroundsAdapter(
         val thumb: ImageView = view.findViewById(R.id.background_thumbnail)
         val overlay: View = view.findViewById(R.id.selection_overlay)
         val settingsBtn: ImageView = view.findViewById(R.id.btn_settings)
+        val pluginBadge: ImageView = view.findViewById(R.id.plugin_badge)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -48,6 +49,7 @@ class BackgroundsAdapter(
                 "__ADD__" -> {
                     holder.settingsBtn.visibility = View.GONE
                     holder.settingsBtn.setOnClickListener(null)
+                    holder.pluginBadge.visibility = View.GONE
                     holder.thumb.setImageResource(R.drawable.baseline_add_photo_alternate_24)
                     holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
                     holder.thumb.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
@@ -57,6 +59,7 @@ class BackgroundsAdapter(
                 com.nxd1frnt.clockdesk2.background.provider.DynamicGradientBackgroundProvider.ID -> {
                     holder.settingsBtn.visibility = View.GONE
                     holder.settingsBtn.setOnClickListener(null)
+                    holder.pluginBadge.visibility = View.GONE
                     holder.thumb.imageTintList = null
                     // Load app drawable gradient as preview
                     Glide.with(context)
@@ -66,10 +69,12 @@ class BackgroundsAdapter(
                     holder.itemView.setOnLongClickListener(null)
                 }
                 com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID -> {
+                    Glide.with(context).clear(holder.thumb)
                     holder.settingsBtn.visibility = View.VISIBLE
                     holder.settingsBtn.setOnClickListener {
                         onSettingsClick?.invoke(id)
                     }
+                    holder.pluginBadge.visibility = View.GONE
                     val color = com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider().getColor(context)
                     holder.thumb.setImageDrawable(null)
                     val bg = GradientDrawable().apply {
@@ -100,22 +105,53 @@ class BackgroundsAdapter(
                         } else {
                             holder.settingsBtn.setOnClickListener(null)
                         }
-                        val payload = plugin?.getCurrentPayload(context)
-                        if (payload is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor) {
-                            holder.thumb.setImageDrawable(null)
-                            val bg = GradientDrawable().apply {
-                                shape = GradientDrawable.RECTANGLE
-                                setColor(payload.color)
+
+                        val previewModel = plugin?.getPreviewModel(context)
+                        if (previewModel != null) {
+                            holder.thumb.imageTintList = null
+                            holder.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
+                            Glide.with(context)
+                                .load(previewModel)
+                                .centerCrop()
+                                .into(holder.thumb)
+
+                            val pluginIcon = plugin?.getPluginIcon(context)
+                            if (pluginIcon != null) {
+                                holder.pluginBadge.visibility = View.VISIBLE
+                                holder.pluginBadge.backgroundTintList = ColorStateList.valueOf(
+                                    ColorUtils.setAlphaComponent(palette.surfaceContainerHighest, 230)
+                                )
+                                holder.pluginBadge.setImageDrawable(pluginIcon)
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && pluginIcon is android.graphics.drawable.AdaptiveIconDrawable) {
+                                    holder.pluginBadge.imageTintList = null
+                                } else if (pluginIcon is android.graphics.drawable.BitmapDrawable) {
+                                    holder.pluginBadge.imageTintList = null
+                                } else {
+                                    holder.pluginBadge.imageTintList = ColorStateList.valueOf(palette.onSurface)
+                                }
+                            } else {
+                                holder.pluginBadge.visibility = View.GONE
                             }
-                            holder.thumb.background = bg
-                            val isLight = ColorUtils.calculateLuminance(payload.color) > 0.5
-                            val iconTint = if (isLight) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-                            holder.thumb.imageTintList = ColorStateList.valueOf(iconTint)
                         } else {
-                            holder.thumb.imageTintList = ColorStateList.valueOf(palette.primary)
+                            holder.pluginBadge.visibility = View.GONE
+                            Glide.with(context).clear(holder.thumb)
+                            val payload = plugin?.getCurrentPayload(context)
+                            if (payload is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.SolidColor) {
+                                holder.thumb.setImageDrawable(null)
+                                val bg = GradientDrawable().apply {
+                                    shape = GradientDrawable.RECTANGLE
+                                    setColor(payload.color)
+                                }
+                                holder.thumb.background = bg
+                                val isLight = ColorUtils.calculateLuminance(payload.color) > 0.5
+                                val iconTint = if (isLight) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                                holder.thumb.imageTintList = ColorStateList.valueOf(iconTint)
+                            } else {
+                                holder.thumb.imageTintList = ColorStateList.valueOf(palette.primary)
+                            }
+                            holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
+                            holder.thumb.setImageDrawable(plugin?.getPluginIcon(context) ?: androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_layers))
                         }
-                        holder.thumb.scaleType = ImageView.ScaleType.CENTER_INSIDE
-                        holder.thumb.setImageResource(R.drawable.ic_layers)
                         holder.itemView.setOnLongClickListener {
                             onLongClick(id)
                             true
@@ -123,6 +159,7 @@ class BackgroundsAdapter(
                     } else {
                         holder.settingsBtn.visibility = View.GONE
                         holder.settingsBtn.setOnClickListener(null)
+                        holder.pluginBadge.visibility = View.GONE
                         holder.thumb.imageTintList = null
                         holder.thumb.scaleType = ImageView.ScaleType.CENTER_CROP
                         Glide.with(context)

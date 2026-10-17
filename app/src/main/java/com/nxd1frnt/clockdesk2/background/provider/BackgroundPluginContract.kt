@@ -30,6 +30,8 @@ object BackgroundPluginContract {
     const val KEY_ICON_NAME = "icon_name"
     const val KEY_COLOR = "color"
     const val KEY_IMAGE_URI = "image_uri"
+    const val KEY_PREVIEW_URI = "preview_uri"
+    const val KEY_THUMBNAIL_URI = "thumbnail_uri"
     const val KEY_SETTINGS_ACTIVITY = "settings_activity"
     const val KEY_SUPPORTS_BLUR = "supports_blur"
     const val KEY_SUPPORTS_CROP = "supports_crop"

@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
+import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.background.BackgroundManager
 import com.nxd1frnt.clockdesk2.utils.Logger
 import org.xmlpull.v1.XmlPullParser
@@ -113,6 +114,20 @@ class BackgroundProviderManager private constructor(private val context: Context
         }
     }
 
+    fun savePreviewUriForId(id: String, previewUri: String?) {
+        val editor = prefs.edit()
+        if (previewUri != null) {
+            editor.putString("bg_plugin_preview_uri_$id", previewUri)
+        } else {
+            editor.remove("bg_plugin_preview_uri_$id")
+        }
+        editor.apply()
+    }
+
+    fun getSavedPreviewUriForId(id: String): String? {
+        return prefs.getString("bg_plugin_preview_uri_$id", null)
+    }
+
     private fun loadCachedPlugins() {
         val jsonStr = prefs.getString(KEY_CACHED_PLUGINS, null) ?: return
         try {
@@ -123,20 +138,31 @@ class BackgroundProviderManager private constructor(private val context: Context
                 val pkg = obj.getString("packageName")
                 val rawName = obj.getString("displayName")
                 val rawDesc = obj.optString("description", "")
+                val id = obj.getString("id")
+                val previewResId = obj.optInt("previewResId", 0)
+                val previewResName = if (obj.has("previewResName") && !obj.isNull("previewResName")) obj.getString("previewResName") else null
+                val previewUri = if (obj.has("previewUri") && !obj.isNull("previewUri")) obj.getString("previewUri") else getSavedPreviewUriForId(id)
+                val iconResId = obj.optInt("iconResId", R.drawable.ic_layers)
+                val iconResName = if (obj.has("iconResName") && !obj.isNull("iconResName")) obj.getString("iconResName") else null
                 cached.add(
                     ExternalBackgroundPlugin(
                         packageName = pkg,
                         receiverClassName = obj.getString("receiverClassName"),
-                        id = obj.getString("id"),
+                        id = id,
                         displayName = resolvePotentiallyRawString(pkg, rawName),
                         description = resolvePotentiallyRawString(pkg, rawDesc),
+                        iconResId = iconResId,
                         settingsActivity = if (obj.isNull("settingsActivity")) null else obj.getString("settingsActivity"),
                         capabilities = ProviderCapabilities(
                             supportsBlur = obj.optBoolean("supportsBlur", true),
                             supportsCrop = obj.optBoolean("supportsCrop", obj.optBoolean("supportsCropping", true)),
                             supportsDimming = obj.optBoolean("supportsDimming", obj.optBoolean("supportsDim", true)),
                             supportsWeather = obj.optBoolean("supportsWeather", true)
-                        )
+                        ),
+                        previewResId = previewResId,
+                        previewResName = previewResName,
+                        previewUri = previewUri,
+                        iconResName = iconResName
                     )
                 )
             }
@@ -166,6 +192,11 @@ class BackgroundProviderManager private constructor(private val context: Context
                     put("supportsCropping", p.capabilities.supportsCrop)
                     put("supportsDimming", p.capabilities.supportsDimming)
                     put("supportsWeather", p.capabilities.supportsWeather)
+                    if (p.previewResId != 0) put("previewResId", p.previewResId)
+                    if (p.previewResName != null) put("previewResName", p.previewResName)
+                    if (p.previewUri != null) put("previewUri", p.previewUri)
+                    if (p.iconResId != 0 && p.iconResId != R.drawable.ic_layers) put("iconResId", p.iconResId)
+                    if (p.iconResName != null) put("iconResName", p.iconResName)
                 }
                 jsonArray.put(obj)
             }
@@ -255,6 +286,10 @@ class BackgroundProviderManager private constructor(private val context: Context
                         var supportsCrop = true
                         var supportsWeather = true
                         var supportsDim = true
+                        var previewResId = 0
+                        var previewResName: String? = null
+                        var iconResId = 0
+                        var iconResName: String? = null
 
                         while (parser.next() != XmlPullParser.END_DOCUMENT) {
                             if (parser.eventType == XmlPullParser.START_TAG && parser.name == "background-plugin") {
@@ -278,6 +313,32 @@ class BackgroundProviderManager private constructor(private val context: Context
                                     hasDimAttr -> parser.getAttributeBooleanValue(null, "supportsDim", true)
                                     else -> true
                                 }
+                                previewResId = parser.getAttributeResourceValue(null, "preview",
+                                    parser.getAttributeResourceValue(null, "previewDrawable",
+                                        parser.getAttributeResourceValue(null, "thumbnail", 0)))
+                                val previewAttr = parser.getAttributeValue(null, "preview")
+                                    ?: parser.getAttributeValue(null, "previewDrawable")
+                                    ?: parser.getAttributeValue(null, "thumbnail")
+                                if (previewResId == 0 && previewAttr != null) {
+                                    if (previewAttr.startsWith("@")) {
+                                        val trimmed = previewAttr.substring(1)
+                                        previewResName = trimmed.substringAfter("/")
+                                        previewResId = trimmed.toIntOrNull() ?: 0
+                                    } else {
+                                        previewResName = previewAttr.substringAfter("/")
+                                    }
+                                }
+                                iconResId = parser.getAttributeResourceValue(null, "icon", 0)
+                                val iconAttr = parser.getAttributeValue(null, "icon")
+                                if (iconResId == 0 && iconAttr != null) {
+                                    if (iconAttr.startsWith("@")) {
+                                        val trimmed = iconAttr.substring(1)
+                                        iconResName = trimmed.substringAfter("/")
+                                        iconResId = trimmed.toIntOrNull() ?: 0
+                                    } else {
+                                        iconResName = iconAttr.substringAfter("/")
+                                    }
+                                }
                             }
                         }
 
@@ -288,20 +349,26 @@ class BackgroundProviderManager private constructor(private val context: Context
                                 !settingsActivity.contains(".") -> "$packageName.$settingsActivity"
                                 else -> settingsActivity
                             }
+                            val fullId = "external:$packageName/$pluginId"
                             discovered.add(
                                 ExternalBackgroundPlugin(
                                     packageName = packageName,
                                     receiverClassName = className,
-                                    id = "external:$packageName/$pluginId",
+                                    id = fullId,
                                     displayName = displayName,
                                     description = description ?: "",
+                                    iconResId = if (iconResId != 0) iconResId else R.drawable.ic_layers,
                                     settingsActivity = resolvedSettingsActivity,
                                     capabilities = ProviderCapabilities(
                                         supportsBlur = supportsBlur,
                                         supportsCrop = supportsCrop,
                                         supportsDimming = supportsDim,
                                         supportsWeather = supportsWeather
-                                    )
+                                    ),
+                                    previewResId = previewResId,
+                                    previewResName = previewResName,
+                                    previewUri = getSavedPreviewUriForId(fullId),
+                                    iconResName = iconResName
                                 )
                             )
                         }
@@ -403,7 +470,13 @@ class BackgroundProviderManager private constructor(private val context: Context
         }
 
         val effectiveId = plugin?.id ?: if (packageName != null) "external:$packageName/$pluginId" else "external:$pluginId"
-        Logger.i("BackgroundProvider") { "handlePluginUpdate: plugin=$effectiveId, payload=$payload" }
+        val previewUri = intent.getStringExtra(BackgroundPluginContract.KEY_PREVIEW_URI)
+            ?: intent.getStringExtra(BackgroundPluginContract.KEY_THUMBNAIL_URI)
+        if (!previewUri.isNullOrEmpty()) {
+            savePreviewUriForId(effectiveId, previewUri)
+            plugin?.previewUri = previewUri
+        }
+        Logger.i("BackgroundProvider") { "handlePluginUpdate: plugin=$effectiveId, payload=$payload, previewUri=$previewUri" }
         savePayloadForId(effectiveId, payload)
         plugin?.updatePayload(context, payload)
 
