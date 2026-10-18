@@ -134,10 +134,12 @@ class DevicesDeskView @JvmOverloads constructor(
     }
 
     fun refreshDevices() {
-        val allDevices = deskConnectManager.discoveredDevices.values.toList()
+        val pairedDevices = deskConnectManager.discoveredDevices.values
+            .filter { it.isPaired || deskConnectManager.security.isDevicePaired(it.deviceId) }
+            .sortedWith(compareByDescending<DeskConnectDevice> { it.isConnected }.thenBy { it.getDisplayName().lowercase() })
 
         deviceList.clear()
-        deviceList.addAll(allDevices)
+        deviceList.addAll(pairedDevices)
         deviceAdapter.notifyDataSetChanged()
 
         if (deviceList.isEmpty()) {
