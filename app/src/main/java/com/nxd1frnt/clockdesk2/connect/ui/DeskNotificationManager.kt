@@ -24,6 +24,9 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
+import com.nxd1frnt.clockdesk2.desks.DeskType
+import com.nxd1frnt.clockdesk2.timer.TimerManager
+import com.nxd1frnt.clockdesk2.ui.MainActivity
 import com.nxd1frnt.clockdesk2.utils.Logger
 import java.util.LinkedList
 import kotlin.math.abs
@@ -115,10 +118,36 @@ class DeskNotificationManager(
         deskConnectManager.deviceListeners.add(deviceListener)
     }
 
+    fun showTimerExpiredNotification(title: String, text: String) {
+        val item = NotificationItem(
+            deviceId = "local_timer",
+            notificationId = "timer_expired",
+            appName = context.getString(R.string.desk_type_timer),
+            title = title,
+            text = text,
+            iconBytes = null,
+            timestamp = System.currentTimeMillis(),
+            isClearable = true
+        )
+        mainHandler.post {
+            enqueueNotification(item)
+        }
+    }
+
+    fun dismissTimerNotification() {
+        mainHandler.post {
+            queue.removeAll { it.deviceId == "local_timer" || it.notificationId == "timer_expired" }
+            if (currentItem?.deviceId == "local_timer" || currentItem?.notificationId == "timer_expired") {
+                dismissCurrent(notifyManager = false)
+            }
+        }
+    }
+
     private fun getPrefs() = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
     private fun enqueueNotification(item: NotificationItem) {
-        if (!getPrefs().getBoolean("desk_notification_popup_enabled", true)) {
+        val isTimer = item.deviceId == "local_timer" || item.notificationId == "timer_expired"
+        if (!isTimer && !getPrefs().getBoolean("desk_notification_popup_enabled", true)) {
             return
         }
 
@@ -129,8 +158,8 @@ class DeskNotificationManager(
                 updateViewContent(view, item)
                 // Refresh auto dismiss timer
                 val baseDurationSec = getPrefs().getInt("desk_notification_duration", 5)
-                val defaultDisplayMs = (baseDurationSec * 1000L).coerceAtLeast(2000L)
-                scheduleAutoDismiss(if (queue.isNotEmpty()) 3000L else defaultDisplayMs)
+                val defaultDisplayMs = if (isTimer) 60_000L else (baseDurationSec * 1000L).coerceAtLeast(2000L)
+                scheduleAutoDismiss(if (queue.isNotEmpty() && !isTimer) 3000L else defaultDisplayMs)
             }
             return
         }
@@ -150,8 +179,10 @@ class DeskNotificationManager(
     }
 
     private fun updateViewContent(view: View, item: NotificationItem) {
-        val dev = deskConnectManager.discoveredDevices[item.deviceId]
-        val deviceName = dev?.getDisplayName()
+        val deviceName = if (item.deviceId == "local_timer") null else {
+            val dev = deskConnectManager.discoveredDevices[item.deviceId]
+            dev?.getDisplayName()
+        }
 
         DeskNotificationHelper.applyBannerCustomization(
             context = context,
@@ -234,7 +265,19 @@ class DeskNotificationManager(
 
         updateViewContent(view, item)
 
+        val isTimer = item.deviceId == "local_timer" || item.notificationId == "timer_expired"
+        if (isTimer) {
+            view.setOnClickListener {
+                TimerManager.reset()
+                MainActivity.openDeskType(DeskType.TIMER)
+                dismissCurrent(notifyManager = false)
+            }
+        }
+
         dismissBtn.setOnClickListener {
+            if (currentItem?.deviceId == "local_timer" || currentItem?.notificationId == "timer_expired") {
+                TimerManager.reset()
+            }
             dismissCurrent(notifyManager = true)
         }
 
@@ -253,10 +296,10 @@ class DeskNotificationManager(
             .setInterpolator(OvershootInterpolator(0.8f))
             .start()
 
-        // Auto dismiss based on user preference: duration if single, 3 seconds if backlog exists
+        // Auto dismiss based on user preference: duration if single, 3 seconds if backlog exists (timers stay 60s)
         val baseDurationSec = prefs.getInt("desk_notification_duration", 5)
-        val defaultDisplayMs = (baseDurationSec * 1000L).coerceAtLeast(2000L)
-        val displayTimeMs = if (queue.isNotEmpty()) 3000L else defaultDisplayMs
+        val defaultDisplayMs = if (isTimer) 60_000L else (baseDurationSec * 1000L).coerceAtLeast(2000L)
+        val displayTimeMs = if (queue.isNotEmpty() && !isTimer) 3000L else defaultDisplayMs
         scheduleAutoDismiss(displayTimeMs)
 
         // Absolute safety watchdog: force-dismiss after timeout no matter what
@@ -423,7 +466,10 @@ class DeskNotificationManager(
 
         isDismissing = true
 
-        if (notifyManager && itemToDismiss != null && itemToDismiss.isClearable) {
+        val isTimer = itemToDismiss != null && (itemToDismiss.deviceId == "local_timer" || itemToDismiss.notificationId == "timer_expired")
+        if (isTimer) {
+            TimerManager.reset()
+        } else if (notifyManager && itemToDismiss != null && itemToDismiss.isClearable) {
             deskConnectManager.dismissNotification(itemToDismiss.deviceId, itemToDismiss.notificationId)
         }
 

@@ -597,6 +597,20 @@ object DeskNotificationHelper {
         }
 
         if (!iconApplied) {
+            if (notificationId == "timer_expired" || notificationId.startsWith("timer_")) {
+                val effectiveTint = tintColor
+                    ?: MaterialColors.getColor(
+                        iconView,
+                        androidx.appcompat.R.attr.colorPrimary,
+                        Color.WHITE
+                    )
+                iconView.setImageResource(R.drawable.ic_timer)
+                iconView.setColorFilter(effectiveTint, PorterDuff.Mode.SRC_IN)
+                iconApplied = true
+            }
+        }
+
+        if (!iconApplied) {
             val pkg = if (notificationId.contains("|")) {
                 notificationId.split("|").getOrNull(1)
             } else null

@@ -15,6 +15,7 @@ class ClockDeskApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.nxd1frnt.clockdesk2.timer.TimerManager.init(this)
 
         val processName = getCurrentProcessName(this)
         // Only set the uncaught exception handler in the main process, not the crash reporting process itself.

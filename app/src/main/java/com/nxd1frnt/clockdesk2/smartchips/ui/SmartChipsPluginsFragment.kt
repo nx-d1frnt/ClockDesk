@@ -60,7 +60,7 @@ class SmartChipsPluginsFragment : Fragment() {
 
         val savedOrderString = prefs.getString(
             "smart_chip_order",
-            "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip"
+            "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_timer_chip,show_weather_chip,show_weather_alert_chip"
         ) ?: ""
         val savedOrderList = savedOrderString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
         Logger.d("SmartChipsFragment") { "Saved order: $savedOrderList" }
@@ -232,6 +232,14 @@ class SmartChipsPluginsFragment : Fragment() {
             desc = getString(R.string.show_alarm_chip_summary),
             isInternal = true,
             iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_alarm)
+        )
+        map["show_timer_chip"] = ChipDef(
+            id = "show_timer_chip",
+            packageName = requireContext().packageName,
+            name = getString(R.string.show_timer_chip),
+            desc = getString(R.string.show_timer_chip_summary),
+            isInternal = true,
+            iconDrawable = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_timer)
         )
         map["show_weather_chip"] = ChipDef(
             id = "show_weather_chip",

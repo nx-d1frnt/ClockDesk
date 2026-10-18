@@ -261,6 +261,7 @@ class SmartChipManager(
         UpdatePlugin(context),
         BackgroundProgressPlugin(context),
         AlarmChipPlugin(context),
+        com.nxd1frnt.clockdesk2.smartchips.plugins.TimerSmartChipPlugin(context),
         WeatherChipPlugin(context),
         WeatherAlertPlugin(context)
     )
@@ -951,7 +952,7 @@ class SmartChipManager(
     }
 
     private fun getOrderedVisibleChips(): List<ChipInfo> {
-        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_weather_chip,show_weather_alert_chip") ?: ""
+        val orderString = sharedPreferences.getString("smart_chip_order", "system_bg_progress,show_notifications_chip,show_battery_alert,show_companion_battery,show_device_connection_chip,show_updates,show_alarm_chip,show_timer_chip,show_weather_chip,show_weather_alert_chip") ?: ""
         val orderList = orderString.split(",").map { it.trim() }
 
         return allChips

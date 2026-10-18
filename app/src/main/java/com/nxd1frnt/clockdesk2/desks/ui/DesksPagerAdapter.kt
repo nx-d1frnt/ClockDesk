@@ -143,6 +143,7 @@ class DesksPagerAdapter(
                 is WeatherDeskView -> view.refreshMonetTheme(palette)
                 is DevicesDeskView -> view.refreshMonetTheme(palette)
                 is AppsDeskView -> view.refreshMonetTheme(palette)
+                is TimerDeskView -> view.refreshMonetTheme(palette)
                 else -> UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
             }
         }
@@ -155,6 +156,7 @@ class DesksPagerAdapter(
             DeskType.APPS -> AppsDeskView(context)
             DeskType.DEVICES -> DevicesDeskView(context)
             DeskType.WEATHER -> WeatherDeskView(context)
+            DeskType.TIMER -> TimerDeskView(context)
             DeskType.WEB_KIOSK -> WebKioskDeskView(context)
             DeskType.WIDGETS -> error("Widgets use the activity host")
         }
@@ -163,6 +165,7 @@ class DesksPagerAdapter(
             is WeatherDeskView -> page.refreshMonetTheme(palette)
             is DevicesDeskView -> page.refreshMonetTheme(palette)
             is AppsDeskView -> page.refreshMonetTheme(palette)
+            is TimerDeskView -> page.refreshMonetTheme(palette)
             else -> UiMonetThemeManager.applyLiveToViewHierarchy(page, palette)
         }
         return page
@@ -208,6 +211,7 @@ class DesksPagerAdapter(
     private fun dispose(view: View) {
         (view as? WebKioskDeskView)?.dispose()
         (view as? AppsDeskView)?.dispose()
+        (view as? TimerDeskView)?.dispose()
     }
 
     fun destroy() {

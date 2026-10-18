@@ -13,6 +13,7 @@ enum class DeskType(
     APPS("apps", R.string.desk_type_apps, R.drawable.ic_grid),
     DEVICES("devices", R.string.desk_type_devices, R.drawable.ic_devices),
     WEATHER("weather", R.string.desk_type_weather, R.drawable.ic_mostly_cloudy_day),
+    TIMER("timer", R.string.desk_type_timer, R.drawable.ic_timer),
     WEB_KIOSK("web_kiosk", R.string.desk_type_web_kiosk, R.drawable.ic_web);
 
     companion object {
