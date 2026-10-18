@@ -15,6 +15,7 @@ import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 
 class DeskConnectDiscovery(
@@ -94,23 +95,33 @@ class DeskConnectDiscovery(
     }
 
     fun broadcastIdentity() {
-        udpExecutor.execute {
-            sendBroadcastPacket()
+        if (!isRunning.get() || udpExecutor.isShutdown) return
+        try {
+            udpExecutor.execute {
+                sendBroadcastPacket()
+            }
+        } catch (e: RejectedExecutionException) {
+            Logger.w("DeskConnectDiscovery") { "Failed to schedule broadcastIdentity: executor shutdown" }
         }
     }
 
     fun forceRefresh() {
         lastRepliedTime.clear()
         broadcastIdentity()
-        udpExecutor.execute {
-            try {
-                Thread.sleep(500)
-                if (isRunning.get()) {
-                    sendBroadcastPacket()
+        if (!isRunning.get() || udpExecutor.isShutdown) return
+        try {
+            udpExecutor.execute {
+                try {
+                    Thread.sleep(500)
+                    if (isRunning.get()) {
+                        sendBroadcastPacket()
+                    }
+                } catch (e: InterruptedException) {
+                    // Ignored
                 }
-            } catch (e: InterruptedException) {
-                // Ignored
             }
+        } catch (e: RejectedExecutionException) {
+            Logger.w("DeskConnectDiscovery") { "Failed to schedule forceRefresh: executor shutdown" }
         }
     }
 
@@ -206,24 +217,29 @@ class DeskConnectDiscovery(
     }
 
     private fun sendUnicastIdentity(targetAddress: InetAddress, port: Int) {
-        udpExecutor.execute {
-            try {
-                val identityPacket = DeskConnectPacket.createFullIdentity(
-                    deviceId = security.deviceId,
-                    deviceName = deviceName,
-                    deviceType = "tablet",
-                    tcpPort = tcpPort
-                )
-                val json = identityPacket.toJson() + "\n"
-                val data = json.toByteArray(StandardCharsets.UTF_8)
-                val p = DatagramPacket(data, data.size, targetAddress, port)
+        if (!isRunning.get() || udpExecutor.isShutdown) return
+        try {
+            udpExecutor.execute {
+                try {
+                    val identityPacket = DeskConnectPacket.createFullIdentity(
+                        deviceId = security.deviceId,
+                        deviceName = deviceName,
+                        deviceType = "tablet",
+                        tcpPort = tcpPort
+                    )
+                    val json = identityPacket.toJson() + "\n"
+                    val data = json.toByteArray(StandardCharsets.UTF_8)
+                    val p = DatagramPacket(data, data.size, targetAddress, port)
 
-                DatagramSocket().use { sendSocket ->
-                    sendSocket.send(p)
+                    DatagramSocket().use { sendSocket ->
+                        sendSocket.send(p)
+                    }
+                } catch (e: Exception) {
+                    Logger.w("DeskConnectDiscovery") { "Failed to send unicast identity to $targetAddress: ${e.message}" }
                 }
-            } catch (e: Exception) {
-                Logger.w("DeskConnectDiscovery") { "Failed to send unicast identity to $targetAddress: ${e.message}" }
             }
+        } catch (e: RejectedExecutionException) {
+            Logger.w("DeskConnectDiscovery") { "Failed to send unicast identity: executor shutdown" }
         }
     }
 

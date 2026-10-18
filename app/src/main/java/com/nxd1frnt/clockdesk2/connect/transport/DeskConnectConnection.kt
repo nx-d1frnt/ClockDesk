@@ -13,6 +13,7 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 
 class DeskConnectConnection(
@@ -26,7 +27,7 @@ class DeskConnectConnection(
     @Volatile
     var isReplaced: Boolean = false
 
-    fun isAlive(): Boolean = isRunning.get() && !socket.isClosed
+    fun isAlive(): Boolean = isRunning.get() && !socket.isClosed && !sendExecutor.isShutdown
 
     private var readerThread: Thread? = null
     private var outputStream: OutputStream? = null
@@ -93,43 +94,48 @@ class DeskConnectConnection(
     private fun processIncomingPacket(packet: DeskConnectPacket) {
         val payloadPort = packet.payloadTransferInfo?.optInt("port", -1) ?: -1
         if (packet.payloadSize > 0 && payloadPort > 0) {
-            payloadExecutor.execute {
-                var payloadBytes: ByteArray? = null
-                try {
-                    val remoteAddress = (socket.remoteSocketAddress as? InetSocketAddress)?.address
-                        ?: device.ipAddress
-                        ?: socket.inetAddress
+            if (!isRunning.get() || socket.isClosed || payloadExecutor.isShutdown) return
+            try {
+                payloadExecutor.execute {
+                    var payloadBytes: ByteArray? = null
+                    try {
+                        val remoteAddress = (socket.remoteSocketAddress as? InetSocketAddress)?.address
+                            ?: device.ipAddress
+                            ?: socket.inetAddress
 
-                    val plainSocket = Socket()
-                    plainSocket.connect(InetSocketAddress(remoteAddress, payloadPort), 8000)
-                    plainSocket.soTimeout = 8000
+                        val plainSocket = Socket()
+                        plainSocket.connect(InetSocketAddress(remoteAddress, payloadPort), 8000)
+                        plainSocket.soTimeout = 8000
 
-                    val sslSocket = security.convertToSslSocket(plainSocket, clientMode = true)
-                    sslSocket.startHandshake()
+                        val sslSocket = security.convertToSslSocket(plainSocket, clientMode = true)
+                        sslSocket.startHandshake()
 
-                    val inStream = sslSocket.getInputStream()
-                    val baos = ByteArrayOutputStream()
-                    val buffer = ByteArray(4096)
-                    var totalRead = 0L
-                    val targetSize = packet.payloadSize
+                        val inStream = sslSocket.getInputStream()
+                        val baos = ByteArrayOutputStream()
+                        val buffer = ByteArray(4096)
+                        var totalRead = 0L
+                        val targetSize = packet.payloadSize
 
-                    while (totalRead < targetSize) {
-                        val toRead = minOf(buffer.size.toLong(), targetSize - totalRead).toInt()
-                        val bytesRead = inStream.read(buffer, 0, toRead)
-                        if (bytesRead == -1) break
-                        baos.write(buffer, 0, bytesRead)
-                        totalRead += bytesRead
+                        while (totalRead < targetSize) {
+                            val toRead = minOf(buffer.size.toLong(), targetSize - totalRead).toInt()
+                            val bytesRead = inStream.read(buffer, 0, toRead)
+                            if (bytesRead == -1) break
+                            baos.write(buffer, 0, bytesRead)
+                            totalRead += bytesRead
+                        }
+                        payloadBytes = baos.toByteArray()
+                        sslSocket.close()
+                        Logger.d("DeskConnectConnection") { "Successfully fetched payload for ${packet.type} (${payloadBytes.size} bytes) from ${device.deviceId}" }
+                    } catch (e: Exception) {
+                        Logger.w("DeskConnectConnection") { "Failed to fetch payload on port $payloadPort for ${packet.type}: ${e.message}" }
                     }
-                    payloadBytes = baos.toByteArray()
-                    sslSocket.close()
-                    Logger.d("DeskConnectConnection") { "Successfully fetched payload for ${packet.type} (${payloadBytes.size} bytes) from ${device.deviceId}" }
-                } catch (e: Exception) {
-                    Logger.w("DeskConnectConnection") { "Failed to fetch payload on port $payloadPort for ${packet.type}: ${e.message}" }
-                }
 
-                if (isRunning.get()) {
-                    onPacketReceived(this, packet, payloadBytes)
+                    if (isRunning.get()) {
+                        onPacketReceived(this, packet, payloadBytes)
+                    }
                 }
+            } catch (e: RejectedExecutionException) {
+                Logger.w("DeskConnectConnection") { "Failed to schedule payload fetch for ${packet.type}: executor is shutdown" }
             }
         } else {
             onPacketReceived(this, packet, null)
@@ -137,25 +143,30 @@ class DeskConnectConnection(
     }
 
     fun sendPacket(packet: DeskConnectPacket, onComplete: ((Boolean) -> Unit)? = null) {
-        if (!isRunning.get() || socket.isClosed) {
+        if (!isRunning.get() || socket.isClosed || sendExecutor.isShutdown) {
             onComplete?.invoke(false)
             return
         }
 
-        sendExecutor.execute {
-            try {
-                val json = packet.toJson() + "\n"
-                val data = json.toByteArray(StandardCharsets.UTF_8)
-                synchronized(this) {
-                    outputStream?.write(data)
-                    outputStream?.flush()
+        try {
+            sendExecutor.execute {
+                try {
+                    val json = packet.toJson() + "\n"
+                    val data = json.toByteArray(StandardCharsets.UTF_8)
+                    synchronized(this) {
+                        outputStream?.write(data)
+                        outputStream?.flush()
+                    }
+                    onComplete?.invoke(true)
+                } catch (e: Exception) {
+                    Logger.e("DeskConnectConnection") { "Error sending packet to ${device.deviceId}: ${e.message}" }
+                    close()
+                    onComplete?.invoke(false)
                 }
-                onComplete?.invoke(true)
-            } catch (e: Exception) {
-                Logger.e("DeskConnectConnection") { "Error sending packet to ${device.deviceId}: ${e.message}" }
-                close()
-                onComplete?.invoke(false)
             }
+        } catch (e: RejectedExecutionException) {
+            Logger.w("DeskConnectConnection") { "Failed to schedule sendPacket for ${packet.type} to ${device.deviceId}: executor is shutdown" }
+            onComplete?.invoke(false)
         }
     }
 
