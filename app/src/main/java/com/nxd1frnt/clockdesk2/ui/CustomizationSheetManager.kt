@@ -685,7 +685,7 @@ class CustomizationSheetManager(
         bsGridSnapSwitch.isChecked = widgetMover.isGridSnapEnabled()
         bsIgnoreCollisionSwitch.isChecked = widgetMover.isCollisionCheckEnabled()
 
-        val prefs = sideSheetView.context.getSharedPreferences("ClockDeskPrefs", android.content.Context.MODE_PRIVATE)
+        val prefs = fontManager.appearancePreferences
         bsShowMediaIconSwitch.setOnCheckedChangeListener(null)
         bsShowMediaIconSwitch.isChecked = prefs.getBoolean("show_media_icon", true)
         bsShowMediaIconSwitch.setOnCheckedChangeListener { _, isChecked ->

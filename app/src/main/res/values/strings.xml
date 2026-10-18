@@ -811,4 +811,16 @@
     <string name="weather_desk_hourly">Hourly Forecast</string>
     <string name="weather_desk_daily">7-Day Forecast</string>
     <string name="manage_desks_btn">Desks</string>
+    <string name="desk_copy_title">%1$s (copy)</string>
+    <string name="desk_rename">Rename desk</string>
+    <string name="desk_duplicate">Duplicate desk</string>
+    <string name="desk_set_start">Open this desk on launch</string>
+    <string name="desk_resume_last">Open the last used desk on launch</string>
+    <string name="desk_start_label">%1$s · Start</string>
+    <string name="desk_options">Desk options</string>
+    <string name="desk_name">Desk name</string>
+    <string name="desk_preview_empty">Add widgets</string>
+    <string name="desk_preview_apps">Your apps</string>
+    <string name="desk_preview_web">Web page</string>
+    <string name="desk_name_required">Enter a desk name</string>
 </resources>

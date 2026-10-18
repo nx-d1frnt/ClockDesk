@@ -20,13 +20,23 @@ import org.json.JSONObject
 class DesktopWidgetManager(
     private val context: Context,
     private val mainLayout: ConstraintLayout,
-    var host: DesktopWidgetHost? = null
+    var host: DesktopWidgetHost? = null,
+    layoutKey: String = DEFAULT_LAYOUT_KEY
 ) {
+    companion object {
+        const val DEFAULT_LAYOUT_KEY = "active_widgets_json"
+
+        fun positionPreferencesName(layoutKey: String): String =
+            if (layoutKey == DEFAULT_LAYOUT_KEY) "WidgetPositions" else "WidgetPositions_$layoutKey"
+    }
+
+    var layoutKey: String = layoutKey
+        private set
     private val TAG = "DesktopWidgetManager"
     private val prefs: SharedPreferences =
         context.getSharedPreferences("DesktopLayout", Context.MODE_PRIVATE)
-    private val legacyPrefs: SharedPreferences =
-        context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
+    private val legacyPrefs: SharedPreferences
+        get() = context.getSharedPreferences(positionPreferencesName(layoutKey), Context.MODE_PRIVATE)
 
     private val activeInstances = mutableListOf<WidgetInstance>()
     private val instanceViewMap = mutableMapOf<String, View>()
@@ -37,6 +47,25 @@ class DesktopWidgetManager(
 
     init {
         loadLayout()
+    }
+
+    fun switchLayout(layoutKey: String) {
+        if (this.layoutKey == layoutKey) return
+        saveLayout()
+        activeControllers.values.forEach { it.onDestroy() }
+        activeControllers.clear()
+        instanceViewMap.values.forEach {
+            it.animate().setListener(null).cancel()
+            it.clearAnimation()
+            it.setOnClickListener(null)
+            it.setOnTouchListener(null)
+            it.visibility = View.GONE
+            it.alpha = 0f
+        }
+        instanceViewMap.clear()
+        this.layoutKey = layoutKey
+        loadLayout()
+        onWidgetsChanged?.invoke()
     }
 
     fun getActiveInstances(): List<WidgetInstance> = activeInstances.toList()
@@ -78,7 +107,7 @@ class DesktopWidgetManager(
 
     private fun loadLayout() {
         activeInstances.clear()
-        val jsonString = prefs.getString("active_widgets_json", null)
+        val jsonString = prefs.getString(layoutKey, null)
         if (jsonString != null) {
             try {
                 val array = JSONArray(jsonString)
@@ -117,14 +146,14 @@ class DesktopWidgetManager(
 
         if (activeInstances.isEmpty()) {
             val hasConfigured = prefs.getBoolean("has_configured_desktop", false)
-            if (!hasConfigured) {
+            if (!hasConfigured && layoutKey == DEFAULT_LAYOUT_KEY) {
                 migrateOrInitDefaults()
                 prefs.edit().putBoolean("has_configured_desktop", true).apply()
             }
         }
 
         val layoutVersion = prefs.getInt("desktop_layout_version", 1)
-        if (layoutVersion < 2) {
+        if (layoutKey == DEFAULT_LAYOUT_KEY && layoutVersion < 2) {
             val mediaInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.MEDIA }
             val timeInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.TIME }
             val dateInstance = activeInstances.firstOrNull { it.type == DesktopWidgetType.DATE }
@@ -218,10 +247,9 @@ class DesktopWidgetManager(
             }
             array.put(obj)
         }
-        prefs.edit()
-            .putString("active_widgets_json", array.toString())
-            .putBoolean("has_configured_desktop", true)
-            .apply()
+        val editor = prefs.edit().putString(layoutKey, array.toString())
+        if (layoutKey == DEFAULT_LAYOUT_KEY) editor.putBoolean("has_configured_desktop", true)
+        editor.apply()
         Logger.d(TAG) { "Desktop layout saved with ${activeInstances.size} widgets" }
     }
 
@@ -258,6 +286,7 @@ class DesktopWidgetManager(
             val instance = activeInstances.firstOrNull { it.type == type }
             if (instance != null) {
                 instanceViewMap[instance.instanceId] = view
+                view.alpha = 1f
                 view.visibility = if (instance.isVisible) View.VISIBLE else View.GONE
                 if (currentHost != null) {
                     val controller = activeControllers.getOrPut(instance.instanceId) {

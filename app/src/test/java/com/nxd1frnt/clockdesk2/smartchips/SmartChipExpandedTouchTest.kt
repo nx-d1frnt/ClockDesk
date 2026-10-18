@@ -165,7 +165,8 @@ class SmartChipExpandedTouchTest {
 
         // Add a mock ChipInfo entry into allChips via reflection
         val chipInfoClass = SmartChipManager::class.java.declaredClasses.first { it.simpleName == "ChipInfo" }
-        val constructor = chipInfoClass.declaredConstructors.first().apply { isAccessible = true }
+        val constructor = chipInfoClass.declaredConstructors.single { it.parameterCount == 6 }
+            .apply { isAccessible = true }
         // ChipInfo(id, channelId, view, isVisible, currentText, clickActivityClassName)
         val chipInfo = constructor.newInstance("test_overflow_chip", "test_channel", chipView, true, "Test", null)
 

@@ -37,7 +37,9 @@ import kotlin.math.roundToInt
 class WidgetMover(
     private val context: Context,
     initialViews: List<View>,
-    private val parentView: View
+    private val parentView: View,
+    positionPreferencesName: String = "WidgetPositions",
+    autoInitialize: Boolean = true
 ) {
     private val views = initialViews.toMutableList()
 
@@ -78,8 +80,21 @@ class WidgetMover(
     }
 
     private val TAG = "WidgetMover"
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
+    private var prefs: SharedPreferences =
+        context.getSharedPreferences(positionPreferencesName, Context.MODE_PRIVATE)
+
+    fun setPositionPreferences(name: String) {
+        parentView.removeCallbacks(restoreRunnable)
+        pendingPostApplyRunnable?.let { parentView.removeCallbacks(it) }
+        pendingPostApplyRunnable = null
+        views.forEach { it.animate().cancel() }
+        if (parentView is ViewGroup) android.transition.TransitionManager.endTransitions(parentView)
+        prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        isFirstRestore = true
+        loadInitialState()
+        checkAndInitializeDefaults()
+        restoreOrderAndPositions()
+    }
 
     // State Management
     private var currentMode: LayoutMode = LayoutMode.StackMode
@@ -132,7 +147,7 @@ class WidgetMover(
         Logger.d("WidgetMover"){"WidgetMover initialized with ${views.size} views"}
         loadInitialState()
 
-        parentView.post {
+        if (autoInitialize) parentView.post {
             ensureLayoutReady {
                 Logger.d("WidgetMover"){"Auto-initializing widget positions..."}
                 checkAndInitializeDefaults()
@@ -141,11 +156,44 @@ class WidgetMover(
         }
     }
 
+    /** Lay out a detached thumbnail using the same constraints as the live desk. */
+    fun restoreImmediately(width: Int, height: Int) {
+        checkAndInitializeDefaults()
+        fun layout() {
+            parentView.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+            )
+            parentView.layout(0, 0, width, height)
+        }
+        layout()
+        restoreRunnable.run()
+        layout()
+        pendingPostApplyRunnable?.let {
+            parentView.removeCallbacks(it)
+            it.run()
+        }
+        pendingPostApplyRunnable = null
+        layout()
+    }
+
     private fun ensureLayoutReady(action: () -> Unit) {
         if (parentView.width > 0 && parentView.height > 0) {
             action()
         } else {
-            parentView.post { ensureLayoutReady(action) }
+            // A widget desk may stay detached while another desk is selected.
+            // Wait for its first layout instead of posting endlessly while hidden.
+            parentView.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                override fun onLayoutChange(
+                    view: View, left: Int, top: Int, right: Int, bottom: Int,
+                    oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int
+                ) {
+                    if (view.width > 0 && view.height > 0) {
+                        view.removeOnLayoutChangeListener(this)
+                        action()
+                    }
+                }
+            })
         }
     }
 
@@ -434,9 +482,6 @@ class WidgetMover(
                     view.scaleX = 1f
                     view.scaleY = 1f
                 }
-                if (view.visibility == View.VISIBLE && view.alpha < 1f) {
-                    view.alpha = 1f
-                }
                 if (isInitialRestore) {
                     view.translationX = 0f
                     view.translationY = 0f
@@ -470,9 +515,6 @@ class WidgetMover(
                 } else {
                     view.scaleX = 1f
                     view.scaleY = 1f
-                }
-                if (view.visibility == View.VISIBLE && view.alpha < 1f) {
-                    view.alpha = 1f
                 }
                 val idName = getResourceName(view.id)
                 val savedX = prefs.getFloat("${idName}_x", 0f)

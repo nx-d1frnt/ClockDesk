@@ -11,6 +11,7 @@ class BurnInProtectionManager(
     private var maxShiftPx: Int = 10,
     private val intervalMs: Long = 60000L //1 minute
 ) {
+    var positionPreferencesName: String = "WidgetPositions"
     private val views = mutableListOf<View>()
 
     init {
@@ -88,7 +89,7 @@ class BurnInProtectionManager(
     fun getBasePosition(view: View): Pair<Float, Float> {
         val targetView = resolveTargetView(view)
         val context = targetView.context ?: return Pair(0f, 0f)
-        val prefs = context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(positionPreferencesName, Context.MODE_PRIVATE)
         val idName = try {
             context.resources.getResourceEntryName(targetView.id)
         } catch (e: Exception) {

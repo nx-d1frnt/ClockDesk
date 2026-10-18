@@ -7,6 +7,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.EditText
+import android.text.InputFilter
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -17,12 +19,14 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.desks.DeskItem
 import com.nxd1frnt.clockdesk2.desks.DeskManager
 import com.nxd1frnt.clockdesk2.desks.DeskType
-import java.util.Collections
 
 class DeskOverviewManager(
     private val activity: Activity,
     private val overlayView: View,
     private val deskManager: DeskManager,
+    private val previews: DeskPreviewStore,
+    private val selectedDeskId: () -> String?,
+    private val capturePreviews: () -> Unit,
     private val onOpenDesk: (Int) -> Unit
 ) {
 
@@ -38,6 +42,10 @@ class DeskOverviewManager(
         adapter = OverviewAdapter(
             context = activity,
             desks = deskManager.getDesks().toMutableList(),
+            previews = previews,
+            selectedDeskId = selectedDeskId,
+            startDeskId = { deskManager.getStartDeskId() },
+            onOptions = { showOptions(it) },
             onDeskClick = { position ->
                 hide()
                 onOpenDesk(position)
@@ -63,7 +71,7 @@ class DeskOverviewManager(
                 val fromPos = viewHolder.bindingAdapterPosition
                 val toPos = target.bindingAdapterPosition
                 val deskCount = adapter.getDesksCount()
-                if (fromPos < deskCount && toPos < deskCount) {
+                if (fromPos in 0 until deskCount && toPos in 0 until deskCount) {
                     adapter.moveItem(fromPos, toPos)
                     return true
                 }
@@ -89,6 +97,7 @@ class DeskOverviewManager(
     fun show() {
         if (isVisible) return
         isVisible = true
+        capturePreviews()
         refreshList()
         overlayView.visibility = View.VISIBLE
         overlayView.alpha = 0f
@@ -120,6 +129,50 @@ class DeskOverviewManager(
         adapter.updateList(deskManager.getDesks())
     }
 
+    private fun showOptions(desk: DeskItem) {
+        val actions = mutableListOf<Pair<String, () -> Unit>>(
+            activity.getString(R.string.desk_rename) to { showRenameDialog(desk) },
+            activity.getString(R.string.desk_duplicate) to {
+                capturePreviews()
+                deskManager.duplicateDesk(desk.id)?.let { copy ->
+                    hide()
+                    onOpenDesk(deskManager.getDesks().indexOfFirst { it.id == copy.id })
+                }
+            },
+            activity.getString(R.string.desk_set_start) to { deskManager.setStartDesk(desk.id) }
+        )
+        if (deskManager.getStartDeskId() != null) {
+            actions.add(activity.getString(R.string.desk_resume_last) to { deskManager.setStartDesk(null) })
+        }
+        MaterialAlertDialogBuilder(activity).setTitle(desk.title)
+            .setItems(actions.map { it.first }.toTypedArray()) { _, index -> actions[index].second() }
+            .setNegativeButton(R.string.cancel, null).show()
+    }
+
+    private fun showRenameDialog(desk: DeskItem) {
+        val input = EditText(activity).apply {
+            setSingleLine(true)
+            filters = arrayOf(InputFilter.LengthFilter(80))
+            hint = activity.getString(R.string.desk_name)
+            setText(desk.title)
+            selectAll()
+        }
+        val padding = (24 * activity.resources.displayMetrics.density).toInt()
+        val wrapper = android.widget.FrameLayout(activity).apply {
+            setPadding(padding, 0, padding, 0)
+            addView(input)
+        }
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle(R.string.desk_rename).setView(wrapper)
+            .setPositiveButton(R.string.apply, null).setNegativeButton(R.string.cancel, null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (deskManager.renameDesk(desk.id, input.text.toString())) dialog.dismiss()
+                else input.error = activity.getString(R.string.desk_name_required)
+            }
+        }
+        dialog.show()
+    }
+
     private fun showDeleteConfirm(desk: DeskItem) {
         MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.delete_desk)
@@ -149,13 +202,18 @@ class DeskOverviewManager(
             .show()
     }
 
-    private class OverviewAdapter(
+    internal class OverviewAdapter(
         private val context: Context,
         private val desks: MutableList<DeskItem>,
+        private val previews: DeskPreviewStore,
+        private val selectedDeskId: () -> String?,
+        private val startDeskId: () -> String?,
+        private val onOptions: (DeskItem) -> Unit,
         private val onDeskClick: (Int) -> Unit,
         private val onDeleteDesk: (DeskItem) -> Unit,
         private val onAddDesk: () -> Unit
     ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        init { setHasStableIds(true) }
 
         companion object {
             private const val TYPE_DESK = 0
@@ -173,9 +231,13 @@ class DeskOverviewManager(
         }
 
         fun moveItem(from: Int, to: Int) {
-            Collections.swap(desks, from, to)
+            if (from !in desks.indices || to !in desks.indices) return
+            desks.add(to, desks.removeAt(from))
             notifyItemMoved(from, to)
         }
+
+        override fun getItemId(position: Int): Long =
+            if (position == desks.size) Long.MIN_VALUE else desks[position].id.hashCode().toLong()
 
         override fun getItemViewType(position: Int): Int {
             return if (position < desks.size) TYPE_DESK else TYPE_ADD
@@ -197,8 +259,14 @@ class DeskOverviewManager(
             if (holder is DeskViewHolder) {
                 val desk = desks[position]
                 holder.txtTitle.text = desk.title
-                holder.txtType.text = context.getString(desk.type.titleResId)
+                val typeTitle = context.getString(desk.type.titleResId)
+                holder.txtType.text = if (desk.id == startDeskId()) context.getString(R.string.desk_start_label, typeTitle) else typeTitle
                 holder.imgIcon.setImageResource(desk.type.iconResId)
+                holder.preview.setImageBitmap(previews.get(desk))
+                holder.btnOptions.setOnClickListener { onOptions(desk) }
+                holder.card.strokeColor = com.google.android.material.color.MaterialColors.getColor(holder.card,
+                    if (desk.id == selectedDeskId()) androidx.appcompat.R.attr.colorPrimary
+                    else com.google.android.material.R.attr.colorOutlineVariant)
 
                 holder.btnDelete.visibility = if (desks.size > 1) View.VISIBLE else View.GONE
                 holder.btnDelete.setOnClickListener {
@@ -206,7 +274,8 @@ class DeskOverviewManager(
                 }
 
                 holder.card.setOnClickListener {
-                    onDeskClick(position)
+                    val currentPosition = desks.indexOfFirst { it.id == desk.id }
+                    if (currentPosition >= 0) onDeskClick(currentPosition)
                 }
             } else if (holder is AddViewHolder) {
                 holder.card.setOnClickListener {
@@ -218,6 +287,8 @@ class DeskOverviewManager(
         class DeskViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val card: MaterialCardView = view.findViewById(R.id.card_overview_desk)
             val imgIcon: ImageView = view.findViewById(R.id.img_overview_icon)
+            val preview: ImageView = view.findViewById(R.id.img_overview_preview)
+            val btnOptions: ImageView = view.findViewById(R.id.btn_overview_options)
             val txtTitle: TextView = view.findViewById(R.id.txt_overview_title)
             val txtType: TextView = view.findViewById(R.id.txt_overview_type)
             val btnDelete: ImageView = view.findViewById(R.id.btn_overview_delete)

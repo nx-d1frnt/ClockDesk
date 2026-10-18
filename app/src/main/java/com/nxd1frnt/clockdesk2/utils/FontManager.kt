@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
@@ -75,11 +76,14 @@ class FontManager(
     initialLoggingState: Boolean
 ) {
 
+    var appearancePreferences: SharedPreferences = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
     private val keyPrefixMap = mapOf(
         R.id.time_text to "time",
         R.id.date_text to "date",
         R.id.lastfm_layout to "lastfm",
-        R.id.smart_chip_container to "chips"
+        R.id.smart_chip_container to "chips",
+        R.id.weather_layout to "weather"
     )
 
     private val settingsMap = mutableMapOf<Int, FontSettings>()
@@ -354,7 +358,7 @@ class FontManager(
     }
 
     private fun loadCustomColors() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         val saved = prefs.getString("custom_saved_colors", null)
         customColors.clear()
         if (!saved.isNullOrBlank()) {
@@ -370,7 +374,7 @@ class FontManager(
     }
 
     private fun saveCustomColors() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         val hexList = customColors.joinToString(",") { String.format("#%08X", it) }
         prefs.edit().putString("custom_saved_colors", hexList).apply()
     }
@@ -567,7 +571,7 @@ class FontManager(
     }
 
     fun loadFont() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
 
         rebuildFontList()
         loadCustomColors()
@@ -649,7 +653,7 @@ class FontManager(
     }
 
     fun saveSettings() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         val editor = prefs.edit()
 
         editor.putBoolean("nightShiftEnabled", isNightShiftEnabled)
@@ -759,6 +763,11 @@ class FontManager(
         }
 
         when (viewId) {
+            R.id.weather_layout -> {
+                applyStyleToTextView(weatherText, settings, typeface, finalColor, colorOnly)
+                weatherIcon.setColorFilter(finalColor)
+                if (!colorOnly) weatherIcon.alpha = settings.alpha
+            }
             R.id.time_text -> {
                 applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
                 applyClockStyleToTimeView()
@@ -946,7 +955,7 @@ class FontManager(
     @SuppressLint("RestrictedApi")
     fun setDynamicScheme(seedColor: Int) {
         this.currentScheme = Scheme.dark(seedColor)
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         prefs.edit().putInt("dynamic_seed_color", seedColor).apply()
         applyAll()
         onDynamicSchemeChanged?.invoke(seedColor)
@@ -1278,7 +1287,7 @@ class FontManager(
     fun getDynamicColor(): Int? = dynamicColor
 
     fun clearDynamicColors() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         prefs.edit().remove("dynamic_seed_color").apply()
         currentScheme = null
         dynamicColor = null

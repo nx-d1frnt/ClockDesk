@@ -776,4 +776,16 @@
     <string name="weather_desk_hourly">Почасовой прогноз</string>
     <string name="weather_desk_daily">Прогноз на 7 дней</string>
     <string name="manage_desks_btn">Столы</string>
+    <string name="desk_copy_title">%1$s (копия)</string>
+    <string name="desk_rename">Переименовать деск</string>
+    <string name="desk_duplicate">Дублировать деск</string>
+    <string name="desk_set_start">Открывать этот деск при запуске</string>
+    <string name="desk_resume_last">Открывать последний деск при запуске</string>
+    <string name="desk_start_label">%1$s · Стартовый</string>
+    <string name="desk_options">Настройки деска</string>
+    <string name="desk_name">Название деска</string>
+    <string name="desk_preview_empty">Добавьте виджеты</string>
+    <string name="desk_preview_apps">Ваши приложения</string>
+    <string name="desk_preview_web">Веб-страница</string>
+    <string name="desk_name_required">Введите название деска</string>
 </resources>

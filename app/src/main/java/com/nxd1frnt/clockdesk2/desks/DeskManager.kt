@@ -31,6 +31,61 @@ class DeskManager(private val context: Context) {
         return desks.firstOrNull { it.id == id }
     }
 
+    fun getStartDeskId(): String? = prefs.getString("start_desk_id", null)
+        ?.takeIf { id -> desks.any { it.id == id } }
+
+    fun getInitialDeskId(): String = getStartDeskId()
+        ?: prefs.getString("last_selected_desk_id", null)?.takeIf { id -> desks.any { it.id == id } }
+        ?: getDesks().first().id
+
+    fun recordSelectedDesk(id: String) {
+        if (getDeskById(id) != null) prefs.edit().putString("last_selected_desk_id", id).apply()
+    }
+
+    fun setStartDesk(id: String?) {
+        if (id != null && getDeskById(id) == null) return
+        prefs.edit().putString("start_desk_id", id).apply()
+        onDesksChanged?.invoke()
+    }
+
+    fun renameDesk(id: String, title: String): Boolean {
+        val desk = getDeskById(id) ?: return false
+        val normalized = title.trim().take(80)
+        if (normalized.isEmpty()) return false
+        updateDesk(desk.copy(title = normalized))
+        return true
+    }
+
+    @Synchronized
+    fun duplicateDesk(id: String): DeskItem? {
+        val source = getDeskById(id) ?: return null
+        val newId = "desk_${source.type.typeId}_${UUID.randomUUID().toString().take(8)}"
+        val newDesk = source.copy(
+            id = newId,
+            title = context.getString(R.string.desk_copy_title, source.title),
+            order = (desks.maxOfOrNull { it.order } ?: -1) + 1,
+            widgetLayoutKey = "active_widgets_$newId"
+        )
+        if (source.type == DeskType.WIDGETS) {
+            val layouts = context.getSharedPreferences("DesktopLayout", Context.MODE_PRIVATE)
+            val layout = layouts.getString(source.widgetLayoutKey, null) ?: "[]"
+            layouts.edit().putString(newDesk.widgetLayoutKey, layout).apply()
+            val positions = context.getSharedPreferences(
+                com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager.positionPreferencesName(source.widgetLayoutKey), Context.MODE_PRIVATE
+            )
+            val copiedPositions = context.getSharedPreferences(
+                com.nxd1frnt.clockdesk2.widgets.DesktopWidgetManager.positionPreferencesName(newDesk.widgetLayoutKey), Context.MODE_PRIVATE
+            ).edit()
+            positions.all.forEach { (key, value) -> DeskAppearancePreferences.putValue(copiedPositions, key, value) }
+            copiedPositions.apply()
+            DeskAppearancePreferences.copyProfile(context, source.widgetLayoutKey, newDesk.widgetLayoutKey)
+        }
+        desks.add(newDesk)
+        saveDesks()
+        onDesksChanged?.invoke()
+        return newDesk
+    }
+
     @Synchronized
     fun addDesk(
         type: DeskType,
@@ -40,11 +95,7 @@ class DeskManager(private val context: Context) {
         val title = customTitle ?: context.getString(type.titleResId)
         val id = "desk_${type.typeId}_${UUID.randomUUID().toString().take(8)}"
         val maxOrder = desks.maxOfOrNull { it.order } ?: -1
-        val widgetKey = if (type == DeskType.WIDGETS && desks.none { it.type == DeskType.WIDGETS }) {
-            "active_widgets_json"
-        } else {
-            "active_widgets_${id}"
-        }
+        val widgetKey = "active_widgets_${id}"
 
         val newDesk = DeskItem(
             id = id,
@@ -73,6 +124,10 @@ class DeskManager(private val context: Context) {
             // Re-normalize order
             desks.sortBy { it.order }
             desks.forEachIndexed { index, desk -> desk.order = index }
+            if (prefs.getString("start_desk_id", null) == id) prefs.edit().remove("start_desk_id").apply()
+            if (prefs.getString("last_selected_desk_id", null) == id) {
+                prefs.edit().putString("last_selected_desk_id", desks.first().id).apply()
+            }
             saveDesks()
             onDesksChanged?.invoke()
         }
@@ -81,6 +136,7 @@ class DeskManager(private val context: Context) {
 
     @Synchronized
     fun reorderDesks(reorderedDesks: List<DeskItem>) {
+        if (reorderedDesks.size != desks.size || reorderedDesks.map { it.id }.toSet() != desks.map { it.id }.toSet()) return
         desks.clear()
         reorderedDesks.forEachIndexed { index, desk ->
             desk.order = index
@@ -116,7 +172,13 @@ class DeskManager(private val context: Context) {
                     val order = obj.optInt("order", i)
                     val customUrl = obj.optString("customUrl", "")
                     val autoRefreshMinutes = obj.optInt("autoRefreshMinutes", 0)
-                    val widgetLayoutKey = obj.optString("widgetLayoutKey", "active_widgets_json")
+                    val fallbackWidgetKey = if (id == "desk_widgets_main") {
+                        "active_widgets_json"
+                    } else {
+                        "active_widgets_$id"
+                    }
+                    val widgetLayoutKey = obj.optString("widgetLayoutKey", fallbackWidgetKey)
+                        .ifBlank { fallbackWidgetKey }
 
                     desks.add(
                         DeskItem(
@@ -148,6 +210,20 @@ class DeskManager(private val context: Context) {
             saveDesks()
         } else {
             desks.sortBy { it.order }
+            // Older configurations could assign the legacy key to several desks.
+            // Keep the original layout on its owner and isolate the other desks.
+            val widgetDesks = desks.filter { it.type == DeskType.WIDGETS }
+                .sortedBy { if (it.id == "desk_widgets_main") 0 else 1 }
+            val usedKeys = mutableSetOf<String>()
+            var keysChanged = false
+            widgetDesks.forEach { desk ->
+                if (!usedKeys.add(desk.widgetLayoutKey)) {
+                    desk.widgetLayoutKey = "active_widgets_${desk.id}"
+                    usedKeys.add(desk.widgetLayoutKey)
+                    keysChanged = true
+                }
+            }
+            if (keysChanged) saveDesks()
         }
     }
 

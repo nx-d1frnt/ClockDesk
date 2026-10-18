@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.cancel
 
 class AppsDeskView @JvmOverloads constructor(
     context: Context,
@@ -39,6 +40,7 @@ class AppsDeskView @JvmOverloads constructor(
     )
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var loadJob: Job? = null
     private val allApps = mutableListOf<AppItem>()
     private val filteredApps = mutableListOf<AppItem>()
 
@@ -81,8 +83,20 @@ class AppsDeskView @JvmOverloads constructor(
             editSearch.setText("")
         }
 
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
         loadInstalledApps()
     }
+
+    override fun onDetachedFromWindow() {
+        loadJob?.cancel()
+        loadJob = null
+        super.onDetachedFromWindow()
+    }
+
+    fun dispose() { scope.cancel() }
 
     private fun calculateSpanCount(): Int {
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -95,7 +109,8 @@ class AppsDeskView @JvmOverloads constructor(
     }
 
     private fun loadInstalledApps() {
-        scope.launch {
+        loadJob?.cancel()
+        loadJob = scope.launch {
             val apps = withContext(Dispatchers.IO) {
                 val pm = context.packageManager
                 val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
@@ -139,6 +154,7 @@ class AppsDeskView @JvmOverloads constructor(
         private val items: List<AppItem>,
         private val onClick: (AppItem) -> Unit
     ) : RecyclerView.Adapter<AppsAdapter.ViewHolder>() {
+        init { stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY }
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val iconView: ImageView = view.findViewById(R.id.app_icon)
