@@ -2282,15 +2282,32 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun cancelBackgroundLoads(clearEditBackground: Boolean = true) {
         backgroundRequestId++
-        activeBackgroundTarget?.let {
-            activeBackgroundTarget = null
-            GlideApp.with(this).clear(it)
-        }
+        val bgTarget = activeBackgroundTarget
+        activeBackgroundTarget = null
+        val editTarget = if (clearEditBackground) activeEditBackgroundTarget else null
         if (clearEditBackground) {
-            activeEditBackgroundTarget?.let {
-                activeEditBackgroundTarget = null
-                GlideApp.with(this).clear(it)
+            activeEditBackgroundTarget = null
+        }
+        if (bgTarget == null && editTarget == null) return
+
+        val isActivityDestroyed = Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed
+        try {
+            val requestManager = if (isActivityDestroyed) {
+                GlideApp.with(applicationContext)
+            } else {
+                GlideApp.with(this)
             }
+            bgTarget?.let { requestManager.clear(it) }
+            editTarget?.let { requestManager.clear(it) }
+        } catch (e: IllegalArgumentException) {
+            try {
+                val appRequestManager = GlideApp.with(applicationContext)
+                bgTarget?.let { appRequestManager.clear(it) }
+                editTarget?.let { appRequestManager.clear(it) }
+            } catch (ignored: Exception) {
+            }
+        } catch (e: Exception) {
+            Logger.w("MainActivity") { "Failed to clear background targets: ${e.message}" }
         }
     }
 
