@@ -52,6 +52,13 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.viewpager2.widget.ViewPager2
+import android.view.ScaleGestureDetector
+import android.view.GestureDetector
+import com.nxd1frnt.clockdesk2.desks.DeskManager
+import com.nxd1frnt.clockdesk2.desks.ui.DesksPagerAdapter
+import com.nxd1frnt.clockdesk2.desks.ui.DeskPageIndicatorView
+import com.nxd1frnt.clockdesk2.desks.ui.DeskOverviewManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
@@ -59,6 +66,7 @@ import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -168,6 +176,17 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var burnInProtectionManager: BurnInProtectionManager
     private lateinit var powerStateManager: PowerStateManager
     private lateinit var sensorManager: SensorManager
+
+    // Desks Feature
+    private lateinit var deskManager: DeskManager
+    private lateinit var desksViewPager: ViewPager2
+    private lateinit var deskPageIndicator: DeskPageIndicatorView
+    private lateinit var deskOverviewManager: DeskOverviewManager
+    private lateinit var desksPagerAdapter: DesksPagerAdapter
+    private lateinit var primaryWidgetsContainer: ConstraintLayout
+    private lateinit var scaleGestureDetector: ScaleGestureDetector
+    private lateinit var deskGestureDetector: GestureDetector
+    private lateinit var btnManageDesks: MaterialButton
 
     // State Variables
     private var musicManager: MusicPluginManager? = null
@@ -444,14 +463,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun initViews() {
-        timeText = findViewById(R.id.time_text)
-        dateText = findViewById(R.id.date_text)
-        weatherText = findViewById(R.id.weather_text)
-        weatherIcon = findViewById(R.id.weather_icon)
-        weatherLayout = findViewById(R.id.weather_layout)
-        lastfmLayout = findViewById(R.id.lastfm_layout)
-        lastfmIcon = findViewById(R.id.lastfm_icon)
-        nowPlayingTextView = findViewById(R.id.now_playing_text)
+        primaryWidgetsContainer = layoutInflater.inflate(R.layout.layout_desk_widgets, null, false) as ConstraintLayout
+
+        timeText = primaryWidgetsContainer.findViewById(R.id.time_text)
+        dateText = primaryWidgetsContainer.findViewById(R.id.date_text)
+        weatherText = primaryWidgetsContainer.findViewById(R.id.weather_text)
+        weatherIcon = primaryWidgetsContainer.findViewById(R.id.weather_icon)
+        weatherLayout = primaryWidgetsContainer.findViewById(R.id.weather_layout)
+        lastfmLayout = primaryWidgetsContainer.findViewById(R.id.lastfm_layout)
+        lastfmIcon = primaryWidgetsContainer.findViewById(R.id.lastfm_icon)
+        nowPlayingTextView = primaryWidgetsContainer.findViewById(R.id.now_playing_text)
+        backgroundCustomizationTab = primaryWidgetsContainer.findViewById(R.id.background_customization_fab)
+        chipContainer = primaryWidgetsContainer.findViewById(R.id.smart_chip_container)
+        smartChipScrollView = primaryWidgetsContainer.findViewById(R.id.smart_chip_scrollview)
+        emptyDeskPrompt = primaryWidgetsContainer.findViewById(R.id.empty_desk_prompt)
+
+        desksViewPager = findViewById(R.id.desks_view_pager)
+        deskPageIndicator = findViewById(R.id.desk_page_indicator)
+        btnManageDesks = findViewById<MaterialButton>(R.id.btn_manage_desks)
+
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
@@ -459,7 +489,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         performanceOverlay = findViewById(R.id.performance_overlay)
         settingsButton = findViewById(R.id.settings_button)
         debugButton = findViewById(R.id.demo_button)
-        backgroundCustomizationTab = findViewById(R.id.background_customization_fab)
         mainLayout = findViewById(R.id.main_layout)
         sideSheet = findViewById(R.id.side_sheet)
         backgroundBottomSheet = findViewById(R.id.background_bottom_sheet)
@@ -471,15 +500,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         tutorialLayout = findViewById(R.id.tutorial_overlay_root)
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
-        chipContainer = findViewById(R.id.smart_chip_container)
-        smartChipScrollView = findViewById(R.id.smart_chip_scrollview)
         smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
         editModeActionBar = findViewById(R.id.edit_mode_action_bar)
         btnAddWidget = findViewById(R.id.btn_add_widget)
         btnResetLayout = findViewById(R.id.btn_reset_layout)
         btnDoneEdit = findViewById(R.id.btn_done_edit)
-        emptyDeskPrompt = findViewById(R.id.empty_desk_prompt)
         androidx.core.widget.ImageViewCompat.setImageTintList(editModeBlurLayer, null)
         backgroundCustomizationTab.alpha = 0f
         backgroundCustomizationTab.visibility = View.GONE
@@ -620,7 +646,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             enableAdditionalLogging
         )
 
-        desktopWidgetManager = DesktopWidgetManager(this, mainLayout, host = this)
+        desktopWidgetManager = DesktopWidgetManager(this, primaryWidgetsContainer, host = this)
         desktopWidgetManager.bindExistingViews(
             timeView = timeText,
             dateView = dateText,
@@ -637,7 +663,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val burnInShiftPx = (burnInShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
         burnInProtectionManager = BurnInProtectionManager(activeViews, maxShiftPx = burnInShiftPx)
 
-        widgetMover = WidgetMover(this, movableViews, mainLayout)
+        widgetMover = WidgetMover(this, movableViews, primaryWidgetsContainer)
         widgetMover.burnInProtectionManager = burnInProtectionManager
 
         desktopWidgetManager.onWidgetsChanged = {
@@ -661,6 +687,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             checkAndPlayEntranceAnimation()
         }
 
+        setupDesksSystem()
+
         smartPixelManager = SmartPixelManager(this, smartPixelOverlay, timeoutMs = 10000L)
         if (prefs.getBoolean("smart_pixels_enabled", false)) smartPixelManager.start()
 
@@ -675,6 +703,66 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         fontManager.loadFont()
         setupPreferencesListener(prefs)
         com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).addListener(backgroundProviderListener)
+    }
+
+    private fun setupDesksSystem() {
+        deskManager = DeskManager(this)
+        desksPagerAdapter = DesksPagerAdapter(this, deskManager, primaryWidgetsContainer)
+        desksViewPager.adapter = desksPagerAdapter
+        desksViewPager.offscreenPageLimit = 3
+        deskPageIndicator.setPageCount(deskManager.getDesks().size, desksViewPager.currentItem)
+        deskPageIndicator.onPageClicked = { pos -> desksViewPager.setCurrentItem(pos, true) }
+
+        desksViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                super.onPageSelected(position)
+                deskPageIndicator.setCurrentPage(position)
+            }
+
+            override fun onPageScrollStateChanged(state: Int) {
+                super.onPageScrollStateChanged(state)
+                if (state == ViewPager2.SCROLL_STATE_DRAGGING) {
+                    deskPageIndicator.showTemporarily()
+                }
+            }
+        })
+
+        deskManager.onDesksChanged = {
+            val updatedList = deskManager.getDesks()
+            desksPagerAdapter.updateDesks(updatedList)
+            deskPageIndicator.setPageCount(updatedList.size, desksViewPager.currentItem)
+            if (::deskOverviewManager.isInitialized) {
+                deskOverviewManager.refreshList()
+            }
+        }
+
+        val overviewOverlay = findViewById<View>(R.id.desk_overview_overlay)
+        deskOverviewManager = DeskOverviewManager(this, overviewOverlay, deskManager) { targetIndex ->
+            desksViewPager.setCurrentItem(targetIndex, true)
+        }
+
+        btnManageDesks.setOnClickListener {
+            deskOverviewManager.show()
+        }
+
+        scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (detector.scaleFactor < 0.82f && !isEditMode && !deskOverviewManager.isVisible) {
+                    deskOverviewManager.show()
+                    return true
+                }
+                return false
+            }
+        })
+
+        deskGestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onLongPress(e: MotionEvent) {
+                if (!isEditMode && !deskOverviewManager.isVisible) {
+                    mainLayout.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    enterEditMode()
+                }
+            }
+        })
     }
 
     private fun setupDeskConnectSystem() {
@@ -1022,7 +1110,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun setupListeners() {
-        mainLayout.setOnLongClickListener { toggleEditMode(); true }
+        mainLayout.setOnLongClickListener { enterEditMode(); true }
+        if (::primaryWidgetsContainer.isInitialized) {
+            primaryWidgetsContainer.setOnLongClickListener { enterEditMode(); true }
+        }
 
         widgetMover.setOnInteractionListener { isInteracting ->
             if (isInteracting) {
@@ -1142,6 +1233,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (::deskOverviewManager.isInitialized && deskOverviewManager.isVisible) {
+                    deskOverviewManager.hide()
+                    return
+                }
+
                 if (::cropController.isInitialized && isCropModeActive) {
                     cropController.cancelAndExit()
                     return
@@ -1343,6 +1439,20 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         if (::smartPixelManager.isInitialized) {
             smartPixelManager.onUserInteraction()
+        }
+        if (ev != null) {
+            if (::deskPageIndicator.isInitialized && (ev.action == MotionEvent.ACTION_DOWN || ev.action == MotionEvent.ACTION_MOVE)) {
+                deskPageIndicator.showTemporarily()
+            }
+            if (::deskOverviewManager.isInitialized && deskOverviewManager.isVisible) {
+                return super.dispatchTouchEvent(ev)
+            }
+            if (::scaleGestureDetector.isInitialized && !isEditMode) {
+                scaleGestureDetector.onTouchEvent(ev)
+            }
+            if (::deskGestureDetector.isInitialized) {
+                deskGestureDetector.onTouchEvent(ev)
+            }
         }
         if (ev != null && ::smartChipManager.isInitialized && smartChipManager.isStackExpanded) {
             if (smartChipManager.handleExpandedStackTouch(ev)) {
@@ -2635,54 +2745,73 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         return dp * resources.displayMetrics.density
     }
 
-    private fun toggleEditMode() {
-        isEditMode = !isEditMode
-        smartChipManager.setEditMode(isEditMode) { clickedView ->
+    private fun enterEditMode() {
+        if (isEditMode) return
+        if (::deskManager.isInitialized && ::desksViewPager.isInitialized) {
+            val currentDesk = deskManager.getDesks().getOrNull(desksViewPager.currentItem)
+            if (currentDesk != null && currentDesk.type != com.nxd1frnt.clockdesk2.desks.DeskType.WIDGETS) {
+                return
+            }
+        }
+        isEditMode = true
+        smartChipManager.setEditMode(true) { clickedView ->
             ensureCustomizationSheetManager().showForView(clickedView)
             resetEditModeTimeout()
         }
-        widgetMover.setEditMode(isEditMode)
+        widgetMover.setEditMode(true)
         val targetRadius = dpToPx(36f)
-        val dockSlideOffset = dpToPx(24f)
+
+        if (::desksViewPager.isInitialized) {
+            desksViewPager.post {
+                if (isEditMode) {
+                    desksViewPager.isUserInputEnabled = false
+                }
+            }
+        }
+
+        backgroundCustomizationTab.visibility = View.VISIBLE
+        backgroundCustomizationTab.alpha = 0f
+        backgroundCustomizationTab.scaleX = 0.8f
+        backgroundCustomizationTab.scaleY = 0.8f
+        backgroundCustomizationTab.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(animationDuration)
+            .setInterpolator(MotionUtils.EMPHASIZED_DECELERATE)
+            .start()
+
+        mainLayout.animate()
+            .scaleX(0.92f)
+            .scaleY(0.92f)
+            .setDuration(animationDuration)
+            .setInterpolator(MotionUtils.EMPHASIZED)
+            .start()
+        animateCornerRadius(mainLayout, 0f, targetRadius, animationDuration, MotionUtils.EMPHASIZED)
+
+        if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
+            editModeBlurLayer.animate().cancel()
+            editModeBlurLayer.visibility = View.VISIBLE
+            editModeBlurLayer.alpha = 1.0f
+            updateBackgroundFilters(force = true)
+        }
+
+        showDock(animate = true)
+
+        updateEmptyDeskPromptVisibility()
+
+        desktopWidgetManager.setEditMode(true)
+        if (!isDemoMode) {
+            handler.removeCallbacks(editModeTimeoutRunnable)
+            handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
+        }
+    }
+
+    private fun toggleEditMode() {
         if (isEditMode) {
-            backgroundCustomizationTab.visibility = View.VISIBLE
-            backgroundCustomizationTab.alpha = 0f
-            backgroundCustomizationTab.scaleX = 0.8f
-            backgroundCustomizationTab.scaleY = 0.8f
-            backgroundCustomizationTab.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(animationDuration)
-                .setInterpolator(MotionUtils.EMPHASIZED_DECELERATE)
-                .start()
-
-            mainLayout.animate()
-                .scaleX(0.92f)
-                .scaleY(0.92f)
-                .setDuration(animationDuration)
-                .setInterpolator(MotionUtils.EMPHASIZED)
-                .start()
-            animateCornerRadius(mainLayout, 0f, targetRadius, animationDuration, MotionUtils.EMPHASIZED)
-
-            if (isAdvancedGraphicsEnabled && isGraphicsEditBlurEnabled && hasCustomImageBackground) {
-                editModeBlurLayer.animate().cancel()
-                editModeBlurLayer.visibility = View.VISIBLE
-                editModeBlurLayer.alpha = 1.0f
-                updateBackgroundFilters(force = true)
-            }
-
-            showDock(animate = true)
-
-            updateEmptyDeskPromptVisibility()
-
-            desktopWidgetManager.setEditMode(true)
-            if (!isDemoMode) {
-                handler.removeCallbacks(editModeTimeoutRunnable)
-                handler.postDelayed(editModeTimeoutRunnable, editModeTimeout)
-            }
-        } else {
             exitEditMode()
+        } else {
+            enterEditMode()
         }
     }
 
@@ -2698,7 +2827,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun exitEditMode() {
+        if (!isEditMode) return
         isEditMode = false
+        if (::desksViewPager.isInitialized) {
+            desksViewPager.isUserInputEnabled = true
+        }
         //updateBackgroundFilters(force = true)
         smartChipManager.setEditMode(false) { }
         widgetMover.setEditMode(false)

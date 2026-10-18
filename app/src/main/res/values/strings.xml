@@ -770,4 +770,45 @@
     <string name="background_plugins_title">Background Plugins</string>
     <string name="manage_background_plugins">Manage Background plugins</string>
     <string name="manage_background_plugins_summary">Configure and choose background sources</string>
+
+    <!-- Desks Feature -->
+    <string name="desks_title">Desks</string>
+    <string name="desk_type_widgets">Widgets</string>
+    <string name="desk_type_apps">Apps</string>
+    <string name="desk_type_devices">Your Devices</string>
+    <string name="desk_type_weather">Weather</string>
+    <string name="desk_type_web_kiosk">Web Kiosk</string>
+    <string name="desk_overview_title">Desks Overview</string>
+    <string name="desk_overview_hint">Tap a desk to open, drag cards to reorder</string>
+    <string name="add_desk">Add Desk</string>
+    <string name="select_desk_type">Select Desk Type</string>
+    <string name="delete_desk">Delete Desk</string>
+    <string name="delete_desk_confirm">Are you sure you want to delete \"%1$s\"?</string>
+    <string name="search_apps_hint">Search apps…</string>
+    <string name="no_apps_found">No apps found</string>
+    <string name="device_status_online">Online</string>
+    <string name="device_status_offline">Offline</string>
+    <string name="device_battery_charging">Charging</string>
+    <string name="device_battery_level">%1$d%%</string>
+    <string name="device_ping">Ping</string>
+    <string name="device_ping_sent">Ping sent to %1$s</string>
+    <string name="device_refresh_scan">Scan devices</string>
+    <string name="no_devices_paired">No devices connected</string>
+    <string name="connect_device_prompt">Open DeskConnect settings or pair a device on the same Wi-Fi network</string>
+    <string name="open_deskconnect_settings">Open Settings</string>
+    <string name="kiosk_url_dialog_title">Web Kiosk Settings</string>
+    <string name="kiosk_url_hint">URL (e.g. https://...)</string>
+    <string name="kiosk_refresh_interval">Auto-refresh (minutes, 0 = off)</string>
+    <string name="kiosk_reload">Reload</string>
+    <string name="kiosk_settings">Settings</string>
+    <string name="kiosk_back">Back</string>
+    <string name="kiosk_error_title">Failed to load page</string>
+    <string name="kiosk_empty_url_prompt">Please set a URL in Kiosk Settings</string>
+    <string name="weather_desk_humidity">Humidity</string>
+    <string name="weather_desk_wind">Wind</string>
+    <string name="weather_desk_uv">UV Index</string>
+    <string name="weather_desk_sunrise_sunset">Sun</string>
+    <string name="weather_desk_hourly">Hourly Forecast</string>
+    <string name="weather_desk_daily">7-Day Forecast</string>
+    <string name="manage_desks_btn">Desks</string>
 </resources>

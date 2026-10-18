@@ -733,4 +733,45 @@
     <string name="background_plugins_title">Плагіни фону</string>
     <string name="manage_background_plugins">Керування плагінами фону</string>
     <string name="manage_background_plugins_summary">Налаштування та вибір джерел фону</string>
+
+    <!-- Desks Feature -->
+    <string name="desks_title">Робочі столи</string>
+    <string name="desk_type_widgets">Віджети</string>
+    <string name="desk_type_apps">Додатки</string>
+    <string name="desk_type_devices">Your Devices</string>
+    <string name="desk_type_weather">Погода</string>
+    <string name="desk_type_web_kiosk">Веб-кіоск</string>
+    <string name="desk_overview_title">Керування столами</string>
+    <string name="desk_overview_hint">Натисніть на стіл для переходу або перетягуйте картки для зміни порядку</string>
+    <string name="add_desk">Додати стіл</string>
+    <string name="select_desk_type">Виберіть тип столу</string>
+    <string name="delete_desk">Видалити стіл</string>
+    <string name="delete_desk_confirm">Видалити робочий стіл \"%1$s\"?</string>
+    <string name="search_apps_hint">Пошук додатків…</string>
+    <string name="no_apps_found">Додатки не знайдено</string>
+    <string name="device_status_online">В мережі</string>
+    <string name="device_status_offline">Не в мережі</string>
+    <string name="device_battery_charging">Заряджається</string>
+    <string name="device_battery_level">%1$d%%</string>
+    <string name="device_ping">Сигнал</string>
+    <string name="device_ping_sent">Сигнал надіслано на %1$s</string>
+    <string name="device_refresh_scan">Пошук пристроїв</string>
+    <string name="no_devices_paired">Немає підключених пристроїв</string>
+    <string name="connect_device_prompt">Відкрийте налаштування DeskConnect або підключіть пристрій у тій самій мережі Wi-Fi</string>
+    <string name="open_deskconnect_settings">Налаштування DeskConnect</string>
+    <string name="kiosk_url_dialog_title">Налаштування веб-кіоску</string>
+    <string name="kiosk_url_hint">URL (наприклад, https://...)</string>
+    <string name="kiosk_refresh_interval">Автооновлення (хвилини, 0 = вимк)</string>
+    <string name="kiosk_reload">Оновити</string>
+    <string name="kiosk_settings">Налаштування</string>
+    <string name="kiosk_back">Назад</string>
+    <string name="kiosk_error_title">Помилка завантаження сторінки</string>
+    <string name="kiosk_empty_url_prompt">Вкажіть адресу сторінки у налаштуваннях кіоску</string>
+    <string name="weather_desk_humidity">Вологість</string>
+    <string name="weather_desk_wind">Вітер</string>
+    <string name="weather_desk_uv">УФ-індекс</string>
+    <string name="weather_desk_sunrise_sunset">Сонце</string>
+    <string name="weather_desk_hourly">Погодинний прогноз</string>
+    <string name="weather_desk_daily">Прогноз на 7 днів</string>
+    <string name="manage_desks_btn">Столи</string>
 </resources>

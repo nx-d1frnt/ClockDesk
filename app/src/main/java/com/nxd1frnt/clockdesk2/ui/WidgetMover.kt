@@ -586,10 +586,22 @@ class WidgetMover(
         val parentY = touchPosition[1] + view.top
 
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> handleTouchDown(view, parentX, parentY)
-            MotionEvent.ACTION_MOVE -> handleTouchMove(view, parentX, parentY)
-            MotionEvent.ACTION_UP -> handleTouchUp(view)
-            MotionEvent.ACTION_CANCEL -> handleTouchCancel(view)
+            MotionEvent.ACTION_DOWN -> {
+                view.parent?.requestDisallowInterceptTouchEvent(true)
+                handleTouchDown(view, parentX, parentY)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                view.parent?.requestDisallowInterceptTouchEvent(true)
+                handleTouchMove(view, parentX, parentY)
+            }
+            MotionEvent.ACTION_UP -> {
+                view.parent?.requestDisallowInterceptTouchEvent(false)
+                handleTouchUp(view)
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                view.parent?.requestDisallowInterceptTouchEvent(false)
+                handleTouchCancel(view)
+            }
             else -> false
         }
     }

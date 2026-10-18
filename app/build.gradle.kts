@@ -165,6 +165,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.cardview)
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.16")
     androidTestImplementation(libs.androidx.junit)

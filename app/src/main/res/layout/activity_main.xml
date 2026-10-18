@@ -83,378 +83,22 @@
 
         </LinearLayout>
 
-        <ScrollView
-            android:id="@+id/smart_chip_scrollview"
-            android:layout_width="165dp"
-            android:layout_height="165dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:scrollbars="none"
-            android:fillViewport="true"
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/desks_view_pager"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
             android:clipChildren="false"
             android:clipToPadding="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
-
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:id="@+id/smart_chip_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:padding="4dp" />
-        </ScrollView>
-
-        <FrameLayout
-            android:id="@+id/lastfm_layout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="8dp"
-            android:layout_marginBottom="16dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            app:layout_constraintBottom_toTopOf="@+id/date_text"
-            app:layout_constraintStart_toStartOf="parent">
-
-            <!-- 1. MINIMAL TICKER STYLE -->
-            <LinearLayout
-                android:id="@+id/media_ticker_layout"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:visibility="visible">
-
-                <ImageView
-                    android:id="@+id/lastfm_icon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="center_vertical"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/music_note"
-                    app:tint="#FFFFFFFF" />
-
-                <TextView
-                    android:id="@+id/now_playing_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginLeft="8dp"
-                    android:ellipsize="marquee"
-                    android:marqueeRepeatLimit="marquee_forever"
-                    android:scrollHorizontally="true"
-                    android:singleLine="true"
-                    android:text="@string/now_playing_placeholder"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="16sp" />
-            </LinearLayout>
-
-            <!-- 2. COMPACT CARD STYLE -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/media_compact_card"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="0dp"
-                app:strokeWidth="0dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerHighest">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="16dp"
-                    android:paddingVertical="8dp">
-
-                    <FrameLayout
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:clipChildren="false"
-                        android:clipToPadding="false">
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/compact_cover_art"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/music_note"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/compact_source_icon"
-                            android:layout_width="21dp"
-                            android:layout_height="21dp"
-                            android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="-3dp"
-                            android:layout_marginBottom="-3dp"
-                            android:padding="2dp"
-                            android:scaleType="fitCenter"
-                            android:background="?attr/colorSurfaceContainerHighest"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                            app:tint="#FFFFFFFF"
-                            android:visibility="gone" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:gravity="center_vertical"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/compact_title_text"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="marquee"
-                            android:marqueeRepeatLimit="marquee_forever"
-                            android:scrollHorizontally="true"
-                            android:singleLine="true"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/compact_artist_text"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:alpha="0.8"
-                            android:ellipsize="marquee"
-                            android:marqueeRepeatLimit="marquee_forever"
-                            android:scrollHorizontally="true"
-                            android:singleLine="true"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- 3. EXPANDED PLAYER STYLE -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/media_expanded_card"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="0dp"
-                app:strokeWidth="0dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerHighest">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        android:clipChildren="false"
-                        android:clipToPadding="false">
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/expanded_cover_art"
-                            android:layout_width="60dp"
-                            android:layout_height="60dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/music_note"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/expanded_source_icon"
-                            android:layout_width="28dp"
-                            android:layout_height="28dp"
-                            android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="-3dp"
-                            android:layout_marginBottom="-3dp"
-                            android:padding="2dp"
-                            android:scaleType="fitCenter"
-                            android:background="?attr/colorSurfaceContainerHighest"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                            app:tint="#FFFFFFFF"
-                            android:visibility="gone" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:minWidth="130dp"
-                        android:layout_marginStart="12dp"
-                        android:layout_marginEnd="8dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/expanded_title_text"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="marquee"
-                            android:marqueeRepeatLimit="marquee_forever"
-                            android:scrollHorizontally="true"
-                            android:singleLine="true"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/expanded_artist_text"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:alpha="0.8"
-                            android:ellipsize="marquee"
-                            android:marqueeRepeatLimit="marquee_forever"
-                            android:scrollHorizontally="true"
-                            android:singleLine="true"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="13sp" />
-
-                        <!-- Squiggly Progress Indicator -->
-                        <com.nxd1frnt.clockdesk2.ui.view.SquigglyProgressBar
-                            android:id="@+id/expanded_progress_bar"
-                            android:layout_width="match_parent"
-                            android:layout_height="14dp"
-                            android:layout_marginTop="6dp" />
-                    </LinearLayout>
-
-                    <!-- Transport Controls Row -->
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <ImageView
-                            android:id="@+id/btn_media_prev"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_skip_previous"
-                            app:tint="?attr/colorOnSurface" />
-
-                        <ImageView
-                            android:id="@+id/btn_media_play_pause"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_marginHorizontal="2dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_play_arrow"
-                            app:tint="?attr/colorOnSurface" />
-
-                        <ImageView
-                            android:id="@+id/btn_media_next"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_skip_next"
-                            app:tint="?attr/colorOnSurface" />
-                    </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-        </FrameLayout>
-
-        <com.nxd1frnt.clockdesk2.ui.view.DateTextView
-            android:id="@+id/date_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginLeft="8dp"
-            android:fontFamily="@font/kanit_regular"
-            android:text="@string/customize_date"
-            android:textColor="#DEFFFFFF"
-            android:textSize="24sp"
-            app:layout_constraintBottom_toTopOf="@id/time_text"
-            app:layout_constraintStart_toStartOf="parent" />
-
-        <LinearLayout
-            android:id="@+id/weather_layout"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginLeft="16dp"
-            android:orientation="horizontal"
-            android:visibility="gone"
-            app:layout_constraintBottom_toTopOf="@id/time_text"
-            app:layout_constraintStart_toEndOf="@id/date_text">
-
-            <ImageView
-                android:id="@+id/weather_icon"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/ic_clear_day" />
-
-            <TextView
-                android:id="@+id/weather_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/kanit_regular"
-                android:gravity="center"
-                android:text="0°C"
-                android:textColor="#DEFFFFFF"
-                android:textSize="24sp" />
-        </LinearLayout>
-
-        <com.nxd1frnt.clockdesk2.ui.view.ClockTextView
-            android:id="@+id/time_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginLeft="8dp"
-            android:layout_marginBottom="16dp"
-            android:fontFamily="@font/kanit_regular"
-            android:gravity="center_horizontal"
-            android:includeFontPadding="false"
-            android:text="00:00"
-            android:textColor="#DEFFFFFF"
-            android:textSize="145sp"
-            app:autoSizeTextType="none"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/background_customization_fab"
-            style="@style/ThemeOverlay.Material3.FloatingActionButton.Primary"
+        <com.nxd1frnt.clockdesk2.desks.ui.DeskPageIndicatorView
+            android:id="@+id/desk_page_indicator"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:layout_marginEnd="24dp"
-            android:layout_marginRight="24dp"
-            android:contentDescription="@string/edit_customization"
-            android:visibility="gone"
-            app:fabSize="mini"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/image_edit_outline"
-            tools:visibility="visible" />
-        <TextView
-            android:id="@+id/empty_desk_prompt"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/empty_desk_prompt"
-            android:textColor="#99FFFFFF"
-            android:textSize="18sp"
-            android:gravity="center"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="parent"
+            android:layout_marginBottom="24dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -537,6 +181,19 @@
                     android:text="@string/reset_layout"
                     android:singleLine="true"
                     app:icon="@drawable/ic_backup_restore" />
+
+                <Space
+                    android:layout_width="4dp"
+                    android:layout_height="wrap_content" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_manage_desks"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/manage_desks_btn"
+                    android:singleLine="true"
+                    app:icon="@drawable/ic_grid" />
 
                 <!-- Visual Divider: Layout vs Exit -->
                 <View
@@ -647,4 +304,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             tools:visibility="visible" />
+
+        <include layout="@layout/overlay_desk_overview" />
     </androidx.constraintlayout.widget.ConstraintLayout>
