@@ -96,6 +96,7 @@
 
         <!-- Drag handle indicator -->
         <ImageView
+            android:id="@+id/img_overview_drag_handle"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:layout_gravity="bottom|center_horizontal"

@@ -11,6 +11,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.desks.DeskItem
 import com.nxd1frnt.clockdesk2.desks.DeskManager
 import com.nxd1frnt.clockdesk2.desks.DeskType
+import com.nxd1frnt.clockdesk2.utils.UiMonetPalette
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class DesksPagerAdapter(
     private val deskManager: DeskManager,
@@ -135,15 +137,35 @@ class DesksPagerAdapter(
         trimDetachedPages()
     }
 
+    fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(widgetsView.context)) {
+        pageViews.values.forEach { view ->
+            when (view) {
+                is WeatherDeskView -> view.refreshMonetTheme(palette)
+                is DevicesDeskView -> view.refreshMonetTheme(palette)
+                is AppsDeskView -> view.refreshMonetTheme(palette)
+                else -> UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
+            }
+        }
+        notifyDataSetChanged()
+    }
+
     private fun createPage(desk: DeskItem): View {
         val context = widgetsView.context
-        return when (desk.type) {
+        val page = when (desk.type) {
             DeskType.APPS -> AppsDeskView(context)
             DeskType.DEVICES -> DevicesDeskView(context)
             DeskType.WEATHER -> WeatherDeskView(context)
             DeskType.WEB_KIOSK -> WebKioskDeskView(context)
             DeskType.WIDGETS -> error("Widgets use the activity host")
         }
+        val palette = UiMonetThemeManager.getPalette(context)
+        when (page) {
+            is WeatherDeskView -> page.refreshMonetTheme(palette)
+            is DevicesDeskView -> page.refreshMonetTheme(palette)
+            is AppsDeskView -> page.refreshMonetTheme(palette)
+            else -> UiMonetThemeManager.applyLiveToViewHierarchy(page, palette)
+        }
+        return page
     }
 
     private fun savePage(id: String, view: View) {

@@ -543,6 +543,31 @@ object UiMonetThemeManager {
                 card.setCardBackgroundColor(palette.surfaceContainer)
                 card.strokeColor = palette.outlineVariant
             }
+            R.id.card_overview_desk -> {
+                card.setCardBackgroundColor(palette.surfaceContainerHigh)
+                card.strokeColor = palette.outlineVariant
+                card.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+            }
+            R.id.card_overview_add_desk -> {
+                card.setCardBackgroundColor(palette.surfaceContainer)
+                card.strokeColor = palette.outline
+                card.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+            }
+            R.id.weather_alert_banner -> {
+                card.setCardBackgroundColor(palette.errorContainer)
+                card.strokeColor = palette.error
+            }
+            R.id.weather_hero_card,
+            R.id.card_search_apps,
+            R.id.kiosk_control_pill -> {
+                card.setCardBackgroundColor(palette.surfaceContainerHighest)
+                card.strokeColor = palette.outlineVariant
+            }
+            R.id.card_desk_device -> {
+                card.setCardBackgroundColor(palette.surfaceContainer)
+                card.strokeColor = palette.outlineVariant
+                card.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+            }
             R.id.bottom_nav_card,
             R.id.settings_main_card,
             R.id.crop_hint_card -> {
@@ -630,6 +655,9 @@ object UiMonetThemeManager {
         when (btn.id) {
             // Filled Primary Buttons
             R.id.btn_done_edit,
+            R.id.btn_overview_done,
+            R.id.btn_open_deskconnect_settings,
+            R.id.btn_kiosk_setup_url,
             R.id.crop_position_button,
             R.id.about_btn_github,
             R.id.about_btn_license,
@@ -641,6 +669,9 @@ object UiMonetThemeManager {
             // Filled Tonal Buttons
             R.id.btn_back,
             R.id.btn_add_widget,
+            R.id.btn_refresh_weather,
+            R.id.btn_scan_devices,
+            R.id.btn_ping_device,
             R.id.apply_button,
             R.id.apply_background_button,
             R.id.cancel_background_button,
@@ -683,7 +714,8 @@ object UiMonetThemeManager {
             }
             // Outlined Buttons
             R.id.move_up_button,
-            R.id.move_down_button -> {
+            R.id.move_down_button,
+            R.id.btn_devices_settings -> {
                 btn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
                 btn.setTextColor(palette.primary)
                 btn.iconTint = ColorStateList.valueOf(palette.primary)
@@ -800,7 +832,10 @@ object UiMonetThemeManager {
             R.id.forecast_item_icon,
             R.id.shade_item_app_icon,
             R.id.notification_app_icon,
-            R.id.device_battery_icon -> return
+            R.id.device_battery_icon,
+            R.id.app_icon,
+            R.id.weather_hero_icon,
+            R.id.img_overview_preview -> return
 
             R.id.widget_icon -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.primary)
@@ -808,10 +843,14 @@ object UiMonetThemeManager {
             }
             R.id.dialog_location_icon,
             R.id.dialog_cycle_icon,
-            R.id.device_icon -> {
+            R.id.device_icon,
+            R.id.img_overview_icon,
+            R.id.img_overview_add_icon -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.primary)
             }
-            R.id.dialog_alert_icon -> {
+            R.id.dialog_alert_icon,
+            R.id.btn_overview_delete,
+            R.id.weather_alert_icon -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.error)
             }
             R.id.settings_indicator -> {
@@ -820,7 +859,11 @@ object UiMonetThemeManager {
             R.id.drag_handle -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.outline)
             }
-            R.id.plugin_icon -> {
+            R.id.plugin_icon,
+            R.id.btn_kiosk_back,
+            R.id.btn_kiosk_reload,
+            R.id.btn_kiosk_settings,
+            R.id.img_device_battery -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.onSurface)
             }
             R.id.icon_free_mode,
@@ -829,7 +872,12 @@ object UiMonetThemeManager {
             R.id.icon_show_media_icon,
             R.id.item_icon,
             R.id.item_chevron,
-            R.id.category_icon -> {
+            R.id.category_icon,
+            R.id.btn_overview_options,
+            R.id.btn_clear_search,
+            R.id.img_overview_drag_handle,
+            R.id.img_empty_devices,
+            R.id.img_search_apps_icon -> {
                 iv.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
             }
             else -> {
@@ -858,6 +906,8 @@ object UiMonetThemeManager {
     private fun styleTextView(tv: TextView, palette: UiMonetPalette) {
         when (tv.id) {
             R.id.weather_auto_temp,
+            R.id.weather_hero_temp,
+            R.id.txt_overview_add_title,
             R.id.header_title,
             R.id.item_status_text,
             R.id.burn_in_value_label,
@@ -868,7 +918,8 @@ object UiMonetThemeManager {
             R.id.dialog_location_mode_badge,
             R.id.dialog_forecast_title -> tv.setTextColor(palette.primary)
 
-            R.id.dialog_alert_text -> tv.setTextColor(palette.error)
+            R.id.dialog_alert_text,
+            R.id.weather_alert_text -> tv.setTextColor(palette.error)
 
             R.id.shade_count_badge -> {
                 tv.setTextColor(palette.onPrimaryContainer)
@@ -903,7 +954,18 @@ object UiMonetThemeManager {
             R.id.about_version,
             R.id.about_footer,
             R.id.dialog_temp_text,
-            R.id.dialog_condition_text -> tv.setTextColor(palette.onSurfaceVariant)
+            R.id.dialog_condition_text,
+            R.id.txt_overview_header_hint,
+            R.id.txt_overview_type,
+            R.id.weather_location_mode,
+            R.id.weather_hero_condition,
+            R.id.lbl_wind,
+            R.id.lbl_uv,
+            R.id.lbl_precip,
+            R.id.lbl_cycle,
+            R.id.txt_device_status,
+            R.id.txt_empty_devices_desc,
+            R.id.txt_no_apps -> tv.setTextColor(palette.onSurfaceVariant)
 
             R.id.weather_auto_icon,
             R.id.preview_clock_date -> { /* Leave untouched */ }

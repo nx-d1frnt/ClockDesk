@@ -9,6 +9,8 @@ import android.util.AttributeSet
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import androidx.core.graphics.ColorUtils
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -42,6 +44,10 @@ class DeskPageIndicatorView @JvmOverloads constructor(
         gravity = Gravity.CENTER
         alpha = 0f
         visibility = View.INVISIBLE
+    }
+
+    fun refreshMonetTheme() {
+        updateDots()
     }
 
     fun setPageCount(count: Int, selectedPage: Int = 0) {
@@ -90,6 +96,8 @@ class DeskPageIndicatorView @JvmOverloads constructor(
         removeAllViews()
         if (pageCount <= 1) return
 
+        val palette = UiMonetThemeManager.getPalette(context)
+        val initialColor = ColorUtils.setAlphaComponent(palette.onSurface, 0x60)
         val density = resources.displayMetrics.density
         val marginPx = (4 * density).toInt()
 
@@ -102,7 +110,7 @@ class DeskPageIndicatorView @JvmOverloads constructor(
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = heightPx / 2f
-                    setColor(Color.WHITE)
+                    setColor(initialColor)
                 }
                 setOnClickListener {
                     onPageClicked?.invoke(i)
@@ -114,12 +122,14 @@ class DeskPageIndicatorView @JvmOverloads constructor(
     }
 
     private fun updateDots() {
+        val palette = UiMonetThemeManager.getPalette(context)
+        val activeColor = palette.primary
+        val inactiveColor = ColorUtils.setAlphaComponent(palette.onSurface, 0x60)
         val density = resources.displayMetrics.density
         val inactiveWidth = (7 * density).roundToInt()
         val extraWidth = (18 * density).roundToInt() - inactiveWidth
         val fromPage = scrollPosition.toInt()
         val nextExtraWidth = (extraWidth * (scrollPosition - fromPage)).roundToInt()
-        val inactiveAlpha = 0x60 / 255f
         for (i in 0 until childCount) {
             val dot = getChildAt(i)
             val selection = (1f - abs(i - scrollPosition)).coerceIn(0f, 1f)
@@ -133,7 +143,9 @@ class DeskPageIndicatorView @JvmOverloads constructor(
             if (dot.layoutParams.width != widthPx) {
                 dot.layoutParams = dot.layoutParams.apply { width = widthPx }
             }
-            dot.alpha = inactiveAlpha + (1f - inactiveAlpha) * selection
+            val color = ColorUtils.blendARGB(inactiveColor, activeColor, selection)
+            (dot.background as? GradientDrawable)?.setColor(color)
+            dot.alpha = 1f
         }
     }
 

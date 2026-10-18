@@ -12,6 +12,8 @@ import android.text.InputFilter
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import android.content.res.ColorStateList
+import androidx.core.graphics.ColorUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -19,6 +21,7 @@ import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.desks.DeskItem
 import com.nxd1frnt.clockdesk2.desks.DeskManager
 import com.nxd1frnt.clockdesk2.desks.DeskType
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class DeskOverviewManager(
     private val activity: Activity,
@@ -98,6 +101,7 @@ class DeskOverviewManager(
         if (isVisible) return
         isVisible = true
         capturePreviews()
+        refreshMonetTheme()
         refreshList()
         overlayView.visibility = View.VISIBLE
         overlayView.alpha = 0f
@@ -125,6 +129,15 @@ class DeskOverviewManager(
             .start()
     }
 
+    fun refreshMonetTheme() {
+        val palette = UiMonetThemeManager.getPalette(activity)
+        overlayView.setBackgroundColor(ColorUtils.setAlphaComponent(palette.surface, 230))
+        overlayView.findViewById<TextView>(R.id.txt_overview_header_title)?.setTextColor(palette.onSurface)
+        overlayView.findViewById<TextView>(R.id.txt_overview_header_hint)?.setTextColor(palette.onSurfaceVariant)
+        UiMonetThemeManager.styleMaterialButton(btnDone, palette)
+        adapter.notifyDataSetChanged()
+    }
+
     fun refreshList() {
         adapter.updateList(deskManager.getDesks())
     }
@@ -144,25 +157,32 @@ class DeskOverviewManager(
         if (deskManager.getStartDeskId() != null) {
             actions.add(activity.getString(R.string.desk_resume_last) to { deskManager.setStartDesk(null) })
         }
-        MaterialAlertDialogBuilder(activity).setTitle(desk.title)
+        val themedCtx = UiMonetThemeManager.wrapContext(activity)
+        val dialog = MaterialAlertDialogBuilder(themedCtx).setTitle(desk.title)
             .setItems(actions.map { it.first }.toTypedArray()) { _, index -> actions[index].second() }
-            .setNegativeButton(R.string.cancel, null).show()
+            .setNegativeButton(R.string.cancel, null).create()
+        dialog.show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showRenameDialog(desk: DeskItem) {
-        val input = EditText(activity).apply {
+        val themedCtx = UiMonetThemeManager.wrapContext(activity)
+        val palette = UiMonetThemeManager.getPalette(themedCtx)
+        val input = EditText(themedCtx).apply {
             setSingleLine(true)
             filters = arrayOf(InputFilter.LengthFilter(80))
             hint = activity.getString(R.string.desk_name)
+            setTextColor(palette.onSurface)
+            setHintTextColor(palette.onSurfaceVariant)
             setText(desk.title)
             selectAll()
         }
         val padding = (24 * activity.resources.displayMetrics.density).toInt()
-        val wrapper = android.widget.FrameLayout(activity).apply {
+        val wrapper = android.widget.FrameLayout(themedCtx).apply {
             setPadding(padding, 0, padding, 0)
             addView(input)
         }
-        val dialog = MaterialAlertDialogBuilder(activity).setTitle(R.string.desk_rename).setView(wrapper)
+        val dialog = MaterialAlertDialogBuilder(themedCtx).setTitle(R.string.desk_rename).setView(wrapper)
             .setPositiveButton(R.string.apply, null).setNegativeButton(R.string.cancel, null).create()
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -171,10 +191,12 @@ class DeskOverviewManager(
             }
         }
         dialog.show()
+        UiMonetThemeManager.styleAlertDialog(dialog, palette)
     }
 
     private fun showDeleteConfirm(desk: DeskItem) {
-        MaterialAlertDialogBuilder(activity)
+        val themedCtx = UiMonetThemeManager.wrapContext(activity)
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
             .setTitle(R.string.delete_desk)
             .setMessage(activity.getString(R.string.delete_desk_confirm, desk.title))
             .setPositiveButton(R.string.delete_desk) { _, _ ->
@@ -182,14 +204,17 @@ class DeskOverviewManager(
                 refreshList()
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+        dialog.show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showAddDeskDialog() {
         val types = DeskType.entries.toTypedArray()
         val items = types.map { activity.getString(it.titleResId) }.toTypedArray()
 
-        MaterialAlertDialogBuilder(activity)
+        val themedCtx = UiMonetThemeManager.wrapContext(activity)
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
             .setTitle(R.string.select_desk_type)
             .setItems(items) { _, which ->
                 val selectedType = types[which]
@@ -199,7 +224,9 @@ class DeskOverviewManager(
                 onOpenDesk(newDesk.order)
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+        dialog.show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     internal class OverviewAdapter(
@@ -256,6 +283,7 @@ class DeskOverviewManager(
         }
 
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            val palette = UiMonetThemeManager.getPalette(context)
             if (holder is DeskViewHolder) {
                 val desk = desks[position]
                 holder.txtTitle.text = desk.title
@@ -264,9 +292,16 @@ class DeskOverviewManager(
                 holder.imgIcon.setImageResource(desk.type.iconResId)
                 holder.preview.setImageBitmap(previews.get(desk))
                 holder.btnOptions.setOnClickListener { onOptions(desk) }
-                holder.card.strokeColor = com.google.android.material.color.MaterialColors.getColor(holder.card,
-                    if (desk.id == selectedDeskId()) androidx.appcompat.R.attr.colorPrimary
-                    else com.google.android.material.R.attr.colorOutlineVariant)
+
+                holder.card.setCardBackgroundColor(palette.surfaceContainerHigh)
+                holder.card.strokeColor = if (desk.id == selectedDeskId()) palette.primary else palette.outlineVariant
+                holder.card.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+                holder.txtTitle.setTextColor(palette.onSurface)
+                holder.txtType.setTextColor(palette.onSurfaceVariant)
+                holder.imgIcon.imageTintList = ColorStateList.valueOf(palette.primary)
+                holder.btnOptions.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
+                holder.btnDelete.imageTintList = ColorStateList.valueOf(palette.error)
+                holder.dragHandle.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
 
                 holder.btnDelete.visibility = if (desks.size > 1) View.VISIBLE else View.GONE
                 holder.btnDelete.setOnClickListener {
@@ -278,6 +313,11 @@ class DeskOverviewManager(
                     if (currentPosition >= 0) onDeskClick(currentPosition)
                 }
             } else if (holder is AddViewHolder) {
+                holder.card.setCardBackgroundColor(palette.surfaceContainer)
+                holder.card.strokeColor = palette.outline
+                holder.card.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+                holder.imgAdd.imageTintList = ColorStateList.valueOf(palette.primary)
+                holder.txtAdd.setTextColor(palette.onSurface)
                 holder.card.setOnClickListener {
                     onAddDesk()
                 }
@@ -292,10 +332,13 @@ class DeskOverviewManager(
             val txtTitle: TextView = view.findViewById(R.id.txt_overview_title)
             val txtType: TextView = view.findViewById(R.id.txt_overview_type)
             val btnDelete: ImageView = view.findViewById(R.id.btn_overview_delete)
+            val dragHandle: ImageView = view.findViewById(R.id.img_overview_drag_handle)
         }
 
         class AddViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val card: MaterialCardView = view.findViewById(R.id.card_overview_add_desk)
+            val imgAdd: ImageView = view.findViewById(R.id.img_overview_add_icon)
+            val txtAdd: TextView = view.findViewById(R.id.txt_overview_add_title)
         }
     }
 }

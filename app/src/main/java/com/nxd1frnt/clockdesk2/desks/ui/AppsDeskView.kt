@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.drawable.Drawable
 import android.text.Editable
@@ -19,6 +20,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetPalette
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -85,8 +88,18 @@ class AppsDeskView @JvmOverloads constructor(
 
     }
 
+    fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
+        UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
+        editSearch.setTextColor(palette.onSurface)
+        editSearch.setHintTextColor(palette.onSurfaceVariant)
+        btnClearSearch.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
+        txtNoApps.setTextColor(palette.onSurfaceVariant)
+        adapter.notifyDataSetChanged()
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        refreshMonetTheme()
         loadInstalledApps()
     }
 
@@ -167,9 +180,11 @@ class AppsDeskView @JvmOverloads constructor(
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val palette = UiMonetThemeManager.getPalette(holder.itemView.context)
             val app = items[position]
             holder.iconView.setImageDrawable(app.icon)
             holder.labelView.text = app.label
+            holder.labelView.setTextColor(palette.onSurface)
             holder.itemView.setOnClickListener { onClick(app) }
         }
 

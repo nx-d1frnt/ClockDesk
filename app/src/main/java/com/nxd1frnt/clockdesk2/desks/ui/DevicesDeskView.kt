@@ -3,6 +3,8 @@ package com.nxd1frnt.clockdesk2.desks.ui
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
@@ -13,13 +15,17 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
 import com.nxd1frnt.clockdesk2.ui.settings.SettingsActivity
+import com.nxd1frnt.clockdesk2.utils.UiMonetPalette
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
 class DevicesDeskView @JvmOverloads constructor(
     context: Context,
@@ -106,8 +112,14 @@ class DevicesDeskView @JvmOverloads constructor(
         btnOpenSettings.setOnClickListener(openSettingsAction)
     }
 
+    fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
+        UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
+        deviceAdapter.notifyDataSetChanged()
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        refreshMonetTheme()
         deskConnectManager.deviceListeners.add(deviceListener)
         deskConnectManager.batteryListeners.add(batteryListener)
         deskConnectManager.broadcastDiscovery()
@@ -161,9 +173,19 @@ class DevicesDeskView @JvmOverloads constructor(
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val device = items[position]
             val context = holder.itemView.context
+            val palette = UiMonetThemeManager.getPalette(context)
+
+            (holder.itemView as? MaterialCardView)?.let { card ->
+                card.setCardBackgroundColor(palette.surfaceContainer)
+                card.strokeColor = palette.outlineVariant
+                card.rippleColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(palette.primary, 32))
+            }
 
             holder.txtName.text = device.getDisplayName()
+            holder.txtName.setTextColor(palette.onSurface)
             holder.imgIcon.setImageResource(device.getDeviceTypeIconRes())
+            holder.imgIcon.imageTintList = ColorStateList.valueOf(palette.primary)
+            (holder.imgIcon.background?.mutate() as? GradientDrawable)?.setColor(palette.surfaceContainerHigh)
 
             // Status online/offline
             val isOnline = device.isConnected
@@ -172,6 +194,10 @@ class DevicesDeskView @JvmOverloads constructor(
             } else {
                 context.getString(R.string.device_status_offline)
             }
+            holder.txtStatus.setTextColor(palette.onSurfaceVariant)
+            (holder.dotStatus.background?.mutate() as? GradientDrawable)?.setColor(
+                if (isOnline) palette.primary else palette.outlineVariant
+            )
             holder.dotStatus.alpha = if (isOnline) 1.0f else 0.4f
 
             // Battery
@@ -179,6 +205,9 @@ class DevicesDeskView @JvmOverloads constructor(
             if (batteryLevel != null && batteryLevel >= 0) {
                 holder.layoutBattery.visibility = View.VISIBLE
                 holder.txtBattery.text = context.getString(R.string.device_battery_level, batteryLevel)
+                holder.txtBattery.setTextColor(palette.onSurface)
+                holder.imgBattery.imageTintList = ColorStateList.valueOf(palette.onSurface)
+                (holder.layoutBattery.background?.mutate() as? GradientDrawable)?.setColor(palette.surfaceContainerHigh)
                 if (device.isCharging == true) {
                     holder.imgBattery.setImageResource(R.drawable.ic_battery_charging)
                 } else if (batteryLevel <= 20) {
@@ -192,6 +221,7 @@ class DevicesDeskView @JvmOverloads constructor(
 
             // Ping button
             holder.btnPing.visibility = if (isOnline) View.VISIBLE else View.GONE
+            UiMonetThemeManager.styleMaterialButton(holder.btnPing, palette)
             holder.btnPing.setOnClickListener {
                 onPing(device)
             }

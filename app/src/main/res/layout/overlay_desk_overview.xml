@@ -32,19 +32,21 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/txt_overview_header_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/desk_overview_title"
-                    android:textColor="#FFFFFFFF"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="24sp"
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/txt_overview_header_hint"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="@string/desk_overview_hint"
-                    android:textColor="#B3FFFFFF"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp" />
             </LinearLayout>
 

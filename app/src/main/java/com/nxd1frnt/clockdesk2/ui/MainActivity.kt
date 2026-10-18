@@ -457,6 +457,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (::backgroundSheetManager.isInitialized) {
             backgroundSheetManager.refreshMonetTheme()
         }
+        if (::deskPageIndicator.isInitialized) {
+            deskPageIndicator.refreshMonetTheme()
+        }
+        if (::deskOverviewManager.isInitialized) {
+            deskOverviewManager.refreshMonetTheme()
+        }
+        if (::desksPagerAdapter.isInitialized) {
+            desksPagerAdapter.refreshMonetTheme()
+        }
     }
 
     private fun setupEntranceAnimation() {

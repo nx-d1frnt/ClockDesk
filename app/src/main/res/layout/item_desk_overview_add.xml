@@ -22,12 +22,14 @@
         android:padding="16dp">
 
         <ImageView
+            android:id="@+id/img_overview_add_icon"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:src="@drawable/ic_add"
             app:tint="?attr/colorPrimary" />
 
         <TextView
+            android:id="@+id/txt_overview_add_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
