@@ -29,6 +29,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
@@ -56,6 +57,7 @@ import androidx.viewpager2.widget.ViewPager2
 import android.view.ScaleGestureDetector
 import android.view.GestureDetector
 import com.nxd1frnt.clockdesk2.desks.DeskManager
+import com.nxd1frnt.clockdesk2.desks.DeskAppearancePreferences
 import com.nxd1frnt.clockdesk2.desks.ui.DesksPagerAdapter
 import com.nxd1frnt.clockdesk2.desks.ui.DeskPageIndicatorView
 import com.nxd1frnt.clockdesk2.desks.ui.DeskOverviewManager
@@ -179,6 +181,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     // Desks Feature
     private lateinit var deskManager: DeskManager
+    private lateinit var deskAppearancePreferences: DeskAppearancePreferences
+    private var restoredDeskPages: Bundle? = null
     private lateinit var desksViewPager: ViewPager2
     private lateinit var deskPageIndicator: DeskPageIndicatorView
     private lateinit var deskOverviewManager: DeskOverviewManager
@@ -187,6 +191,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var scaleGestureDetector: ScaleGestureDetector
     private lateinit var deskGestureDetector: GestureDetector
     private lateinit var btnManageDesks: MaterialButton
+    private var selectedDeskId: String? = null
 
     // State Variables
     private var musicManager: MusicPluginManager? = null
@@ -203,11 +208,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     override fun onMusicArtworkChanged(artworkSource: Any?) {}
     override fun onWidgetClicked(widget: DesktopWidgetController) {
         widget.rootView?.let {
-            customizationSheetManager.showForView(it)
+            ensureCustomizationSheetManager().showForView(it)
             resetEditModeTimeout()
         }
     }
-    override fun getPreferences(): SharedPreferences = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+    override fun getPreferences(): SharedPreferences = if (::deskAppearancePreferences.isInitialized) {
+        deskAppearancePreferences
+    } else getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
     private var isCropModeActive = false
     private var isScaleAnimating = false
     private var isLaunchingFilePicker = false
@@ -290,9 +297,10 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private var pendingRestoreRunnable: Runnable? = null
     private var pendingBackgroundRestoreRunnable: Runnable? = null
     private lateinit var entranceAnimationManager: EntranceAnimationManager
-    private var isWidgetLayoutComplete = false
+    private var isEntranceLayoutReady = false
     private var isBackgroundReady = false
     private var entranceAnimationPlayed = false
+    private var startupSystemsInitialized = false
     private val ENTRANCE_ANIMATION_TIMEOUT = 2500L
     private val MIN_LOADER_DURATION = 200L
     private var activityStartTime = 0L
@@ -300,6 +308,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private val entranceAnimationRunnable = Runnable {
         checkAndPlayEntranceAnimation(force = true)
+    }
+    private val playEntranceAnimationRunnable = Runnable {
+        if (isResumed && !isDestroyed && !isFinishing) {
+            entranceAnimationManager.play { completeStartup() }
+        }
     }
 
     private val editModeTimeoutRunnable = Runnable {
@@ -372,27 +385,42 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun checkAndPlayEntranceAnimation(force: Boolean = false) {
         if (entranceAnimationPlayed) return
-        if (force || (isWidgetLayoutComplete && isBackgroundReady)) {
+        if (force || (isEntranceLayoutReady && isBackgroundReady)) {
             entranceAnimationPlayed = true
             handler.removeCallbacks(entranceAnimationRunnable)
-
-            val timePassed = System.currentTimeMillis() - activityStartTime
-            val delay = if (force) 0L else maxOf(0L, MIN_LOADER_DURATION - timePassed)
-
-            mainLayout.postDelayed({
-                entranceAnimationManager.play {
-                    setupMusicSystem()
-                    setupDeskConnectSystem()
-                    loadFogTextures()
-                }
-            }, delay)
+            scheduleEntranceAnimation()
         }
     }
 
+    private fun scheduleEntranceAnimation() {
+        mainLayout.removeCallbacks(playEntranceAnimationRunnable)
+        val delay = maxOf(0L, MIN_LOADER_DURATION - (SystemClock.uptimeMillis() - activityStartTime))
+        mainLayout.postDelayed(playEntranceAnimationRunnable, delay)
+    }
+
+    private fun completeStartup() {
+        if (startupSystemsInitialized || !isResumed || isDestroyed || isFinishing) return
+        startupSystemsInitialized = true
+        setupMusicSystem()
+        setupDeskConnectSystem()
+        loadFogTextures()
+    }
+
+    private fun finishEntranceAnimation() {
+        if (!::entranceAnimationManager.isInitialized) return
+        entranceAnimationPlayed = true
+        handler.removeCallbacks(entranceAnimationRunnable)
+        mainLayout.removeCallbacks(playEntranceAnimationRunnable)
+        entranceAnimationManager.finish()
+        completeStartup()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        activityStartTime = System.currentTimeMillis()
+        activityStartTime = SystemClock.uptimeMillis()
         UiMonetThemeManager.applyToActivity(this)
         super.onCreate(savedInstanceState)
+        selectedDeskId = savedInstanceState?.getString("selected_desk_id")
+        restoredDeskPages = savedInstanceState?.getBundle("desk_pages")
 
         setupWindowFlags()
         setContentView(R.layout.activity_main)
@@ -429,20 +457,43 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (::backgroundSheetManager.isInitialized) {
             backgroundSheetManager.refreshMonetTheme()
         }
+        if (::deskPageIndicator.isInitialized) {
+            deskPageIndicator.refreshMonetTheme()
+        }
+        if (::deskOverviewManager.isInitialized) {
+            deskOverviewManager.refreshMonetTheme()
+        }
+        if (::desksPagerAdapter.isInitialized) {
+            desksPagerAdapter.refreshMonetTheme()
+        }
     }
 
     private fun setupEntranceAnimation() {
         val themeColor = fontManager.getDynamicScheme().primary
+        val isWidgetDesk = deskManager.getDeskById(selectedDeskId.orEmpty())?.type ==
+            com.nxd1frnt.clockdesk2.desks.DeskType.WIDGETS
         entranceAnimationManager = EntranceAnimationManager(
             rootView = mainLayout,
-            widgets = desktopWidgetManager.getViews(),
+            widgets = if (isWidgetDesk) desktopWidgetManager.getViews() else listOf(desksViewPager),
             turbulenceOverlay = turbulenceOverlay,
             isTurbulenceEnabled = isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled,
             dynamicBackgroundView = dynamicBackgroundView,
-            targetTranslationYProvider = { view -> widgetMover.getRestTranslationY(view) },
+            targetTranslationYProvider = { view -> if (view === desksViewPager) 0f else widgetMover.getRestTranslationY(view) },
             themeColor = themeColor
         )
         entranceAnimationManager.prepareViews()
+        if (!isWidgetDesk) {
+            desksViewPager.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                override fun onLayoutChange(view: View, left: Int, top: Int, right: Int, bottom: Int,
+                    oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int) {
+                    if (view.width > 0 && view.height > 0) {
+                        view.removeOnLayoutChangeListener(this)
+                        isEntranceLayoutReady = true
+                        checkAndPlayEntranceAnimation()
+                    }
+                }
+            })
+        }
     }
 
     private fun setupWindowFlags() {
@@ -514,10 +565,18 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun initCoreManagers() {
+        deskManager = DeskManager(this)
+        selectedDeskId = selectedDeskId?.takeIf { deskManager.getDeskById(it) != null }
+            ?: deskManager.getInitialDeskId()
+        val initialWidgetLayoutKey = deskManager.getDeskById(selectedDeskId!!)
+            ?.takeIf { it.type == com.nxd1frnt.clockdesk2.desks.DeskType.WIDGETS }?.widgetLayoutKey
+            ?: deskManager.getDesks().firstOrNull { it.type == com.nxd1frnt.clockdesk2.desks.DeskType.WIDGETS }
+                ?.widgetLayoutKey ?: DesktopWidgetManager.DEFAULT_LAYOUT_KEY
+        deskAppearancePreferences = DeskAppearancePreferences(this).apply { switchLayout(initialWidgetLayoutKey) }
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         enableAdditionalLogging = prefs.getBoolean("additional_logging", false)
         Logger.isLoggingEnabled = enableAdditionalLogging
-        showMediaIcon = prefs.getBoolean("show_media_icon", false)
+        showMediaIcon = deskAppearancePreferences.getBoolean("show_media_icon", false)
         isAdvancedGraphicsEnabled = prefs.getBoolean("advanced_graphics", false)
         isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
         isGraphicsTurbulenceEnabled = prefs.getBoolean("graphics_enable_turbulence", true)
@@ -578,6 +637,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             chipContainer,
             enableAdditionalLogging
         )
+        fontManager.appearancePreferences = deskAppearancePreferences
         fontManager.onDynamicSchemeChanged = {
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) {
@@ -589,7 +649,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         smartChipManager = SmartChipManager(
             this,
             chipContainer,
-            prefs,
+            deskAppearancePreferences,
             fontManager
         )
         lifecycle.addObserver(smartChipManager)
@@ -646,7 +706,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             enableAdditionalLogging
         )
 
-        desktopWidgetManager = DesktopWidgetManager(this, primaryWidgetsContainer, host = this)
+        desktopWidgetManager = DesktopWidgetManager(
+            this, primaryWidgetsContainer, host = this, layoutKey = initialWidgetLayoutKey
+        )
         desktopWidgetManager.bindExistingViews(
             timeView = timeText,
             dateView = dateText,
@@ -662,11 +724,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val burnInShiftDp = prefs.getInt("burn_in_shift_distance_dp", 10).toFloat()
         val burnInShiftPx = (burnInShiftDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
         burnInProtectionManager = BurnInProtectionManager(activeViews, maxShiftPx = burnInShiftPx)
+        burnInProtectionManager.positionPreferencesName = DesktopWidgetManager.positionPreferencesName(initialWidgetLayoutKey)
 
-        widgetMover = WidgetMover(this, movableViews, primaryWidgetsContainer)
+        widgetMover = WidgetMover(this, movableViews, primaryWidgetsContainer,
+            positionPreferencesName = DesktopWidgetManager.positionPreferencesName(initialWidgetLayoutKey))
         widgetMover.burnInProtectionManager = burnInProtectionManager
 
         desktopWidgetManager.onWidgetsChanged = {
+            fontManager.loadFont()
             desktopWidgetManager.bindExistingViews(
                 timeView = timeText,
                 dateView = dateText,
@@ -675,15 +740,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 weatherView = weatherLayout
             )
             setupMediaWidgetCallbacks()
+            desktopWidgetManager.getController<MediaDesktopWidget>()?.apply {
+                updateMediaStyle(fontManager.getMediaStyle())
+                handleMusicStateUpdate(currentMusicState)
+            }
+            clockManager.refreshForDeskSwitch(reschedule = isResumed)
             val currentActiveViews = desktopWidgetManager.getViews()
             widgetMover.setViews(currentActiveViews.filter { it !== smartChipScrollView && it !== chipContainer })
             burnInProtectionManager.updateViews(currentActiveViews)
-            fontManager.loadFont()
             updateEmptyDeskPromptVisibility()
         }
 
         widgetMover.onInitialLayoutComplete = {
-            isWidgetLayoutComplete = true
+            isEntranceLayoutReady = true
             checkAndPlayEntranceAnimation()
         }
 
@@ -701,35 +770,86 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         powerStateManager.registerObserver(weatherGetter)
 
         fontManager.loadFont()
-        setupPreferencesListener(prefs)
+        desktopWidgetManager.getController<MediaDesktopWidget>()?.updateMediaStyle(fontManager.getMediaStyle())
+        setupPreferencesListener(deskAppearancePreferences)
         com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).addListener(backgroundProviderListener)
     }
 
     private fun setupDesksSystem() {
-        deskManager = DeskManager(this)
-        desksPagerAdapter = DesksPagerAdapter(this, deskManager, primaryWidgetsContainer)
+        desksPagerAdapter = DesksPagerAdapter(deskManager, primaryWidgetsContainer) { desk ->
+            if (desktopWidgetManager.layoutKey != desk.widgetLayoutKey) {
+                if (isEditMode) exitEditMode()
+                val positionsName = DesktopWidgetManager.positionPreferencesName(desk.widgetLayoutKey)
+                deskAppearancePreferences.switchLayout(desk.widgetLayoutKey)
+                showMediaIcon = deskAppearancePreferences.getBoolean("show_media_icon", false)
+                burnInProtectionManager.positionPreferencesName = positionsName
+                widgetMover.setPositionPreferences(positionsName)
+                desktopWidgetManager.switchLayout(desk.widgetLayoutKey)
+                smartChipManager.onPreferencesChanged()
+            }
+        }
+        val initialPosition = deskManager.getDesks().indexOfFirst { it.id == selectedDeskId }.coerceAtLeast(0)
+        desksPagerAdapter.restoreState(restoredDeskPages)
+        restoredDeskPages = null
+        desksPagerAdapter.selectDesk(initialPosition)
+        desksViewPager.isSaveEnabled = false
         desksViewPager.adapter = desksPagerAdapter
-        desksViewPager.offscreenPageLimit = 3
+        desksViewPager.setCurrentItem(initialPosition, false)
+        deskManager.recordSelectedDesk(deskManager.getDesks()[initialPosition].id)
+        desksViewPager.offscreenPageLimit = 1
         deskPageIndicator.setPageCount(deskManager.getDesks().size, desksViewPager.currentItem)
         deskPageIndicator.onPageClicked = { pos -> desksViewPager.setCurrentItem(pos, true) }
 
+        var pendingDeskPosition: Int? = null
+        var scrollState = ViewPager2.SCROLL_STATE_IDLE
+
         desksViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
+                deskPageIndicator.setScrollPosition(position, positionOffset)
+            }
+
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
-                deskPageIndicator.setCurrentPage(position)
+                if (deskManager.getDesks().getOrNull(position)?.id != selectedDeskId &&
+                    ::entranceAnimationManager.isInitialized && !entranceAnimationManager.isComplete) {
+                    finishEntranceAnimation()
+                }
+                if (isEditMode) exitEditMode()
+                deskPageIndicator.showTemporarily()
+                selectedDeskId = deskManager.getDesks().getOrNull(position)?.id
+                selectedDeskId?.let { deskManager.recordSelectedDesk(it) }
+
+                if (scrollState == ViewPager2.SCROLL_STATE_IDLE) {
+                    desksPagerAdapter.selectDesk(position)
+                } else {
+                    pendingDeskPosition = position
+                }
             }
 
             override fun onPageScrollStateChanged(state: Int) {
                 super.onPageScrollStateChanged(state)
+                scrollState = state
                 if (state == ViewPager2.SCROLL_STATE_DRAGGING) {
                     deskPageIndicator.showTemporarily()
+                } else if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                    deskPageIndicator.setCurrentPage(desksViewPager.currentItem)
+                    val targetPos = pendingDeskPosition ?: desksViewPager.currentItem
+                    pendingDeskPosition = null
+                    desksPagerAdapter.selectDesk(targetPos)
                 }
             }
         })
 
         deskManager.onDesksChanged = {
             val updatedList = deskManager.getDesks()
+            val selectedPosition = updatedList.indexOfFirst { it.id == selectedDeskId }
+                .takeIf { it >= 0 } ?: desksViewPager.currentItem.coerceIn(0, updatedList.lastIndex)
+            if (updatedList[selectedPosition].id != selectedDeskId) finishEntranceAnimation()
             desksPagerAdapter.updateDesks(updatedList)
+            desksViewPager.setCurrentItem(selectedPosition, false)
+            selectedDeskId = updatedList[selectedPosition].id
+            deskManager.recordSelectedDesk(updatedList[selectedPosition].id)
+            desksPagerAdapter.selectDesk(selectedPosition)
             deskPageIndicator.setPageCount(updatedList.size, desksViewPager.currentItem)
             if (::deskOverviewManager.isInitialized) {
                 deskOverviewManager.refreshList()
@@ -737,7 +857,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
 
         val overviewOverlay = findViewById<View>(R.id.desk_overview_overlay)
-        deskOverviewManager = DeskOverviewManager(this, overviewOverlay, deskManager) { targetIndex ->
+        deskOverviewManager = DeskOverviewManager(this, overviewOverlay, deskManager,
+            desksPagerAdapter.previews, { selectedDeskId }, { desksPagerAdapter.capturePreviews() }) { targetIndex ->
             desksViewPager.setCurrentItem(targetIndex, true)
         }
 
@@ -1474,7 +1595,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (::desksPagerAdapter.isInitialized) outState.putBundle("desk_pages", desksPagerAdapter.saveState())
+        outState.putString("selected_desk_id", selectedDeskId)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onDestroy() {
+        if (::entranceAnimationManager.isInitialized) entranceAnimationManager.destroy()
+        if (::mainLayout.isInitialized) mainLayout.removeCallbacks(playEntranceAnimationRunnable)
+        if (::desksPagerAdapter.isInitialized) desksPagerAdapter.destroy()
         musicStateUpdates.pause()
         musicStateUpdates.clear()
         backgroundLoads.pause()
@@ -1506,7 +1636,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         handler.removeCallbacksAndMessages(null)
         if (::backgroundSheetManager.isInitialized) backgroundSheetManager.onDestroy()
         com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).removeListener(backgroundProviderListener)
-        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
+        deskAppearancePreferences.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)
     }
 
@@ -2171,15 +2301,32 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun cancelBackgroundLoads(clearEditBackground: Boolean = true) {
         backgroundRequestId++
-        activeBackgroundTarget?.let {
-            activeBackgroundTarget = null
-            GlideApp.with(this).clear(it)
-        }
+        val bgTarget = activeBackgroundTarget
+        activeBackgroundTarget = null
+        val editTarget = if (clearEditBackground) activeEditBackgroundTarget else null
         if (clearEditBackground) {
-            activeEditBackgroundTarget?.let {
-                activeEditBackgroundTarget = null
-                GlideApp.with(this).clear(it)
+            activeEditBackgroundTarget = null
+        }
+        if (bgTarget == null && editTarget == null) return
+
+        val isActivityDestroyed = Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed
+        try {
+            val requestManager = if (isActivityDestroyed) {
+                GlideApp.with(applicationContext)
+            } else {
+                GlideApp.with(this)
             }
+            bgTarget?.let { requestManager.clear(it) }
+            editTarget?.let { requestManager.clear(it) }
+        } catch (e: IllegalArgumentException) {
+            try {
+                val appRequestManager = GlideApp.with(applicationContext)
+                bgTarget?.let { appRequestManager.clear(it) }
+                editTarget?.let { appRequestManager.clear(it) }
+            } catch (ignored: Exception) {
+            }
+        } catch (e: Exception) {
+            Logger.w("MainActivity") { "Failed to clear background targets: ${e.message}" }
         }
     }
 
@@ -2947,7 +3094,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     override fun onResume() {
         super.onResume()
+        if (::desksPagerAdapter.isInitialized) desksPagerAdapter.setHostResumed(true)
         isResumed = true
+        if (::entranceAnimationManager.isInitialized) {
+            if (entranceAnimationManager.isComplete) completeStartup()
+            else if (entranceAnimationPlayed && !entranceAnimationManager.hasStarted) scheduleEntranceAnimation()
+        }
         updateSensorRegistration()
         if (::tutorialManager.isInitialized) {
             tutorialManager.checkAndUpdatePermissionState()
@@ -3005,8 +3157,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val enableSmartPixels = prefs.getBoolean("power_saver_enable_smart_pixels", true)
         val shouldStartSmartPixels = prefs.getBoolean("smart_pixels_enabled", false) || (isPowerSavingMode && enableSmartPixels)
         if (shouldStartSmartPixels) smartPixelManager.start() else smartPixelManager.stop()
-        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-            .registerOnSharedPreferenceChangeListener(preferenceChangeListener)
+        deskAppearancePreferences.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
         smartChipManager.updateAllChips()
         val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
         val activeProviderId = bpm.getActiveProviderId()
@@ -3411,8 +3562,16 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     override fun onPause() {
-        super.onPause()
         isResumed = false
+        mainLayout.removeCallbacks(playEntranceAnimationRunnable)
+        if (::entranceAnimationManager.isInitialized && entranceAnimationManager.hasStarted) {
+            entranceAnimationManager.finish()
+        }
+        if (::desksPagerAdapter.isInitialized) {
+            desksPagerAdapter.capturePreviews()
+            desksPagerAdapter.setHostResumed(false)
+        }
+        super.onPause()
         musicStateUpdates.pause(replayLatest = true)
         backgroundLoads.pause(replayLatest = isBackgroundLoading)
         if (isBackgroundLoading) {

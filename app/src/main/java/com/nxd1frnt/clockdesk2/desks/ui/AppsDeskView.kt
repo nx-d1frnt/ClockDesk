@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.drawable.Drawable
 import android.text.Editable
@@ -19,11 +20,14 @@ import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetPalette
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.cancel
 
 class AppsDeskView @JvmOverloads constructor(
     context: Context,
@@ -39,6 +43,7 @@ class AppsDeskView @JvmOverloads constructor(
     )
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var loadJob: Job? = null
     private val allApps = mutableListOf<AppItem>()
     private val filteredApps = mutableListOf<AppItem>()
 
@@ -81,8 +86,30 @@ class AppsDeskView @JvmOverloads constructor(
             editSearch.setText("")
         }
 
+    }
+
+    fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
+        UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
+        editSearch.setTextColor(palette.onSurface)
+        editSearch.setHintTextColor(palette.onSurfaceVariant)
+        btnClearSearch.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
+        txtNoApps.setTextColor(palette.onSurfaceVariant)
+        adapter.notifyDataSetChanged()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        refreshMonetTheme()
         loadInstalledApps()
     }
+
+    override fun onDetachedFromWindow() {
+        loadJob?.cancel()
+        loadJob = null
+        super.onDetachedFromWindow()
+    }
+
+    fun dispose() { scope.cancel() }
 
     private fun calculateSpanCount(): Int {
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -95,7 +122,8 @@ class AppsDeskView @JvmOverloads constructor(
     }
 
     private fun loadInstalledApps() {
-        scope.launch {
+        loadJob?.cancel()
+        loadJob = scope.launch {
             val apps = withContext(Dispatchers.IO) {
                 val pm = context.packageManager
                 val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
@@ -139,6 +167,7 @@ class AppsDeskView @JvmOverloads constructor(
         private val items: List<AppItem>,
         private val onClick: (AppItem) -> Unit
     ) : RecyclerView.Adapter<AppsAdapter.ViewHolder>() {
+        init { stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY }
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val iconView: ImageView = view.findViewById(R.id.app_icon)
@@ -151,9 +180,11 @@ class AppsDeskView @JvmOverloads constructor(
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val palette = UiMonetThemeManager.getPalette(holder.itemView.context)
             val app = items[position]
             holder.iconView.setImageDrawable(app.icon)
             holder.labelView.text = app.label
+            holder.labelView.setTextColor(palette.onSurface)
             holder.itemView.setOnClickListener { onClick(app) }
         }
 

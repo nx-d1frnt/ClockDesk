@@ -25,9 +25,19 @@
             android:padding="16dp">
 
             <ImageView
+                android:id="@+id/img_overview_preview"
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:scaleType="fitCenter"
+                android:importantForAccessibility="no" />
+
+            <ImageView
                 android:id="@+id/img_overview_icon"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:visibility="gone"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:src="@drawable/ic_clock"
                 app:tint="?attr/colorPrimary" />
 
@@ -35,7 +45,7 @@
                 android:id="@+id/txt_overview_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:gravity="center"
                 android:maxLines="2"
                 android:ellipsize="end"
@@ -55,9 +65,24 @@
                 tools:text="Widget Desk" />
         </LinearLayout>
 
+        <ImageView
+            android:id="@+id/btn_overview_options"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="@string/desk_options"
+            android:padding="10dp"
+            android:src="@drawable/ic_desk_more"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
         <!-- Delete Button -->
         <ImageView
             android:id="@+id/btn_overview_delete"
+            android:contentDescription="@string/delete_desk"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_gravity="top|end"
@@ -71,6 +96,7 @@
 
         <!-- Drag handle indicator -->
         <ImageView
+            android:id="@+id/img_overview_drag_handle"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:layout_gravity="bottom|center_horizontal"

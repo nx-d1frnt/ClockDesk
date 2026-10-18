@@ -11,6 +11,8 @@ import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.utils.UiMonetPalette
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.weathergetter.WeatherGetter
 import com.nxd1frnt.clockdesk2.weathergetter.getUvIndexDescription
 import com.nxd1frnt.clockdesk2.weathergetter.getWeatherConditionDescription
@@ -75,8 +77,16 @@ class WeatherDeskView @JvmOverloads constructor(
         }
     }
 
+    fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
+        UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
+        for (i in 0 until layoutHourly.childCount) {
+            layoutHourly.getChildAt(i)?.let { UiMonetThemeManager.applyLiveToViewHierarchy(it, palette) }
+        }
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        refreshMonetTheme()
         WeatherGetter.registerListener(weatherListener)
         updateWeatherData()
     }
@@ -192,6 +202,7 @@ class WeatherDeskView @JvmOverloads constructor(
                         itemIcon.setImageResource(getWeatherIconRes(hourlyCode, isDay = true))
                         itemTemp.text = if (hourlyTemp != null) "${hourlyTemp.toInt()}$tempSuffix" else "--"
                         itemCond.text = getWeatherConditionDescription(context, hourlyCode)
+                        UiMonetThemeManager.applyLiveToViewHierarchy(itemView, UiMonetThemeManager.getPalette(context))
                         layoutHourly.addView(itemView)
                     }
                 }

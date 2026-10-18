@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
@@ -75,11 +76,14 @@ class FontManager(
     initialLoggingState: Boolean
 ) {
 
+    var appearancePreferences: SharedPreferences = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
     private val keyPrefixMap = mapOf(
         R.id.time_text to "time",
         R.id.date_text to "date",
         R.id.lastfm_layout to "lastfm",
-        R.id.smart_chip_container to "chips"
+        R.id.smart_chip_container to "chips",
+        R.id.weather_layout to "weather"
     )
 
     private val settingsMap = mutableMapOf<Int, FontSettings>()
@@ -87,8 +91,11 @@ class FontManager(
     private val customColors: MutableList<Int> = mutableListOf()
     @SuppressLint("RestrictedApi")
     private var currentScheme: Scheme? = null
+    private var hasNotifiedDynamicSeed = false
+    private var lastNotifiedDynamicSeed: Int? = null
     var onDynamicSchemeChanged: ((Int?) -> Unit)? = null
     companion object {
+        private val typefaceCache = java.util.concurrent.ConcurrentHashMap<String, Typeface>()
         val resourceFontIds = listOf(
             R.font.googlesansflex,
             R.font.anton_regular,
@@ -354,7 +361,7 @@ class FontManager(
     }
 
     private fun loadCustomColors() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         val saved = prefs.getString("custom_saved_colors", null)
         customColors.clear()
         if (!saved.isNullOrBlank()) {
@@ -370,7 +377,7 @@ class FontManager(
     }
 
     private fun saveCustomColors() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         val hexList = customColors.joinToString(",") { String.format("#%08X", it) }
         prefs.edit().putString("custom_saved_colors", hexList).apply()
     }
@@ -524,6 +531,7 @@ class FontManager(
                 }
 
                 if (deleteCustomFontFile(context, item)) {
+                    typefaceCache.remove(deletedId)
                     rebuildFontList()
 
                     viewFontMap.forEach { (viewId, oldFontId) ->
@@ -555,21 +563,29 @@ class FontManager(
 
     private fun getTypeface(index: Int): Typeface {
         if (index !in fonts.indices) return Typeface.DEFAULT
+        val item = fonts[index]
+        if (item is FontItem.AddNew) return Typeface.DEFAULT
+        val fontId = getFontIdentifier(item)
+        typefaceCache[fontId]?.let { return it }
         return try {
-            when (val item = fonts[index]) {
+            val loaded = when (item) {
                 is FontItem.ResourceFont -> ResourcesCompat.getFont(context, item.resId) ?: Typeface.DEFAULT
                 is FontItem.CustomFont -> Typeface.createFromFile(item.path)
                 is FontItem.AddNew -> Typeface.DEFAULT
             }
+            typefaceCache[fontId] = loaded
+            loaded
         } catch (e: Exception) {
             Typeface.DEFAULT
         }
     }
 
     fun loadFont() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
 
-        rebuildFontList()
+        if (fonts.isEmpty()) {
+            rebuildFontList()
+        }
         loadCustomColors()
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)
@@ -641,7 +657,12 @@ class FontManager(
         }
 
         applyAll()
-        onDynamicSchemeChanged?.invoke(if (savedSeed != -1) savedSeed else null)
+        val normalizedSeed = if (savedSeed != -1) savedSeed else null
+        if (!hasNotifiedDynamicSeed || lastNotifiedDynamicSeed != normalizedSeed) {
+            hasNotifiedDynamicSeed = true
+            lastNotifiedDynamicSeed = normalizedSeed
+            onDynamicSchemeChanged?.invoke(normalizedSeed)
+        }
     }
 
     private fun getFontIdentifier(item: FontItem): String {
@@ -649,7 +670,7 @@ class FontManager(
     }
 
     fun saveSettings() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         val editor = prefs.edit()
 
         editor.putBoolean("nightShiftEnabled", isNightShiftEnabled)
@@ -759,6 +780,11 @@ class FontManager(
         }
 
         when (viewId) {
+            R.id.weather_layout -> {
+                applyStyleToTextView(weatherText, settings, typeface, finalColor, colorOnly)
+                weatherIcon.setColorFilter(finalColor)
+                if (!colorOnly) weatherIcon.alpha = settings.alpha
+            }
             R.id.time_text -> {
                 applyStyleToTextView(timeText, settings, typeface, finalColor, colorOnly)
                 applyClockStyleToTimeView()
@@ -946,9 +972,11 @@ class FontManager(
     @SuppressLint("RestrictedApi")
     fun setDynamicScheme(seedColor: Int) {
         this.currentScheme = Scheme.dark(seedColor)
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         prefs.edit().putInt("dynamic_seed_color", seedColor).apply()
         applyAll()
+        hasNotifiedDynamicSeed = true
+        lastNotifiedDynamicSeed = seedColor
         onDynamicSchemeChanged?.invoke(seedColor)
     }
 
@@ -1082,34 +1110,47 @@ class FontManager(
 
     private fun applyStyleToTextView(textView: TextView, settings: FontSettings, typeface: Typeface, color: Int, colorOnly: Boolean = false) {
         if (!colorOnly) {
-            textView.typeface = typeface
-            textView.textSize = settings.size
-            textView.alpha = settings.alpha
+            val typefaceChanged = textView.typeface !== typeface
+            if (typefaceChanged) {
+                textView.typeface = typeface
+            }
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.size)
+            if (textView.alpha != settings.alpha) {
+                textView.alpha = settings.alpha
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 try {
-                    textView.breakStrategy = android.graphics.text.LineBreaker.BREAK_STRATEGY_SIMPLE
-                    textView.hyphenationFrequency = android.text.Layout.HYPHENATION_FREQUENCY_NONE
+                    if (textView.breakStrategy != android.graphics.text.LineBreaker.BREAK_STRATEGY_SIMPLE) {
+                        textView.breakStrategy = android.graphics.text.LineBreaker.BREAK_STRATEGY_SIMPLE
+                    }
+                    if (textView.hyphenationFrequency != android.text.Layout.HYPHENATION_FREQUENCY_NONE) {
+                        textView.hyphenationFrequency = android.text.Layout.HYPHENATION_FREQUENCY_NONE
+                    }
                 } catch (e: Exception) {}
             }
 
-            if (settings.maxWidthPercent >= 100) {
-                textView.maxWidth = Int.MAX_VALUE
+            val desiredMaxWidth = if (settings.maxWidthPercent >= 100) {
+                Int.MAX_VALUE
             } else {
                 val displayMetrics = context.resources.displayMetrics
                 val screenWidth = displayMetrics.widthPixels
-                val targetWidthPx = (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
-                textView.maxWidth = targetWidthPx
+                (screenWidth * (settings.maxWidthPercent / 100f)).toInt()
+            }
+            if (textView.maxWidth != desiredMaxWidth) {
+                textView.maxWidth = desiredMaxWidth
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
-                    textView.fontVariationSettings = null
                     val variationSettings = if (settings.variationAxes.isNotEmpty()) {
                         settings.variationAxes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }
                     } else null
 
-                    textView.fontVariationSettings = variationSettings
+                    if (typefaceChanged || textView.fontVariationSettings != variationSettings) {
+                        textView.fontVariationSettings = null
+                        textView.fontVariationSettings = variationSettings
+                    }
                     if (textView is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
                         textView.customFontVariationSettings = variationSettings
                     } else if (textView is com.nxd1frnt.clockdesk2.ui.view.DateTextView) {
@@ -1147,6 +1188,7 @@ class FontManager(
 
         if (clockStyle.isTwoLine) {
             timeText.isSingleLine = false
+            timeText.setHorizontallyScrolling(false)
             timeText.maxLines = 2
             timeText.maxWidth = Int.MAX_VALUE
             timeText.setLineSpacing(0f, 0.80f)
@@ -1155,15 +1197,18 @@ class FontManager(
             }
         } else if (clockStyle.isAnalog) {
             timeText.isSingleLine = false
+            timeText.setHorizontallyScrolling(false)
             timeText.maxLines = 1
         } else {
-            timeText.isSingleLine = true
+            timeText.isSingleLine = false
+            timeText.setHorizontallyScrolling(false)
             timeText.maxLines = 1
             timeText.setLineSpacing(0f, 1.0f)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 timeText.letterSpacing = 0.0f
             }
         }
+        timeText.scrollX = 0
     }
 
     fun getDateStyle(): DateStyle = dateStyle
@@ -1182,34 +1227,35 @@ class FontManager(
 
         if (dateStyle.isTwoLine) {
             dateText.isSingleLine = false
+            dateText.setHorizontallyScrolling(false)
             dateText.maxLines = 2
             dateText.maxWidth = Int.MAX_VALUE
             dateText.setLineSpacing(0f, 0.85f)
-            dateText.gravity = android.view.Gravity.START or (dateText.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                dateText.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 dateText.letterSpacing = -0.01f
             }
         } else if (dateStyle.isBadge || dateStyle.isHeroDay) {
             dateText.isSingleLine = false
+            dateText.setHorizontallyScrolling(false)
             dateText.maxLines = 1
         } else if (dateStyle.isChipPill) {
-            dateText.isSingleLine = true
+            dateText.isSingleLine = false
+            dateText.setHorizontallyScrolling(false)
             dateText.maxLines = 1
             dateText.setLineSpacing(0f, 1.0f)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 dateText.letterSpacing = 0.04f
             }
         } else {
-            dateText.isSingleLine = true
+            dateText.isSingleLine = false
+            dateText.setHorizontallyScrolling(false)
             dateText.maxLines = 1
             dateText.setLineSpacing(0f, 1.0f)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 dateText.letterSpacing = 0.0f
             }
         }
+        dateText.scrollX = 0
     }
 
     fun getMediaStyle(): MediaStyle = mediaStyle
@@ -1278,11 +1324,13 @@ class FontManager(
     fun getDynamicColor(): Int? = dynamicColor
 
     fun clearDynamicColors() {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+        val prefs = appearancePreferences
         prefs.edit().remove("dynamic_seed_color").apply()
         currentScheme = null
         dynamicColor = null
         applyAll()
+        hasNotifiedDynamicSeed = true
+        lastNotifiedDynamicSeed = null
         onDynamicSchemeChanged?.invoke(null)
     }
 

@@ -19,33 +19,41 @@ class ClockTextView @JvmOverloads constructor(
 
     var isAnalogMode: Boolean = false
         set(value) {
-            field = value
-            requestLayout()
-            invalidate()
-        }
-
-    var isTwoLineMode: Boolean = false
-        set(value) {
-            field = value
-            if (!isAnalogMode) {
+            if (field != value) {
+                field = value
                 requestLayout()
                 invalidate()
             }
         }
 
+    var isTwoLineMode: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                if (!isAnalogMode) {
+                    requestLayout()
+                    invalidate()
+                }
+            }
+        }
+
     var showBackdrop: Boolean = true
         set(value) {
-            field = value
-            if (isAnalogMode) {
-                invalidate()
+            if (field != value) {
+                field = value
+                if (isAnalogMode) {
+                    invalidate()
+                }
             }
         }
 
     var customFontVariationSettings: String? = null
         set(value) {
-            field = value
-            if (isAnalogMode) {
-                invalidate()
+            if (field != value) {
+                field = value
+                if (isAnalogMode) {
+                    invalidate()
+                }
             }
         }
 

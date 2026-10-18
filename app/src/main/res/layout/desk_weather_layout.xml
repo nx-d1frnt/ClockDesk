@@ -61,6 +61,7 @@
 
         <!-- Hero Card -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/weather_hero_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
@@ -202,6 +203,7 @@
                     android:padding="14dp">
 
                     <TextView
+                        android:id="@+id/lbl_wind"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/weather_desk_wind"
@@ -240,6 +242,7 @@
                     android:padding="14dp">
 
                     <TextView
+                        android:id="@+id/lbl_uv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/weather_desk_uv"
@@ -284,6 +287,7 @@
                     android:padding="14dp">
 
                     <TextView
+                        android:id="@+id/lbl_precip"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/weather_desk_humidity"
@@ -322,6 +326,7 @@
                     android:padding="14dp">
 
                     <TextView
+                        android:id="@+id/lbl_cycle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/weather_desk_sunrise_sunset"

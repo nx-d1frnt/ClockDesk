@@ -685,7 +685,7 @@ class CustomizationSheetManager(
         bsGridSnapSwitch.isChecked = widgetMover.isGridSnapEnabled()
         bsIgnoreCollisionSwitch.isChecked = widgetMover.isCollisionCheckEnabled()
 
-        val prefs = sideSheetView.context.getSharedPreferences("ClockDeskPrefs", android.content.Context.MODE_PRIVATE)
+        val prefs = fontManager.appearancePreferences
         bsShowMediaIconSwitch.setOnCheckedChangeListener(null)
         bsShowMediaIconSwitch.isChecked = prefs.getBoolean("show_media_icon", true)
         bsShowMediaIconSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -1184,12 +1184,6 @@ class CustomizationSheetManager(
                 }
 
                 fontManager.setDateStyle(newStyle)
-                if (newStyle == DateStyle.TWO_LINE && view is TextView) {
-                    view.gravity = android.view.Gravity.START or (view.gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                        view.textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-                    }
-                }
                 clockManager.updateDateText()
                 val controller = widgetManager?.getControllerForView(view) as? DateDesktopWidget
                 controller?.updateDate(clockManager.getCurrentTime())

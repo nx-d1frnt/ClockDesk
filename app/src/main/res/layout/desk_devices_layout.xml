@@ -17,6 +17,7 @@
         android:layout_marginBottom="16dp">
 
         <TextView
+            android:id="@+id/txt_devices_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -71,12 +72,14 @@
             android:visibility="gone">
 
             <ImageView
+                android:id="@+id/img_empty_devices"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:src="@drawable/ic_devices"
                 app:tint="?attr/colorOutline" />
 
             <TextView
+                android:id="@+id/txt_empty_devices_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -86,6 +89,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/txt_empty_devices_desc"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"

@@ -10,6 +10,7 @@
 
     <!-- Search Bar Card -->
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_search_apps"
         android:layout_width="match_parent"
         android:layout_height="52dp"
         android:layout_gravity="center_horizontal"
@@ -28,6 +29,7 @@
             android:paddingHorizontal="16dp">
 
             <ImageView
+                android:id="@+id/img_search_apps_icon"
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@android:drawable/ic_menu_search"

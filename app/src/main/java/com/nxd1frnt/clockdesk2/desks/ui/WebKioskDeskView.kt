@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.os.Bundle
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -44,6 +45,10 @@ class WebKioskDeskView @JvmOverloads constructor(
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var refreshRunnable: Runnable? = null
+    private var configuredUrl: String? = null
+    private var isPageActive = false
+    private var disposed = false
+    private var restoredScroll: Pair<Int, Int>? = null
 
     private val edgeMarginPx = (40 * resources.displayMetrics.density)
 
@@ -98,6 +103,10 @@ class WebKioskDeskView @JvmOverloads constructor(
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 progressIndicator.visibility = View.GONE
+                restoredScroll?.let { (x, y) ->
+                    restoredScroll = null
+                    webView.post { if (!disposed) webView.scrollTo(x, y) }
+                }
             }
 
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
@@ -143,19 +152,23 @@ class WebKioskDeskView @JvmOverloads constructor(
         if (url.isNotEmpty() && (url.startsWith("http://") || url.startsWith("https://"))) {
             emptyLayout.visibility = View.GONE
             webView.visibility = View.VISIBLE
-            if (webView.url != url) {
+            if (configuredUrl != url) {
+                restoredScroll = null
                 webView.loadUrl(url)
             }
         } else {
             emptyLayout.visibility = View.VISIBLE
             webView.visibility = View.GONE
         }
+        configuredUrl = url
 
         scheduleAutoRefresh()
     }
 
     private fun scheduleAutoRefresh() {
         refreshRunnable?.let { mainHandler.removeCallbacks(it) }
+        refreshRunnable = null
+        if (!isPageActive || !isAttachedToWindow || disposed) return
         val minutes = currentDesk?.autoRefreshMinutes ?: 0
         if (minutes > 0) {
             val intervalMs = minutes * 60 * 1000L
@@ -187,20 +200,57 @@ class WebKioskDeskView @JvmOverloads constructor(
                 if (newUrl.isNotEmpty() && !newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
                     newUrl = "https://$newUrl"
                 }
-                val newInterval = editInterval.text.toString().toIntOrNull() ?: 0
+                val newInterval = (editInterval.text.toString().toIntOrNull() ?: 0).coerceIn(0, 1440)
 
-                desk.customUrl = newUrl
-                desk.autoRefreshMinutes = newInterval
-
-                onUpdatedCallback?.invoke(desk)
-                bindDesk(desk, onUpdatedCallback ?: {})
+                val updated = desk.copy(customUrl = newUrl, autoRefreshMinutes = newInterval)
+                bindDesk(updated, onUpdatedCallback ?: {})
+                onUpdatedCallback?.invoke(updated)
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
         refreshRunnable?.let { mainHandler.removeCallbacks(it) }
+        webView.onPause()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        updateActivity()
+    }
+
+    fun setPageActive(active: Boolean) {
+        isPageActive = active
+        updateActivity()
+    }
+
+    private fun updateActivity() {
+        if (disposed) return
+        if (isPageActive && isAttachedToWindow) webView.onResume() else webView.onPause()
+        scheduleAutoRefresh()
+    }
+
+    fun savePageState(): Bundle = Bundle().apply {
+        putString("configured_url", configuredUrl)
+        putInt("scroll_x", webView.scrollX)
+        putInt("scroll_y", webView.scrollY)
+        webView.saveState(this)
+    }
+
+    fun restorePageState(state: Bundle) {
+        restoredScroll = state.getInt("scroll_x") to state.getInt("scroll_y")
+        if (webView.restoreState(state) != null) configuredUrl = state.getString("configured_url")
+        else restoredScroll = null
+    }
+
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        mainHandler.removeCallbacksAndMessages(null)
+        webView.stopLoading()
+        webView.destroy()
+        onUpdatedCallback = null
     }
 }

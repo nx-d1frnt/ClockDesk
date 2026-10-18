@@ -43,7 +43,9 @@ class TimeDesktopWidget(
             val minutePattern = "mm"
             val hourStr = SimpleDateFormat(hourPattern, Locale.getDefault()).format(currentTime)
             val minStr = SimpleDateFormat(minutePattern, Locale.getDefault()).format(currentTime)
-            view.text = "$hourStr\n$minStr"
+            val safeHour = hourStr.toCharArray().joinToString("\u2060")
+            val safeMin = minStr.toCharArray().joinToString("\u2060")
+            view.text = "$safeHour\n$safeMin"
         } else {
             val showSeconds = host.getPreferences().getBoolean("clock_show_seconds", false)
             val effectivePattern = if (showSeconds && !timePattern.contains("s")) {

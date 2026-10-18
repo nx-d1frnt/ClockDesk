@@ -37,13 +37,17 @@ import kotlin.math.roundToInt
 class WidgetMover(
     private val context: Context,
     initialViews: List<View>,
-    private val parentView: View
+    private val parentView: View,
+    positionPreferencesName: String = "WidgetPositions",
+    autoInitialize: Boolean = true
 ) {
     private val views = initialViews.toMutableList()
 
     fun setViews(newViews: List<View>) {
         views.clear()
         views.addAll(newViews)
+        checkAndInitializeDefaults()
+        applyAllInternalGravities()
         if (isEditMode) {
             views.forEach { view ->
                 view.setOnTouchListener(dragListener)
@@ -56,6 +60,9 @@ class WidgetMover(
     fun addView(view: View) {
         if (!views.contains(view)) {
             views.add(view)
+            val idName = getResourceName(view.id)
+            val internalGravity = prefs.getInt("${idName}_internal_gravity", GRAVITY_CENTER)
+            applyInternalGravity(view, internalGravity)
             if (isEditMode) {
                 view.setOnTouchListener(dragListener)
                 view.setBackgroundResource(R.drawable.editable_border)
@@ -78,8 +85,23 @@ class WidgetMover(
     }
 
     private val TAG = "WidgetMover"
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("WidgetPositions", Context.MODE_PRIVATE)
+    private var prefs: SharedPreferences =
+        context.getSharedPreferences(positionPreferencesName, Context.MODE_PRIVATE)
+
+    fun setPositionPreferences(name: String, andRestore: Boolean = false) {
+        parentView.removeCallbacks(restoreRunnable)
+        pendingPostApplyRunnable?.let { parentView.removeCallbacks(it) }
+        pendingPostApplyRunnable = null
+        views.forEach { it.animate().cancel() }
+        if (parentView is ViewGroup) android.transition.TransitionManager.endTransitions(parentView)
+        prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        isFirstRestore = true
+        loadInitialState()
+        checkAndInitializeDefaults()
+        if (andRestore) {
+            restoreOrderAndPositions()
+        }
+    }
 
     // State Management
     private var currentMode: LayoutMode = LayoutMode.StackMode
@@ -132,7 +154,7 @@ class WidgetMover(
         Logger.d("WidgetMover"){"WidgetMover initialized with ${views.size} views"}
         loadInitialState()
 
-        parentView.post {
+        if (autoInitialize) parentView.post {
             ensureLayoutReady {
                 Logger.d("WidgetMover"){"Auto-initializing widget positions..."}
                 checkAndInitializeDefaults()
@@ -141,11 +163,44 @@ class WidgetMover(
         }
     }
 
+    /** Lay out a detached thumbnail using the same constraints as the live desk. */
+    fun restoreImmediately(width: Int, height: Int) {
+        checkAndInitializeDefaults()
+        fun layout() {
+            parentView.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+            )
+            parentView.layout(0, 0, width, height)
+        }
+        layout()
+        restoreRunnable.run()
+        layout()
+        pendingPostApplyRunnable?.let {
+            parentView.removeCallbacks(it)
+            it.run()
+        }
+        pendingPostApplyRunnable = null
+        layout()
+    }
+
     private fun ensureLayoutReady(action: () -> Unit) {
         if (parentView.width > 0 && parentView.height > 0) {
             action()
         } else {
-            parentView.post { ensureLayoutReady(action) }
+            // A widget desk may stay detached while another desk is selected.
+            // Wait for its first layout instead of posting endlessly while hidden.
+            parentView.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                override fun onLayoutChange(
+                    view: View, left: Int, top: Int, right: Int, bottom: Int,
+                    oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int
+                ) {
+                    if (view.width > 0 && view.height > 0) {
+                        view.removeOnLayoutChangeListener(this)
+                        action()
+                    }
+                }
+            })
         }
     }
 
@@ -284,12 +339,16 @@ class WidgetMover(
     // RESTORE LOGIC
     // ============================================================================
 
-    private val restoreRunnable = Runnable {
+    private fun applyAllInternalGravities() {
         views.forEach { view ->
             val idName = getResourceName(view.id)
             val internalGravity = prefs.getInt("${idName}_internal_gravity", GRAVITY_CENTER)
             applyInternalGravity(view, internalGravity)
         }
+    }
+
+    private val restoreRunnable = Runnable {
+        applyAllInternalGravities()
         applyHybridLayout()
     }
 
@@ -299,7 +358,11 @@ class WidgetMover(
         if (parentView !is ConstraintLayout) return
 
         parentView.removeCallbacks(restoreRunnable)
-        parentView.post(restoreRunnable)
+        if (isFirstRestore && parentView.width > 0 && parentView.height > 0) {
+            restoreRunnable.run()
+        } else {
+            parentView.post(restoreRunnable)
+        }
     }
 
     private fun applyHybridLayout() {
@@ -424,6 +487,19 @@ class WidgetMover(
         val isInitialRestore = isFirstRestore
         if (isFirstRestore) {
             isFirstRestore = false
+            val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+            val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
+            stackedViews.forEach { view ->
+                view.translationX = shiftX
+                view.translationY = shiftY
+            }
+            freeViews.forEach { view ->
+                val idName = getResourceName(view.id)
+                val savedX = prefs.getFloat("${idName}_x", 0f)
+                val savedY = prefs.getFloat("${idName}_y", 0f)
+                view.translationX = savedX + shiftX
+                view.translationY = savedY + shiftY
+            }
         }
 
         val postRunnable = Runnable {
@@ -434,12 +510,11 @@ class WidgetMover(
                     view.scaleX = 1f
                     view.scaleY = 1f
                 }
-                if (view.visibility == View.VISIBLE && view.alpha < 1f) {
-                    view.alpha = 1f
-                }
                 if (isInitialRestore) {
-                    view.translationX = 0f
-                    view.translationY = 0f
+                    val shiftX = burnInProtectionManager?.currentShiftX ?: 0f
+                    val shiftY = burnInProtectionManager?.currentShiftY ?: 0f
+                    view.translationX = shiftX
+                    view.translationY = shiftY
                 } else {
                     val (oldX, oldY) = oldVisualPositions[view] ?: Pair(view.x, view.y)
                     val startTransX = oldX - view.left
@@ -470,9 +545,6 @@ class WidgetMover(
                 } else {
                     view.scaleX = 1f
                     view.scaleY = 1f
-                }
-                if (view.visibility == View.VISIBLE && view.alpha < 1f) {
-                    view.alpha = 1f
                 }
                 val idName = getResourceName(view.id)
                 val savedX = prefs.getFloat("${idName}_x", 0f)
@@ -997,6 +1069,31 @@ class WidgetMover(
         }
     }
 
+    private fun applyTextViewInternalGravity(textView: TextView, targetGravity: Int, targetTextAlignment: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            if (textView.textAlignment != targetTextAlignment) {
+                textView.textAlignment = targetTextAlignment
+            }
+        }
+        if (textView.gravity != targetGravity) {
+            textView.gravity = targetGravity
+        } else {
+            val verticalMask = targetGravity and Gravity.VERTICAL_GRAVITY_MASK
+            val tempHorizontal = if ((targetGravity and Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.CENTER_HORIZONTAL) {
+                Gravity.START
+            } else {
+                Gravity.CENTER_HORIZONTAL
+            }
+            textView.gravity = tempHorizontal or verticalMask
+            textView.gravity = targetGravity
+        }
+        if (textView.ellipsize != android.text.TextUtils.TruncateAt.MARQUEE) {
+            textView.scrollX = 0
+        }
+        textView.requestLayout()
+        textView.invalidate()
+    }
+
     private fun applyInternalGravity(view: View, mode: Int) {
         val hGravity = when (mode) {
             GRAVITY_START -> Gravity.START
@@ -1005,48 +1102,61 @@ class WidgetMover(
             else -> Gravity.CENTER_HORIZONTAL
         }
         val targetGravity = hGravity or Gravity.CENTER_VERTICAL
+        val targetTextAlignment = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            when (mode) {
+                GRAVITY_START -> View.TEXT_ALIGNMENT_VIEW_START
+                GRAVITY_CENTER -> View.TEXT_ALIGNMENT_CENTER
+                GRAVITY_END -> View.TEXT_ALIGNMENT_VIEW_END
+                else -> View.TEXT_ALIGNMENT_CENTER
+            }
+        } else {
+            0
+        }
 
         when (view) {
             is TextView -> {
-                view.gravity = targetGravity
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    view.textAlignment = when (mode) {
-                        GRAVITY_START -> View.TEXT_ALIGNMENT_VIEW_START
-                        GRAVITY_CENTER -> View.TEXT_ALIGNMENT_CENTER
-                        GRAVITY_END -> View.TEXT_ALIGNMENT_VIEW_END
-                        else -> View.TEXT_ALIGNMENT_CENTER
-                    }
-                }
+                applyTextViewInternalGravity(view, targetGravity, targetTextAlignment)
             }
             is LinearLayout -> {
                 view.gravity = targetGravity
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                    view.textAlignment = targetTextAlignment
+                }
                 for (i in 0 until view.childCount) {
                     val child = view.getChildAt(i)
                     if (child is TextView) {
-                        child.gravity = targetGravity
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                            child.textAlignment = when (mode) {
-                                GRAVITY_START -> View.TEXT_ALIGNMENT_VIEW_START
-                                GRAVITY_CENTER -> View.TEXT_ALIGNMENT_CENTER
-                                GRAVITY_END -> View.TEXT_ALIGNMENT_VIEW_END
-                                else -> View.TEXT_ALIGNMENT_CENTER
+                        applyTextViewInternalGravity(child, targetGravity, targetTextAlignment)
+                    }
+                }
+                view.requestLayout()
+                view.invalidate()
+            }
+            is ViewGroup -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                    view.textAlignment = targetTextAlignment
+                }
+                view.findViewById<LinearLayout>(R.id.media_ticker_layout)?.let { ticker ->
+                    ticker.gravity = targetGravity
+                }
+                listOf(
+                    R.id.now_playing_text,
+                    R.id.compact_title_text,
+                    R.id.compact_artist_text,
+                    R.id.expanded_title_text,
+                    R.id.expanded_artist_text
+                ).forEach { textId ->
+                    view.findViewById<TextView>(textId)?.let { tv ->
+                        applyTextViewInternalGravity(tv, targetGravity, targetTextAlignment)
+                        (tv.parent as? LinearLayout)?.let { parentLinear ->
+                            if (parentLinear.orientation == LinearLayout.VERTICAL) {
+                                parentLinear.gravity = hGravity or Gravity.CENTER_VERTICAL
                             }
                         }
                     }
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    view.textAlignment = when (mode) {
-                        GRAVITY_START -> View.TEXT_ALIGNMENT_VIEW_START
-                        GRAVITY_CENTER -> View.TEXT_ALIGNMENT_CENTER
-                        GRAVITY_END -> View.TEXT_ALIGNMENT_VIEW_END
-                        else -> View.TEXT_ALIGNMENT_CENTER
-                    }
-                }
+                view.requestLayout()
+                view.invalidate()
             }
-        }
-        view.post {
-            view.invalidate()
-            view.requestLayout()
         }
     }
 
