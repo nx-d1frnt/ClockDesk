@@ -83,7 +83,7 @@ class WidgetMover(
     private var prefs: SharedPreferences =
         context.getSharedPreferences(positionPreferencesName, Context.MODE_PRIVATE)
 
-    fun setPositionPreferences(name: String) {
+    fun setPositionPreferences(name: String, andRestore: Boolean = false) {
         parentView.removeCallbacks(restoreRunnable)
         pendingPostApplyRunnable?.let { parentView.removeCallbacks(it) }
         pendingPostApplyRunnable = null
@@ -93,7 +93,9 @@ class WidgetMover(
         isFirstRestore = true
         loadInitialState()
         checkAndInitializeDefaults()
-        restoreOrderAndPositions()
+        if (andRestore) {
+            restoreOrderAndPositions()
+        }
     }
 
     // State Management

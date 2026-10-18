@@ -26,7 +26,10 @@ class DesksPagerAdapter(
     private var selectedDeskId: String? = null
     private var hostResumed = true
 
-    init { setHasStableIds(true) }
+    init {
+        setHasStableIds(true)
+        previews.preload(desks)
+    }
 
     fun selectDesk(position: Int) {
         val desk = desks.getOrNull(position) ?: return
@@ -94,6 +97,7 @@ class DesksPagerAdapter(
         boundPages.keys.retainAll(ids)
         desks.clear()
         desks.addAll(newDesks)
+        previews.preload(newDesks)
         notifyDataSetChanged()
     }
 

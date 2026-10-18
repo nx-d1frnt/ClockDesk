@@ -573,7 +573,9 @@ class FontManager(
     fun loadFont() {
         val prefs = appearancePreferences
 
-        rebuildFontList()
+        if (fonts.isEmpty()) {
+            rebuildFontList()
+        }
         loadCustomColors()
         isNightShiftEnabled = prefs.getBoolean("nightShiftEnabled", false)
         isDynamicColorEnabled = prefs.getBoolean("use_dynamic_color", false)

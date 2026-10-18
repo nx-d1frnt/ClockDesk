@@ -789,9 +789,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         desksViewPager.adapter = desksPagerAdapter
         desksViewPager.setCurrentItem(initialPosition, false)
         deskManager.recordSelectedDesk(deskManager.getDesks()[initialPosition].id)
-        desksViewPager.offscreenPageLimit = 3
+        desksViewPager.offscreenPageLimit = 1
         deskPageIndicator.setPageCount(deskManager.getDesks().size, desksViewPager.currentItem)
         deskPageIndicator.onPageClicked = { pos -> desksViewPager.setCurrentItem(pos, true) }
+
+        var pendingDeskPosition: Int? = null
+        var scrollState = ViewPager2.SCROLL_STATE_IDLE
 
         desksViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
@@ -808,15 +811,24 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 deskPageIndicator.showTemporarily()
                 selectedDeskId = deskManager.getDesks().getOrNull(position)?.id
                 selectedDeskId?.let { deskManager.recordSelectedDesk(it) }
-                desksPagerAdapter.selectDesk(position)
+
+                if (scrollState == ViewPager2.SCROLL_STATE_IDLE) {
+                    desksPagerAdapter.selectDesk(position)
+                } else {
+                    pendingDeskPosition = position
+                }
             }
 
             override fun onPageScrollStateChanged(state: Int) {
                 super.onPageScrollStateChanged(state)
+                scrollState = state
                 if (state == ViewPager2.SCROLL_STATE_DRAGGING) {
                     deskPageIndicator.showTemporarily()
                 } else if (state == ViewPager2.SCROLL_STATE_IDLE) {
                     deskPageIndicator.setCurrentPage(desksViewPager.currentItem)
+                    val targetPos = pendingDeskPosition ?: desksViewPager.currentItem
+                    pendingDeskPosition = null
+                    desksPagerAdapter.selectDesk(targetPos)
                 }
             }
         })
