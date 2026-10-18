@@ -44,9 +44,11 @@ class DesksPagerAdapter(
                 }
             }
             activeWidgetDeskId = desk.id
+            boundPages[desk.id]?.let { attach(it, widgetsView) }
             onWidgetDeskSelected(desk)
+        } else {
+            boundPages[desk.id]?.let { attach(it, widgetsView) }
         }
-        boundPages[desk.id]?.let { attach(it, widgetsView) }
     }
 
     fun setHostResumed(resumed: Boolean) {

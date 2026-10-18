@@ -34,18 +34,42 @@ class DeskPreviewStore(private val context: Context) {
     private val cache = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
-    private val directory = File(context.cacheDir, "desk_previews").apply { mkdirs() }
+    private val directory = File(context.cacheDir, "desk_previews_v2").apply { mkdirs() }
     private fun file(id: String) = File(directory, id.replace(Regex("[^a-zA-Z0-9_-]"), "_") + ".png")
+
+    init {
+        diskWriter.execute {
+            File(context.cacheDir, "desk_previews").takeIf { it.exists() }?.deleteRecursively()
+        }
+    }
+
+    private fun getCached(id: String): Bitmap? = synchronized(cache) { cache.get(id) }
+    private fun putCached(id: String, bitmap: Bitmap) {
+        synchronized(cache) { cache.put(id, bitmap) }
+    }
+
+    private fun saveToDiskAsync(id: String, bitmap: Bitmap) {
+        val target = file(id)
+        diskWriter.execute {
+            try {
+                val temp = File(target.path + ".tmp")
+                temp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                if (!temp.renameTo(target)) temp.delete()
+            } catch (e: Exception) {
+                Logger.w("DeskPreviewStore") { "Could not save preview: ${e.message}" }
+            }
+        }
+    }
 
     fun preload(desks: List<DeskItem>) {
         diskWriter.execute {
             desks.forEach { desk ->
-                if (cache.get(desk.id) == null) {
+                if (getCached(desk.id) == null) {
                     val target = file(desk.id)
                     if (target.exists()) {
                         try {
                             BitmapFactory.decodeFile(target.path)?.let { bmp ->
-                                cache.put(desk.id, bmp)
+                                putCached(desk.id, bmp)
                             }
                         } catch (e: Exception) {
                             Logger.w("DeskPreviewStore") { "Failed to preload preview: ${e.message}" }
@@ -57,9 +81,15 @@ class DeskPreviewStore(private val context: Context) {
     }
 
     fun get(desk: DeskItem): Bitmap {
-        cache.get(desk.id)?.let { return it }
-        val bitmap = BitmapFactory.decodeFile(file(desk.id).path) ?: fallback(desk)
-        cache.put(desk.id, bitmap)
+        getCached(desk.id)?.let { return it }
+        val diskFile = file(desk.id)
+        val decoded = if (diskFile.exists()) BitmapFactory.decodeFile(diskFile.path) else null
+        val bitmap = decoded ?: fallback(desk).also {
+            if (desk.type == DeskType.WIDGETS) {
+                saveToDiskAsync(desk.id, it)
+            }
+        }
+        putCached(desk.id, bitmap)
         return bitmap
     }
 
@@ -67,17 +97,8 @@ class DeskPreviewStore(private val context: Context) {
         if (view.width <= 0 || view.height <= 0) return
         try {
             val bitmap = render(view)
-            cache.put(id, bitmap)
-            val target = file(id)
-            diskWriter.execute {
-                try {
-                    val temp = File(target.path + ".tmp")
-                    temp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    if (!temp.renameTo(target)) temp.delete()
-                } catch (e: Exception) {
-                    Logger.w("DeskPreviewStore") { "Could not save preview: ${e.message}" }
-                }
-            }
+            putCached(id, bitmap)
+            saveToDiskAsync(id, bitmap)
         } catch (e: RuntimeException) {
             // Some artwork drawables use hardware bitmaps, unavailable to this canvas.
             Logger.w("DeskPreviewStore") { "Could not capture preview: ${e.message}" }
@@ -85,7 +106,7 @@ class DeskPreviewStore(private val context: Context) {
     }
 
     fun invalidate(id: String) {
-        cache.remove(id)
+        synchronized(cache) { cache.remove(id) }
         val target = file(id)
         diskWriter.execute { target.delete() }
     }
@@ -95,7 +116,6 @@ class DeskPreviewStore(private val context: Context) {
         val bitmap = Bitmap.createBitmap((view.width * scale).toInt().coerceAtLeast(1),
             (view.height * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         Canvas(bitmap).apply {
-            drawColor(Color.rgb(24, 29, 38))
             scale(scale, scale)
             view.draw(this)
         }
@@ -103,9 +123,13 @@ class DeskPreviewStore(private val context: Context) {
     }
 
     private fun fallback(desk: DeskItem): Bitmap {
+        if (desk.type == DeskType.WIDGETS) {
+            try { return renderWidgets(desk) } catch (e: RuntimeException) {
+                Logger.w("DeskPreviewStore") { "Could not render widget preview: ${e.message}" }
+            }
+        }
         val bitmap = Bitmap.createBitmap(768, 432, Bitmap.Config.ARGB_8888)
         Canvas(bitmap).apply {
-            drawColor(Color.rgb(24, 29, 38))
             val icon = context.getDrawable(desk.type.iconResId)?.mutate()
             icon?.setTint(Color.WHITE)
             icon?.setBounds(344, 122, 424, 202)
@@ -119,5 +143,57 @@ class DeskPreviewStore(private val context: Context) {
             }
         }
         return bitmap
+    }
+
+    private fun renderWidgets(desk: DeskItem): Bitmap {
+        val root = LayoutInflater.from(context).inflate(R.layout.layout_desk_widgets, null, false) as ConstraintLayout
+        val time = root.findViewById<TextView>(R.id.time_text)
+        val date = root.findViewById<TextView>(R.id.date_text)
+        val media = root.findViewById<android.view.ViewGroup>(R.id.lastfm_layout)
+        val chips = root.findViewById<ConstraintLayout>(R.id.smart_chip_container)
+        val preferences = DeskAppearancePreferences(context).apply { switchLayout(desk.widgetLayoutKey) }
+        val fonts = FontManager(context, time, date, media, root.findViewById(R.id.now_playing_text),
+            root.findViewById(R.id.lastfm_icon), root.findViewById(R.id.weather_text),
+            root.findViewById(R.id.weather_icon), chips, false).apply { appearancePreferences = preferences }
+        val host = object : DesktopWidgetHost {
+            override val hostContext = context
+            override val isEditMode = false
+            override val fontManager = fonts
+            override fun getPreferences() = preferences
+            override fun getRestTranslationX(view: View) = 0f
+            override fun onMusicArtworkChanged(artworkSource: Any?) {}
+            override fun onWidgetClicked(widget: DesktopWidgetController) {}
+        }
+        val manager = DesktopWidgetManager(context, root, host, desk.widgetLayoutKey)
+        try {
+            fonts.loadFont()
+            manager.bindExistingViews(time, date, media, chips, root.findViewById(R.id.weather_layout))
+            root.findViewById<TextView>(R.id.now_playing_text).text = context.getString(R.string.now_playing_placeholder)
+            root.findViewById<TextView>(R.id.compact_title_text).text = context.getString(R.string.now_playing_placeholder)
+            root.findViewById<TextView>(R.id.expanded_title_text).text = context.getString(R.id.expanded_title_text.let { R.string.now_playing_placeholder })
+            chips.addView(TextView(context).apply {
+                id = R.id.chip_text
+                text = context.getString(R.string.widget_smart_chips_title)
+                fonts.applyStyleToSmartChip(this)
+            })
+            val screen = context.resources.displayMetrics
+            val width = screen.widthPixels.coerceAtLeast(960)
+            val height = screen.heightPixels.coerceAtLeast(540)
+            WidgetMover(context, manager.getViews().filter { it !== chips }, root,
+                DesktopWidgetManager.positionPreferencesName(desk.widgetLayoutKey), autoInitialize = false)
+                .restoreImmediately(width, height)
+            if (manager.getActiveInstances().isEmpty()) {
+                root.findViewById<TextView>(R.id.empty_desk_prompt).apply {
+                    visibility = View.VISIBLE
+                    text = context.getString(R.string.desk_preview_empty)
+                }
+                root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                root.layout(0, 0, width, height)
+            }
+            return render(root)
+        } finally {
+            manager.getControllers().forEach { it.onDestroy() }
+        }
     }
 }

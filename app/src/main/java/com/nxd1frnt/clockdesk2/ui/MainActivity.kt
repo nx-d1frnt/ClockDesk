@@ -722,6 +722,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         widgetMover.burnInProtectionManager = burnInProtectionManager
 
         desktopWidgetManager.onWidgetsChanged = {
+            fontManager.loadFont()
             desktopWidgetManager.bindExistingViews(
                 timeView = timeText,
                 dateView = dateText,
@@ -730,11 +731,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 weatherView = weatherLayout
             )
             setupMediaWidgetCallbacks()
-            fontManager.loadFont()
             desktopWidgetManager.getController<MediaDesktopWidget>()?.apply {
                 updateMediaStyle(fontManager.getMediaStyle())
                 handleMusicStateUpdate(currentMusicState)
             }
+            clockManager.refreshForDeskSwitch(reschedule = isResumed)
             val currentActiveViews = desktopWidgetManager.getViews()
             widgetMover.setViews(currentActiveViews.filter { it !== smartChipScrollView && it !== chipContainer })
             burnInProtectionManager.updateViews(currentActiveViews)
@@ -776,9 +777,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 widgetMover.setPositionPreferences(positionsName)
                 desktopWidgetManager.switchLayout(desk.widgetLayoutKey)
                 smartChipManager.onPreferencesChanged()
-                clockManager.updateTimeText()
-                clockManager.updateDateText()
-                if (isResumed) clockManager.startUpdates()
             }
         }
         val initialPosition = deskManager.getDesks().indexOfFirst { it.id == selectedDeskId }.coerceAtLeast(0)

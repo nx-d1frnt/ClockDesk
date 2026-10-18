@@ -62,21 +62,25 @@ class ClockManager(
         return timePattern.contains('s') || timePattern.contains('S')
     }
 
+    private fun computeNextDelayMs(now: Long = System.currentTimeMillis()): Long {
+        return when {
+            isDebugMode -> debugCycleInterval
+            shouldUpdateEverySecond() -> {
+                val delay = 1000L - (now % 1000L)
+                if (delay <= 0L) 1000L else delay
+            }
+            else -> {
+                val delay = 60000L - (now % 60000L)
+                if (delay <= 0L) 60000L else delay
+            }
+        }
+    }
+
     private val clockUpdateRunnable = object : Runnable {
         override fun run() {
             updateClock()
             val now = System.currentTimeMillis()
-            val interval = when {
-                isDebugMode -> debugCycleInterval
-                shouldUpdateEverySecond() -> {
-                    val delay = 1000L - (now % 1000L)
-                    if (delay <= 0L) 1000L else delay
-                }
-                else -> {
-                    val delay = 60000L - (now % 60000L)
-                    if (delay <= 0L) 60000L else delay
-                }
-            }
+            val interval = computeNextDelayMs(now)
             handler.postDelayed(this, interval)
             Logger.v("ClockUpdate"){"Clock updated at $now, next in ${interval}ms"}
         }
@@ -176,6 +180,16 @@ class ClockManager(
         handler.post(clockUpdateRunnable)
     }
 
+    fun refreshForDeskSwitch(reschedule: Boolean) {
+        val currentTime = getCurrentTime()
+        updateTimeText()
+        updateDateText()
+        fontManager.applyNightShiftTransition(currentTime, dayTimeGetter, true)
+        handler.removeCallbacks(clockUpdateRunnable)
+        if (reschedule) {
+            handler.postDelayed(clockUpdateRunnable, computeNextDelayMs())
+        }
+    }
 
     fun stopUpdates() {
         handler.removeCallbacks(clockUpdateRunnable)

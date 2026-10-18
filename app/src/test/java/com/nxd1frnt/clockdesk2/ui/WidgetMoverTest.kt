@@ -103,6 +103,100 @@ class WidgetMoverTest {
         }
     }
 
+    @Test fun switchingBetweenWidgetDesksPreservesTextAlignmentAndLayoutAlignment() {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val desk1Prefs = activity.getSharedPreferences("WidgetPositions_desk1", Context.MODE_PRIVATE)
+            desk1Prefs.edit().clear()
+                .putBoolean("is_layout_initialized", true)
+                .putInt("widget_mover_layout_version", 2)
+                .putInt("time_text_internal_gravity", 2) // GRAVITY_END
+                .putInt("date_text_internal_gravity", 2) // GRAVITY_END
+                .apply()
+
+            val desk2Prefs = activity.getSharedPreferences("WidgetPositions_desk2", Context.MODE_PRIVATE)
+            desk2Prefs.edit().clear()
+                .putBoolean("is_layout_initialized", true)
+                .putInt("widget_mover_layout_version", 2)
+                .putInt("time_text_internal_gravity", 0) // GRAVITY_START
+                .putInt("date_text_internal_gravity", 1) // GRAVITY_CENTER
+                .apply()
+
+            val desktop = ConstraintLayout(activity)
+            val timeView = com.nxd1frnt.clockdesk2.ui.view.ClockTextView(activity).apply {
+                id = R.id.time_text
+                text = "12:34"
+            }
+            val dateView = com.nxd1frnt.clockdesk2.ui.view.DateTextView(activity).apply {
+                id = R.id.date_text
+                dateStyle = com.nxd1frnt.clockdesk2.utils.DateStyle.TWO_LINE
+                text = "MON\nOCT 18"
+            }
+            desktop.addView(timeView, ConstraintLayout.LayoutParams(400, 120))
+            desktop.addView(dateView, ConstraintLayout.LayoutParams(400, 120))
+            activity.setContentView(desktop)
+            shadowOf(Looper.getMainLooper()).idle()
+
+            val mover = WidgetMover(activity, listOf(timeView, dateView), desktop, "WidgetPositions_desk1")
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(View.TEXT_ALIGNMENT_VIEW_END, timeView.textAlignment)
+            assertEquals(View.TEXT_ALIGNMENT_VIEW_END, dateView.textAlignment)
+            assertTrue(timeView.layout.alignment.name in setOf("ALIGN_OPPOSITE", "ALIGN_RIGHT"))
+            assertTrue(dateView.layout.alignment.name in setOf("ALIGN_OPPOSITE", "ALIGN_RIGHT"))
+
+            // Switch to desk 2
+            mover.setPositionPreferences("WidgetPositions_desk2")
+            dateView.dateStyle = com.nxd1frnt.clockdesk2.utils.DateStyle.TWO_LINE
+            dateView.isTwoLineMode = true
+            mover.setViews(listOf(timeView, dateView))
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(View.TEXT_ALIGNMENT_VIEW_START, timeView.textAlignment)
+            assertEquals(View.TEXT_ALIGNMENT_CENTER, dateView.textAlignment)
+            assertTrue(timeView.layout.alignment.name in setOf("ALIGN_NORMAL", "ALIGN_LEFT"))
+            assertEquals(android.text.Layout.Alignment.ALIGN_CENTER, dateView.layout.alignment)
+
+            // Switch back to desk 1
+            mover.setPositionPreferences("WidgetPositions_desk1")
+            dateView.dateStyle = com.nxd1frnt.clockdesk2.utils.DateStyle.TWO_LINE
+            dateView.isTwoLineMode = true
+            mover.setViews(listOf(timeView, dateView))
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(View.TEXT_ALIGNMENT_VIEW_END, timeView.textAlignment)
+            assertEquals(View.TEXT_ALIGNMENT_VIEW_END, dateView.textAlignment)
+            assertTrue(timeView.layout.alignment.name in setOf("ALIGN_OPPOSITE", "ALIGN_RIGHT"))
+            assertTrue(dateView.layout.alignment.name in setOf("ALIGN_OPPOSITE", "ALIGN_RIGHT"))
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test fun deskPreviewCaptureHasTransparentBackground() {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val container = FrameLayout(activity)
+            activity.setContentView(container)
+            shadowOf(Looper.getMainLooper()).idle()
+
+            val store = com.nxd1frnt.clockdesk2.desks.ui.DeskPreviewStore(activity)
+            val desk = com.nxd1frnt.clockdesk2.desks.DeskItem(
+                id = "test_desk_transparent",
+                type = com.nxd1frnt.clockdesk2.desks.DeskType.WIDGETS,
+                title = "Widgets",
+                order = 0
+            )
+            store.capture(desk.id, container)
+            val bmp = store.get(desk)
+            assertEquals(android.graphics.Color.TRANSPARENT, bmp.getPixel(0, 0))
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
     private fun withFixture(oversized: Boolean = false, block: (Fixture) -> Unit) {
         val controller = Robolectric.buildActivity(Activity::class.java).setup()
         try {

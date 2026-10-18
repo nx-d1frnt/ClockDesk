@@ -44,8 +44,9 @@ class DateDesktopWidget(
             view.text = formatTwoLineDate(currentDate, pattern)
         } else {
             val pattern = fontManager.getDateFormatPattern().ifBlank { "EEE, MMM dd" }
+            val effectivePattern = pattern.replace("\\n", " ").trim()
             try {
-                val dateFormat = SimpleDateFormat(pattern, Locale.getDefault())
+                val dateFormat = SimpleDateFormat(effectivePattern, Locale.getDefault())
                 view.text = dateFormat.format(currentDate)
             } catch (e: Exception) {
                 val fallbackFormat = SimpleDateFormat("EEE, MMM dd", Locale.getDefault())
@@ -78,7 +79,9 @@ class DateDesktopWidget(
 
             val line1 = SimpleDateFormat(topPattern.ifBlank { "EEE" }, locale).format(currentDate)
             val line2 = SimpleDateFormat(bottomPattern.ifBlank { "MMM d" }, locale).format(currentDate)
-            "$line1\n$line2"
+            val safeLine1 = line1.toCharArray().joinToString("\u2060")
+            val safeLine2 = line2.toCharArray().joinToString("\u2060")
+            "$safeLine1\n$safeLine2"
         } catch (e: Exception) {
             val line1 = SimpleDateFormat("EEE", locale).format(currentDate)
             val line2 = SimpleDateFormat("MMM d", locale).format(currentDate)

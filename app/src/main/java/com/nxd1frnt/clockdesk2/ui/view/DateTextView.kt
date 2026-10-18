@@ -25,10 +25,11 @@ class DateTextView @JvmOverloads constructor(
 
     var dateStyle: DateStyle = DateStyle.STANDARD
         set(value) {
+            val changed = field != value
             field = value
             isBadgeMode = value.isBadge
             isTwoLineMode = value.isTwoLine
-            if (value.isHeroDay || value.isChipPill) {
+            if (changed && (value.isHeroDay || value.isChipPill)) {
                 requestLayout()
                 invalidate()
             }
@@ -36,23 +37,21 @@ class DateTextView @JvmOverloads constructor(
 
     var isBadgeMode: Boolean = false
         set(value) {
-            field = value
-            requestLayout()
-            invalidate()
+            if (field != value) {
+                field = value
+                requestLayout()
+                invalidate()
+            }
         }
 
     var isTwoLineMode: Boolean = false
         set(value) {
-            field = value
-            if (!isBadgeMode && dateStyle != DateStyle.HERO_DAY && dateStyle != DateStyle.CHIP_PILL) {
-                if (value) {
-                    gravity = android.view.Gravity.START or (gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                        textAlignment = android.view.View.TEXT_ALIGNMENT_VIEW_START
-                    }
+            if (field != value) {
+                field = value
+                if (!isBadgeMode && dateStyle != DateStyle.HERO_DAY && dateStyle != DateStyle.CHIP_PILL) {
+                    requestLayout()
+                    invalidate()
                 }
-                requestLayout()
-                invalidate()
             }
         }
 
