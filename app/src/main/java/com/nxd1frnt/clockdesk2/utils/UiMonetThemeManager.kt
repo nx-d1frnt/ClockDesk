@@ -11,7 +11,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.util.TypedValue
-import android.view.ContextThemeWrapper
+import androidx.appcompat.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
@@ -185,6 +185,9 @@ object UiMonetThemeManager {
             activityContext = activityContext.baseContext
         }
         val base = activityContext ?: context
+        if (base is Activity) {
+            return base
+        }
         val themed = ContextThemeWrapper(base, R.style.Theme_ClockDesk)
         val seedColor = getActiveSeedColor(base)
         return if (seedColor != null) {

@@ -46,6 +46,11 @@
         <item name="materialButtonToggleGroupStyle">@style/Theme.ClockDesk.Button.ToggleGroup</item>
         <item name="selectableItemBackgroundBorderless">?android:attr/selectableItemBackgroundBorderless</item>
         <item name="selectableItemBackground">?android:attr/selectableItemBackground</item>
+        <item name="listPreferredItemHeightSmall">48dp</item>
+        <item name="listPreferredItemPaddingLeft">16dp</item>
+        <item name="listPreferredItemPaddingRight">16dp</item>
+        <item name="listPreferredItemPaddingStart">16dp</item>
+        <item name="listPreferredItemPaddingEnd">16dp</item>
     </style>
 
     <style name="Theme.ClockDesk.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">

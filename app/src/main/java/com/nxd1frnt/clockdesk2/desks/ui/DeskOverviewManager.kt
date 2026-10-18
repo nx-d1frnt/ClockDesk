@@ -157,8 +157,7 @@ class DeskOverviewManager(
         if (deskManager.getStartDeskId() != null) {
             actions.add(activity.getString(R.string.desk_resume_last) to { deskManager.setStartDesk(null) })
         }
-        val themedCtx = UiMonetThemeManager.wrapContext(activity)
-        val dialog = MaterialAlertDialogBuilder(themedCtx).setTitle(desk.title)
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle(desk.title)
             .setItems(actions.map { it.first }.toTypedArray()) { _, index -> actions[index].second() }
             .setNegativeButton(R.string.cancel, null).create()
         dialog.show()
@@ -166,9 +165,8 @@ class DeskOverviewManager(
     }
 
     private fun showRenameDialog(desk: DeskItem) {
-        val themedCtx = UiMonetThemeManager.wrapContext(activity)
-        val palette = UiMonetThemeManager.getPalette(themedCtx)
-        val input = EditText(themedCtx).apply {
+        val palette = UiMonetThemeManager.getPalette(activity)
+        val input = EditText(activity).apply {
             setSingleLine(true)
             filters = arrayOf(InputFilter.LengthFilter(80))
             hint = activity.getString(R.string.desk_name)
@@ -178,11 +176,11 @@ class DeskOverviewManager(
             selectAll()
         }
         val padding = (24 * activity.resources.displayMetrics.density).toInt()
-        val wrapper = android.widget.FrameLayout(themedCtx).apply {
+        val wrapper = android.widget.FrameLayout(activity).apply {
             setPadding(padding, 0, padding, 0)
             addView(input)
         }
-        val dialog = MaterialAlertDialogBuilder(themedCtx).setTitle(R.string.desk_rename).setView(wrapper)
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle(R.string.desk_rename).setView(wrapper)
             .setPositiveButton(R.string.apply, null).setNegativeButton(R.string.cancel, null).create()
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -195,8 +193,7 @@ class DeskOverviewManager(
     }
 
     private fun showDeleteConfirm(desk: DeskItem) {
-        val themedCtx = UiMonetThemeManager.wrapContext(activity)
-        val dialog = MaterialAlertDialogBuilder(themedCtx)
+        val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.delete_desk)
             .setMessage(activity.getString(R.string.delete_desk_confirm, desk.title))
             .setPositiveButton(R.string.delete_desk) { _, _ ->
@@ -213,8 +210,7 @@ class DeskOverviewManager(
         val types = DeskType.entries.toTypedArray()
         val items = types.map { activity.getString(it.titleResId) }.toTypedArray()
 
-        val themedCtx = UiMonetThemeManager.wrapContext(activity)
-        val dialog = MaterialAlertDialogBuilder(themedCtx)
+        val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.select_desk_type)
             .setItems(items) { _, which ->
                 val selectedType = types[which]
