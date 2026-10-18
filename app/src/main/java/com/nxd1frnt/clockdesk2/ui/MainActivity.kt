@@ -208,7 +208,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     override fun onMusicArtworkChanged(artworkSource: Any?) {}
     override fun onWidgetClicked(widget: DesktopWidgetController) {
         widget.rootView?.let {
-            customizationSheetManager.showForView(it)
+            ensureCustomizationSheetManager().showForView(it)
             resetEditModeTimeout()
         }
     }
