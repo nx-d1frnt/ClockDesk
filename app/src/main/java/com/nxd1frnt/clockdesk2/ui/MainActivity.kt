@@ -90,6 +90,7 @@ import com.nxd1frnt.clockdesk2.smartchips.SmartChipManager
 import com.nxd1frnt.clockdesk2.smartchips.plugins.BackgroundProgressPlugin
 import com.nxd1frnt.clockdesk2.ui.settings.BackgroundSheetManager
 import com.nxd1frnt.clockdesk2.ui.settings.SettingsActivity
+import com.nxd1frnt.clockdesk2.ui.touch.EditModeTouchGuard
 import com.nxd1frnt.clockdesk2.ui.view.DynamicBackgroundView
 import com.nxd1frnt.clockdesk2.ui.view.PerformanceOverlayView
 import com.nxd1frnt.clockdesk2.ui.view.TurbulenceView
@@ -211,6 +212,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var primaryWidgetsContainer: ConstraintLayout
     private lateinit var scaleGestureDetector: ScaleGestureDetector
     private lateinit var deskGestureDetector: GestureDetector
+    private val editModeTouchGuard = EditModeTouchGuard()
     private lateinit var btnManageDesks: MaterialButton
     private var selectedDeskId: String? = null
 
@@ -1612,6 +1614,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (ev != null && editModeTouchGuard.shouldConsume(ev)) return true
         if (::smartPixelManager.isInitialized) {
             smartPixelManager.onUserInteraction()
         }
@@ -2968,6 +2971,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             if (currentDesk != null && currentDesk.type != com.nxd1frnt.clockdesk2.desks.DeskType.WIDGETS) {
                 return
             }
+        }
+        editModeTouchGuard.cancelCurrentGesture { cancel ->
+            if (::deskGestureDetector.isInitialized) deskGestureDetector.onTouchEvent(cancel)
+            if (::scaleGestureDetector.isInitialized) scaleGestureDetector.onTouchEvent(cancel)
+            if (::smartChipManager.isInitialized && smartChipManager.isStackExpanded) {
+                smartChipManager.handleExpandedStackTouch(cancel)
+            }
+            super.dispatchTouchEvent(cancel)
         }
         isEditMode = true
         smartChipManager.setEditMode(true) { clickedView ->
