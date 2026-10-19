@@ -266,6 +266,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             if (isFinishing || isDestroyed) return@runOnUiThread
             val activeId = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).getActiveProviderId()
             if (activeId == provider.id || activeId.endsWith("/${provider.id}") || provider.id.endsWith("/$activeId")) {
+                // The provider has already cached this payload for restoring after music stops.
+                if (isMusicBackgroundActive()) return@runOnUiThread
                 Logger.i("BackgroundFlow") { "BackgroundProvider updated: ${provider.id}, applying payload $payload" }
                 applyBackgroundPayload(payload)
             }
@@ -3245,7 +3247,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (activeProviderId.startsWith("external:") && startupSystemsInitialized) {
             val plugin = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
             val payload = plugin?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
-            if (payload !is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient) {
+            if (!isMusicBackgroundActive() && payload !is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient) {
                 applyBackgroundPayload(payload, skipAnimation = true)
             }
             if (plugin != null) {
@@ -3270,6 +3272,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_FULLSCREEN)
     }
+
+    private fun isMusicBackgroundActive(): Boolean =
+        wasMusicBackgroundApplied && backgroundManager.isMusicAlbumArtEnabled()
 
     fun isDynamicGradientActive(): Boolean {
         if (wasMusicBackgroundApplied) return false
