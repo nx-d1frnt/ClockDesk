@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.ui
 
+import com.nxd1frnt.clockdesk2.utils.PowerSavePolicy
 import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -301,7 +302,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
     private val PICK_FONT_REQUEST = 400
-    private val minPowerSaveBrightness = 0.01f
 
     private var isResumed = false
     private enum class NightDimState { NORMAL, DIMMED }
@@ -356,21 +356,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 val lux = event.values[0]
                 lastSeenLux = lux
 
-                if (isPowerSavingMode) {
-                    val layoutParams = window.attributes
-                    val newBrightness = when {
-                        lux <= 20 -> minPowerSaveBrightness
-                        lux <= 500 -> 0.1f
-                        lux <= 5000 -> 0.25f
-                        else -> 0.4f
-                    }
-
-                    if (layoutParams.screenBrightness != newBrightness) {
-                        layoutParams.screenBrightness = newBrightness
-                        window.attributes = layoutParams
-                    }
-                    return
-                }
+                if (PowerSavePolicy.read(
+                        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE), isPowerSavingMode
+                    ).brightnessOverride != null) return
 
                 // Smart Night Dimming logic
                 val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
@@ -809,7 +797,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
 
-        powerStateManager = PowerStateManager(this)
+        powerStateManager = PowerStateManager.getInstance(this)
         powerStateManager.registerObserver(this)
         powerStateManager.registerObserver(clockManager)
         powerStateManager.registerObserver(weatherGetter)
@@ -1684,7 +1672,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 powerStateManager.unregisterObserver(clockManager)
             }
             powerStateManager.unregisterObserver(weatherGetter)
-            powerStateManager.destroy()
         }
         if (::clockManager.isInitialized) {
             clockManager.stopUpdates()
@@ -2178,7 +2165,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     updateBackgroundFilters()
                 }
             }
-            weatherGetter.startUpdates(lat, lon)
+            if (isResumed) weatherGetter.startUpdates(lat, lon)
         }
     }
 
@@ -2933,6 +2920,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private fun stopUpdates() {
         clockManager.stopUpdates()
         gradientManager.stopUpdates()
+        weatherGetter.stopUpdates()
         handler.removeCallbacks(editModeTimeoutRunnable)
     }
 
@@ -3178,6 +3166,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         super.onResume()
         if (::desksPagerAdapter.isInitialized) desksPagerAdapter.setHostResumed(true)
         isResumed = true
+        desktopWidgetManager.getControllers().forEach { it.onResume() }
         if (::entranceAnimationManager.isInitialized) {
             if (entranceAnimationManager.isComplete) completeStartup()
             else if (entranceAnimationPlayed && !entranceAnimationManager.hasStarted) scheduleEntranceAnimation()
@@ -3193,7 +3182,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             dynamicBackgroundView.areAnimationsPaused = isPowerSavingMode && disableAnimations
         }
         setupWindowFlags()
-        val disableWeather = isPowerSavingMode && prefs.getBoolean("power_saver_disable_weather", true)
+        onPowerSaveModeChanged(powerStateManager.isPowerSaveEnabled())
         locationManager.loadCoordinates { lat, lon ->
             dayTimeGetter.fetch(lat, lon) {
                 if (isDynamicGradientActive()) gradientManager.updateGradient()
@@ -3206,7 +3195,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     reEvaluateSmartNightDimming()
                 }
             }
-            if (!disableWeather && ::weatherGetter.isInitialized) {
+            if (isResumed && ::weatherGetter.isInitialized) {
                 weatherGetter.startUpdates(lat, lon)
             }
         }
@@ -3649,6 +3638,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     override fun onPause() {
         isResumed = false
+        desktopWidgetManager.getControllers().forEach { it.onPause() }
         mainLayout.removeCallbacks(playEntranceAnimationRunnable)
         if (::entranceAnimationManager.isInitialized && entranceAnimationManager.hasStarted) {
             entranceAnimationManager.finish()
@@ -3705,101 +3695,22 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
-        val modeChanged = isPowerSavingMode != isEnabled
         isPowerSavingMode = isEnabled
-
-        Logger.d("MainActivity") { "Power Save Mode changed to: $isEnabled. Adapting UI." }
-
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-        val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
-        val disableWeather = prefs.getBoolean("power_saver_disable_weather", true)
-        val lockBrightness = prefs.getBoolean("power_saver_lock_brightness", true)
-        val disableLightSensor = prefs.getBoolean("power_saver_disable_light_sensor", true)
-        val enableSmartPixels = prefs.getBoolean("power_saver_enable_smart_pixels", true)
-        val limitFps = prefs.getBoolean("power_saver_limit_fps", true)
-        val fpsLimitValue = prefs.getInt("power_saver_fps_limit_value", 30)
-
-        if (isEnabled) {
-            // Apply granular battery saving rules
-
-            // 1. OpenGL Animations & Framerate
-            if (::dynamicBackgroundView.isInitialized) {
-                dynamicBackgroundView.areAnimationsPaused = disableAnimations
-                dynamicBackgroundView.maxFps = if (limitFps) fpsLimitValue else 0
-            }
-
-            // 2. Weather Updates
-            if (disableWeather) {
-                if (::weatherGetter.isInitialized) {
-                    weatherGetter.stopUpdates()
-                }
-            } else {
-                locationManager.loadCoordinates { lat, lon ->
-                    if (::weatherGetter.isInitialized) {
-                        weatherGetter.startUpdates(lat, lon)
-                    }
-                }
-            }
-
-            // 3. Ambient Light Sensor
-            updateSensorRegistration()
-
-            // 4. Brightness Override
-            if (lockBrightness) {
-                val brightnessPct = prefs.getInt("power_saver_brightness_level", 1) / 100f
-                applyBrightnessOverride(brightnessPct.coerceIn(0.01f, 1.0f))
-            } else {
-                val layoutParams = window.attributes
-                val savedBrightness = prefs.getInt("power_saver_brightness_level", 1) / 100f
-                if (layoutParams.screenBrightness == savedBrightness.coerceIn(0.01f, 1.0f) || layoutParams.screenBrightness == minPowerSaveBrightness) {
-                    applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
-                }
-            }
-
-            // 5. Smart Pixels
-            if (enableSmartPixels) {
-                smartPixelManager.start()
-            } else {
-                if (!prefs.getBoolean("smart_pixels_enabled", false)) {
-                    smartPixelManager.stop()
-                }
-            }
-
-        } else {
-            // Restore normal mode
-            if (modeChanged) {
-                // 1. Graphics animations & framerate
-                if (::dynamicBackgroundView.isInitialized) {
-                    dynamicBackgroundView.areAnimationsPaused = false
-                    dynamicBackgroundView.maxFps = 0
-                }
-
-                // 2. Weather
-                locationManager.loadCoordinates { lat, lon ->
-                    if (::weatherGetter.isInitialized) {
-                        weatherGetter.startUpdates(lat, lon)
-                    }
-                }
-
-                // 3. Sensors & brightness
-                updateSensorRegistration()
-                val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
-                if (brightnessMode == "smart_night") {
-                    applyNightDimMode(currentNightDimState)
-                } else {
-                    applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
-                }
-
-                // 4. Smart pixels (restore state matching user preference)
-                if (prefs.getBoolean("smart_pixels_enabled", false)) {
-                    smartPixelManager.start()
-                } else {
-                    smartPixelManager.stop()
-                }
-            }
+        val policy = PowerSavePolicy.read(prefs, isEnabled)
+        if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.areAnimationsPaused = policy.pauseAnimations
+            dynamicBackgroundView.maxFps = policy.maxFps
         }
-
-        // Always update background filters (handles dimming changes)
+        updateSensorRegistration()
+        if (isResumed) {
+            val brightness = policy.brightnessOverride
+            if (brightness != null) applyBrightnessOverride(brightness)
+            else if (prefs.getString("brightness_mode", "system") == "smart_night")
+                applyNightDimMode(currentNightDimState)
+            else applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+            if (policy.enableSmartPixels) smartPixelManager.start() else smartPixelManager.stop()
+        }
         if (::dynamicBackgroundView.isInitialized && dynamicBackgroundView.visibility == View.VISIBLE) {
             updateBackgroundFilters()
         }
@@ -3850,7 +3761,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun applyNightDimMode(state: NightDimState) {
-        if (isPowerSavingMode) return // Let power save mode handle its own brightness
+        if (PowerSavePolicy.read(
+                getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE), isPowerSavingMode
+            ).brightnessOverride != null) return
 
         if (dayTimeGetter.isDay()) {
             applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
@@ -3870,12 +3783,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         if (!::sensorManager.isInitialized) return
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
-        val disableLightSensorInPowerSave = prefs.getBoolean("power_saver_disable_light_sensor", true)
-
-        val shouldRegister = isResumed && (
-            (isPowerSavingMode && !disableLightSensorInPowerSave) ||
-            (!isPowerSavingMode && brightnessMode == "smart_night" && !dayTimeGetter.isDay())
-        )
+        val policy = PowerSavePolicy.read(prefs, isPowerSavingMode)
+        val shouldRegister = isResumed && !policy.disableLightSensor &&
+            brightnessMode == "smart_night" && !dayTimeGetter.isDay()
 
         if (shouldRegister) {
             lightSensor?.let {

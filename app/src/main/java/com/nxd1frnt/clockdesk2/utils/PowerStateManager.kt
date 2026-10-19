@@ -11,6 +11,14 @@ import java.lang.ref.WeakReference
 
 class PowerStateManager(private val context: Context) {
 
+    companion object {
+        @Volatile private var instance: PowerStateManager? = null
+
+        fun getInstance(context: Context): PowerStateManager = instance ?: synchronized(this) {
+            instance ?: PowerStateManager(context.applicationContext).also { instance = it }
+        }
+    }
+
     private var isPowerSavingMode = false
 
     private val observers = mutableListOf<WeakReference<PowerSaveObserver>>()
@@ -52,6 +60,7 @@ class PowerStateManager(private val context: Context) {
     }
 
     fun registerObserver(observer: PowerSaveObserver) {
+        if (observers.any { it.get() === observer }) return
         observers.add(WeakReference(observer))
         observer.onPowerSaveModeChanged(isPowerSavingMode)
     }

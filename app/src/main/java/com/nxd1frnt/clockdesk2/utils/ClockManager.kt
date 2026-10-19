@@ -24,12 +24,13 @@ class ClockManager(
 ) : PowerSaveObserver {
 
     private var isLowPower = false
+    private var isUpdating = false
 
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
         isLowPower = isEnabled
         updateTimeText()
         Logger.d("ClockManager"){"Power saving mode changed: isLowPower=$isLowPower"}
-        startUpdates()
+        if (isUpdating) startUpdates()
     }
     private var isDebugMode = false
     private val debugCycleInterval = 5L // milliseconds (25 ticks/sec for smooth performance)
@@ -176,11 +177,13 @@ class ClockManager(
     }
 
     fun startUpdates() {
+        isUpdating = true
         handler.removeCallbacks(clockUpdateRunnable)
         handler.post(clockUpdateRunnable)
     }
 
     fun refreshForDeskSwitch(reschedule: Boolean) {
+        isUpdating = reschedule
         val currentTime = getCurrentTime()
         updateTimeText()
         updateDateText()
@@ -192,6 +195,7 @@ class ClockManager(
     }
 
     fun stopUpdates() {
+        isUpdating = false
         handler.removeCallbacks(clockUpdateRunnable)
     }
 

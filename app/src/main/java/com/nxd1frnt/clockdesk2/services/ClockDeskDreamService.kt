@@ -1,5 +1,7 @@
 package com.nxd1frnt.clockdesk2.services
 
+import com.nxd1frnt.clockdesk2.utils.SmartPixelManager
+import com.nxd1frnt.clockdesk2.utils.PowerSavePolicy
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.graphics.Color
@@ -80,6 +82,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     private lateinit var locationManager: LocationManager
     private lateinit var dayTimeGetter: SunriseAPI
     private lateinit var powerStateManager: PowerStateManager
+    private lateinit var smartPixelManager: SmartPixelManager
     private var musicManager: MusicPluginManager? = null
     // endregion
 
@@ -108,9 +111,9 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
                 val lux = event.values[0]
                 lastSeenLux = lux
 
-                if (isPowerSavingMode) {
-                    return
-                }
+                if (PowerSavePolicy.read(
+                        getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE), isPowerSavingMode
+                    ).brightnessOverride != null) return
 
                 val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
                 val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
@@ -174,6 +177,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
             initViews()
             hideUIControls()
             initManagers()
+            smartPixelManager = SmartPixelManager(themedContext, view.findViewById(R.id.smart_pixel_overlay))
 
         } catch (e: Exception) {
             Log.e("ClockDeskDream", "CRASH in onAttachedToWindow", e)
@@ -217,7 +221,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
                 }
             }
             // 2. Weather
-            if (::weatherGetter.isInitialized) weatherGetter.startUpdates(lat, lon)
+            if (isDreaming && ::weatherGetter.isInitialized) weatherGetter.startUpdates(lat, lon)
             // 3. Gradient (only if no user photo)
             if (!hasCustomImageBackground && ::gradientManager.isInitialized) {
                 gradientManager.startUpdates()
@@ -267,7 +271,6 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
 
         if (::powerStateManager.isInitialized) {
             powerStateManager.unregisterObserver(this)
-            powerStateManager.destroy()
         }
 
         if (::dynamicBackgroundView.isInitialized) {
@@ -278,12 +281,18 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         if (::gradientManager.isInitialized) gradientManager.stopUpdates()
         if (::weatherGetter.isInitialized) weatherGetter.stopUpdates()
         if (::burnInProtectionManager.isInitialized) burnInProtectionManager.stop()
+        if (::smartPixelManager.isInitialized) smartPixelManager.stop()
         musicManager?.destroy()
         musicManager = null
         stopPerformanceUpdates()
     }
 
     override fun onDetachedFromWindow() {
+        if (::powerStateManager.isInitialized) {
+            powerStateManager.unregisterObserver(this)
+            if (::clockManager.isInitialized) powerStateManager.unregisterObserver(clockManager)
+            if (::weatherGetter.isInitialized) powerStateManager.unregisterObserver(weatherGetter)
+        }
         super.onDetachedFromWindow()
     }
 
@@ -436,7 +445,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
         dynamicBackgroundView.weatherResolutionScale = targetWeatherScale
 
-        powerStateManager = PowerStateManager(themedContext)
+        powerStateManager = PowerStateManager.getInstance(themedContext)
         powerStateManager.registerObserver(clockManager)
         powerStateManager.registerObserver(weatherGetter)
 
@@ -602,19 +611,22 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
         isPowerSavingMode = isEnabled
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
-        val disableAnimations = prefs.getBoolean("power_saver_disable_animations", true)
-        val limitFps = prefs.getBoolean("power_saver_limit_fps", true)
-        val fpsLimitValue = prefs.getInt("power_saver_fps_limit_value", 30)
-
+        val policy = PowerSavePolicy.read(prefs, isEnabled)
         if (::dynamicBackgroundView.isInitialized) {
-            if (isEnabled) {
-                dynamicBackgroundView.areAnimationsPaused = disableAnimations
-                dynamicBackgroundView.maxFps = if (limitFps) fpsLimitValue else 0
-            } else {
-                dynamicBackgroundView.areAnimationsPaused = false
-                dynamicBackgroundView.maxFps = 0
-            }
+            dynamicBackgroundView.areAnimationsPaused = policy.pauseAnimations
+            dynamicBackgroundView.maxFps = policy.maxFps
             updateBackgroundFilters()
+        }
+        updateSensorRegistration()
+        if (isDreaming) {
+            val brightness = policy.brightnessOverride
+            if (brightness != null) applyBrightnessOverride(brightness)
+            else if (prefs.getString("brightness_mode", "system") == "smart_night")
+                applyNightDimMode(currentNightDimState)
+            else applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+            if (::smartPixelManager.isInitialized) {
+                if (policy.enableSmartPixels) smartPixelManager.start() else smartPixelManager.stop()
+            }
         }
     }
 
@@ -768,7 +780,9 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
     }
 
     private fun applyNightDimMode(state: NightDimState) {
-        if (isPowerSavingMode) return // Let power save mode handle its own brightness
+        if (PowerSavePolicy.read(
+                getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE), isPowerSavingMode
+            ).brightnessOverride != null) return
 
         if (dayTimeGetter.isDay()) {
             applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
@@ -789,7 +803,9 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
         val brightnessMode = prefs.getString("brightness_mode", "system") ?: "system"
 
-        val shouldRegister = isDreaming && !isPowerSavingMode && brightnessMode == "smart_night" && !dayTimeGetter.isDay()
+        val policy = PowerSavePolicy.read(prefs, isPowerSavingMode)
+        val shouldRegister = isDreaming && !policy.disableLightSensor &&
+            brightnessMode == "smart_night" && !dayTimeGetter.isDay()
 
         if (shouldRegister) {
             lightSensor?.let {

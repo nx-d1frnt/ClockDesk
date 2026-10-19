@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import com.nxd1frnt.clockdesk2.utils.PowerSavePolicy
 import com.nxd1frnt.clockdesk2.utils.LocationManager
 import com.nxd1frnt.clockdesk2.network.NetworkManager
 import com.nxd1frnt.clockdesk2.utils.Logger
@@ -68,29 +70,43 @@ open class WeatherGetter(
     private var interval = 30 * 60 * 1000L
     private val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
+    private var updatesRequested = false
+    private var lastRequestAt: Long? = null
+    private var lastRequestKey: String? = null
+
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
         isPowerSaveActive = isEnabled
         updateInterval()
+        scheduleNextUpdate()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        if (key == "weather_refresh_interval") {
+        if (key == "weather_refresh_interval" || key == "temperature_unit" ||
+            key == "wind_speed_unit" || key == "precipitation_unit") {
             updateInterval()
-            if (lastLatitude != null && lastLongitude != null) {
-                Logger.d("WeatherGetter") { "Weather refresh rate preference changed. Rescheduling updates." }
-                startUpdates(lastLatitude!!, lastLongitude!!)
-            }
-        } else if (key == "temperature_unit" || key == "wind_speed_unit" || key == "precipitation_unit") {
-            if (lastLatitude != null && lastLongitude != null) {
-                Logger.d("WeatherGetter") { "Weather unit preference changed ($key). Fetching updated data..." }
-                fetch(lastLatitude!!, lastLongitude!!)
-            }
+            scheduleNextUpdate()
         }
+    }
+
+    private fun requestKey(): String = listOf(
+        lastLatitude, lastLongitude,
+        prefs.getString("temperature_unit", "celsius"),
+        prefs.getString("wind_speed_unit", "kmh"),
+        prefs.getString("precipitation_unit", "mm")
+    ).joinToString("|")
+
+    private fun scheduleNextUpdate() {
+        handler.removeCallbacks(updateRunnable)
+        if (!updatesRequested || PowerSavePolicy.read(prefs, isPowerSaveActive).suspendWeather) return
+        val last = lastRequestAt
+        val delay = if (last == null || requestKey() != lastRequestKey) 0L
+            else (interval - (SystemClock.elapsedRealtime() - last)).coerceAtLeast(0L)
+        handler.postDelayed(updateRunnable, delay)
     }
 
     private fun updateInterval() {
         val baseMinutesStr = prefs.getString("weather_refresh_interval", "30") ?: "30"
-        val baseMinutes = baseMinutesStr.toLongOrNull() ?: 30L
+        val baseMinutes = (baseMinutesStr.toLongOrNull() ?: 30L).coerceIn(1L, 1440L)
         val baseIntervalMs = baseMinutes * 60 * 1000L
         
         interval = if (isPowerSaveActive) {
@@ -101,7 +117,7 @@ open class WeatherGetter(
         Logger.d("WeatherGetter") { "Weather interval updated: $interval ms (powerSave=$isPowerSaveActive)" }
     }
 
-    val requestQueue = NetworkManager.getRequestQueue(context)
+    val requestQueue by lazy { NetworkManager.getRequestQueue(context.applicationContext) }
 
     var temperature: Double? = null
     var weatherCode: Int? = null
@@ -118,25 +134,28 @@ open class WeatherGetter(
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            if (lastLatitude != null && lastLongitude != null) {
-                Logger.d("WeatherGetter"){"Auto-refreshing weather data..."}
-                fetch(lastLatitude!!, lastLongitude!!)
-            }
-            handler.postDelayed(this, interval)
+            if (!updatesRequested || PowerSavePolicy.read(prefs, isPowerSaveActive).suspendWeather) return
+            val latitude = lastLatitude ?: return
+            val longitude = lastLongitude ?: return
+            // Preserve the schedule across pauses and policy changes, including in-flight requests.
+            lastRequestAt = SystemClock.elapsedRealtime()
+            lastRequestKey = requestKey()
+            fetch(latitude, longitude)
+            scheduleNextUpdate()
         }
     }
 
     fun startUpdates(latitude: Double, longitude: Double) {
         lastLatitude = latitude
         lastLongitude = longitude
-
-        stopUpdates()
-        prefs.registerOnSharedPreferenceChangeListener(this)
+        if (!updatesRequested) prefs.registerOnSharedPreferenceChangeListener(this)
+        updatesRequested = true
         updateInterval()
-        handler.post(updateRunnable)
+        scheduleNextUpdate()
     }
 
     fun stopUpdates() {
+        updatesRequested = false
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         handler.removeCallbacks(updateRunnable)
     }

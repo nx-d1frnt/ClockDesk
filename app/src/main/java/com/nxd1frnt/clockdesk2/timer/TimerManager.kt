@@ -1,5 +1,7 @@
 package com.nxd1frnt.clockdesk2.timer
 
+import com.nxd1frnt.clockdesk2.utils.PowerStateManager
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.Ringtone
@@ -20,7 +22,18 @@ enum class TimerState {
     FINISHED
 }
 
-object TimerManager {
+object TimerManager : PowerSaveObserver {
+
+    private var isPowerSaving = false
+
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        if (isPowerSaving == isEnabled) return
+        isPowerSaving = isEnabled
+        if (state == TimerState.RUNNING) {
+            handler.removeCallbacks(tickRunnable)
+            handler.post(tickRunnable)
+        }
+    }
 
     interface TimerListener {
         fun onTimerTick(remainingMillis: Long, totalDurationMillis: Long)
@@ -61,7 +74,7 @@ object TimerManager {
             if (remaining <= 0L) {
                 onFinished()
             } else {
-                handler.postDelayed(this, 100L)
+                handler.postDelayed(this, minOf(if (isPowerSaving) 1000L else 100L, remaining))
             }
         }
     }
@@ -75,6 +88,7 @@ object TimerManager {
             appContext = context.applicationContext
             isSilent = appContext?.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
                 ?.getBoolean("timer_is_silent", false) ?: false
+            PowerStateManager.getInstance(context).registerObserver(this)
         }
     }
 

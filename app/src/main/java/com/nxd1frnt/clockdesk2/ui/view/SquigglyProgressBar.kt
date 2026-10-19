@@ -118,6 +118,7 @@ class SquigglyProgressBar @JvmOverloads constructor(
     }
 
     private fun startWaveAnimation() {
+        if (!isShown || !isAttachedToWindow || windowVisibility != VISIBLE) return
         if (waveAnimator?.isRunning == true) return
         waveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 1200L
@@ -165,11 +166,17 @@ class SquigglyProgressBar @JvmOverloads constructor(
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (visibility == VISIBLE && isPlaying) {
+        if (isShown && isPlaying) {
             startWaveAnimation()
         } else {
             stopWaveAnimation()
         }
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == VISIBLE && isPlaying && isShown) startWaveAnimation()
+        else stopWaveAnimation()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

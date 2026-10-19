@@ -15,6 +15,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import com.nxd1frnt.clockdesk2.utils.PowerSaveObserver
+import com.nxd1frnt.clockdesk2.utils.PowerStateManager
+import com.nxd1frnt.clockdesk2.utils.PowerSavePolicy
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
@@ -38,7 +42,7 @@ class MediaDesktopWidget(
     instance: WidgetInstance,
     definition: DesktopWidgetDefinition,
     host: DesktopWidgetHost
-) : DesktopWidgetController(instance, definition, host) {
+) : DesktopWidgetController(instance, definition, host), PowerSaveObserver {
 
     override var rootView: View? = null
 
@@ -102,10 +106,44 @@ class MediaDesktopWidget(
 
     private var currentPositionMs: Long = 0L
     private var currentDurationMs: Long = 0L
+    private var positionSampleMs = 0L
+    private var positionSampleAt = 0L
+    private var hostResumed = true
+    private var isPowerSaving = false
+    private val powerStateManager = PowerStateManager.getInstance(host.hostContext)
+    private val attachListener = object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) { resumeProgressTracker() }
+        override fun onViewDetachedFromWindow(v: View) {
+            stopProgressTracker()
+            expandedProgressBar?.isPlaying = false
+        }
+    }
+
+    override fun onPowerSaveModeChanged(isEnabled: Boolean) {
+        isPowerSaving = isEnabled
+        resumeProgressTracker()
+    }
+
+    override fun onPause() {
+        hostResumed = false
+        stopProgressTracker()
+        expandedProgressBar?.isPlaying = false
+    }
+
+    override fun onResume() {
+        hostResumed = true
+        resumeProgressTracker()
+    }
+
+    override fun setVisible(visible: Boolean) {
+        super.setVisible(visible)
+        resumeProgressTracker()
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun bindView(view: View) {
         super.bindView(view)
+        view.addOnAttachStateChangeListener(attachListener)
 
         // 1. Minimal Ticker
         mediaTickerLayout = view.findViewById(R.id.media_ticker_layout)
@@ -178,6 +216,7 @@ class MediaDesktopWidget(
 
         val currentStyle = host.fontManager?.getMediaStyle() ?: MediaStyle.MINIMAL_TICKER
         applyStyleVisibility(currentStyle)
+        powerStateManager.registerObserver(this)
     }
 
     fun updateMediaStyle(style: MediaStyle) {
@@ -193,6 +232,7 @@ class MediaDesktopWidget(
         mediaTickerLayout?.visibility = if (style == MediaStyle.MINIMAL_TICKER) View.VISIBLE else View.GONE
         mediaCompactCard?.visibility = if (style == MediaStyle.COMPACT_CARD) View.VISIBLE else View.GONE
         mediaExpandedCard?.visibility = if (style == MediaStyle.EXPANDED_PLAYER) View.VISIBLE else View.GONE
+        resumeProgressTracker()
     }
 
     override fun setEditMode(isEditMode: Boolean) {
@@ -296,11 +336,11 @@ class MediaDesktopWidget(
                 isPlayingState = true
 
                 populateTrackData(track, isPlaying = true)
-                startProgressTracker(track)
 
                 if (isTextDifferent || layout.visibility != View.VISIBLE || layout.alpha < 1f) {
                     performTrackTransition(trackInfoText)
                 }
+                startProgressTracker(track)
             }
 
             is PluginState.Paused -> {
@@ -331,6 +371,8 @@ class MediaDesktopWidget(
                 cancelPausedTimeout()
                 stopProgressTracker()
                 currentTrack = null
+                isPlayingState = false
+                expandedProgressBar?.isPlaying = false
                 performIdleTransition()
             }
         }
@@ -413,6 +455,8 @@ class MediaDesktopWidget(
 
         currentDurationMs = track.durationMs ?: 0L
         currentPositionMs = track.positionMs ?: 0L
+        positionSampleMs = currentPositionMs
+        positionSampleAt = SystemClock.elapsedRealtime()
         updateProgressBarUI()
     }
 
@@ -464,20 +508,31 @@ class MediaDesktopWidget(
     }
 
     private fun startProgressTracker(track: MusicTrack) {
+        currentDurationMs = track.durationMs ?: 0L
+        positionSampleMs = track.positionMs ?: 0L
+        positionSampleAt = SystemClock.elapsedRealtime()
+        resumeProgressTracker()
+    }
+
+    private fun resumeProgressTracker() {
         stopProgressTracker()
-        val duration = track.durationMs ?: return
-        if (duration <= 0) return
-
-        currentDurationMs = duration
-        currentPositionMs = track.positionMs ?: 0L
-
+        val visible = hostResumed && instance.isVisible && rootView?.isShown == true &&
+            mediaExpandedCard?.isShown == true
+        val animate = visible && isPlayingState &&
+            !PowerSavePolicy.read(host.getPreferences(), isPowerSaving).pauseAnimations
+        expandedProgressBar?.isPlaying = animate
+        if (!visible || !isPlayingState || currentDurationMs <= 0) return
+        val interval = if (isPowerSaving) 5000L else 1000L
         progressTrackerRunnable = object : Runnable {
             override fun run() {
-                if (isPlayingState && currentDurationMs > 0) {
-                    currentPositionMs = (currentPositionMs + 1000L).coerceAtMost(currentDurationMs)
-                    updateProgressBarUI()
-                    mainHandler.postDelayed(this, 1000L)
+                if (!hostResumed || rootView?.isShown != true || mediaExpandedCard?.isShown != true) {
+                    expandedProgressBar?.isPlaying = false
+                    return
                 }
+                currentPositionMs = (positionSampleMs + SystemClock.elapsedRealtime() - positionSampleAt)
+                    .coerceIn(0L, currentDurationMs)
+                updateProgressBarUI()
+                if (currentPositionMs < currentDurationMs) mainHandler.postDelayed(this, interval)
             }
         }
         mainHandler.post(progressTrackerRunnable!!)
@@ -490,9 +545,9 @@ class MediaDesktopWidget(
 
     private fun updateProgressBarUI() {
         val bar = expandedProgressBar ?: return
-        if (bar.isPlaying != isPlayingState) {
-            bar.isPlaying = isPlayingState
-        }
+        bar.isPlaying = isPlayingState && hostResumed && rootView?.isShown == true &&
+            mediaExpandedCard?.isShown == true &&
+            !PowerSavePolicy.read(host.getPreferences(), isPowerSaving).pauseAnimations
         if (currentDurationMs > 0) {
             val progress = ((currentPositionMs.toFloat() / currentDurationMs.toFloat()) * 1000).toInt().coerceIn(0, 1000)
             if (bar.progress != progress) {
@@ -794,6 +849,9 @@ class MediaDesktopWidget(
     }
 
     override fun onDestroy() {
+        onPause()
+        powerStateManager.unregisterObserver(this)
+        rootView?.removeOnAttachStateChangeListener(attachListener)
         cancelPausedTimeout()
         stopProgressTracker()
         rootView?.animate()?.cancel()
