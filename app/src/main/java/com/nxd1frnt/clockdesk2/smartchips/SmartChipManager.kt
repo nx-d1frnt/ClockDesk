@@ -15,6 +15,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -27,6 +28,7 @@ import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
 import android.view.animation.PathInterpolator
 import android.widget.ImageView
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
@@ -86,8 +88,22 @@ class SmartChipManager(
     private var isFirstLoad = true
     private val springInterpolator = PathInterpolator(0.2f, 1.0f, 0.3f, 1.0f)
 
+    private val chipScrollView = chipContainer.parent as? ScrollView
+    private val originalClipChildren = chipScrollView?.clipChildren ?: false
+    private val originalClipToPadding = chipScrollView?.clipToPadding ?: false
+    private var isExpandedTouchActive = false
+
     var isStackExpanded: Boolean = false
-        private set
+        private set(value) {
+            field = value
+            chipScrollView?.apply {
+                // Expanded content must stay inside the scrollable viewport.
+                clipChildren = value || originalClipChildren
+                clipToPadding = value || originalClipToPadding
+                if (!value) scrollTo(0, 0)
+            }
+            if (!value) isExpandedTouchActive = false
+        }
 
     private val autoCollapseHandler = Handler(Looper.getMainLooper())
     private val autoCollapseRunnable = Runnable {
@@ -95,8 +111,6 @@ class SmartChipManager(
             collapseStack()
         }
     }
-
-    private var activeTouchedChip: View? = null
 
     fun expandStack() {
         if (isStackExpanded) return
@@ -109,9 +123,8 @@ class SmartChipManager(
     fun collapseStack() {
         if (!isStackExpanded) return
         isStackExpanded = false
-        activeTouchedChip = null
+        isExpandedTouchActive = false
         autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
-        (chipContainer.parent as? android.widget.ScrollView)?.smoothScrollTo(0, 0)
         sortAndRedrawChips(contentChanged = true)
     }
 
@@ -126,7 +139,7 @@ class SmartChipManager(
         sharedPreferences.edit().putBoolean("smart_chips_stack_overflow", enabled).apply()
         if (!enabled && isStackExpanded) {
             isStackExpanded = false
-            activeTouchedChip = null
+            isExpandedTouchActive = false
             autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         }
         onPreferencesChanged()
@@ -134,116 +147,34 @@ class SmartChipManager(
 
     fun handleExpandedStackTouch(ev: MotionEvent): Boolean {
         if (!isStackExpanded || isEditMode) {
-            activeTouchedChip = null
+            isExpandedTouchActive = false
             return false
         }
+        val scrollView = chipScrollView ?: return false
 
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val hitChip = findHitChip(ev.rawX, ev.rawY)
-                if (hitChip != null) {
-                    activeTouchedChip = hitChip
-                    dispatchToChip(hitChip, ev)
-                    return true
-                } else {
-                    activeTouchedChip = null
-                    collapseStack()
-                    return false
-                }
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val target = activeTouchedChip
-                if (target != null) {
-                    dispatchToChip(target, ev)
-                    return true
-                }
-            }
-            MotionEvent.ACTION_UP -> {
-                val target = activeTouchedChip
-                activeTouchedChip = null
-                if (target != null) {
-                    dispatchToChip(target, ev)
-                    return true
-                }
-            }
-            MotionEvent.ACTION_CANCEL -> {
-                val target = activeTouchedChip
-                activeTouchedChip = null
-                if (target != null) {
-                    dispatchToChip(target, ev)
-                    return true
-                }
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            val bounds = Rect()
+            isExpandedTouchActive = scrollView.getGlobalVisibleRect(bounds) &&
+                bounds.contains(ev.rawX.toInt(), ev.rawY.toInt())
+            if (!isExpandedTouchActive) {
+                collapseStack()
+                return false
             }
         }
-        return false
-    }
+        if (!isExpandedTouchActive) return false
 
-    private fun findHitChip(rawX: Float, rawY: Float): View? {
-        val visibleChips = getOrderedVisibleChips()
-        if (visibleChips.isEmpty()) return null
-
-        val loc = IntArray(2)
-        val density = context.resources.displayMetrics.density
-        val gapSlopPx = (6 * density).toInt()
-
-        var bestChip: View? = null
-        var bestDistance = Float.MAX_VALUE
-
-        // First pass: exact hit inside view bounds
-        for (chipInfo in visibleChips) {
-            val v = chipInfo.view
-            if (v.visibility != View.VISIBLE || !ViewCompat.isAttachedToWindow(v) || v.alpha < 0.1f) continue
-            v.getLocationOnScreen(loc)
-            val left = loc[0].toFloat()
-            val top = loc[1].toFloat()
-            val right = left + v.width
-            val bottom = top + v.height
-
-            if (rawX in left..right && rawY in top..bottom) {
-                return v
-            }
-
-            // Candidate for vertical gap match if X is within bounds and Y is within gapSlop
-            if (rawX in left..right && rawY >= top - gapSlopPx && rawY <= bottom + gapSlopPx) {
-                val centerY = (top + bottom) / 2f
-                val dist = kotlin.math.abs(rawY - centerY)
-                if (dist < bestDistance) {
-                    bestDistance = dist
-                    bestChip = v
-                }
-            }
-        }
-
-        return bestChip
-    }
-
-    private fun dispatchToChip(target: View, ev: MotionEvent): Boolean {
-        if (!ViewCompat.isAttachedToWindow(target)) return false
-        val loc = IntArray(2)
-        target.getLocationOnScreen(loc)
-        val density = context.resources.displayMetrics.density
-        val gapSlopPx = (6 * density).toInt()
-
-        val rawLocalX = ev.rawX - loc[0].toFloat()
-        val rawLocalY = ev.rawY - loc[1].toFloat()
-
-        val localX = if (rawLocalX in -gapSlopPx.toFloat()..(target.width + gapSlopPx).toFloat()) {
-            rawLocalX.coerceIn(0f, target.width.toFloat().coerceAtLeast(1f))
-        } else {
-            rawLocalX
-        }
-
-        val localY = if (rawLocalY in -gapSlopPx.toFloat()..(target.height + gapSlopPx).toFloat()) {
-            rawLocalY.coerceIn(0f, target.height.toFloat().coerceAtLeast(1f))
-        } else {
-            rawLocalY
-        }
-
+        resetAutoCollapseTimer()
+        val location = IntArray(2)
+        scrollView.getLocationOnScreen(location)
         val childEvent = MotionEvent.obtain(ev)
-        childEvent.setLocation(localX, localY)
-        val handled = target.dispatchTouchEvent(childEvent)
+        childEvent.setLocation(ev.rawX - location[0], ev.rawY - location[1])
+        // Let ScrollView intercept drags and cancel the pressed chip before scrolling.
+        scrollView.dispatchTouchEvent(childEvent)
         childEvent.recycle()
-        return handled
+        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+            isExpandedTouchActive = false
+        }
+        return true
     }
 
 //    private val periodicUpdateRunnable = object : Runnable {
@@ -472,7 +403,9 @@ class SmartChipManager(
 
     init {
         chipContainer.viewTreeObserver.addOnScrollChangedListener {
-            resetAllChipsScale()
+            if (isStackExpanded || !sharedPreferences.getBoolean("smart_chips_stack_overflow", false)) {
+                resetAllChipsScale()
+            }
         }
         internalPlugins.forEach { plugin ->
             if (plugin !is IMultiSmartChip) {
@@ -512,7 +445,7 @@ class SmartChipManager(
         if (isStackExpanded) {
             isStackExpanded = false
         }
-        activeTouchedChip = null
+        isExpandedTouchActive = false
 
         unregisterReceiver()
         Logger.d("SmartChipManager") { "Stopped listening. App is sleeping." }
@@ -521,7 +454,7 @@ class SmartChipManager(
     // Вызывается при полном уничтожении экрана (защита от утечек)
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
-        activeTouchedChip = null
+        isExpandedTouchActive = false
         unregisterReceiver() // На всякий случай
     }
 
@@ -1030,6 +963,15 @@ class SmartChipManager(
             autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         }
 
+        // Retarget from the current state without callbacks left by a previous stack layout.
+        visibleChips.forEach { chipInfo ->
+            chipInfo.view.animate().apply {
+                withEndAction(null)
+                cancel()
+                setStartDelay(0L)
+            }
+        }
+
         val density = context.resources.displayMetrics.density
         val spacingPx = (6 * density).toInt()
 
@@ -1046,7 +988,7 @@ class SmartChipManager(
                     connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
                     setHorizontalBias(id, 1.0f)
                     if (i == 0) {
-                        connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                        connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 0)
                     } else {
                         val prevId = visibleChips[i - 1].view.id
                         connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
@@ -1062,7 +1004,7 @@ class SmartChipManager(
                 connect(anchorId, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
                 setHorizontalBias(anchorId, 1.0f)
                 if (anchorIndex == 0) {
-                    connect(anchorId, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                    connect(anchorId, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 0)
                 } else {
                     val prevId = visibleChips[anchorIndex - 1].view.id
                     connect(anchorId, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
@@ -1077,7 +1019,7 @@ class SmartChipManager(
                     connect(id, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START)
                     connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
                     setHorizontalBias(id, 1.0f)
-                    connect(id, ConstraintSet.TOP, anchorId, ConstraintSet.TOP)
+                    connect(id, ConstraintSet.TOP, anchorId, ConstraintSet.TOP, 0)
                 }
             } else {
                 visibleChips.forEachIndexed { index, chipInfo ->
@@ -1090,7 +1032,7 @@ class SmartChipManager(
                     connect(id, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
                     setHorizontalBias(id, 1.0f)
                     if (index == 0) {
-                        connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP)
+                        connect(id, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 0)
                     } else {
                         val prevId = visibleChips[index - 1].view.id
                         connect(id, ConstraintSet.TOP, prevId, ConstraintSet.BOTTOM, spacingPx)
@@ -1221,7 +1163,16 @@ class SmartChipManager(
             addTransition(ChangeBounds().apply {
                 resizeClip = false
             })
-            addTransition(ScaleAndFade())
+            val appearance = ScaleAndFade()
+            if (sharedPreferences.getBoolean("smart_chips_stack_overflow", false)) {
+                val visibleChips = getOrderedVisibleChips()
+                val anchorIndex = calculateStackAnchor(visibleChips, getUsableHeight())
+                if (anchorIndex >= 0) {
+                    // These views animate their own scale/alpha as stack layers.
+                    visibleChips.drop(anchorIndex).forEach { appearance.excludeTarget(it.view, true) }
+                }
+            }
+            addTransition(appearance)
         }
     }
 
@@ -1241,6 +1192,7 @@ class SmartChipManager(
             }
 
             if (contentChanged) {
+                TransitionManager.endTransitions(container)
                 TransitionManager.beginDelayedTransition(container, createChipTransition())
                 applyLayoutAndTransforms(container, visibleChips)
             }
@@ -1249,6 +1201,7 @@ class SmartChipManager(
 
         currentActiveChipIds = newTags
 
+        TransitionManager.endTransitions(container)
         TransitionManager.beginDelayedTransition(container, createChipTransition())
 
         val visibleViews = visibleChips.map { it.view }.toSet()
@@ -1292,7 +1245,11 @@ class SmartChipManager(
 
         if (isFirstLoad && visibleChips.isNotEmpty()) {
             isFirstLoad = false
-            animateStaggeredEntrance(visibleChips)
+            val anchorIndex = if (sharedPreferences.getBoolean("smart_chips_stack_overflow", false) && !isStackExpanded) {
+                calculateStackAnchor(visibleChips, getUsableHeight())
+            } else -1
+            // Stack members already have their own scale, offset and visibility animation.
+            animateStaggeredEntrance(if (anchorIndex >= 0) visibleChips.take(anchorIndex) else visibleChips)
         }
     }
 
