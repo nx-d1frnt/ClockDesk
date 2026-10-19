@@ -30,6 +30,7 @@ class TimerDeskView @JvmOverloads constructor(
     private val txtDigits: TextView
     private val txtStatus: TextView
     private val cardDisplay: MaterialCardView
+    private val cardControls: MaterialCardView
     private val progressCircular: CircularProgressIndicator
 
     private val btnCustom: MaterialButton
@@ -68,6 +69,7 @@ class TimerDeskView @JvmOverloads constructor(
         txtDigits = findViewById(R.id.txt_timer_digits)
         txtStatus = findViewById(R.id.txt_timer_status)
         cardDisplay = findViewById(R.id.card_timer_display)
+        cardControls = findViewById(R.id.card_timer_controls)
         progressCircular = findViewById(R.id.progress_timer_circular)
 
         btnCustom = findViewById(R.id.btn_timer_custom)
@@ -145,6 +147,8 @@ class TimerDeskView @JvmOverloads constructor(
         txtStatus.setTextColor(palette.onSurfaceVariant)
         cardDisplay.setCardBackgroundColor(palette.surfaceContainer)
         cardDisplay.strokeColor = palette.outlineVariant
+        cardControls.setCardBackgroundColor(palette.surfaceContainer)
+        cardControls.strokeColor = palette.outlineVariant
         progressCircular.trackColor = palette.surfaceContainerHighest
         updateSilent(TimerManager.isSilent)
         updateState(TimerManager.state)
