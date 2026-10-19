@@ -1154,9 +1154,9 @@ class SmartChipManager(
                         ViewCompat.setTranslationZ(v, 8f)
                         v.animate()
                             .translationY(8f * density)
-                            .scaleX(0.94f)
-                            .scaleY(0.94f)
-                            .alpha(targetAlpha * 0.85f)
+                            .scaleX(0.90f)
+                            .scaleY(0.90f)
+                            .alpha(targetAlpha * 0.70f)
                             .setDuration(350L)
                             .setInterpolator(springInterpolator)
                             .start()
@@ -1166,9 +1166,9 @@ class SmartChipManager(
                         ViewCompat.setTranslationZ(v, 4f)
                         v.animate()
                             .translationY(16f * density)
-                            .scaleX(0.88f)
-                            .scaleY(0.88f)
-                            .alpha(targetAlpha * 0.65f)
+                            .scaleX(0.82f)
+                            .scaleY(0.82f)
+                            .alpha(targetAlpha * 0.45f)
                             .setDuration(350L)
                             .setInterpolator(springInterpolator)
                             .start()
@@ -1177,8 +1177,8 @@ class SmartChipManager(
                         ViewCompat.setTranslationZ(v, 0f)
                         v.animate()
                             .translationY(16f * density)
-                            .scaleX(0.82f)
-                            .scaleY(0.82f)
+                            .scaleX(0.76f)
+                            .scaleY(0.76f)
                             .alpha(0f)
                             .setDuration(350L)
                             .setInterpolator(springInterpolator)
@@ -1350,7 +1350,7 @@ class SmartChipManager(
                     if (isStackExpanded) {
                         resetAutoCollapseTimer()
                     }
-                    val targetPressScale = if (isStackedChild && !isStackExpanded) 0.90f else 0.95f
+                    val targetPressScale = if (isStackedChild && !isStackExpanded) 0.86f else 0.95f
                     v.animate()
                         .scaleX(targetPressScale)
                         .scaleY(targetPressScale)
@@ -1365,8 +1365,8 @@ class SmartChipManager(
                     if (!isInside) {
                         val baseScale = if (isStackedChild && !isStackExpanded) {
                             when (chipIndex - anchorIndex) {
-                                1 -> 0.94f
-                                2 -> 0.88f
+                                1 -> 0.90f
+                                2 -> 0.82f
                                 else -> 1.0f
                             }
                         } else 1.0f
@@ -1384,8 +1384,8 @@ class SmartChipManager(
                     val isInside = x >= 0 && x <= v.width && y >= 0 && y <= v.height
                     val baseScale = if (isStackedChild && !isStackExpanded) {
                         when (chipIndex - anchorIndex) {
-                            1 -> 0.94f
-                            2 -> 0.88f
+                            1 -> 0.90f
+                            2 -> 0.82f
                             else -> 1.0f
                         }
                     } else 1.0f
@@ -1408,8 +1408,8 @@ class SmartChipManager(
                 MotionEvent.ACTION_CANCEL -> {
                     val baseScale = if (isStackedChild && !isStackExpanded) {
                         when (chipIndex - anchorIndex) {
-                            1 -> 0.94f
-                            2 -> 0.88f
+                            1 -> 0.90f
+                            2 -> 0.82f
                             else -> 1.0f
                         }
                     } else 1.0f
