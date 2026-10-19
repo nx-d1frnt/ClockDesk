@@ -486,6 +486,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
     private fun applyLiveMonetTheme() {
         UiMonetThemeManager.applyLiveToMainActivity(this)
+        if (::dynamicBackgroundView.isInitialized && ::fontManager.isInitialized) {
+            dynamicBackgroundView.updateTurbulenceLiveConfig(color = fontManager.getDynamicScheme().primary)
+        }
         if (::customizationSheetManager.isInitialized) {
             customizationSheetManager.refreshMonetTheme()
         }
@@ -1473,6 +1476,11 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 "graphics_enable_transitions" -> {
                     isGraphicsTransitionsEnabled = prefs.getBoolean("graphics_enable_transitions", true)
                 }
+                "graphics_transition_style" -> runOnUiThread {
+                    if (::dynamicBackgroundView.isInitialized) {
+                        dynamicBackgroundView.reloadTransitionPreferences()
+                    }
+                }
                 "graphics_enable_edit_blur" -> {
                     isGraphicsEditBlurEnabled = prefs.getBoolean("graphics_enable_edit_blur", true)
                     if (!isGraphicsEditBlurEnabled) {
@@ -1592,7 +1600,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     val noiseColor = fontManager.getDynamicScheme().primary
                     dynamicBackgroundView.playTurbulence(noiseColor, continuous = true)
                 } else {
-                    dynamicBackgroundView.updateTurbulenceLiveConfig(continuous = true)
+                    dynamicBackgroundView.updateTurbulenceLiveConfig(
+                        continuous = true, color = fontManager.getDynamicScheme().primary)
                 }
             } else {
                 if (!isAdvancedGraphicsEnabled || !isGraphicsTurbulenceEnabled || !isGraphicsTurbulenceContinuousMusicEnabled) {
@@ -2263,6 +2272,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             if (!wasMusicBackgroundApplied) {
                 fontManager.clearDynamicColors()
             }
+            val duration = if (!skipAnimation && isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled) 1800L else 0L
+            gradientManager.updateGradient(duration)
             gradientManager.startUpdates()
             updateBackgroundFilters()
 
@@ -2325,6 +2336,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         backgroundImageView.setImageDrawable(null)
         backgroundImageView.visibility = View.GONE
         dynamicBackgroundView.visibility = View.VISIBLE
+        dynamicBackgroundView.reloadTransitionPreferences()
+        dynamicBackgroundView.setTransitionColorSeed(fontManager.getDynamicScheme().primary)
         val duration = if (skipAnimation || !isAdvancedGraphicsEnabled || !isGraphicsTransitionsEnabled) 0L else 1200L
         dynamicBackgroundView.transitionToSolidColor(color, duration, force = true)
         updateBackgroundFilters(force = true)
@@ -2346,8 +2359,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         backgroundLoads.submit(BackgroundLoad(model, blurIntensity, skipAnimation, onComplete))
     }
 
-    private fun cancelBackgroundLoads(clearEditBackground: Boolean = true) {
+    private fun cancelBackgroundLoads(
+        clearEditBackground: Boolean = true,
+        keepCompositeLoading: Boolean = false
+    ) {
         backgroundRequestId++
+        if (!keepCompositeLoading && ::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.cancelCompositeLoading()
+        }
         val bgTarget = activeBackgroundTarget
         activeBackgroundTarget = null
         val editTarget = if (clearEditBackground) activeEditBackgroundTarget else null
@@ -2393,7 +2412,8 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         
         val isSourceChanged = !areArtworkSourcesEqual(lastBackgroundSource, model)
 
-        cancelBackgroundLoads()
+        val animAllowed = isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && isSourceChanged && !skipAnimation
+        cancelBackgroundLoads(keepCompositeLoading = animAllowed)
         val requestId = backgroundRequestId
         isBackgroundLoading = true
         setCustomBackground(true)
@@ -2421,17 +2441,15 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 backgroundLayout.setBackgroundDrawable(gradientDrawable)
             }
 
-            val animAllowed = isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && isSourceChanged && !skipAnimation
             if (animAllowed) {
+                dynamicBackgroundView.reloadTransitionPreferences()
+                dynamicBackgroundView.setTransitionColorSeed(fontManager.getDynamicScheme().primary)
+                dynamicBackgroundView.beginCompositeLoading()
                 isScaleAnimating = true
-                dynamicBackgroundView.animate()
-                    .scaleX(targetZoom + 0.2f)
-                    .scaleY(targetZoom + 0.2f)
-                    .setDuration(400)
-                    .start()
+                dynamicBackgroundView.setBackgroundZoom(targetZoom + 0.2f, 400L)
             } else {
-                dynamicBackgroundView.scaleX = targetZoom + 0.2f
-                dynamicBackgroundView.scaleY = targetZoom + 0.2f
+                isScaleAnimating = false
+                dynamicBackgroundView.setBackgroundZoom(targetZoom + 0.2f)
             }
 
             if (dynamicBackgroundView.visibility != View.VISIBLE) {
@@ -2501,10 +2519,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                                     fontManager.setDynamicColorFromSeed(fontManager.getDynamicScheme().secondary)
 
                                     val noiseColor = fontManager.getDynamicScheme().primary
+                                    dynamicBackgroundView.reloadTransitionPreferences()
+                                    dynamicBackgroundView.setTransitionColorSeed(noiseColor)
 
-                                    if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation) {
-                                        val isContinuous = isGraphicsTurbulenceContinuousMusicEnabled && currentMusicState is PluginState.Playing
-                                        dynamicBackgroundView.playTurbulence(noiseColor, continuous = isContinuous)
+                                    val isContinuous = isGraphicsTurbulenceContinuousMusicEnabled && currentMusicState is PluginState.Playing
+                                    val useSelfContainedTransition = isGraphicsTransitionsEnabled &&
+                                        dynamicBackgroundView.transitionType != DynamicBackgroundView.TransitionType.LIQUID_CHROMATIC
+                                    if (isAdvancedGraphicsEnabled && isGraphicsTurbulenceEnabled && isSourceChanged && !skipAnimation && (!useSelfContainedTransition || isContinuous)) {
+                                        if (useSelfContainedTransition && isContinuous && dynamicBackgroundView.isTurbulencePlaying) {
+                                            dynamicBackgroundView.updateTurbulenceLiveConfig(
+                                                continuous = true, color = noiseColor)
+                                        } else {
+                                            dynamicBackgroundView.playTurbulence(noiseColor, continuous = isContinuous)
+                                        }
                                     }
 
                                     val isBitmap = model is Bitmap
@@ -2536,20 +2563,14 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
                                     if (isAdvancedGraphicsEnabled && isGraphicsTransitionsEnabled && !skipAnimation) {
                                         isScaleAnimating = true
-                                        dynamicBackgroundView.animate()
-                                            .scaleX(finalZoom)
-                                            .scaleY(finalZoom)
-                                            .setDuration(1200)
-                                            .setListener(object : AnimatorListenerAdapter() {
-                                                override fun onAnimationEnd(animation: Animator) {
-                                                    if (!isBackgroundRequestCurrent(requestId)) return
-                                                    isScaleAnimating = false
-                                                    updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
-                                                }
-                                            }).start()
+                                        dynamicBackgroundView.setBackgroundZoom(finalZoom, 1200L) {
+                                            if (isBackgroundRequestCurrent(requestId)) {
+                                                isScaleAnimating = false
+                                                updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
+                                            }
+                                        }
                                     } else {
-                                        dynamicBackgroundView.scaleX = finalZoom
-                                        dynamicBackgroundView.scaleY = finalZoom
+                                        dynamicBackgroundView.setBackgroundZoom(finalZoom)
                                         isScaleAnimating = false
                                         updateBackgroundProgress(BackgroundProgressPlugin.Stage.COMPLETED)
                                     }
@@ -2586,6 +2607,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                     activeBackgroundTarget = null
                     handler.post { requestManager.clear(this) }
                     isBackgroundLoading = false
+                    dynamicBackgroundView.cancelCompositeLoading()
                     lastBackgroundSource = null
                     lastBlurIntensity = null
                     updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
@@ -2637,6 +2659,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             if (!isBackgroundRequestCurrent(requestId)) return
             isBackgroundLoading = false
             updateBackgroundProgress(BackgroundProgressPlugin.Stage.FAILED, getString(R.string.stage_failed))
+            dynamicBackgroundView.cancelCompositeLoading()
             Logger.e("MainActivity"){"loadBackgroundInternal failed: ${e.message}"}
             onComplete?.invoke()
         }
@@ -2850,8 +2873,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
 
         if (!isScaleAnimating) {
             val zoom = calculateZoom(effectiveDim, previewZoom)
-            dynamicBackgroundView.scaleX = zoom
-            dynamicBackgroundView.scaleY = zoom
+            dynamicBackgroundView.setBackgroundZoom(zoom)
         }
     }
 
@@ -3195,6 +3217,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         graphicsRenderScale = prefs.getInt("graphics_render_scale", 100)
         graphicsWeatherScale = prefs.getInt("graphics_weather_scale", 40)
         if (::dynamicBackgroundView.isInitialized) {
+            dynamicBackgroundView.reloadTransitionPreferences()
             val targetScale = if (isAdvancedGraphicsEnabled) graphicsRenderScale / 100f else 0.5f
             dynamicBackgroundView.setRenderScale(targetScale)
             val targetWeatherScale = if (isAdvancedGraphicsEnabled) graphicsWeatherScale / 100f else 0.4f
@@ -3208,7 +3231,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         smartChipManager.updateAllChips()
         val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this)
         val activeProviderId = bpm.getActiveProviderId()
-        if (activeProviderId.startsWith("external:")) {
+        if (activeProviderId.startsWith("external:") && startupSystemsInitialized) {
             val plugin = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
             val payload = plugin?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
             if (payload !is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.Gradient) {
@@ -3573,13 +3596,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val activeProviderId = bpm.getActiveProviderId()
         if (activeProviderId == com.nxd1frnt.clockdesk2.background.provider.SolidColorBackgroundProvider.ID) {
             val color = bpm.solidColorProvider.getColor(this)
-            applySolidColorBackground(color, skipAnimation = true)
+            applySolidColorBackground(color, skipAnimation = false)
             return
         }
         if (activeProviderId.startsWith("external:")) {
             val provider = bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
             val payload = provider?.getCurrentPayload(this) ?: bpm.getSavedPayloadForId(activeProviderId)
-            applyBackgroundPayload(payload, skipAnimation = true)
+            applyBackgroundPayload(payload, skipAnimation = false)
             if (provider != null) {
                 bpm.requestDataFromPlugin(provider)
             } else {

@@ -845,4 +845,16 @@
     <string name="desk_preview_apps">Your apps</string>
     <string name="desk_preview_web">Web page</string>
     <string name="desk_name_required">Enter a desk name</string>
+    <string name="graphics_transition_style_title">Background Transition Style</string>
+    <string name="graphics_transition_style_summary">Choose the shader animation used when switching backgrounds</string>
+    <string-array name="graphics_transition_style_entries">
+        <item>Liquid Chromatic Distortion</item>
+        <item>Composite Loading &amp; Circular Reveal (AOSP)</item>
+        <item>Sparkle Swipe</item>
+    </string-array>
+    <string-array name="graphics_transition_style_values">
+        <item>liquid_chromatic</item>
+        <item>composite_loading</item>
+        <item>sparkle_swipe</item>
+    </string-array>
 </resources>

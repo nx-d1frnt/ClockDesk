@@ -169,4 +169,34 @@ class BackgroundCropTest {
         assertTrue("dx + sX <= 1.0", dx + sX <= 1.0001f)
         assertTrue("dy + sY <= 1.0", dy + sY <= 1.0001f)
     }
+    @Test
+    fun backgroundOnlyZoomMatchesCenteredImageMagnificationForEveryScreenSample() {
+        val crops = listOf(
+            DynamicBackgroundView.computeCenterCrop(1080, 1920, 1920, 1080, false, 1.5f, 0f, 600f),
+            DynamicBackgroundView.computeCenterCrop(2560, 1080, 1080, 1920, false, 1.2f, -120f, 0f),
+            floatArrayOf(1f, 1f, 0f, 0f) // Gradient or neutral startup texture.
+        )
+        for (crop in crops) for (zoom in listOf(1f, 1.1f, 1.4f, 2f)) {
+            val result = DynamicBackgroundView.applyBackgroundZoom(crop, zoom)
+            for (screenUv in listOf(0f, 0.25f, 0.5f, 0.75f, 1f)) {
+                val imageUv = (screenUv - 0.5f) / zoom + 0.5f
+                assertEquals(crop[2] + crop[0] * imageUv, result[2] + result[0] * screenUv, 0.00001f)
+                assertEquals(crop[3] + crop[1] * imageUv, result[3] + result[1] * screenUv, 0.00001f)
+            }
+            assertTrue(result[2] >= 0f && result[2] + result[0] <= 1.00001f)
+            assertTrue(result[3] >= 0f && result[3] + result[1] <= 1.00001f)
+        }
+    }
+
+    @Test
+    fun backgroundOnlyZoomPreservesTheSavedCropAndItsFocus() {
+        val crop = floatArrayOf(0.6f, 0.4f, 0.2f, 0.1f)
+        val original = crop.copyOf()
+        val zoomed = DynamicBackgroundView.applyBackgroundZoom(crop, 1.4f)
+        assertEquals(crop[2] + crop[0] * 0.5f, zoomed[2] + zoomed[0] * 0.5f, 0.00001f)
+        assertEquals(crop[3] + crop[1] * 0.5f, zoomed[3] + zoomed[1] * 0.5f, 0.00001f)
+        org.junit.Assert.assertArrayEquals(original, crop, 0f)
+        org.junit.Assert.assertArrayEquals(original, DynamicBackgroundView.applyBackgroundZoom(crop, 1f), 0.00001f)
+    }
+
 }
