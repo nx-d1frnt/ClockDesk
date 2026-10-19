@@ -446,6 +446,18 @@ class PerformanceSettingsFragment : BaseM3SettingsFragment() {
                 isEnabled = { advGraphics }
             )
 
+            val transitionsEnabled = advGraphics && prefs.getBoolean("graphics_enable_transitions", true)
+
+            choice(
+                key = "graphics_transition_style",
+                title = getString(R.string.graphics_transition_style_title),
+                summary = getString(R.string.graphics_transition_style_summary),
+                entries = resources.getStringArray(R.array.graphics_transition_style_entries),
+                entryValues = resources.getStringArray(R.array.graphics_transition_style_values),
+                defaultValue = "liquid_chromatic",
+                isEnabled = { transitionsEnabled }
+            )
+
             switch(
                 key = "graphics_enable_turbulence",
                 title = getString(R.string.graphics_enable_turbulence_title),

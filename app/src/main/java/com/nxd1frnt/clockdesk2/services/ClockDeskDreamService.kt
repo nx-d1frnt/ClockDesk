@@ -755,8 +755,7 @@ class ClockDeskDreamService : DreamService(), PowerSaveObserver {
         dynamicBackgroundView.setColorFilter(combinedMatrix)
 
         val zoom = calculateZoom(effectiveDim)
-        dynamicBackgroundView.scaleX = zoom
-        dynamicBackgroundView.scaleY = zoom
+        dynamicBackgroundView.setBackgroundZoom(zoom)
     }
 
     private fun applyBrightnessOverride(brightnessValue: Float) {

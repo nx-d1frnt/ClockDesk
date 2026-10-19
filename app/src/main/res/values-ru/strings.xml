@@ -810,4 +810,11 @@
     <string name="desk_preview_apps">Ваши приложения</string>
     <string name="desk_preview_web">Веб-страница</string>
     <string name="desk_name_required">Введите название деска</string>
+    <string name="graphics_transition_style_title">Стиль перехода фона</string>
+    <string name="graphics_transition_style_summary">Выберите шейдерную анимацию при смене фона</string>
+    <string-array name="graphics_transition_style_entries">
+        <item>Жидкое хроматическое искажение</item>
+        <item>Composite Loading и круговое раскрытие (AOSP)</item>
+        <item>Свайп с искрами</item>
+    </string-array>
 </resources>

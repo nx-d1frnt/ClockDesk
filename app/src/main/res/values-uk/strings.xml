@@ -796,4 +796,11 @@
     <string name="weather_desk_hourly">Погодинний прогноз</string>
     <string name="weather_desk_daily">Прогноз на 7 днів</string>
     <string name="manage_desks_btn">Столи</string>
+    <string name="graphics_transition_style_title">Стиль переходу фону</string>
+    <string name="graphics_transition_style_summary">Оберіть шейдерну анімацію під час зміни фону</string>
+    <string-array name="graphics_transition_style_entries">
+        <item>Рідке хроматичне спотворення</item>
+        <item>Composite Loading та кругове розкриття (AOSP)</item>
+        <item>Свайп з іскрами</item>
+    </string-array>
 </resources>

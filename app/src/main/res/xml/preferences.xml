@@ -66,6 +66,15 @@
             android:defaultValue="true"
             app:dependency="advanced_graphics" />
 
+        <androidx.preference.ListPreference
+            app:key="graphics_transition_style"
+            app:title="@string/graphics_transition_style_title"
+            app:useSimpleSummaryProvider="true"
+            android:entries="@array/graphics_transition_style_entries"
+            android:entryValues="@array/graphics_transition_style_values"
+            android:defaultValue="liquid_chromatic"
+            app:dependency="graphics_enable_transitions" />
+
         <androidx.preference.SwitchPreferenceCompat
             app:key="graphics_enable_turbulence"
             app:title="@string/graphics_enable_turbulence_title"
