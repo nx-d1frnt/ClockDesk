@@ -68,6 +68,8 @@ class DeskConnectManager private constructor(private val context: Context) {
 
     val security = DeskConnectSecurity(context)
     private val mainHandler = Handler(Looper.getMainLooper())
+    // Main-handler state, independent of individual sockets and identity packets.
+    private val connectedDeviceIds = mutableSetOf<String>()
     private val sharedPrefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
 
     val discoveredDevices = ConcurrentHashMap<String, DeskConnectDevice>()
@@ -404,7 +406,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
         mainHandler.post {
             deviceListeners.forEach { it.onDeviceDiscovered(device) }
-            deviceListeners.forEach { it.onDeviceConnected(device) }
+            notifyDeviceConnected(device)
         }
     }
 
@@ -451,11 +453,12 @@ class DeskConnectManager private constructor(private val context: Context) {
             }
 
             mainHandler.post {
-                deviceListeners.forEach { it.onDeviceConnected(device) }
+                notifyDeviceConnected(device)
             }
         }, onError = {
             connectingDevices.remove(device.deviceId)
-            device.isConnected = false
+            // An incoming link may have succeeded while the outgoing attempt failed.
+            device.isConnected = activeConnections[device.deviceId]?.isAlive() == true
             Logger.w("DeskConnect/Connection") {
                 "Failed outgoing connection to ${device.deviceName} (${device.deviceId}) at ${device.ipAddress?.hostAddress}:${device.tcpPort}: ${it.message}"
             }
@@ -506,7 +509,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
                 mainHandler.post {
                     deviceListeners.forEach { it.onDeviceDiscovered(device) }
-                    deviceListeners.forEach { it.onDeviceConnected(device) }
+                    notifyDeviceConnected(device)
                 }
             }
 
@@ -843,6 +846,14 @@ class DeskConnectManager private constructor(private val context: Context) {
         }
     }
 
+    private fun notifyDeviceConnected(device: DeskConnectDevice) {
+        // Called on the main handler. A new socket or identity packet does not
+        // mean a new connection if no disconnect was published in between.
+        if (connectedDeviceIds.add(device.deviceId)) {
+            deviceListeners.forEach { it.onDeviceConnected(device) }
+        }
+    }
+
     private fun handleDisconnected(conn: DeskConnectConnection) {
         val dev = conn.device
         if (conn.isReplaced) {
@@ -852,8 +863,7 @@ class DeskConnectManager private constructor(private val context: Context) {
             return
         }
 
-        if (activeConnections[dev.deviceId] == conn) {
-            activeConnections.remove(dev.deviceId)
+        if (activeConnections.remove(dev.deviceId, conn)) {
             discovery?.onDeviceDisconnected(dev.deviceId)
             // Wait 1000ms grace period: if the peer reconnected with a new socket during renegotiation,
             // don't drop media player state or broadcast false disconnects
@@ -871,7 +881,9 @@ class DeskConnectManager private constructor(private val context: Context) {
                     Logger.i("DeskConnect/Connection") {
                         "Device disconnected: ${dev.deviceName} (${dev.deviceId}) [ip=${dev.ipAddress?.hostAddress ?: "unknown"}]"
                     }
-                    deviceListeners.forEach { it.onDeviceDisconnected(dev) }
+                    if (connectedDeviceIds.remove(dev.deviceId)) {
+                        deviceListeners.forEach { it.onDeviceDisconnected(dev) }
+                    }
                 } else {
                     Logger.d("DeskConnect/Connection") {
                         "Device ${dev.deviceName} (${dev.deviceId}) connection gracefully maintained by newer socket"
