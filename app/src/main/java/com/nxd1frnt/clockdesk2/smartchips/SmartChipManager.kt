@@ -821,7 +821,6 @@ class SmartChipManager(
                 if (updateMultiChipPlugin(plugin)) isContentChanged = true
             } else {
                 val chipInfo = allChips.find { it.id == plugin.preferenceKey } ?: return@forEach
-                val isSystemChip = plugin.preferenceKey == "system_bg_progress"
                 val isEnabled = sharedPreferences.getBoolean(plugin.preferenceKey, true)
                 if (!isEnabled) {
                     if (chipInfo.isVisible) isContentChanged = true // Если чип исчез, структура меняется
@@ -836,7 +835,8 @@ class SmartChipManager(
 
                     if (chipInfo.isVisible != newIsVisible) {
                         isContentChanged = true
-                    } else if (newIsVisible && oldText != newText) {
+                    } else if (newIsVisible && oldText != newText && plugin !is BackgroundProgressPlugin) {
+                        // Progress only changes single-line content; keep stack animations running.
                         isContentChanged = true
                     }
                     

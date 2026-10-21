@@ -11,7 +11,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.smartchips.ISmartChip
-import com.nxd1frnt.clockdesk2.smartchips.setTextWithFade
 
 class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
 
@@ -36,8 +35,9 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
     )
 
     companion object {
-        private const val MIN_STAGE_DISPLAY_MS = 500L
-        private const val COMPLETED_DISPLAY_MS = 850L
+        private const val SHOW_DELAY_MS = 300L
+        private const val UPDATE_INTERVAL_MS = 300L
+        private const val COMPLETED_DISPLAY_MS = 500L
         private const val FAILED_DISPLAY_MS = 2000L
 
         var currentStage: Stage = Stage.IDLE
@@ -47,7 +47,7 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
         var onGlobalStateChanged: (() -> Unit)? = null
 
         private val mainHandler = Handler(Looper.getMainLooper())
-        private val stageQueue = ArrayDeque<StageItem>()
+        private var pendingStage: StageItem? = null
         private var stageStartTime = 0L
         private var advanceRunnable: Runnable? = null
 
@@ -63,9 +63,8 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
         }
 
         /**
-         * Post a progress stage to be displayed.
-         * Guarantees each stage has a minimum display time to ensure user readability
-         * without any skipped or prematurely aborted animations.
+         * Coalesce bursts into the latest stage instead of replaying completed work.
+         * Fast operations finish before the chip appears; terminal states bypass throttling.
          */
         fun postStage(stage: Stage, messageOverride: String? = null) {
             if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -80,55 +79,44 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
 
             val item = StageItem(stage, messageOverride)
 
-            if (stage == Stage.FAILED) {
+            if (stage == Stage.FAILED || stage == Stage.COMPLETED) {
+                if (currentStage == stage && customMessage == messageOverride && advanceRunnable != null) return
+                val wasVisible = currentStage != Stage.IDLE
+                clearPending()
+                if (stage == Stage.COMPLETED && !wasVisible) return
+                applyStage(item)
+                scheduleReset(if (stage == Stage.FAILED) FAILED_DISPLAY_MS else COMPLETED_DISPLAY_MS)
+                return
+            }
+
+            // A new operation must not inherit a previous result's hide callback.
+            if (currentStage == Stage.COMPLETED || currentStage == Stage.FAILED) {
                 clearPending()
                 applyStage(item)
-                advanceRunnable = Runnable { reset() }
-                mainHandler.postDelayed(advanceRunnable!!, FAILED_DISPLAY_MS)
                 return
             }
 
-            if (currentStage == Stage.IDLE) {
-                applyStage(item)
+            if (currentStage == stage && customMessage == messageOverride) {
+                clearPending()
                 return
             }
 
-            if (currentStage == stage && customMessage == messageOverride && stageQueue.isEmpty()) {
-                return
-            }
-
-            val elapsed = SystemClock.uptimeMillis() - stageStartTime
-            if (elapsed >= MIN_STAGE_DISPLAY_MS && stageQueue.isEmpty()) {
-                applyStage(item)
-            } else {
-                val lastInQueue = stageQueue.lastOrNull()
-                if (lastInQueue?.stage != stage || lastInQueue.customMessage != messageOverride) {
-                    stageQueue.add(item)
-                    scheduleAdvanceIfNeeded()
-                }
-            }
+            pendingStage = item
+            scheduleAdvanceIfNeeded()
         }
 
         private fun scheduleAdvanceIfNeeded() {
             if (advanceRunnable != null) return
 
-            val elapsed = SystemClock.uptimeMillis() - stageStartTime
-            val remaining = (MIN_STAGE_DISPLAY_MS - elapsed).coerceAtLeast(0L)
+            val remaining = if (currentStage == Stage.IDLE) SHOW_DELAY_MS else {
+                (UPDATE_INTERVAL_MS - (SystemClock.uptimeMillis() - stageStartTime)).coerceAtLeast(0L)
+            }
 
             advanceRunnable = Runnable {
                 advanceRunnable = null
-                if (stageQueue.isNotEmpty()) {
-                    val next = stageQueue.removeFirst()
-                    applyStage(next)
-                    if (next.stage == Stage.COMPLETED) {
-                        advanceRunnable = Runnable { reset() }
-                        mainHandler.postDelayed(advanceRunnable!!, COMPLETED_DISPLAY_MS)
-                    } else if (stageQueue.isNotEmpty()) {
-                        scheduleAdvanceIfNeeded()
-                    }
-                } else if (currentStage == Stage.COMPLETED) {
-                    reset()
-                }
+                val next = pendingStage
+                pendingStage = null
+                if (next != null) applyStage(next)
             }
             mainHandler.postDelayed(advanceRunnable!!, remaining)
         }
@@ -138,11 +126,11 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
             customMessage = item.customMessage
             stageStartTime = SystemClock.uptimeMillis()
             onGlobalStateChanged?.invoke()
+        }
 
-            if (item.stage == Stage.COMPLETED && stageQueue.isEmpty() && advanceRunnable == null) {
-                advanceRunnable = Runnable { reset() }
-                mainHandler.postDelayed(advanceRunnable!!, COMPLETED_DISPLAY_MS)
-            }
+        private fun scheduleReset(delayMs: Long) {
+            advanceRunnable = Runnable { reset() }
+            mainHandler.postDelayed(advanceRunnable!!, delayMs)
         }
 
         fun reset() {
@@ -161,7 +149,7 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
         private fun clearPending() {
             advanceRunnable?.let { mainHandler.removeCallbacks(it) }
             advanceRunnable = null
-            stageQueue.clear()
+            pendingStage = null
         }
     }
 
@@ -184,27 +172,9 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
         val textView = view.findViewById<TextView>(R.id.chip_text)
 
         if (iconView != null && currentStage.iconRes != 0) {
-            val currentTag = iconView.tag as? Int
-            if (currentTag == null) {
+            if (iconView.tag != currentStage.iconRes) {
                 iconView.setImageResource(currentStage.iconRes)
                 iconView.tag = currentStage.iconRes
-            } else if (currentTag != currentStage.iconRes) {
-                iconView.tag = currentStage.iconRes
-                iconView.animate()
-                    .alpha(0f)
-                    .scaleX(0.7f)
-                    .scaleY(0.7f)
-                    .setDuration(120)
-                    .withEndAction {
-                        iconView.setImageResource(currentStage.iconRes)
-                        iconView.animate()
-                            .alpha(1f)
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(150)
-                            .start()
-                    }
-                    .start()
             }
         }
 
@@ -213,7 +183,10 @@ class BackgroundProgressPlugin(private val context: Context) : ISmartChip {
         } else ""
 
         if (textView != null) {
-            textView.setTextWithFade(text)
+            // Keep updates synchronous and local: nested bounds transitions conflict
+            // with the manager's stack appearance and layout animations.
+            if (textView.text.toString() != text) textView.text = text
+            textView.isSelected = true
         }
 
         return true
