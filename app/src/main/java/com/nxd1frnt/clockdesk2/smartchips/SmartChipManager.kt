@@ -25,6 +25,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.view.animation.OvershootInterpolator
 import android.view.animation.PathInterpolator
 import android.widget.ImageView
@@ -92,15 +93,23 @@ class SmartChipManager(
     private val originalClipChildren = chipScrollView?.clipChildren ?: false
     private val originalClipToPadding = chipScrollView?.clipToPadding ?: false
     private var isExpandedTouchActive = false
+    private var collapsedViewportHeight = 0
+    private var collapsedLayoutHeight: Int? = null
 
     var isStackExpanded: Boolean = false
         private set(value) {
             field = value
             chipScrollView?.apply {
-                // Expanded content must stay inside the scrollable viewport.
+                // The viewport grows with the expanded list, including its touch bounds.
                 clipChildren = value || originalClipChildren
                 clipToPadding = value || originalClipToPadding
-                if (!value) scrollTo(0, 0)
+                if (!value) {
+                    collapsedLayoutHeight?.let { height ->
+                        layoutParams = layoutParams.apply { this.height = height }
+                    }
+                    collapsedLayoutHeight = null
+                    scrollTo(0, 0)
+                }
             }
             if (!value) isExpandedTouchActive = false
         }
@@ -114,6 +123,10 @@ class SmartChipManager(
 
     fun expandStack() {
         if (isStackExpanded) return
+        chipScrollView?.let {
+            collapsedViewportHeight = it.layoutParams.height.takeIf { height -> height > 0 } ?: it.height
+            collapsedLayoutHeight = it.layoutParams.height
+        }
         isStackExpanded = true
         autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         autoCollapseHandler.postDelayed(autoCollapseRunnable, 8000L)
@@ -427,6 +440,8 @@ class SmartChipManager(
         internalPlugins.forEach { it.startListening() } // Будим плагины
         registerReceiver()
         requestInitialState()
+        // Returning with unchanged chip IDs still requires restoring the stack's transforms.
+        sortAndRedrawChips(contentChanged = true)
         Logger.d("SmartChipManager") { "Started listening for chip updates." }
     }
 
@@ -443,7 +458,7 @@ class SmartChipManager(
 
         autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         if (isStackExpanded) {
-            isStackExpanded = false
+            collapseStack()
         }
         isExpandedTouchActive = false
 
@@ -601,19 +616,11 @@ class SmartChipManager(
                     var options: Bundle? = null
 
                     if (context is Activity) {
-                        val transitionName = "shared_chip_container"
-                        view.transitionName = transitionName
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            options = ActivityOptions.makeSceneTransitionAnimation(
-                                context,
-                                Pair.create(view, transitionName)
-                            ).toBundle()
-                        } else {
-                            options = ActivityOptions.makeScaleUpAnimation(
-                                view, 0, 0, view.width, view.height
-                            ).toBundle()
-                        }
+                        // A stack layer keeps animating after the tap. Sharing that View
+                        // with another activity lets two transitions own its transforms.
+                        options = ActivityOptions.makeScaleUpAnimation(
+                            view, 0, 0, view.width, view.height
+                        ).toBundle()
                     } else {
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
@@ -901,12 +908,37 @@ class SmartChipManager(
 
     private fun getUsableHeight(): Int {
         val parentView = chipContainer.parent as? View
-        val availableHeight = if (parentView != null && parentView.height > 0) {
-            parentView.height - parentView.paddingTop - parentView.paddingBottom
-        } else {
-            (165 * context.resources.displayMetrics.density).toInt()
-        }
+        // Overflow is defined by the collapsed widget, not the enlarged viewport.
+        val viewportHeight = if (isStackExpanded && collapsedViewportHeight > 0) {
+            collapsedViewportHeight
+        } else parentView?.layoutParams?.height?.takeIf { it > 0 } ?: parentView?.height ?: 0
+        val availableHeight = if (viewportHeight > 0) viewportHeight -
+            (parentView?.paddingTop ?: 0) - (parentView?.paddingBottom ?: 0)
+        else (165 * context.resources.displayMetrics.density).toInt()
         return (availableHeight - chipContainer.paddingTop - chipContainer.paddingBottom).coerceAtLeast(0)
+    }
+
+    private fun updateExpandedViewport(visibleChips: List<ChipInfo>) {
+        if (!isStackExpanded) return
+        val scrollView = chipScrollView ?: return
+        val parent = scrollView.parent as? View ?: return
+        val bounds = Rect()
+        if (!parent.getGlobalVisibleRect(bounds)) return
+        val windowBounds = Rect()
+        scrollView.getWindowVisibleDisplayFrame(windowBounds)
+        if (!windowBounds.isEmpty) bounds.intersect(windowBounds)
+        val location = IntArray(2)
+        scrollView.getLocationOnScreen(location)
+        val availableHeight = (bounds.bottom - location[1]).coerceAtLeast(1)
+        val spacing = (6 * context.resources.displayMetrics.density).toInt()
+        val contentHeight = visibleChips.sumOf { getChipHeight(it.view) } +
+            spacing * (visibleChips.size - 1).coerceAtLeast(0) +
+            chipContainer.paddingTop + chipContainer.paddingBottom +
+            scrollView.paddingTop + scrollView.paddingBottom
+        val targetHeight = contentHeight.coerceAtLeast(collapsedViewportHeight).coerceAtMost(availableHeight)
+        if (scrollView.layoutParams.height != targetHeight) {
+            scrollView.layoutParams = scrollView.layoutParams.apply { height = targetHeight }
+        }
     }
 
     private fun getChipHeight(view: View): Int {
@@ -962,6 +994,7 @@ class SmartChipManager(
             isStackExpanded = false
             autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
         }
+        updateExpandedViewport(visibleChips)
 
         // Retarget from the current state without callbacks left by a previous stack layout.
         visibleChips.forEach { chipInfo ->
@@ -1271,6 +1304,10 @@ class SmartChipManager(
     private fun setupChipTouchFeedback(view: View) {
         if (view.getTag(R.id.tag_touch_listener_set) == true) return
         view.setTag(R.id.tag_touch_listener_set, true)
+        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var isTap = false
 
         view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) {
@@ -1304,6 +1341,9 @@ class SmartChipManager(
 
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    downX = event.rawX
+                    downY = event.rawY
+                    isTap = true
                     if (isStackExpanded) {
                         resetAutoCollapseTimer()
                     }
@@ -1316,6 +1356,10 @@ class SmartChipManager(
                         .start()
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (kotlin.math.abs(event.rawX - downX) > touchSlop ||
+                        kotlin.math.abs(event.rawY - downY) > touchSlop) {
+                        isTap = false
+                    }
                     val x = event.x
                     val y = event.y
                     val isInside = x >= 0 && x <= v.width && y >= 0 && y <= v.height
@@ -1353,16 +1397,32 @@ class SmartChipManager(
                         .setInterpolator(OvershootInterpolator(1.4f))
                         .start()
 
-                    if (isInside) {
+                    val wasTap = isTap &&
+                        kotlin.math.abs(event.rawX - downX) <= touchSlop &&
+                        kotlin.math.abs(event.rawY - downY) <= touchSlop
+                    isTap = false
+                    if (isInside && wasTap) {
                         if (!isEditMode && isStackedChild && !isStackExpanded) {
                             expandStack()
                             return@setOnTouchListener true
                         } else if (isStackExpanded) {
-                            handler.postDelayed({ collapseStack() }, 200L)
+                            // Use the cancellable idle timer so a subsequent drag keeps it open.
+                            autoCollapseHandler.removeCallbacks(autoCollapseRunnable)
+                            autoCollapseHandler.postDelayed(autoCollapseRunnable, 200L)
                         }
+                    }
+                    // A child can retain the gesture even when ScrollView does not intercept it.
+                    // Do not let its default ACTION_UP handling turn a drag into a click.
+                    if (!wasTap) {
+                        val cancel = MotionEvent.obtain(event)
+                        cancel.action = MotionEvent.ACTION_CANCEL
+                        v.onTouchEvent(cancel)
+                        cancel.recycle()
+                        return@setOnTouchListener true
                     }
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    isTap = false
                     val baseScale = if (isStackedChild && !isStackExpanded) {
                         when (chipIndex - anchorIndex) {
                             1 -> 0.90f

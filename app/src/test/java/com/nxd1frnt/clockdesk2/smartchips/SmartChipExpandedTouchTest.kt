@@ -11,6 +11,9 @@ import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import com.nxd1frnt.clockdesk2.utils.FontManager
 import org.junit.Assert.*
 import org.junit.Test
@@ -47,6 +50,9 @@ class SmartChipExpandedTouchTest {
         val manager: SmartChipManager
         val chips = mutableListOf<TextView>()
         var clicks = 0
+        val owner = object : LifecycleOwner {
+            override val lifecycle: Lifecycle = LifecycleRegistry(this)
+        }
 
         init {
             scroll.addView(container)
@@ -60,6 +66,11 @@ class SmartChipExpandedTouchTest {
             )
             manager = SmartChipManager(activity, container, prefs, fontManager)
             entries().clear()
+            // This fixture supplies synthetic chips; lifecycle tests must not start network plugins.
+            SmartChipManager::class.java.getDeclaredField("internalPlugins").apply {
+                isAccessible = true
+                set(manager, emptyList<ISmartChip>())
+            }
         }
 
         @Suppress("UNCHECKED_CAST")
@@ -88,6 +99,29 @@ class SmartChipExpandedTouchTest {
             SmartChipManager::class.java.getDeclaredMethod("executeSortAndRedrawChips", Boolean::class.javaPrimitiveType)
                 .apply { isAccessible = true }.invoke(manager, true)
             settle()
+        }
+
+        fun configureExternalClick(index: Int) {
+            val entry = entries()[index]
+            entry.javaClass.getDeclaredField("clickActivityClassName").apply {
+                isAccessible = true
+                set(entry, ".DetailsActivity")
+            }
+            SmartChipManager::class.java.getDeclaredMethod(
+                "setupExternalChipClickListener", View::class.java, String::class.java, String::class.java
+            ).apply { isAccessible = true }.invoke(manager, chips[index], "chip_$index", "example.plugin")
+        }
+
+        fun assertCollapsedStack() {
+            assertFalse(manager.isStackExpanded)
+            assertEquals(0, scroll.scrollY)
+            val anchor = chips[2]
+            assertEquals(anchor.top, chips[3].top)
+            assertEquals(0.90f, chips[3].scaleX, 0.01f)
+            assertEquals(8f, chips[3].translationY, 0.01f)
+            assertEquals(0.82f, chips[4].scaleX, 0.01f)
+            assertTrue(anchor.z > chips[3].z)
+            chips.drop(5).forEach { assertEquals(View.INVISIBLE, it.visibility) }
         }
 
         fun layout() {
@@ -119,6 +153,54 @@ class SmartChipExpandedTouchTest {
     }
 
     @Test
+    fun externalChipLaunchDoesNotShareAnimatedLayerAndReturnRestoresStack() {
+        val f = Fixture()
+        try {
+            f.addChips(12)
+            f.configureExternalClick(7)
+            f.manager.expandStack()
+            f.settle()
+            val chip = f.chips[7]
+            f.scroll.scrollTo(0, chip.top)
+            assertTrue(chip.performClick())
+            val launch = shadowOf(f.activity).nextStartedActivity
+            assertNotNull("External chip must open its activity", launch)
+            assertEquals("example.plugin.DetailsActivity", launch.component?.className)
+            assertNull("Stack layers must not become activity shared elements", chip.transitionName)
+
+            // Leaving can happen before the delayed collapse from the tap runs.
+            assertTrue(f.manager.isStackExpanded)
+            f.manager.onStop(f.owner)
+            f.settle()
+            f.assertCollapsedStack()
+            f.manager.onStart(f.owner)
+            f.settle()
+            f.assertCollapsedStack()
+        } finally {
+            f.manager.onStop(f.owner)
+            f.close()
+        }
+    }
+
+    @Test
+    fun returningWithUnchangedChipIdsReappliesStackTransforms() {
+        val f = Fixture()
+        try {
+            f.addChips(8)
+            f.manager.onStop(f.owner)
+            // Simulate properties left by an interrupted activity/press animation.
+            f.chips[3].scaleX = 0.5f
+            f.chips[3].translationY = 0f
+            f.manager.onStart(f.owner)
+            f.settle()
+            f.assertCollapsedStack()
+        } finally {
+            f.manager.onStop(f.owner)
+            f.close()
+        }
+    }
+
+    @Test
     fun handleExpandedStackTouchCollapsesOnTapOutside() {
         val f = Fixture()
         try {
@@ -136,10 +218,11 @@ class SmartChipExpandedTouchTest {
     fun expandedStackScrollsWithoutClickingOrCollapsing() {
         val f = Fixture()
         try {
-            f.addChips(12)
+            f.addChips(40)
             f.manager.expandStack()
             f.settle()
             assertTrue(f.scroll.clipChildren)
+            assertTrue("Expanded touch viewport must grow beyond the widget", f.scroll.height > 165)
             assertTrue(f.container.height > f.scroll.height)
             val downTime = SystemClock.uptimeMillis()
             assertTrue(f.touch(MotionEvent.ACTION_DOWN, 100f, 140f, downTime))
@@ -155,7 +238,58 @@ class SmartChipExpandedTouchTest {
             f.manager.collapseStack()
             f.settle()
             assertEquals(0, f.scroll.scrollY)
+            assertEquals(165, f.scroll.height)
             assertFalse(f.scroll.clipChildren)
+        } finally { f.close() }
+    }
+
+    @Test
+    fun dragRetainedByChipDoesNotClickOrCollapse() {
+        val f = Fixture()
+        try {
+            f.addChips(12)
+            f.manager.expandStack()
+            f.settle()
+            val chip = f.chips.first()
+            val x = chip.left + chip.width / 2f
+            val y = chip.top + 10f
+            val downTime = SystemClock.uptimeMillis()
+            assertTrue(f.touch(MotionEvent.ACTION_DOWN, x, y, downTime))
+            // A child may keep the gesture; movement within its bounds is still not a tap.
+            f.scroll.requestDisallowInterceptTouchEvent(true)
+            assertTrue(f.touch(MotionEvent.ACTION_MOVE, x, y + 20f, downTime))
+            assertTrue(f.touch(MotionEvent.ACTION_UP, x, y + 20f, downTime))
+            f.settle()
+            assertEquals(0, f.clicks)
+            assertFalse(chip.isPressed)
+            assertTrue(f.manager.isStackExpanded)
+        } finally { f.close() }
+    }
+
+    @Test
+    fun newDragCancelsCollapseScheduledByPreviousTap() {
+        val f = Fixture()
+        try {
+            f.addChips(40)
+            f.manager.expandStack()
+            f.settle()
+            val chip = f.chips.first()
+            val x = chip.left + chip.width / 2f
+            val y = chip.top + chip.height / 2f
+            val tapTime = SystemClock.uptimeMillis()
+            assertTrue(f.touch(MotionEvent.ACTION_DOWN, x, y, tapTime))
+            assertTrue(f.touch(MotionEvent.ACTION_UP, x, y, tapTime))
+            assertTrue("Tap should only schedule collapse", f.manager.isStackExpanded)
+            val dragTime = SystemClock.uptimeMillis()
+            assertTrue(f.touch(MotionEvent.ACTION_DOWN, 100f, 140f, dragTime))
+            assertTrue(f.touch(MotionEvent.ACTION_MOVE, 100f, 90f, dragTime))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(250))
+            assertTrue("Previous tap must not collapse an active drag", f.manager.isStackExpanded)
+            assertTrue(f.touch(MotionEvent.ACTION_MOVE, 100f, 20f, dragTime))
+            assertTrue(f.touch(MotionEvent.ACTION_UP, 100f, 20f, dragTime))
+            f.settle()
+            assertEquals(1, f.clicks)
+            assertTrue(f.manager.isStackExpanded)
         } finally { f.close() }
     }
 
@@ -163,7 +297,7 @@ class SmartChipExpandedTouchTest {
     fun expandedStackDeliversClicksAfterScrolling() {
         val f = Fixture()
         try {
-            f.addChips(12)
+            f.addChips(40)
             f.manager.expandStack()
             f.settle()
             val chip = f.chips[7]
@@ -183,13 +317,79 @@ class SmartChipExpandedTouchTest {
     fun chipsOutsideExpandedViewportCannotReceiveClicks() {
         val f = Fixture()
         try {
-            f.addChips(12)
+            f.addChips(40)
             f.manager.expandStack()
             f.settle()
             val chip = f.chips.last()
             assertFalse(f.touch(MotionEvent.ACTION_DOWN, 100f, chip.top + 10f))
             assertEquals(0, f.clicks)
             assertFalse(f.manager.isStackExpanded)
+        } finally { f.close() }
+    }
+
+    @Test
+    fun expandedChipBelowOriginalWidgetReceivesClick() {
+        val f = Fixture()
+        try {
+            f.addChips(12)
+            f.manager.expandStack()
+            f.settle()
+            val chip = f.chips[7]
+            val x = chip.left + chip.width / 2f
+            val y = chip.top + chip.height / 2f
+            assertTrue("Chip must lie below the original touch bounds", y > 165f)
+            assertTrue("Visible chip must be inside the expanded viewport", y < f.scroll.height)
+            val downTime = SystemClock.uptimeMillis()
+            assertTrue(f.touch(MotionEvent.ACTION_DOWN, x, y, downTime))
+            assertTrue(f.touch(MotionEvent.ACTION_UP, x, y, downTime))
+            f.settle()
+            assertEquals(1, f.clicks)
+            assertEquals(165, f.scroll.height)
+            f.assertCollapsedStack()
+        } finally { f.close() }
+    }
+
+    @Test
+    fun expandedViewportFitsAvailableSpaceBelowMovedWidget() {
+        val f = Fixture()
+        try {
+            f.addChips(40)
+            f.scroll.translationY = 700f
+            f.manager.expandStack()
+            f.settle()
+            assertTrue(f.scroll.height > 165)
+            assertTrue("Viewport must fit below the moved widget", f.scroll.height <= 300)
+            assertTrue("Remaining chips must still be scrollable", f.container.height > f.scroll.height)
+            val chip = f.chips[5]
+            val x = chip.left + chip.width / 2f
+            val y = chip.top + chip.height / 2f
+            assertTrue(y > 165f && y < f.scroll.height)
+            val downTime = SystemClock.uptimeMillis()
+            assertTrue(f.touch(MotionEvent.ACTION_DOWN, x, y, downTime))
+            assertTrue(f.touch(MotionEvent.ACTION_UP, x, y, downTime))
+            f.settle()
+            assertEquals(1, f.clicks)
+            assertEquals(165, f.scroll.height)
+        } finally { f.close() }
+    }
+
+    @Test
+    fun rapidReopeningPreservesOriginalCollapsedHeight() {
+        val f = Fixture()
+        try {
+            f.addChips(12)
+            f.manager.expandStack()
+            f.settle()
+            assertTrue(f.scroll.height > 165)
+            f.manager.collapseStack()
+            // Reopen before the requested resize has reached the next layout pass.
+            f.manager.expandStack()
+            f.settle()
+            assertTrue(f.manager.isStackExpanded)
+            f.manager.collapseStack()
+            f.settle()
+            assertEquals(165, f.scroll.height)
+            f.assertCollapsedStack()
         } finally { f.close() }
     }
 
