@@ -778,6 +778,7 @@
     <string name="desk_type_devices">Your Devices</string>
     <string name="desk_type_weather">Weather</string>
     <string name="desk_type_timer">Timer</string>
+    <string name="desk_type_notifications">Notifications</string>
     <string name="timer_start">Start</string>
     <string name="timer_pause">Pause</string>
     <string name="timer_resume">Resume</string>

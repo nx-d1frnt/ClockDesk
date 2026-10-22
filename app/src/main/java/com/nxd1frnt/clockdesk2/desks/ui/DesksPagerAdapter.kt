@@ -144,6 +144,7 @@ class DesksPagerAdapter(
                 is DevicesDeskView -> view.refreshMonetTheme(palette)
                 is AppsDeskView -> view.refreshMonetTheme(palette)
                 is TimerDeskView -> view.refreshMonetTheme(palette)
+                is NotificationsDeskView -> view.refreshMonetTheme(palette)
                 else -> UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
             }
         }
@@ -158,6 +159,7 @@ class DesksPagerAdapter(
             DeskType.WEATHER -> WeatherDeskView(context)
             DeskType.TIMER -> TimerDeskView(context)
             DeskType.WEB_KIOSK -> WebKioskDeskView(context)
+            DeskType.NOTIFICATIONS -> NotificationsDeskView(context)
             DeskType.WIDGETS -> error("Widgets use the activity host")
         }
         val palette = UiMonetThemeManager.getPalette(context)
@@ -166,6 +168,7 @@ class DesksPagerAdapter(
             is DevicesDeskView -> page.refreshMonetTheme(palette)
             is AppsDeskView -> page.refreshMonetTheme(palette)
             is TimerDeskView -> page.refreshMonetTheme(palette)
+            is NotificationsDeskView -> page.refreshMonetTheme(palette)
             else -> UiMonetThemeManager.applyLiveToViewHierarchy(page, palette)
         }
         return page

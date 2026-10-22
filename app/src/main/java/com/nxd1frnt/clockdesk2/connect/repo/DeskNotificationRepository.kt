@@ -112,10 +112,9 @@ class DeskNotificationRepository private constructor(private val context: Contex
     }
 
     fun clearAllNotifications() {
-        val toDismiss = activeNotifications.values.toList()
-        activeNotifications.clear()
+        val toDismiss = activeNotifications.values.filter { it.isClearable }
         toDismiss.forEach { item ->
-            if (item.isClearable) {
+            if (activeNotifications.remove(key(item.deviceId, item.notificationId), item)) {
                 deskConnectManager.dismissNotification(item.deviceId, item.notificationId)
             }
         }

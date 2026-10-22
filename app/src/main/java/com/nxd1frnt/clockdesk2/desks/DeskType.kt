@@ -14,7 +14,8 @@ enum class DeskType(
     DEVICES("devices", R.string.desk_type_devices, R.drawable.ic_devices),
     WEATHER("weather", R.string.desk_type_weather, R.drawable.ic_mostly_cloudy_day),
     TIMER("timer", R.string.desk_type_timer, R.drawable.ic_timer),
-    WEB_KIOSK("web_kiosk", R.string.desk_type_web_kiosk, R.drawable.ic_web);
+    WEB_KIOSK("web_kiosk", R.string.desk_type_web_kiosk, R.drawable.ic_web),
+    NOTIFICATIONS("notifications", R.string.desk_type_notifications, R.drawable.ic_notifications);
 
     companion object {
         fun fromTypeId(typeId: String): DeskType =

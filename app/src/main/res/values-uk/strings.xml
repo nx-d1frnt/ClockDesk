@@ -741,6 +741,7 @@
     <string name="desk_type_devices">Your Devices</string>
     <string name="desk_type_weather">Погода</string>
     <string name="desk_type_timer">Таймер</string>
+    <string name="desk_type_notifications">Сповіщення</string>
     <string name="timer_start">Старт</string>
     <string name="timer_pause">Пауза</string>
     <string name="timer_resume">Продовжити</string>
