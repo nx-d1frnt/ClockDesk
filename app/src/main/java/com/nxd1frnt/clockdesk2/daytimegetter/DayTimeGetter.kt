@@ -8,7 +8,7 @@ import java.util.Calendar
 import java.util.Date
 
 open class DayTimeGetter(private val context: Context, private val locationManager: LocationManager) {
-    val requestQueue = NetworkManager.getRequestQueue(context)
+    val requestQueue by lazy { NetworkManager.getRequestQueue(context.applicationContext) }
     var sunriseTime: Date? = null
     var sunsetTime: Date? = null
     var dawnTime: Date? = null

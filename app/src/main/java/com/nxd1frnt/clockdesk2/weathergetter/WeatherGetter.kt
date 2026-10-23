@@ -73,6 +73,7 @@ open class WeatherGetter(
     private var updatesRequested = false
     private var lastRequestAt: Long? = null
     private var lastRequestKey: String? = null
+    private var consecutiveFailures = 0
 
     override fun onPowerSaveModeChanged(isEnabled: Boolean) {
         isPowerSaveActive = isEnabled
@@ -82,7 +83,8 @@ open class WeatherGetter(
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (key == "weather_refresh_interval" || key == "temperature_unit" ||
-            key == "wind_speed_unit" || key == "precipitation_unit") {
+            key == "wind_speed_unit" || key == "precipitation_unit" ||
+            key == "power_saver_disable_weather") {
             updateInterval()
             scheduleNextUpdate()
         }
@@ -100,8 +102,23 @@ open class WeatherGetter(
         if (!updatesRequested || PowerSavePolicy.read(prefs, isPowerSaveActive).suspendWeather) return
         val last = lastRequestAt
         val delay = if (last == null || requestKey() != lastRequestKey) 0L
-            else (interval - (SystemClock.elapsedRealtime() - last)).coerceAtLeast(0L)
+            else (nextRequestInterval() - (SystemClock.elapsedRealtime() - last)).coerceAtLeast(0L)
         handler.postDelayed(updateRunnable, delay)
+    }
+
+    private fun nextRequestInterval(): Long = if (consecutiveFailures == 0) interval else
+        minOf(interval, 60_000L * (1L shl (consecutiveFailures - 1).coerceAtMost(4)), 15 * 60_000L)
+
+    protected fun onFetchSucceeded() {
+        consecutiveFailures = 0
+        lastRequestAt = SystemClock.elapsedRealtime()
+        scheduleNextUpdate()
+    }
+
+    protected fun onFetchFailed() {
+        consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(5)
+        lastRequestAt = SystemClock.elapsedRealtime()
+        scheduleNextUpdate()
     }
 
     private fun updateInterval() {
@@ -146,6 +163,7 @@ open class WeatherGetter(
     }
 
     fun startUpdates(latitude: Double, longitude: Double) {
+        if (lastLatitude != latitude || lastLongitude != longitude) consecutiveFailures = 0
         lastLatitude = latitude
         lastLongitude = longitude
         if (!updatesRequested) prefs.registerOnSharedPreferenceChangeListener(this)

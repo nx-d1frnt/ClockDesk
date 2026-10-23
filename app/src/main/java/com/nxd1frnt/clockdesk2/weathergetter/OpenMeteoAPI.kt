@@ -1,6 +1,7 @@
 package com.nxd1frnt.clockdesk2.weathergetter
 
 import android.content.Context
+import org.json.JSONObject
 import com.android.volley.Request
 import com.android.volley.toolbox.JsonObjectRequest
 import com.nxd1frnt.clockdesk2.utils.LocationManager
@@ -12,7 +13,10 @@ class OpenMeteoAPI(
     private val onWeatherUpdated: () -> Unit
 ): WeatherGetter(context, locationManager, onWeatherUpdated) {
 
+    private var activeRequest: Request<*>? = null
+
     override fun fetch(latitude: Double, longitude: Double) {
+        activeRequest?.cancel()
         val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         val tempUnit = prefs.getString("temperature_unit", "celsius") ?: "celsius"
         val windUnit = prefs.getString("wind_speed_unit", "kmh") ?: "kmh"
@@ -33,35 +37,12 @@ class OpenMeteoAPI(
                     weatherCode = current.getInt("weather_code")
                     isDay = current.getInt("is_day") == 1
 
-                    windSpeed = if (current.has("wind_speed_10m")) {
-                        current.getDouble("wind_speed_10m")
-                    } else {
-                        0.0
-                    }
-
-                    precipitation = if (current.has("precipitation")) {
-                        current.getDouble("precipitation")
-                    } else {
-                        null
-                    }
-
-                    cloudCover = if (current.has("cloud_cover")) {
-                        current.getInt("cloud_cover")
-                    } else {
-                        null
-                    }
-
-                    visibility = if (current.has("visibility")) {
-                        current.getDouble("visibility")
-                    } else {
-                        null
-                    }
-
-                    uvIndex = if (current.has("uv_index")) {
-                        current.getDouble("uv_index")
-                    } else {
-                        null
-                    }
+                    // Optional values may be present as JSON null (e.g. unavailable UV data).
+                    windSpeed = current.optionalDouble("wind_speed_10m")
+                    precipitation = current.optionalDouble("precipitation")
+                    cloudCover = current.optionalDouble("cloud_cover")?.toInt()
+                    visibility = current.optionalDouble("visibility")
+                    uvIndex = current.optionalDouble("uv_index")
 
                     val hourlyCodesList = mutableListOf<Int>()
                     val hourlyTempsList = mutableListOf<Double>()
@@ -102,16 +83,24 @@ class OpenMeteoAPI(
                         visibility = visibility
                     )
 
+                    onFetchSucceeded()
                     onWeatherUpdated()
 
                 } catch (e: Exception) {
                     Logger.e("OpenMeteoApi"){"Error parsing weather JSON ${e.message}"}
+                    onFetchFailed()
                 }
             },
             {
                 Logger.e("OpenMeteoApi"){"Error fetching weather: ${it.message}"}
+                onFetchFailed()
             }
         )
+        // Every scheduled refresh must reach the server, even if HTTP cache headers allow reuse.
+        request.setShouldCache(false)
+        activeRequest = request
         requestQueue.add(request)
     }
 }
+internal fun JSONObject.optionalDouble(key: String): Double? =
+    optDouble(key, Double.NaN).takeIf { it.isFinite() }

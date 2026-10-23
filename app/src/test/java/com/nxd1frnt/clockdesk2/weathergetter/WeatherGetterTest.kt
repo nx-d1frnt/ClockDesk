@@ -25,6 +25,8 @@ class WeatherGetterTest {
     private lateinit var getter: CountingWeather
 
     private class CountingWeather(context: Context) : WeatherGetter(context, LocationManager(context, 1), {}) {
+        fun fail() = onFetchFailed()
+        fun succeed() = onFetchSucceeded()
         var requests = 0
         override fun fetch(latitude: Double, longitude: Double) { requests++ }
     }
@@ -93,4 +95,45 @@ class WeatherGetterTest {
         idle(120)
         assertEquals(1, getter.requests)
     }
+    @Test fun failedRequestsRetryWithBackoffAndSuccessRestoresNormalInterval() {
+        getter.startUpdates(50.0, 30.0)
+        idle()
+        getter.fail()
+        idle(1)
+        assertEquals(2, getter.requests)
+        getter.fail()
+        idle(1)
+        assertEquals(2, getter.requests)
+        idle(1)
+        assertEquals(3, getter.requests)
+        getter.succeed()
+        idle(29)
+        assertEquals(3, getter.requests)
+        idle(1)
+        assertEquals(4, getter.requests)
+    }
+
+    @Test fun stoppedOrSuspendedUpdatesDoNotRetryFailures() {
+        getter.startUpdates(50.0, 30.0)
+        idle()
+        getter.fail()
+        getter.stopUpdates()
+        idle(10)
+        assertEquals(1, getter.requests)
+        getter.onPowerSaveModeChanged(true)
+        getter.startUpdates(50.0, 30.0)
+        idle(10)
+        assertEquals(1, getter.requests)
+        prefs.edit().putBoolean("power_saver_disable_weather", false).commit()
+        idle()
+        assertEquals(2, getter.requests)
+    }
+
+    @Test fun optionalWeatherNumbersAcceptMissingAndNullValues() {
+        val values = org.json.JSONObject("""{"uv_index":null,"visibility":12000.0}""")
+        org.junit.Assert.assertNull(values.optionalDouble("uv_index"))
+        org.junit.Assert.assertNull(values.optionalDouble("precipitation"))
+        assertEquals(12000.0, values.optionalDouble("visibility")!!, 0.0)
+    }
+
 }

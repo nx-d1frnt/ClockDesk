@@ -12,8 +12,9 @@ import java.util.Date
 import java.util.Locale
 
 class SunriseAPI(private val context: Context, private val locationManager: LocationManager): DayTimeGetter(context, locationManager) {
+    private val cache = SunTimesCache(context)
+
     override fun fetch(latitude: Double, longitude: Double, callback: () -> Unit) {
-        val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
@@ -21,34 +22,38 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
             set(Calendar.MILLISECOND, 0)
         }.time.time
         val cacheKey = "sun_times_${latitude}_${longitude}_${today}"
-        val cachedSunrise = prefs.getLong("sunrise_$cacheKey", 0L)
-        val cachedSunset = prefs.getLong("sunset_$cacheKey", 0L)
+        val cached = cache.read(cacheKey)
 
-        if (cachedSunrise != 0L && cachedSunset != 0L) {
-            sunriseTime = Date(cachedSunrise)
-            sunsetTime = Date(cachedSunset)
-            dawnTime = Date(prefs.getLong("dawn_$cacheKey", 0L))
-            duskTime = Date(prefs.getLong("dusk_$cacheKey", 0L))
-            solarNoonTime = Date(prefs.getLong("solar_noon_$cacheKey", 0L))
+        if (cached != null) {
+            sunriseTime = Date(cached[0])
+            sunsetTime = Date(cached[1])
+            dawnTime = Date(cached[2])
+            duskTime = Date(cached[3])
+            solarNoonTime = Date(cached[4])
             Logger.d("SunTimes"){"Loaded cached sun times: sunrise=$sunriseTime, sunset=$sunsetTime"}
             callback()
             return
         }
 
-        val url = "https://api.sunrise-sunset.org/json?lat=$latitude&lng=$longitude&date=today&formatted=0"
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(today))
+        val url = "https://api.sunrise-sunset.org/json?lat=$latitude&lng=$longitude&date=$date&formatted=0"
         val request = JsonObjectRequest(
             Request.Method.GET, url, null,
             { response ->
-                parseSunTimes(response)
-                with(prefs.edit()) {
-                    putLong("sunrise_$cacheKey", sunriseTime?.time ?: 0L)
-                    putLong("sunset_$cacheKey", sunsetTime?.time ?: 0L)
-                    putLong("dawn_$cacheKey", dawnTime?.time ?: 0L)
-                    putLong("dusk_$cacheKey", duskTime?.time ?: 0L)
-                    putLong("solar_noon_$cacheKey", solarNoonTime?.time ?: 0L)
-                    apply()
+                try {
+                    if (response.optString("status") == "OK" && parseSunTimes(response)) {
+                        cache.write(cacheKey, listOf(
+                            sunriseTime!!.time, sunsetTime!!.time, dawnTime!!.time,
+                            duskTime!!.time, solarNoonTime!!.time
+                        ))
+                        Logger.d("SunTimes"){"Fetched and cached: sunrise=$sunriseTime, sunset=$sunsetTime"}
+                    } else {
+                        setDefault()
+                    }
+                } catch (e: Exception) {
+                    Logger.e("SunTimes"){"Failed to parse sun times: ${e.message}"}
+                    setDefault()
                 }
-                Logger.d("SunTimes"){"Fetched and cached: sunrise=$sunriseTime, sunset=$sunsetTime"}
                 callback()
             },
             {
@@ -57,13 +62,13 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
                 callback()
             }
         )
-        //Volley.newRequestQueue(context).add(request)
+        request.setShouldCache(false)
         requestQueue.add(request)
     }
 
-    private fun parseSunTimes(response: JSONObject) {
+    internal fun parseSunTimes(response: JSONObject): Boolean {
         val results = response.getJSONObject("results")
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply { isLenient = false }
 
         // Get today's date for normalization
         val today = Calendar.getInstance().apply {
@@ -75,8 +80,10 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
 
         fun normalizeTime(time: String): Date? {
             return try {
-                val parsed = dateFormat.parse(time.replace("Z", "+0000")) ?: return null
-                val cal = Calendar.getInstance().apply { setTime(parsed) }                // Normalize to today's date                cal.set(Calendar.YEAR, today.get(Calendar.YEAR))
+                val parsed = dateFormat.parse(time) ?: return null
+                val cal = Calendar.getInstance().apply { setTime(parsed) }
+                // Normalize to today's local date.
+                cal.set(Calendar.YEAR, today.get(Calendar.YEAR))
                 cal.set(Calendar.MONTH, today.get(Calendar.MONTH))
                 cal.set(Calendar.DAY_OF_MONTH, today.get(Calendar.DAY_OF_MONTH))
                 cal.time
@@ -86,21 +93,22 @@ class SunriseAPI(private val context: Context, private val locationManager: Loca
             }
         }
 
-        sunriseTime = normalizeTime(results.getString("sunrise")) ?: run { setDefault(); sunriseTime }
-        sunsetTime = normalizeTime(results.getString("sunset")) ?: run { setDefault(); sunsetTime }
-        solarNoonTime = normalizeTime(results.getString("solar_noon")) ?: run { setDefault(); solarNoonTime }
-        dawnTime = normalizeTime(results.getString("civil_twilight_begin")) ?: run { setDefault(); dawnTime }
-        duskTime = normalizeTime(results.getString("civil_twilight_end")) ?: run { setDefault(); duskTime }
+        sunriseTime = normalizeTime(results.getString("sunrise"))
+        sunsetTime = normalizeTime(results.getString("sunset"))
+        solarNoonTime = normalizeTime(results.getString("solar_noon"))
+        dawnTime = normalizeTime(results.getString("civil_twilight_begin"))
+        duskTime = normalizeTime(results.getString("civil_twilight_end"))
 
         // Validate times
         if (sunriseTime == null || sunsetTime == null || dawnTime == null || duskTime == null || solarNoonTime == null) {
             Logger.w("SunTimes"){"One or more sun times are null, using fallbacks"}
-            setDefault()
+            return false
         } else if (sunriseTime!!.after(sunsetTime) || dawnTime!!.after(sunriseTime) || duskTime!!.before(sunsetTime)) {
             Logger.w("SunTimes"){"Invalid sun times detected: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime"}
-            setDefault()
+            return false
         } else {
             Logger.d("SunTimes"){"Parsed: sunrise=$sunriseTime, sunset=$sunsetTime, dawn=$dawnTime, dusk=$duskTime"}
+            return true
         }
     }
 }
