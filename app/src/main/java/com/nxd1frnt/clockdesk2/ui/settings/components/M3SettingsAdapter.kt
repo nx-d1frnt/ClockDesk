@@ -62,6 +62,7 @@ class M3SettingsAdapter(
         private const val TYPE_BATTERY_STATUS = 10
         private const val TYPE_TURBULENCE_PREVIEW = 11
         private const val TYPE_LIGHT_LEVEL = 12
+        private const val TYPE_UPDATE_STATUS = 13
 
         private const val PAYLOAD_UPDATE_PREVIEW = "payload_update_notification_preview"
     }
@@ -106,6 +107,7 @@ class M3SettingsAdapter(
         val visibleList = rawItems.filter { item ->
             when (item) {
                 is SettingsItem.Header -> true
+                is SettingsItem.UpdateStatus -> true
                 is SettingsItem.Entry -> item.isVisible()
             }
         }
@@ -149,6 +151,7 @@ class M3SettingsAdapter(
             is SettingsItem.BatteryStatus -> TYPE_BATTERY_STATUS
             is SettingsItem.TurbulencePreview -> TYPE_TURBULENCE_PREVIEW
             is SettingsItem.LightLevel -> TYPE_LIGHT_LEVEL
+            is SettingsItem.UpdateStatus -> TYPE_UPDATE_STATUS
         }
     }
 
@@ -156,6 +159,7 @@ class M3SettingsAdapter(
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
             TYPE_HEADER -> HeaderViewHolder(inflater.inflate(R.layout.item_settings_header, parent, false))
+            TYPE_UPDATE_STATUS -> UpdateStatusViewHolder(inflater.inflate(R.layout.item_settings_update_status, parent, false))
             TYPE_SWITCH -> SwitchViewHolder(inflater.inflate(R.layout.item_settings_switch, parent, false))
             TYPE_CLICKABLE -> ClickableViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
             TYPE_CHOICE -> ChoiceViewHolder(inflater.inflate(R.layout.item_settings_clickable, parent, false))
@@ -199,6 +203,7 @@ class M3SettingsAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val item = displayItems[position]) {
             is SettingsItem.Header -> (holder as HeaderViewHolder).bind(item)
+            is SettingsItem.UpdateStatus -> (holder as UpdateStatusViewHolder).bind(item)
             is SettingsItem.Switch -> (holder as SwitchViewHolder).bind(item, position)
             is SettingsItem.Clickable -> (holder as ClickableViewHolder).bind(item, position)
             is SettingsItem.SingleChoice -> (holder as ChoiceViewHolder).bind(item, position)
@@ -242,6 +247,32 @@ class M3SettingsAdapter(
             )
         marginParams.bottomMargin = (marginBottomDp * context.resources.displayMetrics.density).toInt()
         cardView.layoutParams = marginParams
+    }
+
+    class UpdateStatusViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        fun bind(item: SettingsItem.UpdateStatus) {
+            itemView.findViewById<TextView>(R.id.update_card_title).text = item.title
+            itemView.findViewById<TextView>(R.id.update_card_details).text = item.details
+            itemView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.update_card_progress).apply {
+                visibility = if (item.downloading) View.VISIBLE else View.GONE
+                isIndeterminate = item.progress == null
+                if (item.progress != null) progress = item.progress
+            }
+            itemView.findViewById<TextView>(R.id.update_card_progress_text).apply {
+                text = item.progressText
+                visibility = if (item.progressText == null) View.GONE else View.VISIBLE
+            }
+            itemView.findViewById<com.google.android.material.button.MaterialButton>(R.id.update_card_action).apply {
+                text = item.actionTitle
+                isEnabled = item.actionEnabled
+                setOnClickListener { item.onAction() }
+            }
+            itemView.findViewById<com.google.android.material.button.MaterialButton>(R.id.update_card_cancel).apply {
+                text = item.cancelTitle
+                visibility = if (item.downloading) View.VISIBLE else View.GONE
+                setOnClickListener { item.onCancel() }
+            }
+        }
     }
 
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
