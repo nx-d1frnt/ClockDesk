@@ -4,6 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -23,10 +24,13 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.BitmapImageViewTarget
+import com.nxd1frnt.clockdesk2.utils.ArtworkColors
 import com.google.android.material.card.MaterialCardView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.music.MusicTrack
@@ -86,11 +90,25 @@ class MediaDesktopWidget(
     var btnNext: View? = null
         private set
 
+    private var artworkCard: MaterialCardView? = null
+    private var artworkCover: ImageView? = null
+    private var artworkSourceIcon: ImageView? = null
+    private var artworkSourceLabel: TextView? = null
+    private var artworkTitle: TextView? = null
+    private var artworkArtist: TextView? = null
+    private var artworkProgress: SquigglyProgressBar? = null
+    private var artworkPlayPause: ImageView? = null
+    private var artworkColors = ArtworkColors.DEFAULT
+
+    private fun progressBars() = listOfNotNull(expandedProgressBar, artworkProgress)
+    private fun isPlayerShown() = mediaExpandedCard?.isShown == true || artworkCard?.isShown == true
+
     var lastTrackInfo: String? = null
         private set
 
     private var currentTrack: MusicTrack? = null
     private var isPlayingState: Boolean = false
+    private var canControlPlayback = false
 
     // Transport control callbacks
     var onPlayPauseAction: (() -> Unit)? = null
@@ -115,7 +133,7 @@ class MediaDesktopWidget(
         override fun onViewAttachedToWindow(v: View) { resumeProgressTracker() }
         override fun onViewDetachedFromWindow(v: View) {
             stopProgressTracker()
-            expandedProgressBar?.isPlaying = false
+            progressBars().forEach { it.isPlaying = false }
         }
     }
 
@@ -127,7 +145,7 @@ class MediaDesktopWidget(
     override fun onPause() {
         hostResumed = false
         stopProgressTracker()
-        expandedProgressBar?.isPlaying = false
+        progressBars().forEach { it.isPlaying = false }
     }
 
     override fun onResume() {
@@ -173,21 +191,39 @@ class MediaDesktopWidget(
         expandedTitleText?.isSelected = true
         expandedArtistText?.isSelected = true
 
+        artworkCard = view.findViewById(R.id.media_artwork_card)
+        artworkCover = view.findViewById(R.id.artwork_cover_art)
+        artworkSourceIcon = view.findViewById(R.id.artwork_source_icon)
+        artworkSourceLabel = view.findViewById(R.id.artwork_source_label)
+        artworkTitle = view.findViewById<TextView>(R.id.artwork_title_text)?.apply { isSelected = true }
+        artworkArtist = view.findViewById<TextView>(R.id.artwork_artist_text)?.apply { isSelected = true }
+        artworkProgress = view.findViewById(R.id.artwork_progress_bar)
+        artworkPlayPause = view.findViewById(R.id.btn_artwork_play_pause)
+        view.findViewById<View>(R.id.btn_artwork_prev)?.setOnClickListener {
+            if (!host.isEditMode && canControlPlayback) onPrevAction?.invoke()
+        }
+        artworkPlayPause?.setOnClickListener {
+            if (!host.isEditMode && canControlPlayback) onPlayPauseAction?.invoke()
+        }
+        view.findViewById<View>(R.id.btn_artwork_next)?.setOnClickListener {
+            if (!host.isEditMode && canControlPlayback) onNextAction?.invoke()
+        }
+
         // Setup transport controls in Expanded mode
         btnPrev?.setOnClickListener {
-            if (!host.isEditMode) onPrevAction?.invoke()
+            if (!host.isEditMode && canControlPlayback) onPrevAction?.invoke()
         }
         btnPlayPause?.setOnClickListener {
-            if (!host.isEditMode) onPlayPauseAction?.invoke()
+            if (!host.isEditMode && canControlPlayback) onPlayPauseAction?.invoke()
         }
         btnNext?.setOnClickListener {
-            if (!host.isEditMode) onNextAction?.invoke()
+            if (!host.isEditMode && canControlPlayback) onNextAction?.invoke()
         }
 
         // Setup gestures for Minimal and Compact modes (Single tap = Play/Pause, Double tap = Next)
         val gestureDetector = GestureDetector(view.context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                if (!host.isEditMode) {
+                if (!host.isEditMode && canControlPlayback) {
                     onPlayPauseAction?.invoke()
                     return true
                 }
@@ -195,7 +231,7 @@ class MediaDesktopWidget(
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                if (!host.isEditMode) {
+                if (!host.isEditMode && canControlPlayback) {
                     onNextAction?.invoke()
                     return true
                 }
@@ -204,7 +240,7 @@ class MediaDesktopWidget(
         })
 
         val touchListener = View.OnTouchListener { _, event ->
-            if (!host.isEditMode) {
+            if (!host.isEditMode && canControlPlayback) {
                 gestureDetector.onTouchEvent(event)
             } else {
                 false
@@ -216,6 +252,7 @@ class MediaDesktopWidget(
 
         val currentStyle = host.fontManager?.getMediaStyle() ?: MediaStyle.MINIMAL_TICKER
         applyStyleVisibility(currentStyle)
+        updateTransportControls(false)
         powerStateManager.registerObserver(this)
     }
 
@@ -223,6 +260,8 @@ class MediaDesktopWidget(
         applyStyleVisibility(style)
         compactCoverArt?.tag = null
         expandedCoverArt?.tag = null
+        artworkCover?.tag = null
+        artworkSourceIcon?.tag = null
         compactSourceIcon?.tag = null
         expandedSourceIcon?.tag = null
         currentTrack?.let { populateTrackData(it, isPlayingState) }
@@ -232,6 +271,7 @@ class MediaDesktopWidget(
         mediaTickerLayout?.visibility = if (style == MediaStyle.MINIMAL_TICKER) View.VISIBLE else View.GONE
         mediaCompactCard?.visibility = if (style == MediaStyle.COMPACT_CARD) View.VISIBLE else View.GONE
         mediaExpandedCard?.visibility = if (style == MediaStyle.EXPANDED_PLAYER) View.VISIBLE else View.GONE
+        artworkCard?.visibility = if (style == MediaStyle.ARTWORK_PLAYER) View.VISIBLE else View.GONE
         resumeProgressTracker()
     }
 
@@ -255,6 +295,8 @@ class MediaDesktopWidget(
                 updateTextIfChanged(compactArtistText, "Artist")
                 updateTextIfChanged(expandedTitleText, placeholder)
                 updateTextIfChanged(expandedArtistText, "Artist")
+                updateTextIfChanged(artworkTitle, placeholder)
+                updateTextIfChanged(artworkArtist, "Artist")
             }
             val trackToPreview = currentTrack ?: MusicTrack(
                 title = host.hostContext.getString(R.string.now_playing_placeholder),
@@ -287,8 +329,26 @@ class MediaDesktopWidget(
         }
     }
 
+    private fun updateTransportControls(canControl: Boolean) {
+        canControlPlayback = canControl
+        val visibility = if (canControl) View.VISIBLE else View.GONE
+        listOf(btnPrev, btnPlayPause, btnNext, artworkPlayPause,
+            rootView?.findViewById<View>(R.id.btn_artwork_prev),
+            rootView?.findViewById<View>(R.id.btn_artwork_next)).forEach {
+            it?.visibility = visibility
+        }
+        rootView?.findViewById<View>(R.id.artwork_track_text)?.let { text ->
+            val params = text.layoutParams as ViewGroup.MarginLayoutParams
+            val margin = ((if (canControl) 94 else 18) * text.resources.displayMetrics.density).toInt()
+            if (params.marginEnd != margin) {
+                text.layoutParams = params.apply { marginEnd = margin }
+            }
+        }
+    }
+
     fun handleMusicStateUpdate(state: PluginState) {
         val layout = rootView ?: return
+        updateTransportControls(state.canControl)
         if (!instance.isVisible) {
             layout.visibility = View.GONE
             layout.alpha = 0f
@@ -317,6 +377,8 @@ class MediaDesktopWidget(
                     updateTextIfChanged(compactArtistText, "Artist")
                     updateTextIfChanged(expandedTitleText, placeholder)
                     updateTextIfChanged(expandedArtistText, "Artist")
+                    updateTextIfChanged(artworkTitle, placeholder)
+                    updateTextIfChanged(artworkArtist, "Artist")
                     lastTrackInfo = null
                     currentTrack = null
                 }
@@ -372,7 +434,7 @@ class MediaDesktopWidget(
                 stopProgressTracker()
                 currentTrack = null
                 isPlayingState = false
-                expandedProgressBar?.isPlaying = false
+                progressBars().forEach { it.isPlaying = false }
                 performIdleTransition()
             }
         }
@@ -447,10 +509,16 @@ class MediaDesktopWidget(
         updateTextIfChanged(expandedArtistText, track.artist.ifEmpty { "Unknown Artist" })
         loadArtwork(track, expandedCoverArt)
 
+        updateTextIfChanged(artworkTitle, track.title.ifEmpty { trackInfoText })
+        updateTextIfChanged(artworkArtist, track.artist.ifEmpty { "Unknown Artist" })
+        loadArtwork(track, artworkCover)
+
         val playPauseRes = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow
-        if (btnPlayPause?.tag != playPauseRes) {
-            btnPlayPause?.setImageResource(playPauseRes)
-            btnPlayPause?.tag = playPauseRes
+        listOfNotNull(btnPlayPause, artworkPlayPause).forEach { button ->
+            if (button.tag != playPauseRes) {
+                button.setImageResource(playPauseRes)
+                button.tag = playPauseRes
+            }
         }
 
         currentDurationMs = track.durationMs ?: 0L
@@ -476,19 +544,40 @@ class MediaDesktopWidget(
             return
         }
         view.tag = currentSource
+        if (view === artworkCover) {
+            // Cancel any older URL request before replacing it with another cover or fallback.
+            Glide.with(context).clear(view)
+            applyArtworkColors(ArtworkColors.DEFAULT)
+        }
 
         if (track.artworkBitmap != null && !track.artworkBitmap.isRecycled) {
             view.setImageBitmap(track.artworkBitmap)
+            if (view === artworkCover) applyArtworkColors(ArtworkColors.fromBitmap(track.artworkBitmap))
             view.imageTintList = null
             return
         }
 
         if (!track.artworkUrl.isNullOrEmpty()) {
-            Glide.with(context)
-                .load(track.artworkUrl)
-                .placeholder(R.drawable.music_note)
-                .error(R.drawable.music_note)
-                .into(view)
+            if (view === artworkCover) {
+                Glide.with(context).asBitmap()
+                    .load(track.artworkUrl)
+                    .placeholder(R.drawable.music_note)
+                    .error(R.drawable.music_note)
+                    .into(object : BitmapImageViewTarget(view) {
+                        override fun setResource(resource: Bitmap?) {
+                            super.setResource(resource)
+                            if (artworkCover === view) {
+                                applyArtworkColors(resource?.let(ArtworkColors::fromBitmap) ?: ArtworkColors.DEFAULT)
+                            }
+                        }
+                    })
+            } else {
+                Glide.with(context)
+                    .load(track.artworkUrl)
+                    .placeholder(R.drawable.music_note)
+                    .error(R.drawable.music_note)
+                    .into(view)
+            }
             view.imageTintList = null
             return
         }
@@ -507,6 +596,15 @@ class MediaDesktopWidget(
         view.setImageResource(R.drawable.music_note)
     }
 
+    private fun applyArtworkColors(colors: ArtworkColors) {
+        artworkColors = colors
+        artworkPlayPause?.let { button ->
+            button.backgroundTintList = ColorStateList.valueOf(colors.accent)
+            button.imageTintList = ColorStateList.valueOf(colors.onAccent)
+        }
+        artworkSourceIcon?.setColorFilter(colors.accent, PorterDuff.Mode.SRC_IN)
+    }
+
     private fun startProgressTracker(track: MusicTrack) {
         currentDurationMs = track.durationMs ?: 0L
         positionSampleMs = track.positionMs ?: 0L
@@ -517,16 +615,16 @@ class MediaDesktopWidget(
     private fun resumeProgressTracker() {
         stopProgressTracker()
         val visible = hostResumed && instance.isVisible && rootView?.isShown == true &&
-            mediaExpandedCard?.isShown == true
+            isPlayerShown()
         val animate = visible && isPlayingState &&
             !PowerSavePolicy.read(host.getPreferences(), isPowerSaving).pauseAnimations
-        expandedProgressBar?.isPlaying = animate
+        progressBars().forEach { it.isPlaying = animate && it.isShown }
         if (!visible || !isPlayingState || currentDurationMs <= 0) return
         val interval = if (isPowerSaving) 5000L else 1000L
         progressTrackerRunnable = object : Runnable {
             override fun run() {
-                if (!hostResumed || rootView?.isShown != true || mediaExpandedCard?.isShown != true) {
-                    expandedProgressBar?.isPlaying = false
+                if (!hostResumed || rootView?.isShown != true || !isPlayerShown()) {
+                    progressBars().forEach { it.isPlaying = false }
                     return
                 }
                 currentPositionMs = (positionSampleMs + SystemClock.elapsedRealtime() - positionSampleAt)
@@ -544,25 +642,14 @@ class MediaDesktopWidget(
     }
 
     private fun updateProgressBarUI() {
-        val bar = expandedProgressBar ?: return
-        bar.isPlaying = isPlayingState && hostResumed && rootView?.isShown == true &&
-            mediaExpandedCard?.isShown == true &&
-            !PowerSavePolicy.read(host.getPreferences(), isPowerSaving).pauseAnimations
-        if (currentDurationMs > 0) {
-            val progress = ((currentPositionMs.toFloat() / currentDurationMs.toFloat()) * 1000).toInt().coerceIn(0, 1000)
-            if (bar.progress != progress) {
-                bar.progress = progress
-            }
-            if (bar.visibility != View.VISIBLE) {
-                bar.visibility = View.VISIBLE
-            }
-        } else {
-            if (bar.progress != 0) {
-                bar.progress = 0
-            }
-            if (bar.visibility != View.GONE) {
-                bar.visibility = View.GONE
-            }
+        progressBars().forEach { bar ->
+            bar.isPlaying = isPlayingState && hostResumed && rootView?.isShown == true &&
+                bar.isShown &&
+                !PowerSavePolicy.read(host.getPreferences(), isPowerSaving).pauseAnimations
+            bar.progress = if (currentDurationMs > 0) {
+                ((currentPositionMs.toDouble() / currentDurationMs) * bar.max).toInt().coerceIn(0, bar.max)
+            } else 0
+            bar.visibility = if (currentDurationMs > 0) View.VISIBLE else View.GONE
         }
     }
 
@@ -669,7 +756,28 @@ class MediaDesktopWidget(
     }
 
     fun updateSourceIcon(track: MusicTrack) {
+        artworkSourceLabel?.let { label ->
+            val sourceName = track.sourcePackageName?.let { packageName ->
+                runCatching {
+                    val pm = host.hostContext.packageManager
+                    pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
+                }.getOrNull()
+            }
+            label.text = sourceName.orEmpty()
+            label.visibility = if (sourceName.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
         val showMediaIcon = host.getPreferences().getBoolean("show_media_icon", false)
+
+        artworkSourceIcon?.let { icon ->
+            icon.visibility = View.VISIBLE
+            if (showMediaIcon) {
+                applyIconToBadge(icon, track)
+            } else {
+                icon.setImageResource(R.drawable.music_note)
+                icon.tag = null
+            }
+            icon.setColorFilter(artworkColors.accent, PorterDuff.Mode.SRC_IN)
+        }
 
         // Handle badges on Compact & Expanded styles
         if (!showMediaIcon) {
@@ -872,6 +980,15 @@ class MediaDesktopWidget(
         btnPrev = null
         btnPlayPause = null
         btnNext = null
+        artworkCover?.let { Glide.with(host.hostContext).clear(it) }
+        artworkCard = null
+        artworkCover = null
+        artworkSourceIcon = null
+        artworkSourceLabel = null
+        artworkTitle = null
+        artworkArtist = null
+        artworkProgress = null
+        artworkPlayPause = null
         onTimeoutAction = null
         isPausedTimedOut = false
         super.onDestroy()

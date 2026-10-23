@@ -295,6 +295,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <include layout="@layout/widget_media_artwork" />
     </FrameLayout>
 
     <com.nxd1frnt.clockdesk2.ui.view.DateTextView

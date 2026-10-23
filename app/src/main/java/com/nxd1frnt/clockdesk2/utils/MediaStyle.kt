@@ -13,7 +13,8 @@ enum class MediaStyle(
 ) {
     MINIMAL_TICKER("MINIMAL_TICKER", R.string.media_style_minimal_ticker, "Song Title - Artist", null, isCard = false, isExpanded = false),
     COMPACT_CARD("COMPACT_CARD", R.string.media_style_compact_card, "Song Title", "Artist", isCard = true, isExpanded = false),
-    EXPANDED_PLAYER("EXPANDED_PLAYER", R.string.media_style_expanded_player, "Song Title", "Artist", isCard = true, isExpanded = true);
+    EXPANDED_PLAYER("EXPANDED_PLAYER", R.string.media_style_expanded_player, "Song Title", "Artist", isCard = true, isExpanded = true),
+    ARTWORK_PLAYER("ARTWORK_PLAYER", R.string.media_style_artwork_player, "Song Title", "Artist", isCard = true, isExpanded = true);
 
     val isMinimal: Boolean get() = this == MINIMAL_TICKER
 

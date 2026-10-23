@@ -29,6 +29,7 @@ class MediaStyleAdapter(
         val compactTitle: TextView = itemView.findViewById(R.id.compact_preview_title)
         val compactArtist: TextView = itemView.findViewById(R.id.compact_preview_artist)
 
+        val artworkContainer: FrameLayout = itemView.findViewById(R.id.artwork_player_preview)
         val expandedContainer: LinearLayout = itemView.findViewById(R.id.expanded_player_preview)
         val expandedTitle: TextView = itemView.findViewById(R.id.expanded_preview_title)
         val expandedArtist: TextView = itemView.findViewById(R.id.expanded_preview_artist)
@@ -42,6 +43,7 @@ class MediaStyleAdapter(
     override fun onBindViewHolder(holder: MediaStyleViewHolder, position: Int) {
         val style = styles[position]
         val context = holder.itemView.context
+        holder.itemView.contentDescription = context.getString(style.titleRes)
         val isSelected = position == selectedPosition
         val palette = UiMonetThemeManager.getPalette(context)
 
@@ -62,6 +64,7 @@ class MediaStyleAdapter(
         holder.minimalContainer.visibility = View.GONE
         holder.compactContainer.visibility = View.GONE
         holder.expandedContainer.visibility = View.GONE
+        holder.artworkContainer.visibility = View.GONE
 
         when (style) {
             MediaStyle.MINIMAL_TICKER -> {
@@ -73,6 +76,9 @@ class MediaStyleAdapter(
                 holder.compactContainer.visibility = View.VISIBLE
                 holder.compactTitle.setTextColor(textColor)
                 holder.compactArtist.setTextColor(textColor)
+            }
+            MediaStyle.ARTWORK_PLAYER -> {
+                holder.artworkContainer.visibility = View.VISIBLE
             }
             MediaStyle.EXPANDED_PLAYER -> {
                 holder.expandedContainer.visibility = View.VISIBLE

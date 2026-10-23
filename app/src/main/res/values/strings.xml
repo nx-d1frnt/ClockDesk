@@ -858,4 +858,6 @@
         <item>composite_loading</item>
         <item>sparkle_swipe</item>
     </string-array>
+    <string name="media_style_artwork_player">Artwork Player</string>
+    <string name="media_preview_song">Song</string>
 </resources>

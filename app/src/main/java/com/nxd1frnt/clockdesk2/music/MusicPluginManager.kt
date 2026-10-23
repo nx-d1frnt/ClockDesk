@@ -12,6 +12,7 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 class MusicPluginManager(
     private val context: Context,
     private val sharedPreferences: SharedPreferences,
+    initialPlugins: List<IMusicPlugin>? = null,
     private val onUpdate: (PluginState) -> Unit
 ) {
     private val plugins = mutableMapOf<String, IMusicPlugin>()
@@ -24,7 +25,7 @@ class MusicPluginManager(
         }
     }
 
-    private val internalPlugins: List<IMusicPlugin> = mutableListOf<IMusicPlugin>().apply {
+    private val internalPlugins: List<IMusicPlugin> = initialPlugins ?: mutableListOf<IMusicPlugin>().apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             add(SystemSessionPlugin(context))
         }
@@ -36,7 +37,7 @@ class MusicPluginManager(
         sharedPreferences.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
 
         internalPlugins.forEach { registerPlugin(it) }
-        discoverAndRegisterExternalPlugins()
+        if (initialPlugins == null) discoverAndRegisterExternalPlugins()
         reloadPriorities()
     }
 
@@ -138,32 +139,39 @@ class MusicPluginManager(
             }
         }
 
+        // Controls belong to the selected status provider, even when another provider supplies art.
+        val canControl = plugins[selectedId]?.canControl == true
+        activeState = when (activeState) {
+            is PluginState.Playing -> activeState.copy(canControl = canControl)
+            is PluginState.Paused -> activeState.copy(canControl = canControl)
+            else -> activeState
+        }
         onUpdate(activeState)
     }
 
     fun play() {
         val id = primaryPluginId ?: lastActivePluginId ?: return
-        plugins[id]?.play()
+        plugins[id]?.takeIf { it.canControl }?.play()
     }
 
     fun pause() {
         val id = primaryPluginId ?: lastActivePluginId ?: return
-        plugins[id]?.pause()
+        plugins[id]?.takeIf { it.canControl }?.pause()
     }
 
     fun togglePlayPause() {
         val id = primaryPluginId ?: lastActivePluginId ?: return
-        plugins[id]?.togglePlayPause()
+        plugins[id]?.takeIf { it.canControl }?.togglePlayPause()
     }
 
     fun next() {
         val id = primaryPluginId ?: lastActivePluginId ?: return
-        plugins[id]?.next()
+        plugins[id]?.takeIf { it.canControl }?.next()
     }
 
     fun previous() {
         val id = primaryPluginId ?: lastActivePluginId ?: return
-        plugins[id]?.previous()
+        plugins[id]?.takeIf { it.canControl }?.previous()
     }
 
     private fun areTracksSame(t1: MusicTrack, t2: MusicTrack): Boolean {

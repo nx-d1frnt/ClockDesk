@@ -17,8 +17,9 @@ data class MusicTrack(
 )
 
 sealed class PluginState {
-    data class Playing(val track: MusicTrack) : PluginState()
-    data class Paused(val track: MusicTrack) : PluginState()
+    open val canControl: Boolean get() = false
+    data class Playing(val track: MusicTrack, override val canControl: Boolean = false) : PluginState()
+    data class Paused(val track: MusicTrack, override val canControl: Boolean = false) : PluginState()
     object Idle : PluginState()
     object Disabled : PluginState()
 }

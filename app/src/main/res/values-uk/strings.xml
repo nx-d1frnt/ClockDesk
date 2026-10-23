@@ -804,4 +804,6 @@
         <item>Composite Loading та кругове розкриття (AOSP)</item>
         <item>Свайп з іскрами</item>
     </string-array>
+    <string name="media_style_artwork_player">Плеєр з обкладинкою</string>
+    <string name="media_preview_song">Трек</string>
 </resources>
