@@ -193,6 +193,39 @@
             </LinearLayout>
         </LinearLayout>
 
+        <FrameLayout
+            android:id="@+id/artwork_player_preview"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_media_artwork_preview"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="38dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical|start"
+                android:singleLine="true"
+                android:text="@string/media_preview_song"
+                android:textColor="#FFFFFF"
+                android:textSize="8sp" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center_vertical|end"
+                android:background="@drawable/bg_media_play_button"
+                android:padding="4dp"
+                android:src="@drawable/ic_pause"
+                app:tint="#00391E" />
+
+            <com.nxd1frnt.clockdesk2.ui.view.SquigglyProgressBar
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_gravity="bottom" />
+        </FrameLayout>
+
     </FrameLayout>
 
     <!-- Selection indicator divider line -->

@@ -1143,7 +1143,9 @@ class WidgetMover(
                     R.id.compact_title_text,
                     R.id.compact_artist_text,
                     R.id.expanded_title_text,
-                    R.id.expanded_artist_text
+                    R.id.expanded_artist_text,
+                    R.id.artwork_title_text,
+                    R.id.artwork_artist_text
                 ).forEach { textId ->
                     view.findViewById<TextView>(textId)?.let { tv ->
                         applyTextViewInternalGravity(tv, targetGravity, targetTextAlignment)

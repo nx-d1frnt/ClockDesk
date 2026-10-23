@@ -887,6 +887,60 @@ class FontManager(
                     }
                 }
 
+                // Artwork players use the same typography settings as the other media styles.
+                val artworkCard = lastfmLayout.findViewById<MaterialCardView>(R.id.media_artwork_card)
+                artworkCard?.setCardBackgroundColor(finalCardBgColor)
+                lastfmLayout.findViewById<TextView>(R.id.artwork_title_text)?.let {
+                    applyStyleToTextView(it, settings, typeface, finalColor, colorOnly)
+                    if (!colorOnly) it.alpha = 1f
+                }
+                lastfmLayout.findViewById<TextView>(R.id.artwork_artist_text)?.let {
+                    applyStyleToTextView(it, settings.copy(size = settings.size * 0.8f), typeface, finalColor, colorOnly)
+                    if (!colorOnly) it.alpha = 0.8f
+                }
+                lastfmLayout.findViewById<TextView>(R.id.artwork_source_label)?.let {
+                    applyStyleToTextView(it, settings.copy(size = settings.size * 0.58f), typeface, finalColor, colorOnly)
+                    if (!colorOnly) {
+                        it.alpha = 1f
+                        it.maxWidth = minOf(it.maxWidth, (180 * context.resources.displayMetrics.density).toInt())
+                    }
+                }
+                if (!colorOnly) {
+                    artworkCard?.alpha = settings.alpha
+                    artworkCard?.let { card ->
+                        val metrics = context.resources.displayMetrics
+                        val width = minOf((320 * metrics.density).toInt(),
+                            (metrics.widthPixels * settings.maxWidthPercent / 100f).toInt().coerceAtLeast(1))
+                        // Reserve room above and below the track text as its size grows.
+                        val height = maxOf((152 * metrics.density).toInt(),
+                            (settings.size * 1.8f * metrics.scaledDensity * 1.35f + 96 * metrics.density).toInt())
+                        if (card.layoutParams.width != width || card.layoutParams.height != height) {
+                            card.layoutParams = card.layoutParams.apply {
+                                this.width = width
+                                this.height = height
+                            }
+                        }
+                    }
+                }
+                lastfmLayout.findViewById<View>(R.id.artwork_scrim)?.let { scrim ->
+                    if (settings.useDynamicBackgroundColor ||
+                        (settings.backgroundColor != Color.DKGRAY && settings.backgroundColor != 0)) {
+                        scrim.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
+                            androidx.core.graphics.ColorUtils.setAlphaComponent(finalCardBgColor, 102),
+                            androidx.core.graphics.ColorUtils.setAlphaComponent(finalCardBgColor, 221)
+                        ))
+                    } else {
+                        scrim.setBackgroundResource(R.drawable.bg_media_artwork_scrim)
+                    }
+                }
+                lastfmLayout.findViewById<SquigglyProgressBar>(R.id.artwork_progress_bar)?.let { bar ->
+                    bar.setWaveColor(finalColor)
+                    bar.setTrackColor(Color.argb(70, Color.red(finalColor), Color.green(finalColor), Color.blue(finalColor)))
+                }
+                listOf(R.id.btn_artwork_prev, R.id.btn_artwork_next).forEach { id ->
+                    lastfmLayout.findViewById<ImageView>(id)?.setColorFilter(finalColor)
+                }
+
                 // Apply colors to squiggly progress bar
                 lastfmLayout.findViewById<SquigglyProgressBar>(R.id.expanded_progress_bar)?.let { bar ->
                     bar.setWaveColor(finalColor)
