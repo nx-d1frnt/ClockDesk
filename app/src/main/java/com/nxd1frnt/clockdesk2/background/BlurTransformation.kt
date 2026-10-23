@@ -2,6 +2,7 @@ package com.nxd1frnt.clockdesk2.background
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +16,7 @@ import com.nxd1frnt.clockdesk2.utils.Logger
 import java.security.MessageDigest
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 class BlurTransformation(
     private val context: Context,
@@ -25,7 +27,7 @@ class BlurTransformation(
 
     override fun updateDiskCacheKey(messageDigest: MessageDigest) {
         // Callback здесь НЕ участвует, чтобы не ломать кэш
-        messageDigest.update("BlurTransformation(radius=$radius, sampling=$sampling)".toByteArray(Charsets.UTF_8))
+        messageDigest.update("BlurTransformation.v2(radius=$radius, sampling=$sampling)".toByteArray(Charsets.UTF_8))
     }
 
     override fun transform(
@@ -38,8 +40,15 @@ class BlurTransformation(
 
         val width = toTransform.width
         val height = toTransform.height
-        val scaledWidth = width / sampling
-        val scaledHeight = height / sampling
+        // Glide may leave Bitmap models at their original size, and CENTER_INSIDE
+        // never upscales small covers. Normalize both to the requested processing
+        // size so a blur pixel represents the same fraction of either image.
+        val targetWidth = outWidth.takeIf { it > 0 } ?: width
+        val targetHeight = outHeight.takeIf { it > 0 } ?: height
+        val scale = min(targetWidth.toDouble() / width, targetHeight.toDouble() / height)
+        val sample = sampling.coerceAtLeast(1)
+        val scaledWidth = (width * scale / sample).roundToInt().coerceAtLeast(1)
+        val scaledHeight = (height * scale / sample).roundToInt().coerceAtLeast(1)
 
         var bitmap = pool.get(scaledWidth, scaledHeight, Bitmap.Config.ARGB_8888)
         if (bitmap.isRecycled) {
@@ -47,10 +56,10 @@ class BlurTransformation(
         }
 
         val canvas = android.graphics.Canvas(bitmap)
-        canvas.scale(1 / sampling.toFloat(), 1 / sampling.toFloat())
         val paint = android.graphics.Paint()
         paint.flags = android.graphics.Paint.FILTER_BITMAP_FLAG
-        canvas.drawBitmap(toTransform, 0f, 0f, paint)
+        // Explicit bounds also prevent bitmap density from changing the scale.
+        canvas.drawBitmap(toTransform, null, RectF(0f, 0f, scaledWidth.toFloat(), scaledHeight.toFloat()), paint)
 
         // Уведомляем главный поток о начале ресурсоемкой операции (RenderScript или BoxBlur)
         onBlurStarted?.let { callback ->
