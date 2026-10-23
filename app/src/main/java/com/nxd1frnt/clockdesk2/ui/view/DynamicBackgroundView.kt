@@ -1283,6 +1283,13 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 textureCurrent != 0 && compositeLoadingProgram != 0 &&
                 (textureNext != 0 || compositeLoadingTimeline.isWaitingForImage)
 
+        private fun compositeFadeAlpha(): Float {
+            val fadeProgress = (transitionProgress / CompositeLoadingTimeline.FADE_FRACTION)
+                .coerceIn(0f, 1f)
+            return CompositeLoadingTimeline.fadeAlpha(
+                fadeProgress, compositeFadeInterpolator.getInterpolation(fadeProgress))
+        }
+
         private fun drawBackgroundQuad() {
             GLES20.glDisable(GLES20.GL_BLEND)
             GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
@@ -1308,8 +1315,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 // LoadingAnimation: 1100 ms fade, then 3600 ms circular reveal. Stretch
                 // both phases proportionally when the caller requests a longer transition.
                 val fadeFraction = CompositeLoadingTimeline.FADE_FRACTION
-                val alpha = compositeFadeInterpolator.getInterpolation(
-                    (transitionProgress / fadeFraction).coerceIn(0f, 1f))
+                val alpha = compositeFadeAlpha()
                 val reveal = compositeRevealInterpolator.getInterpolation(
                     ((transitionProgress - fadeFraction) / (1f - fadeFraction)).coerceIn(0f, 1f))
                 val blurred = compositeBlur.render(activeCurrent, cropCurrent, viewWidth, viewHeight,
@@ -1547,8 +1553,7 @@ class DynamicBackgroundView @JvmOverloads constructor(
             val compositeInFrame = isCompositeTransitionActive()
             val sparkleInFrame = isSparkleSwipeActive()
             val turbulenceMask = if (compositeInFrame) {
-                1f - compositeFadeInterpolator.getInterpolation(
-                    (transitionProgress / CompositeLoadingTimeline.FADE_FRACTION).coerceIn(0f, 1f))
+                1f - compositeFadeAlpha()
             } else if (sparkleInFrame) {
                 (1f - transitionProgress / 0.15f).coerceIn(0f, 1f)
             } else null
@@ -3911,7 +3916,10 @@ class DynamicBackgroundView @JvmOverloads constructor(
                 vec4 bgNext = texture2D(u_TextureNext, clamp(v_TexCoordNext, 0.0, 1.0));
                 vec4 bgColor = texture2D(u_TextureCurrent, clamp(v_TexCoordCurrent, 0.0, 1.0));
                 if (u_HasBlur > 0.5) {
-                    bgColor = texture2D(u_BlurredBackground, vec2(v_ScreenUv.x, 1.0 - v_ScreenUv.y));
+                    vec4 blurred = texture2D(u_BlurredBackground, vec2(v_ScreenUv.x, 1.0 - v_ScreenUv.y));
+                    // The quarter-resolution buffer must not replace the sharp image
+                    // on the first frame, even when its blur radius is near zero.
+                    bgColor = mix(bgColor, blurred, in_alpha);
                 }
                 vec2 uv = fragP / safeScreenSize;
                 uv.x *= u_aspectRatio;

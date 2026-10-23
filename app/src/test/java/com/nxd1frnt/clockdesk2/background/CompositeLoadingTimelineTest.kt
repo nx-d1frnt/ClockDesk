@@ -6,6 +6,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CompositeLoadingTimelineTest {
+    @Test fun steepFadeHasAGradualOpeningEvenAtLowFrameRates() {
+        assertEquals(0f, CompositeLoadingTimeline.fadeAlpha(0f, 0f), 0f)
+        // Bound the first frame even if the underlying easing curve rises immediately.
+        assertTrue(CompositeLoadingTimeline.fadeAlpha(16f / 1100f, 1f) < 0.02f)
+        assertTrue(CompositeLoadingTimeline.fadeAlpha(33f / 1100f, 1f) < 0.08f)
+        assertTrue(CompositeLoadingTimeline.fadeAlpha(50f / 1100f, 1f) < 0.16f)
+    }
+
+    @Test fun softenedOpeningRejoinsOriginalCurveWithoutChangingFadeDuration() {
+        for (elapsed in 200..1100) {
+            val progress = elapsed / 1100f
+            assertEquals(progress, CompositeLoadingTimeline.fadeAlpha(progress, progress), 0.00001f)
+        }
+        assertEquals(1f, CompositeLoadingTimeline.fadeAlpha(1f, 1f), 0f)
+        val before = CompositeLoadingTimeline.fadeAlpha(199f / 1100f, 0.7f)
+        assertEquals(0.7f, before, 0.0001f)
+    }
+
     @Test fun fastImageContinuesTheFadeAlreadyStartedWithZoom() {
         val timeline = CompositeLoadingTimeline()
         timeline.begin(1000L)

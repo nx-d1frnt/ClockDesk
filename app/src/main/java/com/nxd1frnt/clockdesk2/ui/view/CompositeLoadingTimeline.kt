@@ -29,5 +29,11 @@ internal class CompositeLoadingTimeline {
         const val REVEAL_DURATION_MS = 3600L
         const val TOTAL_DURATION_MS = FADE_DURATION_MS + REVEAL_DURATION_MS
         const val FADE_FRACTION = FADE_DURATION_MS.toFloat() / TOTAL_DURATION_MS
+
+        /** Keep AOSP's fade curve, but give its steep opening a gradual onset. */
+        fun fadeAlpha(fadeProgress: Float, easedAlpha: Float): Float {
+            val onset = (fadeProgress * FADE_DURATION_MS / 200f).coerceIn(0f, 1f)
+            return easedAlpha * onset * onset * (3f - 2f * onset)
+        }
     }
 }
