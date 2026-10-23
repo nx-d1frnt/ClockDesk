@@ -629,6 +629,11 @@ class BackupSettingsFragment : BaseM3SettingsFragment() {
 
 class UpdatesSettingsFragment : BaseM3SettingsFragment() {
 
+    private var notesExpanded = false
+    private val updateListener: () -> Unit = {
+        activity?.runOnUiThread { if (view != null) rebuildSettings() }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val isNightlyBuild = BuildConfig.VERSION_NAME.contains("nightly", ignoreCase = true)
@@ -639,109 +644,138 @@ class UpdatesSettingsFragment : BaseM3SettingsFragment() {
 
     override fun onResume() {
         super.onResume()
-        UpdateManager.onUpdateStateChanged = {
-            activity?.runOnUiThread {
-                rebuildSettings()
-            }
-        }
+        UpdateManager.addStateListener(updateListener)
+        rebuildSettings()
     }
 
     override fun onPause() {
         super.onPause()
-        UpdateManager.onUpdateStateChanged = null
+        UpdateManager.removeStateListener(updateListener)
     }
 
     override fun buildSettings(): List<SettingsItem> = settings {
-        val lastCheck = UpdateManager.getLastCheckTime(requireContext())
+        val lastCheck = UpdateManager.getLastSuccessfulCheckTime(requireContext())
         val lastCheckStr = if (lastCheck > 0L) {
             val dateStr = android.text.format.DateFormat.getMediumDateFormat(requireContext()).format(Date(lastCheck))
             val timeStr = android.text.format.DateFormat.getTimeFormat(requireContext()).format(Date(lastCheck))
-            getString(R.string.check_for_updates_last_checked, "$dateStr $timeStr")
+            getString(R.string.update_last_success, "$dateStr $timeStr")
         } else {
-            getString(R.string.check_for_updates_never)
+            getString(R.string.update_no_success)
         }
 
         val isUpdateAvail = UpdateManager.isUpdateAvailable
         val downloadState = UpdateManager.downloadState
+        val downloading = downloadState == UpdateManager.DownloadState.DOWNLOADING
+        val checking = UpdateManager.isChecking
+        val checkFailed = UpdateManager.lastError != null
+        val ready = isUpdateAvail && downloadState == UpdateManager.DownloadState.READY_TO_INSTALL
+        val downloadFailed = isUpdateAvail && downloadState == UpdateManager.DownloadState.FAILED
 
         val statusText = when {
-            isUpdateAvail -> when (downloadState) {
-                UpdateManager.DownloadState.DOWNLOADING -> {
-                    val percent = UpdateManager.downloadProgress
-                    val downloadedStr = UpdateManager.formatBytes(UpdateManager.downloadedBytes)
-                    val totalStr = UpdateManager.formatBytes(UpdateManager.totalBytes)
-                    getString(R.string.downloading_update_progress, percent, downloadedStr, totalStr)
-                }
-                UpdateManager.DownloadState.READY_TO_INSTALL -> getString(R.string.update_ready_to_install)
-                UpdateManager.DownloadState.FAILED -> getString(R.string.download_failed)
-                UpdateManager.DownloadState.IDLE -> {
-                    val version = UpdateManager.latestVersion ?: ""
-                    getString(R.string.update_status_available, version)
-                }
-            }
-            UpdateManager.isChecking -> getString(R.string.update_status_checking)
-            UpdateManager.lastError != null -> getString(R.string.update_status_error)
-            lastCheck > 0L -> getString(R.string.update_status_up_to_date)
-            else -> getString(R.string.check_for_updates_never)
+            downloading -> getString(R.string.downloading_update_title)
+            checking -> getString(R.string.update_status_checking)
+            checkFailed -> getString(R.string.update_status_error)
+            ready -> getString(R.string.update_ready_to_install)
+            downloadFailed -> getString(R.string.update_download_failed_title)
+            isUpdateAvail -> getString(R.string.update_status_available, UpdateManager.latestVersion.orEmpty())
+            lastCheck > 0L && UpdateManager.latestVersion != null -> getString(R.string.update_status_up_to_date)
+            else -> getString(R.string.update_status_unknown)
         }
 
-        category(getString(R.string.updates_settings_title)) {
+        val installedChannel = getString(if (BuildConfig.VERSION_NAME.contains("nightly", true))
+            R.string.update_channel_nightly else R.string.update_channel_stable)
+        val details = buildList {
+            add(getString(R.string.update_installed_build, BuildConfig.VERSION_NAME, installedChannel))
+            add(lastCheckStr)
+            if (checkFailed) add(getString(R.string.update_check_error_help))
+            if (downloadFailed) add(getString(R.string.update_download_error_help))
+            if (ready) add(getString(R.string.update_install_help))
+        }.joinToString("\n")
+        val actionTitle = getString(when {
+            checking -> R.string.update_status_checking
+            downloading -> R.string.downloading_update_title
+            checkFailed -> R.string.update_retry_check
+            ready -> R.string.install_update_action
+            downloadFailed -> R.string.update_retry_download
+            isUpdateAvail && UpdateManager.apkDownloadUrl == null -> R.string.update_view_release
+            isUpdateAvail -> R.string.download_and_install_title
+            else -> R.string.check_for_updates_title
+        })
+        val progressText = if (!downloading) null else if (UpdateManager.totalBytes > 0) {
+            getString(R.string.downloading_update_progress, UpdateManager.downloadProgress,
+                UpdateManager.formatBytes(UpdateManager.downloadedBytes),
+                UpdateManager.formatBytes(UpdateManager.totalBytes))
+        } else getString(R.string.update_download_unknown_size, UpdateManager.formatBytes(UpdateManager.downloadedBytes))
+
+        updateStatus(SettingsItem.UpdateStatus(
+            title = statusText,
+            details = details,
+            actionTitle = actionTitle,
+            actionEnabled = !checking && !downloading,
+            downloading = downloading,
+            progress = if (UpdateManager.totalBytes > 0) UpdateManager.downloadProgress else null,
+            progressText = progressText,
+            cancelTitle = getString(R.string.cancel),
+            onAction = {
+                if (checkFailed || !isUpdateAvail) UpdateManager.checkForUpdates(requireContext(), force = true)
+                else UpdateManager.downloadAndInstall(requireContext())
+            },
+            onCancel = { UpdateManager.cancelDownload(requireContext()) }
+        ))
+
+        val notes = UpdateManager.releaseNotes?.trim().orEmpty()
+        category(getString(R.string.update_whats_new)) {
             action(
-                title = getString(R.string.update_current_version_title),
-                statusText = BuildConfig.VERSION_NAME,
-                iconRes = R.drawable.update
-            ) {}
+                title = UpdateManager.latestVersion.orEmpty(),
+                summary = if (notesExpanded) notes else notes.lineSequence().take(3).joinToString("\n").take(220),
+                statusText = getString(if (notesExpanded) R.string.update_show_less else R.string.update_show_more),
+                isVisible = { isUpdateAvail && notes.isNotEmpty() && !checking && !checkFailed }
+            ) {
+                notesExpanded = !notesExpanded
+                rebuildSettings()
+            }
+            action(
+                title = getString(R.string.update_view_release),
+                showChevron = true,
+                isVisible = { !checking }
+            ) { UpdateManager.openReleasePage(requireContext()) }
+        }
 
-            switch(
-                key = UpdateManager.KEY_UPDATE_NIGHTLY_CHANNEL,
-                title = getString(R.string.update_nightly_channel_title),
-                summary = getString(R.string.update_nightly_channel_summary),
-                defaultValue = BuildConfig.VERSION_NAME.contains("nightly", ignoreCase = true),
-                onCheckedChange = {
-                    UpdateManager.checkForUpdates(requireContext(), force = true)
-                }
-            )
+        category(getString(R.string.update_channel_category_title)) {
+            val nightly = UpdateManager.isNightlyChannel(requireContext())
+            action(
+                title = getString(R.string.update_channel_title),
+                summary = getString(if (nightly) R.string.update_channel_nightly_description else R.string.update_channel_stable_description),
+                statusText = getString(if (nightly) R.string.update_channel_nightly else R.string.update_channel_stable),
+                showChevron = true,
+                isEnabled = { !checking && !downloading }
+            ) {
+                val dialog = MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.update_channel_title)
+                    .setSingleChoiceItems(arrayOf(
+                        getString(R.string.update_channel_stable_option),
+                        getString(R.string.update_channel_nightly_option)
+                    ), if (nightly) 1 else 0) { dialog, which ->
+                        dialog.dismiss()
+                        if ((which == 1) != nightly) {
+                            prefs.edit().putBoolean(UpdateManager.KEY_UPDATE_NIGHTLY_CHANNEL, which == 1).apply()
+                            notesExpanded = false
+                            UpdateManager.checkForUpdates(requireContext(), force = true)
+                        }
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager.styleAlertDialog(dialog)
+            }
+        }
 
+        category(getString(R.string.notifications_settings_title)) {
             switch(
                 key = "show_updates",
                 title = getString(R.string.show_updates_chip),
                 summary = getString(R.string.show_updates_chip_summary),
                 defaultValue = true
             )
-
-            action(
-                title = getString(R.string.check_for_updates_title),
-                summary = lastCheckStr
-            ) {
-                UpdateManager.checkForUpdates(requireContext(), force = true)
-            }
-
-            action(
-                title = getString(R.string.update_status_title),
-                summary = statusText
-            ) {}
-
-            val installTitle = when (downloadState) {
-                UpdateManager.DownloadState.DOWNLOADING -> getString(R.string.downloading_update_title)
-                UpdateManager.DownloadState.READY_TO_INSTALL -> getString(R.string.install_update_action)
-                else -> getString(R.string.download_and_install_title)
-            }
-
-            val installSummary = when (downloadState) {
-                UpdateManager.DownloadState.DOWNLOADING -> "${UpdateManager.downloadProgress}%"
-                UpdateManager.DownloadState.READY_TO_INSTALL -> UpdateManager.apkFileName
-                UpdateManager.DownloadState.FAILED -> getString(R.string.download_failed)
-                else -> getString(R.string.download_and_install_summary)
-            }
-
-            action(
-                title = installTitle,
-                summary = installSummary,
-                isVisible = { isUpdateAvail },
-                isEnabled = { downloadState != UpdateManager.DownloadState.DOWNLOADING }
-            ) {
-                UpdateManager.downloadAndInstall(requireContext())
-            }
         }
     }
 }

@@ -40,6 +40,9 @@ object UpdateManager {
     const val KEY_UPDATE_NIGHTLY_CHANNEL = "update_nightly_channel"
     const val KEY_LAST_CHECK = "last_check_time"
     const val KEY_LAST_CHECK_SUCCESS = "last_check_success"
+    private const val KEY_LAST_SUCCESS_TIME = "last_success_time"
+    private const val KEY_SUCCESS_CHANNEL = "last_success_channel"
+    private var checkedChannel: Boolean? = null
 
     var isChecking: Boolean = false
         private set
@@ -73,6 +76,16 @@ object UpdateManager {
     private var appContext: Context? = null
 
     var onUpdateStateChanged: (() -> Unit)? = null
+    private val stateListeners = mutableSetOf<() -> Unit>()
+
+    fun addStateListener(listener: () -> Unit) { stateListeners.add(listener) }
+
+    fun removeStateListener(listener: () -> Unit) { stateListeners.remove(listener) }
+
+    private fun notifyStateChanged() {
+        onUpdateStateChanged?.invoke()
+        stateListeners.toList().forEach { it() }
+    }
 
     private val progressPollRunnable = object : Runnable {
         override fun run() {
@@ -100,20 +113,22 @@ object UpdateManager {
                             DownloadManager.STATUS_SUCCESSFUL -> {
                                 downloadState = DownloadState.READY_TO_INSTALL
                                 downloadProgress = 100
-                                onUpdateStateChanged?.invoke()
-                                // Automatically prompt install once download finishes
-                                installApk(ctx)
+                                notifyStateChanged()
                                 return
                             }
                             DownloadManager.STATUS_FAILED -> {
                                 downloadState = DownloadState.FAILED
-                                onUpdateStateChanged?.invoke()
+                                notifyStateChanged()
                                 return
                             }
                             else -> {
-                                onUpdateStateChanged?.invoke()
+                                notifyStateChanged()
                             }
                         }
+                    } else {
+                        downloadState = DownloadState.FAILED
+                        notifyStateChanged()
+                        return
                     }
                 } finally {
                     cursor.close()
@@ -134,11 +149,34 @@ object UpdateManager {
             .getLong(KEY_LAST_CHECK, 0L)
     }
 
+    fun getLastSuccessfulCheckTime(context: Context): Long {
+        val prefs = context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_SUCCESS_CHANNEL) ||
+            prefs.getBoolean(KEY_SUCCESS_CHANNEL, false) != isNightlyChannel(context)) return 0L
+        return prefs.getLong(KEY_LAST_SUCCESS_TIME, 0L)
+    }
+
+    fun cancelDownload(context: Context) {
+        pollHandler.removeCallbacks(progressPollRunnable)
+        if (activeDownloadId != -1L) {
+            (context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager)?.remove(activeDownloadId)
+        }
+        activeDownloadId = -1L
+        downloadState = DownloadState.IDLE
+        downloadProgress = 0
+        downloadedBytes = 0L
+        totalBytes = 0L
+        notifyStateChanged()
+    }
+
     fun getDownloadedFile(context: Context): File? {
         val name = apkFileName ?: return null
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
         val file = File(dir, name)
-        return if (file.exists() && file.length() > 0) file else null
+        // DownloadManager writes directly to the destination; a failed download may leave a partial file.
+        if (!file.exists() || file.length() == 0L) return null
+        val archive = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+        return if (archive?.packageName == context.packageName) file else null
     }
 
     fun formatBytes(bytes: Long): String {
@@ -148,6 +186,7 @@ object UpdateManager {
     }
 
     fun checkForUpdates(context: Context, force: Boolean = false) {
+        if (isChecking || downloadState == DownloadState.DOWNLOADING) return
         appContext = context.applicationContext
         val updatePrefs = context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
         val lastCheck = updatePrefs.getLong(KEY_LAST_CHECK, 0L)
@@ -157,12 +196,22 @@ object UpdateManager {
         if (!force && (now - lastCheck) < 24 * 60 * 60 * 1000) return
 
         val isNightly = isNightlyChannel(context)
+        if (checkedChannel != isNightly) {
+            isUpdateAvailable = false
+            latestVersion = null
+            releaseNotes = null
+            downloadUrl = null
+            apkDownloadUrl = null
+            apkFileName = null
+            downloadState = DownloadState.IDLE
+            checkedChannel = isNightly
+        }
         val apiUrl = if (isNightly) NIGHTLY_API_URL else STABLE_API_URL
         val fallbackReleaseUrl = if (isNightly) NIGHTLY_RELEASE_PAGE_URL else STABLE_RELEASE_PAGE_URL
 
         isChecking = true
         lastError = null
-        onUpdateStateChanged?.invoke()
+        notifyStateChanged()
 
         val request = JsonObjectRequest(Request.Method.GET, apiUrl, null,
             { response ->
@@ -227,18 +276,20 @@ object UpdateManager {
 
                     updatePrefs.edit()
                         .putLong(KEY_LAST_CHECK, now)
+                        .putLong(KEY_LAST_SUCCESS_TIME, now)
+                        .putBoolean(KEY_SUCCESS_CHANNEL, isNightly)
                         .putBoolean(KEY_LAST_CHECK_SUCCESS, true)
                         .apply()
 
                     Logger.d("UpdateManager") {
                         "Checked ($apiUrl): current=$currentVersion, available=$isUpdateAvailable, latest=$latestVersion, apk=$apkFileName"
                     }
-                    onUpdateStateChanged?.invoke()
+                    notifyStateChanged()
                 } catch (e: Exception) {
                     e.printStackTrace()
                     isChecking = false
                     lastError = e.message
-                    onUpdateStateChanged?.invoke()
+                    notifyStateChanged()
                 }
             },
             { error ->
@@ -246,7 +297,7 @@ object UpdateManager {
                 isChecking = false
                 lastError = error.message ?: "Network error"
                 updatePrefs.edit().putLong(KEY_LAST_CHECK, now).apply()
-                onUpdateStateChanged?.invoke()
+                notifyStateChanged()
             }
         )
 
@@ -254,6 +305,8 @@ object UpdateManager {
     }
 
     private fun resolveApkAsset(response: org.json.JSONObject) {
+        apkDownloadUrl = null
+        apkFileName = null
         val assets = response.optJSONArray("assets") ?: return
         var bestUrl: String? = null
         var bestName: String? = null
@@ -305,6 +358,7 @@ object UpdateManager {
     }
 
     fun startDownload(context: Context) {
+        if (downloadState == DownloadState.DOWNLOADING) return
         appContext = context.applicationContext
         val url = apkDownloadUrl ?: run {
             openReleasePage(context)
@@ -339,14 +393,14 @@ object UpdateManager {
             downloadProgress = 0
             downloadedBytes = 0L
             totalBytes = 0L
-            onUpdateStateChanged?.invoke()
+            notifyStateChanged()
 
             pollHandler.removeCallbacks(progressPollRunnable)
             pollHandler.post(progressPollRunnable)
         } catch (e: Exception) {
             Logger.e("UpdateManager") { "Failed to start download: ${e.message}" }
             downloadState = DownloadState.FAILED
-            onUpdateStateChanged?.invoke()
+            notifyStateChanged()
             openReleasePage(context)
         }
     }

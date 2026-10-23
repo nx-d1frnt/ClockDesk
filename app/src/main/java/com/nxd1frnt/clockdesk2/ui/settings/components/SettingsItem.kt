@@ -5,6 +5,19 @@ import android.text.InputType
 sealed class SettingsItem {
     data class Header(val title: String) : SettingsItem()
 
+    data class UpdateStatus(
+        val title: String,
+        val details: String,
+        val actionTitle: String,
+        val actionEnabled: Boolean,
+        val downloading: Boolean,
+        val progress: Int?,
+        val progressText: String?,
+        val cancelTitle: String,
+        val onAction: () -> Unit,
+        val onCancel: () -> Unit
+    ) : SettingsItem()
+
     sealed class Entry : SettingsItem() {
         abstract val key: String?
         abstract val title: String

@@ -100,6 +100,10 @@ abstract class BaseM3SettingsFragment : Fragment() {
         private val items = mutableListOf<SettingsItem>()
         private var currentGroupId = 0
 
+        fun updateStatus(item: SettingsItem.UpdateStatus) {
+            items.add(item)
+        }
+
         fun category(title: String, block: CategoryDslBuilder.() -> Unit) {
             items.add(SettingsItem.Header(title))
             val categoryBuilder = CategoryDslBuilder(prefs, currentGroupId++)
