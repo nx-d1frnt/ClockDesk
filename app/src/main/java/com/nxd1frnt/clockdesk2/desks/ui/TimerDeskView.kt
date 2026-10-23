@@ -152,6 +152,7 @@ class TimerDeskView @JvmOverloads constructor(
         progressCircular.trackColor = palette.surfaceContainerHighest
         updateSilent(TimerManager.isSilent)
         updateState(TimerManager.state)
+        DeskForegroundStyle.apply(this)
     }
 
     override fun onAttachedToWindow() {

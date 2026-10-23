@@ -78,6 +78,9 @@ class AppsDeskView @JvmOverloads constructor(
 
         val spanCount = calculateSpanCount()
         recyclerApps.layoutManager = GridLayoutManager(context, spanCount)
+        // The default pool holds five items, less than one landscape row. Retain
+        // a screen of cells when a cached desk detaches or its app list refreshes.
+        recyclerApps.recycledViewPool.setMaxRecycledViews(0, 35)
         adapter = AppsAdapter(filteredApps) { app ->
             var launched = false
             val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
@@ -134,6 +137,7 @@ class AppsDeskView @JvmOverloads constructor(
         btnClearSearch.imageTintList = ColorStateList.valueOf(palette.onSurfaceVariant)
         txtNoApps.setTextColor(palette.onSurfaceVariant)
         adapter.notifyDataSetChanged()
+        DeskForegroundStyle.apply(this)
     }
 
     override fun onAttachedToWindow() {
@@ -349,11 +353,10 @@ class AppsDeskView @JvmOverloads constructor(
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val palette = UiMonetThemeManager.getPalette(holder.itemView.context)
             val app = items[position]
             holder.iconView.setImageDrawable(app.icon)
             holder.labelView.text = app.label
-            holder.labelView.setTextColor(palette.onSurface)
+            DeskForegroundStyle.applyText(holder.labelView)
             holder.itemView.setOnClickListener { onClick(app) }
         }
 

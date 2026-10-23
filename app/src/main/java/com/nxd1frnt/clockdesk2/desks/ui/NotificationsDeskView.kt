@@ -71,5 +71,6 @@ class NotificationsDeskView @JvmOverloads constructor(
     fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
         UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
         adapter.notifyDataSetChanged()
+        DeskForegroundStyle.apply(this)
     }
 }

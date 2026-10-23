@@ -569,6 +569,12 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         backgroundLayout = findViewById(R.id.background_layout)
         backgroundImageView = findViewById(R.id.background_image_view)
         dynamicBackgroundView = findViewById(R.id.dynamic_background_view)
+        dynamicBackgroundView.onBackgroundForegroundChanged = { color ->
+            if (com.nxd1frnt.clockdesk2.desks.ui.DeskForegroundStyle.update(this, color) &&
+                ::desksPagerAdapter.isInitialized) {
+                desksPagerAdapter.refreshMonetTheme()
+            }
+        }
         turbulenceOverlay = findViewById(R.id.turbulence_overlay)
         performanceOverlay = findViewById(R.id.performance_overlay)
         settingsButton = findViewById(R.id.settings_button)

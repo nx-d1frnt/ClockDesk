@@ -115,6 +115,7 @@ class DevicesDeskView @JvmOverloads constructor(
     fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
         UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
         deviceAdapter.notifyDataSetChanged()
+        DeskForegroundStyle.apply(this)
     }
 
     override fun onAttachedToWindow() {

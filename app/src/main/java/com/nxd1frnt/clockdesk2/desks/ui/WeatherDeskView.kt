@@ -79,9 +79,7 @@ class WeatherDeskView @JvmOverloads constructor(
 
     fun refreshMonetTheme(palette: UiMonetPalette = UiMonetThemeManager.getPalette(context)) {
         UiMonetThemeManager.applyLiveToViewHierarchy(this, palette)
-        for (i in 0 until layoutHourly.childCount) {
-            layoutHourly.getChildAt(i)?.let { UiMonetThemeManager.applyLiveToViewHierarchy(it, palette) }
-        }
+        DeskForegroundStyle.apply(this)
     }
 
     override fun onAttachedToWindow() {
@@ -182,9 +180,13 @@ class WeatherDeskView @JvmOverloads constructor(
             if (hourlyCodes.isNotEmpty()) {
                 txtHourlyTitle.visibility = View.VISIBLE
                 layoutHourly.visibility = View.VISIBLE
-                layoutHourly.removeAllViews()
                 val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                val itemsToShow = minOf(12, hourlyCodes.size - currentHour - 1)
+                val itemsToShow = minOf(12, hourlyCodes.size - currentHour - 1).coerceAtLeast(0)
+                while (layoutHourly.childCount > itemsToShow) {
+                    layoutHourly.removeViewAt(layoutHourly.childCount - 1)
+                }
+                val palette = UiMonetThemeManager.getPalette(context)
+                val inflater = LayoutInflater.from(context)
 
                 for (offset in 1..itemsToShow) {
                     val idx = currentHour + offset
@@ -192,7 +194,13 @@ class WeatherDeskView @JvmOverloads constructor(
                         val hourlyCode = hourlyCodes[idx]
                         val hourlyTemp = if (idx in hourlyTemps.indices) hourlyTemps[idx] else null
 
-                        val itemView = LayoutInflater.from(context).inflate(R.layout.item_weather_forecast, layoutHourly, false)
+                        // Cached pages detach as the pager moves. Keep their forecast cards
+                        // instead of inflating twelve Material hierarchies on every return.
+                        val itemView = layoutHourly.getChildAt(offset - 1)
+                            ?: inflater.inflate(R.layout.item_weather_forecast, layoutHourly, false).also {
+                                UiMonetThemeManager.applyLiveToViewHierarchy(it, palette)
+                                layoutHourly.addView(it)
+                            }
                         val itemTime = itemView.findViewById<TextView>(R.id.forecast_item_time)
                         val itemIcon = itemView.findViewById<ImageView>(R.id.forecast_item_icon)
                         val itemTemp = itemView.findViewById<TextView>(R.id.forecast_item_temp)
@@ -202,8 +210,6 @@ class WeatherDeskView @JvmOverloads constructor(
                         itemIcon.setImageResource(getWeatherIconRes(hourlyCode, isDay = true))
                         itemTemp.text = if (hourlyTemp != null) "${hourlyTemp.toInt()}$tempSuffix" else "--"
                         itemCond.text = getWeatherConditionDescription(context, hourlyCode)
-                        UiMonetThemeManager.applyLiveToViewHierarchy(itemView, UiMonetThemeManager.getPalette(context))
-                        layoutHourly.addView(itemView)
                     }
                 }
             } else {

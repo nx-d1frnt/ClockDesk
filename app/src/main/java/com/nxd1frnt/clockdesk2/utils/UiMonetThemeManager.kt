@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.util.LruCache
 import android.util.TypedValue
 import androidx.appcompat.view.ContextThemeWrapper
 import android.view.View
@@ -83,6 +84,15 @@ data class UiMonetPalette(
 )
 
 object UiMonetThemeManager {
+
+    private data class SeedPaletteKey(val seedColor: Int, val isDark: Boolean)
+
+    // Seeded palettes contain only immutable colors and depend on these two values.
+    // Share them across page creation, reattachment and row binding without retaining a Context.
+    private val seededPalettes = object : LruCache<SeedPaletteKey, UiMonetPalette>(8) {
+        override fun create(key: SeedPaletteKey): UiMonetPalette =
+            createSeedPalette(key.seedColor, key.isDark)
+    }
 
     const val PREF_FILE = "ClockDeskPrefs"
     const val KEY_UI_MONET_FROM_BACKGROUND = "ui_monet_from_background"
@@ -216,53 +226,7 @@ object UiMonetThemeManager {
         val activeSeed = if (isUiMonetEnabled(context)) seedColorOverride else null
 
         if (activeSeed != null) {
-            val scheme = if (isDark) Scheme.dark(activeSeed) else Scheme.light(activeSeed)
-            val core = CorePalette.of(activeSeed)
-            val n1 = core.n1
-
-            val surfaceTone = if (isDark) n1.tone(6) else n1.tone(98)
-            val surfaceContainerLowest = if (isDark) n1.tone(4) else n1.tone(100)
-            val surfaceContainerLow = if (isDark) n1.tone(10) else n1.tone(96)
-            val surfaceContainer = if (isDark) n1.tone(12) else n1.tone(94)
-            val surfaceContainerHigh = if (isDark) n1.tone(17) else n1.tone(92)
-            val surfaceContainerHighest = if (isDark) n1.tone(22) else n1.tone(90)
-
-            return UiMonetPalette(
-                isDark = isDark,
-                isCustomSeed = true,
-                primary = scheme.primary,
-                onPrimary = scheme.onPrimary,
-                primaryContainer = scheme.primaryContainer,
-                onPrimaryContainer = scheme.onPrimaryContainer,
-                secondary = scheme.secondary,
-                onSecondary = scheme.onSecondary,
-                secondaryContainer = scheme.secondaryContainer,
-                onSecondaryContainer = scheme.onSecondaryContainer,
-                tertiary = scheme.tertiary,
-                onTertiary = scheme.onTertiary,
-                tertiaryContainer = scheme.tertiaryContainer,
-                onTertiaryContainer = scheme.onTertiaryContainer,
-                error = scheme.error,
-                onError = scheme.onError,
-                errorContainer = scheme.errorContainer,
-                onErrorContainer = scheme.onErrorContainer,
-                background = surfaceTone,
-                onBackground = scheme.onBackground,
-                surface = surfaceTone,
-                onSurface = scheme.onSurface,
-                surfaceVariant = scheme.surfaceVariant,
-                onSurfaceVariant = scheme.onSurfaceVariant,
-                surfaceContainerLowest = surfaceContainerLowest,
-                surfaceContainerLow = surfaceContainerLow,
-                surfaceContainer = surfaceContainer,
-                surfaceContainerHigh = surfaceContainerHigh,
-                surfaceContainerHighest = surfaceContainerHighest,
-                outline = scheme.outline,
-                outlineVariant = scheme.outlineVariant,
-                inverseSurface = scheme.inverseSurface,
-                inverseOnSurface = scheme.inverseOnSurface,
-                inversePrimary = scheme.inversePrimary
-            )
+            return checkNotNull(seededPalettes.get(SeedPaletteKey(activeSeed, isDark)))
         }
 
         val fallbackCtx = createSystemMaterialContext(context)
@@ -301,6 +265,57 @@ object UiMonetThemeManager {
             inverseSurface = resolveAttrColor(fallbackCtx, com.google.android.material.R.attr.colorSurfaceInverse, R.color.md_theme_inverseSurface),
             inverseOnSurface = resolveAttrColor(fallbackCtx, com.google.android.material.R.attr.colorOnSurfaceInverse, R.color.md_theme_inverseOnSurface),
             inversePrimary = resolveAttrColor(fallbackCtx, com.google.android.material.R.attr.colorPrimaryInverse, R.color.md_theme_inversePrimary)
+        )
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun createSeedPalette(activeSeed: Int, isDark: Boolean): UiMonetPalette {
+        val scheme = if (isDark) Scheme.dark(activeSeed) else Scheme.light(activeSeed)
+        val core = CorePalette.of(activeSeed)
+        val n1 = core.n1
+
+        val surfaceTone = if (isDark) n1.tone(6) else n1.tone(98)
+        val surfaceContainerLowest = if (isDark) n1.tone(4) else n1.tone(100)
+        val surfaceContainerLow = if (isDark) n1.tone(10) else n1.tone(96)
+        val surfaceContainer = if (isDark) n1.tone(12) else n1.tone(94)
+        val surfaceContainerHigh = if (isDark) n1.tone(17) else n1.tone(92)
+        val surfaceContainerHighest = if (isDark) n1.tone(22) else n1.tone(90)
+
+        return UiMonetPalette(
+            isDark = isDark,
+            isCustomSeed = true,
+            primary = scheme.primary,
+            onPrimary = scheme.onPrimary,
+            primaryContainer = scheme.primaryContainer,
+            onPrimaryContainer = scheme.onPrimaryContainer,
+            secondary = scheme.secondary,
+            onSecondary = scheme.onSecondary,
+            secondaryContainer = scheme.secondaryContainer,
+            onSecondaryContainer = scheme.onSecondaryContainer,
+            tertiary = scheme.tertiary,
+            onTertiary = scheme.onTertiary,
+            tertiaryContainer = scheme.tertiaryContainer,
+            onTertiaryContainer = scheme.onTertiaryContainer,
+            error = scheme.error,
+            onError = scheme.onError,
+            errorContainer = scheme.errorContainer,
+            onErrorContainer = scheme.onErrorContainer,
+            background = surfaceTone,
+            onBackground = scheme.onBackground,
+            surface = surfaceTone,
+            onSurface = scheme.onSurface,
+            surfaceVariant = scheme.surfaceVariant,
+            onSurfaceVariant = scheme.onSurfaceVariant,
+            surfaceContainerLowest = surfaceContainerLowest,
+            surfaceContainerLow = surfaceContainerLow,
+            surfaceContainer = surfaceContainer,
+            surfaceContainerHigh = surfaceContainerHigh,
+            surfaceContainerHighest = surfaceContainerHighest,
+            outline = scheme.outline,
+            outlineVariant = scheme.outlineVariant,
+            inverseSurface = scheme.inverseSurface,
+            inverseOnSurface = scheme.inverseOnSurface,
+            inversePrimary = scheme.inversePrimary
         )
     }
 

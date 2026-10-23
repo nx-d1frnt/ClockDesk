@@ -145,7 +145,10 @@ class DesksPagerAdapter(
                 is AppsDeskView -> view.refreshMonetTheme(palette)
                 is TimerDeskView -> view.refreshMonetTheme(palette)
                 is NotificationsDeskView -> view.refreshMonetTheme(palette)
-                else -> UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
+                else -> {
+                    UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
+                    DeskForegroundStyle.apply(view)
+                }
             }
         }
         notifyDataSetChanged()
@@ -169,7 +172,10 @@ class DesksPagerAdapter(
             is AppsDeskView -> page.refreshMonetTheme(palette)
             is TimerDeskView -> page.refreshMonetTheme(palette)
             is NotificationsDeskView -> page.refreshMonetTheme(palette)
-            else -> UiMonetThemeManager.applyLiveToViewHierarchy(page, palette)
+            else -> {
+                UiMonetThemeManager.applyLiveToViewHierarchy(page, palette)
+                DeskForegroundStyle.apply(page)
+            }
         }
         return page
     }

@@ -28,6 +28,7 @@ import android.opengl.GLUtils
 import android.opengl.Matrix
 import android.util.AttributeSet
 import android.view.animation.AccelerateDecelerateInterpolator
+import com.nxd1frnt.clockdesk2.desks.ui.DeskForegroundStyle
 import com.nxd1frnt.clockdesk2.utils.PerformanceTracker
 import com.nxd1frnt.clockdesk2.utils.calculateWeatherIntensity
 import java.nio.ByteBuffer
@@ -58,6 +59,16 @@ class DynamicBackgroundView @JvmOverloads constructor(
         TRANSITION_TO_CONTINUOUS,
         CONTINUOUS,
         EASE_OUT
+    }
+
+    var onBackgroundForegroundChanged: ((Int) -> Unit)? = null
+    private var backgroundSamples = intArrayOf()
+    private val foregroundColorMatrix = ColorMatrix()
+
+    private fun updateBackgroundForeground() {
+        onBackgroundForegroundChanged?.invoke(
+            DeskForegroundStyle.contrastingColor(backgroundSamples, foregroundColorMatrix)
+        )
     }
 
     val performanceTracker = PerformanceTracker()
@@ -215,6 +226,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
         offsetX: Float = 0f,
         offsetY: Float = 0f
     ) {
+        backgroundSamples = DeskForegroundStyle.sample(bitmap)
+        updateBackgroundForeground()
         reloadTransitionPreferences()
         if (!isGradient) {
             lastTopColor = null
@@ -386,6 +399,8 @@ class DynamicBackgroundView @JvmOverloads constructor(
      * Передача матрицы фильтров (Night Shift, диммирование, погода).
      */
     fun setColorFilter(matrix: ColorMatrix) {
+        foregroundColorMatrix.set(matrix)
+        updateBackgroundForeground()
         queueEvent {
             renderer.updateColorMatrix(matrix)
             requestRender()
