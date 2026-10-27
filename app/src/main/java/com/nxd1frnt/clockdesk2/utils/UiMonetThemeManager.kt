@@ -41,6 +41,7 @@ import com.google.android.material.color.utilities.CorePalette
 import com.google.android.material.color.utilities.Scheme
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.progressindicator.BaseProgressIndicator
 import com.google.android.material.slider.RangeSlider
 import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.TextInputLayout
@@ -506,6 +507,10 @@ object UiMonetThemeManager {
                 root.setBackgroundColor(palette.surface)
                 root.isLiftOnScroll = false
             }
+            is BaseProgressIndicator<*> -> {
+                root.setIndicatorColor(palette.primary)
+                root.trackColor = palette.surfaceContainerHighest
+            }
             is ProgressBar -> {
                 root.indeterminateTintList = ColorStateList.valueOf(palette.primary)
                 root.progressTintList = ColorStateList.valueOf(palette.primary)
@@ -679,10 +684,28 @@ object UiMonetThemeManager {
             R.id.crop_position_button,
             R.id.about_btn_github,
             R.id.about_btn_license,
-            R.id.btn_action -> {
-                btn.backgroundTintList = ColorStateList.valueOf(palette.primary)
-                btn.setTextColor(palette.onPrimary)
-                btn.iconTint = ColorStateList.valueOf(palette.onPrimary)
+            R.id.btn_action,
+            R.id.update_card_action -> {
+                val states = arrayOf(
+                    intArrayOf(android.R.attr.state_enabled),
+                    intArrayOf(-android.R.attr.state_enabled)
+                )
+                btn.backgroundTintList = ColorStateList(
+                    states,
+                    intArrayOf(
+                        palette.primary,
+                        ColorUtils.setAlphaComponent(palette.onSurface, 31)
+                    )
+                )
+                val fg = ColorStateList(
+                    states,
+                    intArrayOf(
+                        palette.onPrimary,
+                        ColorUtils.setAlphaComponent(palette.onSurface, 97)
+                    )
+                )
+                btn.setTextColor(fg)
+                btn.iconTint = fg
             }
             // Filled Tonal Buttons
             R.id.btn_back,
@@ -749,6 +772,11 @@ object UiMonetThemeManager {
                 btn.iconTint = ColorStateList.valueOf(palette.primary)
             }
             // Text Buttons (settings_button, demo_button, btn_reset_layout, cancel_button, crop_reset_btn, crop_cancel_btn, etc.)
+            R.id.update_card_cancel -> {
+                btn.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+                btn.setTextColor(palette.primary)
+                btn.iconTint = ColorStateList.valueOf(palette.primary)
+            }
             else -> {
                 if (btn.strokeWidth > 0) {
                     btn.strokeColor = ColorStateList.valueOf(palette.outline)
@@ -859,6 +887,7 @@ object UiMonetThemeManager {
                 iv.imageTintList = ColorStateList.valueOf(palette.primary)
                 (iv.background?.mutate() as? GradientDrawable)?.setStroke(4, palette.outlineVariant)
             }
+            R.id.update_card_icon,
             R.id.dialog_location_icon,
             R.id.dialog_cycle_icon,
             R.id.device_icon,
@@ -944,6 +973,8 @@ object UiMonetThemeManager {
                 (tv.background?.mutate() as? GradientDrawable)?.setColor(palette.primaryContainer)
             }
 
+            R.id.update_card_details,
+            R.id.update_card_progress_text,
             R.id.gallery_subtitle,
             R.id.widget_description,
             R.id.weather_auto_detail,

@@ -5,10 +5,12 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.fragment.app.FragmentActivity
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.ui.settings.components.M3SettingsAdapter
 import com.nxd1frnt.clockdesk2.ui.settings.components.SettingsItem
+import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 import com.nxd1frnt.clockdesk2.utils.UpdateManager
 import org.junit.After
 import org.junit.Assert.*
@@ -163,5 +165,52 @@ class UpdatesSettingsFragmentTest {
         fragment.onPause()
         UpdateManager.cancelDownload(activity)
         assertEquals(2, chipNotifications)
+    }
+
+    @Test
+    fun updateCardActionHasMonetColoring() {
+        val item = card()
+        val adapter = M3SettingsAdapter(
+            activity,
+            activity.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE),
+            listOf(item)
+        )
+        val holder = adapter.onCreateViewHolder(FrameLayout(activity), adapter.getItemViewType(0))
+        adapter.onBindViewHolder(holder, 0)
+
+        val actionBtn = holder.itemView.findViewById<MaterialButton>(R.id.update_card_action)
+        val palette = UiMonetThemeManager.getPalette(activity)
+
+        val enabledStates = intArrayOf(android.R.attr.state_enabled)
+        val disabledStates = intArrayOf(-android.R.attr.state_enabled)
+
+        assertEquals(palette.primary, actionBtn.backgroundTintList?.getColorForState(enabledStates, 0))
+        assertEquals(palette.onPrimary, actionBtn.textColors.getColorForState(enabledStates, 0))
+    }
+
+    @Test
+    fun updateCardActionFollowsMonetPaletteWhenSeeded() {
+        val seedColor = 0xffe91e63.toInt()
+        activity.getSharedPreferences(UiMonetThemeManager.PREF_FILE, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(UiMonetThemeManager.KEY_DYNAMIC_SEED_COLOR, seedColor)
+            .putBoolean(UiMonetThemeManager.KEY_UI_MONET_FROM_BACKGROUND, true)
+            .commit()
+
+        val item = card()
+        val adapter = M3SettingsAdapter(
+            activity,
+            activity.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE),
+            listOf(item)
+        )
+        val holder = adapter.onCreateViewHolder(FrameLayout(activity), adapter.getItemViewType(0))
+        adapter.onBindViewHolder(holder, 0)
+
+        val actionBtn = holder.itemView.findViewById<MaterialButton>(R.id.update_card_action)
+        val palette = UiMonetThemeManager.getPalette(activity)
+
+        val enabledStates = intArrayOf(android.R.attr.state_enabled)
+        assertEquals(palette.primary, actionBtn.backgroundTintList?.getColorForState(enabledStates, 0))
+        assertEquals(palette.onPrimary, actionBtn.textColors.getColorForState(enabledStates, 0))
     }
 }
