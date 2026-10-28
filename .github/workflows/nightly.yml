@@ -7,16 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to build'
-        required: true
-        default: 'master'
+        description: 'Branch to build (leave empty to use NIGHTLY_BRANCH / default branch)'
+        required: false
+        default: ''
 
 concurrency:
   group: nightly-build
   cancel-in-progress: true
 
 env:
-  TARGET_BRANCH: ${{ github.event.inputs.branch || 'master' }}
+  TARGET_BRANCH: ${{ github.event.inputs.branch || vars.NIGHTLY_BRANCH || github.event.repository.default_branch || 'master' }}
 
 jobs:
   check_commits:
