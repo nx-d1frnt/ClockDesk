@@ -109,18 +109,6 @@ jobs:
           echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> "$GITHUB_ENV"
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
-      - name: Clear Old Nightly Assets
-        run: |
-          echo "Checking for old assets in nightly release..."
-          ASSET_IDS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/nightly" \
-            | jq -r '.assets[]?.id // empty')
-          for id in $ASSET_IDS; do
-            echo "Deleting old asset ID: $id"
-            curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id"
-          done
-
       - name: Generate Changelog from Commits
         id: changelog
         run: |
@@ -215,6 +203,13 @@ jobs:
             cat release-assets/sha256sums.txt
             echo '```'
           } > nightly_description.md
+
+      - name: Recreate Nightly Release at Top
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Removing previous nightly release and tag to ensure current chronological ordering..."
+          gh release delete nightly --yes --cleanup-tag || true
 
       - name: Publish Rolling Nightly Release
         uses: softprops/action-gh-release@v2
