@@ -67,6 +67,7 @@ object UpdateManager {
     const val KEY_LAST_RUN_VERSION_NAME = "last_run_version_name"
     const val KEY_PENDING_UPDATE_CHANGELOG = "pending_update_changelog"
     const val KEY_PENDING_UPDATE_VERSION = "pending_update_version"
+    const val KEY_CHANGELOG_SHOWN_VERSION_CODE = "changelog_shown_version_code"
     private var checkedChannel: Boolean? = null
 
     var isChecking: Boolean = false
@@ -88,6 +89,7 @@ object UpdateManager {
         private set
     var isFetchingHistory: Boolean = false
         private set
+    private val pendingHistoryCallbacks = mutableListOf<(List<ReleaseHistoryItem>, String?) -> Unit>()
 
     // In-app download tracking
     var downloadState: DownloadState = DownloadState.IDLE
@@ -761,6 +763,21 @@ object UpdateManager {
         prefs.edit().putString(KEY_CACHED_RELEASES_JSON, jsonArray.toString()).apply()
     }
 
+    fun isReleaseMatch(item: ReleaseHistoryItem, version: String): Boolean {
+        val cleanVer = version.removePrefix("v").trim()
+        val cleanTag = item.tagName.removePrefix("v").trim()
+        if (cleanTag.equals(cleanVer, ignoreCase = true)) return true
+        val escapedVer = Regex.escape(cleanVer)
+        val namePattern = Regex("""(?:^|[\s_vV])${escapedVer}(?:$|[\s_])""", RegexOption.IGNORE_CASE)
+        if (namePattern.containsMatchIn(item.name)) return true
+        if (version.contains("nightly", ignoreCase = true) && item.tagName.equals("nightly", ignoreCase = true)) return true
+        val commit = Regex("""\b([0-9a-f]{7,8})\b""").find(version)?.value
+        if (commit != null && (item.name.contains(commit, ignoreCase = true) || item.rawBody.contains(commit, ignoreCase = true))) {
+            return true
+        }
+        return false
+    }
+
     fun fetchReleaseHistory(
         context: Context,
         force: Boolean = false,
@@ -775,6 +792,12 @@ object UpdateManager {
             return
         }
 
+        if (onComplete != null) {
+            synchronized(pendingHistoryCallbacks) {
+                pendingHistoryCallbacks.add(onComplete)
+            }
+        }
+
         if (isFetchingHistory) return
         isFetchingHistory = true
 
@@ -783,6 +806,11 @@ object UpdateManager {
             RELEASES_LIST_API_URL,
             null,
             { responseArray ->
+                val callbacks = synchronized(pendingHistoryCallbacks) {
+                    val list = pendingHistoryCallbacks.toList()
+                    pendingHistoryCallbacks.clear()
+                    list
+                }
                 isFetchingHistory = false
                 try {
                     val items = mutableListOf<ReleaseHistoryItem>()
@@ -809,14 +837,19 @@ object UpdateManager {
                     }
                     releaseHistory = items
                     saveReleaseHistoryCache(context, items)
-                    onComplete?.invoke(items, null)
+                    callbacks.forEach { it.invoke(items, null) }
                 } catch (e: Exception) {
-                    onComplete?.invoke(releaseHistory, e.message)
+                    callbacks.forEach { it.invoke(releaseHistory, e.message) }
                 }
             },
             { error ->
+                val callbacks = synchronized(pendingHistoryCallbacks) {
+                    val list = pendingHistoryCallbacks.toList()
+                    pendingHistoryCallbacks.clear()
+                    list
+                }
                 isFetchingHistory = false
-                onComplete?.invoke(releaseHistory, error.message)
+                callbacks.forEach { it.invoke(releaseHistory, error.message) }
             }
         )
         NetworkManager.getRequestQueue(context).add(request)
@@ -841,50 +874,73 @@ object UpdateManager {
         val prefs = activity.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
         val lastRunCode = prefs.getInt(KEY_LAST_RUN_VERSION_CODE, -1)
         val lastRunName = prefs.getString(KEY_LAST_RUN_VERSION_NAME, null)
+        val shownCode = prefs.getInt(KEY_CHANGELOG_SHOWN_VERSION_CODE, -1)
         val currentCode = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
         val currentName = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME
 
-        if (lastRunCode == -1) {
+        if (shownCode == currentCode) {
+            return
+        }
+
+        val clockDeskPrefs = activity.getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE)
+        val isFirstLaunch = clockDeskPrefs.getBoolean("isFirstLaunch", true)
+        val hasExistingSettings = clockDeskPrefs.all.isNotEmpty()
+
+        val isPackageUpdated = try {
+            val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                activity.packageManager.getPackageInfo(activity.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                activity.packageManager.getPackageInfo(activity.packageName, 0)
+            }
+            pInfo.firstInstallTime != pInfo.lastUpdateTime
+        } catch (e: Exception) {
+            false
+        }
+
+        val pendingNotes = prefs.getString(KEY_PENDING_UPDATE_CHANGELOG, null)
+        val isUpdate = (lastRunCode != -1 && (lastRunCode != currentCode || lastRunName != currentName))
+            || !pendingNotes.isNullOrBlank()
+            || isPackageUpdated
+            || (!isFirstLaunch && hasExistingSettings)
+
+        if (!isUpdate) {
             prefs.edit()
                 .putInt(KEY_LAST_RUN_VERSION_CODE, currentCode)
                 .putString(KEY_LAST_RUN_VERSION_NAME, currentName)
+                .putInt(KEY_CHANGELOG_SHOWN_VERSION_CODE, currentCode)
                 .apply()
             return
         }
 
-        if (lastRunCode != currentCode || lastRunName != currentName) {
+        val markShown = {
             prefs.edit()
                 .putInt(KEY_LAST_RUN_VERSION_CODE, currentCode)
                 .putString(KEY_LAST_RUN_VERSION_NAME, currentName)
+                .putInt(KEY_CHANGELOG_SHOWN_VERSION_CODE, currentCode)
+                .remove(KEY_PENDING_UPDATE_CHANGELOG)
+                .remove(KEY_PENDING_UPDATE_VERSION)
                 .apply()
+        }
 
-            val pendingNotes = prefs.getString(KEY_PENDING_UPDATE_CHANGELOG, null)
-            prefs.edit().remove(KEY_PENDING_UPDATE_CHANGELOG).apply()
+        if (!pendingNotes.isNullOrBlank()) {
+            markShown()
+            showPostUpdateDialog(activity, currentName, pendingNotes)
+        } else {
+            if (releaseHistory.isEmpty()) {
+                releaseHistory = loadCachedReleaseHistory(activity)
+            }
+            val cached = releaseHistory.firstOrNull { isReleaseMatch(it, currentName) }?.cleanNotes
 
-            if (!pendingNotes.isNullOrBlank()) {
-                showPostUpdateDialog(activity, currentName, pendingNotes)
+            if (!cached.isNullOrBlank()) {
+                markShown()
+                showPostUpdateDialog(activity, currentName, cached)
             } else {
-                if (releaseHistory.isEmpty()) {
-                    releaseHistory = loadCachedReleaseHistory(activity)
-                }
-                val cached = releaseHistory.firstOrNull {
-                    it.tagName.equals(currentName, true) ||
-                    it.name.contains(currentName, true) ||
-                    (currentName.contains("nightly", true) && it.tagName.equals("nightly", true))
-                }?.cleanNotes
-
-                if (!cached.isNullOrBlank()) {
-                    showPostUpdateDialog(activity, currentName, cached)
-                } else {
-                    fetchReleaseHistory(activity, force = true) { items, _ ->
-                        if (!activity.isFinishing && !activity.isDestroyed) {
-                            val fetched = items.firstOrNull {
-                                it.tagName.equals(currentName, true) ||
-                                it.name.contains(currentName, true) ||
-                                (currentName.contains("nightly", true) && it.tagName.equals("nightly", true))
-                            }?.cleanNotes
-                            showPostUpdateDialog(activity, currentName, fetched)
-                        }
+                fetchReleaseHistory(activity, force = true) { items, _ ->
+                    if (!activity.isFinishing && !activity.isDestroyed) {
+                        val fetched = items.firstOrNull { isReleaseMatch(it, currentName) }?.cleanNotes
+                        markShown()
+                        showPostUpdateDialog(activity, currentName, fetched)
                     }
                 }
             }
@@ -894,20 +950,24 @@ object UpdateManager {
     private fun showPostUpdateDialog(activity: Activity, version: String, notes: String?) {
         if (activity.isFinishing || activity.isDestroyed) return
 
-        val msg = notes?.trim().takeIf { !it.isNullOrBlank() }
-            ?: activity.getString(R.string.update_post_update_generic_message)
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
 
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle(activity.getString(R.string.whats_new_in_version, version))
-            .setMessage(msg)
-            .setPositiveButton(R.string.got_it, null)
-            .setNeutralButton(R.string.changelog_history_title) { _, _ ->
-                openChangelogHistory(activity)
-            }
-            .create()
+            val msg = notes?.trim().takeIf { !it.isNullOrBlank() }
+                ?: activity.getString(R.string.update_post_update_generic_message)
 
-        dialog.show()
-        UiMonetThemeManager.styleAlertDialog(dialog)
+            val dialog = MaterialAlertDialogBuilder(activity)
+                .setTitle(activity.getString(R.string.whats_new_in_version, version))
+                .setMessage(msg)
+                .setPositiveButton(R.string.got_it, null)
+                .setNeutralButton(R.string.changelog_history_title) { _, _ ->
+                    openChangelogHistory(activity)
+                }
+                .create()
+
+            dialog.show()
+            UiMonetThemeManager.styleAlertDialog(dialog)
+        }
     }
 
     fun openChangelogHistory(context: Context) {

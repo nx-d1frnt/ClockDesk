@@ -189,4 +189,71 @@ class UpdateManagerTest {
         assertEquals("• feat: something", loaded[0].cleanNotes)
         assertFalse(loaded[0].isPrerelease)
     }
+
+    @Test
+    fun testIsReleaseMatch() {
+        val stableItem = UpdateManager.ReleaseHistoryItem(
+            tagName = "v2.0.0-rc2.1",
+            name = "ClockDesk v2.0.0-rc2.1",
+            date = "Oct 28, 2026",
+            rawBody = "notes",
+            cleanNotes = "• bug fix",
+            isPrerelease = false,
+            htmlUrl = "url"
+        )
+        // Matches regardless of 'v' prefix
+        assertTrue(UpdateManager.isReleaseMatch(stableItem, "2.0.0-rc2.1"))
+        assertTrue(UpdateManager.isReleaseMatch(stableItem, "v2.0.0-rc2.1"))
+        assertFalse(UpdateManager.isReleaseMatch(stableItem, "2.0.0-rc2"))
+
+        val nightlyItem = UpdateManager.ReleaseHistoryItem(
+            tagName = "nightly",
+            name = "Nightly Build (2026-10-28 - experimental-desks - a7aa1a7)",
+            date = "Oct 28, 2026",
+            rawBody = "- commit: a7aa1a7",
+            cleanNotes = "• nightly features",
+            isPrerelease = true,
+            htmlUrl = "url"
+        )
+        // Matches nightly by tag or commit hash
+        assertTrue(UpdateManager.isReleaseMatch(nightlyItem, "2.0.0-rc2.1-nightly-a7aa1a7"))
+        assertTrue(UpdateManager.isReleaseMatch(nightlyItem, "nightly"))
+        assertFalse(UpdateManager.isReleaseMatch(nightlyItem, "2.0.0-rc2.1"))
+    }
+
+    @Test
+    fun testCheckAndShowPostUpdateChangelogWithPendingNotes() {
+        val activity = Robolectric.buildActivity(FragmentActivity::class.java).setup().get()
+        val updatePrefs = activity.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+
+        // Simulate an update with pending changelog
+        updatePrefs.edit()
+            .putString(UpdateManager.KEY_PENDING_UPDATE_CHANGELOG, "• New awesome feature")
+            .putString(UpdateManager.KEY_PENDING_UPDATE_VERSION, "2.0.0-rc2.1")
+            .apply()
+
+        UpdateManager.checkAndShowPostUpdateChangelog(activity)
+
+        // Pending changelog should be cleared and shownCode marked
+        assertNull(updatePrefs.getString(UpdateManager.KEY_PENDING_UPDATE_CHANGELOG, null))
+        val currentCode = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
+        assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_CHANGELOG_SHOWN_VERSION_CODE, -1))
+        assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_LAST_RUN_VERSION_CODE, -1))
+    }
+
+    @Test
+    fun testFreshInstallDoesNotShowChangelog() {
+        val activity = Robolectric.buildActivity(FragmentActivity::class.java).setup().get()
+        val updatePrefs = activity.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+        val settingsPrefs = activity.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
+
+        updatePrefs.edit().clear().apply()
+        settingsPrefs.edit().putBoolean("isFirstLaunch", true).apply()
+
+        UpdateManager.checkAndShowPostUpdateChangelog(activity)
+
+        val currentCode = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
+        assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_CHANGELOG_SHOWN_VERSION_CODE, -1))
+        assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_LAST_RUN_VERSION_CODE, -1))
+    }
 }
