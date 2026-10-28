@@ -1,6 +1,7 @@
 package com.nxd1frnt.clockdesk2.ui
 
 import com.nxd1frnt.clockdesk2.utils.PowerSavePolicy
+import com.nxd1frnt.clockdesk2.utils.UpdateManager
 import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -417,6 +418,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         setupMusicSystem()
         setupDeskConnectSystem()
         loadFogTextures()
+        UpdateManager.checkAndShowPostUpdateChangelog(this)
     }
 
     private fun finishEntranceAnimation() {

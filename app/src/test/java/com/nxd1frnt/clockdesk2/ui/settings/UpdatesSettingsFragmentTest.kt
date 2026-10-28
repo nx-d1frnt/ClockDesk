@@ -213,4 +213,42 @@ class UpdatesSettingsFragmentTest {
         assertEquals(palette.primary, actionBtn.backgroundTintList?.getColorForState(enabledStates, 0))
         assertEquals(palette.onPrimary, actionBtn.textColors.getColorForState(enabledStates, 0))
     }
+
+    @Test
+    fun updatesSettingsFragmentHasChangelogHistoryAction() {
+        val clickables = fragment.buildSettings().filterIsInstance<SettingsItem.Clickable>()
+        val historyAction = clickables.firstOrNull { it.title == activity.getString(R.string.changelog_history_title) }
+        assertNotNull(historyAction)
+        assertEquals(activity.getString(R.string.changelog_history_summary), historyAction?.summary)
+        assertTrue(historyAction!!.showChevron)
+    }
+
+    @Test
+    fun changelogHistoryFragmentBuildsItemsAndExpands() {
+        val testItem = UpdateManager.ReleaseHistoryItem(
+            tagName = "v2.0.0",
+            name = "ClockDesk 2.0.0",
+            date = "Oct 27, 2026",
+            rawBody = "line 1\nline 2\nline 3\nline 4\nline 5",
+            cleanNotes = "line 1\nline 2\nline 3\nline 4\nline 5",
+            isPrerelease = false,
+            htmlUrl = "https://github.com/nx-d1frnt/clockdesk"
+        )
+        state("releaseHistory", listOf(testItem))
+
+        val historyFrag = ChangelogHistoryFragment()
+        activity.supportFragmentManager.beginTransaction().add(historyFrag, "history").commitNow()
+
+        val items = historyFrag.buildSettings().filterIsInstance<SettingsItem.Clickable>()
+        val releaseEntry = items.firstOrNull { it.title == "ClockDesk 2.0.0" }
+        assertNotNull(releaseEntry)
+        assertEquals(activity.getString(R.string.update_show_more), releaseEntry?.statusText)
+
+        // Expand
+        releaseEntry?.onClick?.invoke()
+        val expandedItems = historyFrag.buildSettings().filterIsInstance<SettingsItem.Clickable>()
+        val expandedEntry = expandedItems.firstOrNull { it.title == "ClockDesk 2.0.0" }
+        assertEquals(activity.getString(R.string.update_show_less), expandedEntry?.statusText)
+        assertTrue(expandedEntry?.summary?.contains("line 5") == true)
+    }
 }

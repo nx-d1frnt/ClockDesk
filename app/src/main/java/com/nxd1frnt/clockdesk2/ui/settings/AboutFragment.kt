@@ -44,6 +44,11 @@ class AboutFragment : Fragment() {
         view.findViewById<TextView>(R.id.about_footer).text =
             getString(R.string.about_footer, versionName)
 
+        // Version row tappable to view changelog history
+        view.findViewById<View>(R.id.about_row_version)?.setOnClickListener {
+            com.nxd1frnt.clockdesk2.utils.UpdateManager.openChangelogHistory(requireContext())
+        }
+
         // GitHub button
         view.findViewById<MaterialButton>(R.id.about_btn_github).setOnClickListener {
             openUrl(getString(R.string.about_github_url))

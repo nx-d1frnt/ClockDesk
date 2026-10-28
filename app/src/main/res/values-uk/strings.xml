@@ -732,6 +732,14 @@
     <string name="update_view_release">Відкрити випуск на GitHub</string>
     <string name="update_download_unknown_size">Завантажено %s · очікування повного розміру</string>
     <string name="update_whats_new">Що нового</string>
+    <string name="whats_new_in_version">Що нового в %s</string>
+    <string name="changelog_history_title">Історія змін</string>
+    <string name="changelog_history_summary">Переглянути примітки до випуску минулих версій</string>
+    <string name="got_it">Зрозуміло</string>
+    <string name="loading_changelog_history">Завантаження історії змін…</string>
+    <string name="changelog_history_empty">Немає доступних приміток до випуску</string>
+    <string name="changelog_history_load_failed">Не вдалося завантажити історію змін</string>
+    <string name="update_post_update_generic_message">ClockDesk успішно оновлено. Ознайомтеся з останніми змінами та функціями в історії змін.</string>
     <string name="update_show_more">Показати більше</string>
     <string name="update_show_less">Згорнути</string>
     <string name="update_nightly_channel_title">Канал Nightly</string>

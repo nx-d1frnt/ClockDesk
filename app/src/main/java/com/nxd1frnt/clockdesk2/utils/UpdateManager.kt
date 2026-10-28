@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.utils
 
+import android.app.Activity
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
@@ -12,14 +13,30 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.android.volley.Request
+import com.android.volley.toolbox.JsonArrayRequest
 import com.android.volley.toolbox.JsonObjectRequest
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.network.NetworkManager
+import org.json.JSONArray
 import org.json.JSONException
+import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 object UpdateManager {
+
+    data class ReleaseHistoryItem(
+        val tagName: String,
+        val name: String,
+        val date: String,
+        val rawBody: String,
+        val cleanNotes: String,
+        val isPrerelease: Boolean,
+        val htmlUrl: String
+    )
 
     enum class DownloadState {
         IDLE,
@@ -32,8 +49,11 @@ object UpdateManager {
     private const val GITHUB_REPO = "clockdesk"
     private const val STABLE_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
     private const val NIGHTLY_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/tags/nightly"
+    private const val RELEASES_LIST_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases?per_page=20"
     private const val STABLE_RELEASE_PAGE_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
     private const val NIGHTLY_RELEASE_PAGE_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/tag/nightly"
+    private const val CHANGELOG_START_TAG = "<!-- changelog-start -->"
+    private const val CHANGELOG_END_TAG = "<!-- changelog-end -->"
 
     private const val PREFS_SETTINGS = "ClockDeskPrefs"
     private const val PREFS_UPDATE = "update_prefs"
@@ -42,11 +62,18 @@ object UpdateManager {
     const val KEY_LAST_CHECK_SUCCESS = "last_check_success"
     private const val KEY_LAST_SUCCESS_TIME = "last_success_time"
     private const val KEY_SUCCESS_CHANNEL = "last_success_channel"
+    const val KEY_CACHED_RELEASES_JSON = "cached_releases_json"
+    const val KEY_LAST_RUN_VERSION_CODE = "last_run_version_code"
+    const val KEY_LAST_RUN_VERSION_NAME = "last_run_version_name"
+    const val KEY_PENDING_UPDATE_CHANGELOG = "pending_update_changelog"
+    const val KEY_PENDING_UPDATE_VERSION = "pending_update_version"
     private var checkedChannel: Boolean? = null
 
     var isChecking: Boolean = false
         private set
     var releaseNotes: String? = null
+        private set
+    var rawReleaseNotes: String? = null
         private set
     var isUpdateAvailable: Boolean = false
         private set
@@ -55,6 +82,11 @@ object UpdateManager {
     var latestVersion: String? = null
         private set
     var lastError: String? = null
+        private set
+
+    var releaseHistory: List<ReleaseHistoryItem> = emptyList()
+        private set
+    var isFetchingHistory: Boolean = false
         private set
 
     // In-app download tracking
@@ -200,6 +232,7 @@ object UpdateManager {
             isUpdateAvailable = false
             latestVersion = null
             releaseNotes = null
+            rawReleaseNotes = null
             downloadUrl = null
             apkDownloadUrl = null
             apkFileName = null
@@ -222,13 +255,15 @@ object UpdateManager {
 
                     val tagName = response.optString("tag_name", "")
                     val releaseName = response.optString("name", "")
-                    releaseNotes = response.optString("body", "")
+                    val rawBody = response.optString("body", "")
+                    rawReleaseNotes = rawBody
+                    releaseNotes = parseChangelog(rawBody)
                     downloadUrl = response.optString("html_url", fallbackReleaseUrl)
 
                     if (isNightly) {
                         // Nightly Channel Comparison:
                         val serverCommit = Regex("""\b([0-9a-f]{7})\b""").find(releaseName)?.value
-                            ?: Regex("""\b([0-9a-f]{7})\b""").find(releaseNotes ?: "")?.value
+                            ?: Regex("""\b([0-9a-f]{7})\b""").find(rawBody)?.value
 
                         val isCurrentNightly = currentVersion.contains("nightly", ignoreCase = true)
 
@@ -274,12 +309,17 @@ object UpdateManager {
                         downloadState = DownloadState.IDLE
                     }
 
-                    updatePrefs.edit()
+                    val updateEditor = updatePrefs.edit()
                         .putLong(KEY_LAST_CHECK, now)
                         .putLong(KEY_LAST_SUCCESS_TIME, now)
                         .putBoolean(KEY_SUCCESS_CHANNEL, isNightly)
                         .putBoolean(KEY_LAST_CHECK_SUCCESS, true)
-                        .apply()
+
+                    if (isUpdateAvailable && !releaseNotes.isNullOrBlank()) {
+                        updateEditor.putString(KEY_PENDING_UPDATE_CHANGELOG, releaseNotes)
+                        updateEditor.putString(KEY_PENDING_UPDATE_VERSION, latestVersion)
+                    }
+                    updateEditor.apply()
 
                     Logger.d("UpdateManager") {
                         "Checked ($apiUrl): current=$currentVersion, available=$isUpdateAvailable, latest=$latestVersion, apk=$apkFileName"
@@ -560,6 +600,112 @@ object UpdateManager {
         else -> 0
     }
 
+    fun parseChangelog(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+
+        val startIdx = raw.indexOf(CHANGELOG_START_TAG, ignoreCase = true)
+        val endIdx = if (startIdx >= 0) raw.indexOf(CHANGELOG_END_TAG, startIdx + CHANGELOG_START_TAG.length, ignoreCase = true) else -1
+
+        val sectionText = if (startIdx >= 0 && endIdx > startIdx) {
+            raw.substring(startIdx + CHANGELOG_START_TAG.length, endIdx)
+        } else {
+            fallbackExtractChangelog(raw)
+        }
+
+        return formatChangelogText(sectionText)
+    }
+
+    private fun fallbackExtractChangelog(raw: String): String {
+        val lines = raw.lines()
+        val startIndex = lines.indexOfFirst { line ->
+            val trimmed = line.trim()
+            trimmed.matches(Regex("""^#{1,4}\s*(?:What'?s\s+Changed|Changes).*""", RegexOption.IGNORE_CASE))
+        }
+
+        val candidateLines = if (startIndex >= 0) {
+            lines.drop(startIndex + 1)
+        } else {
+            // No "What's Changed" heading found. Filter out top boilerplate metadata/admonitions.
+            lines.dropWhile { line ->
+                val trimmed = line.trim()
+                trimmed.startsWith("###") || trimmed.startsWith("#") ||
+                    trimmed.startsWith("- **Branch:") || trimmed.startsWith("- **Commit:") ||
+                    trimmed.startsWith("- **Date:") || trimmed.startsWith(">") ||
+                    trimmed.isBlank()
+            }
+        }
+
+        // Cut off at downstream sections like Downloads, Checksums, Full Changelog links
+        val result = mutableListOf<String>()
+        for (line in candidateLines) {
+            val trimmed = line.trim()
+            if (trimmed.matches(Regex("""^#{1,4}\s*.*(?:Downloads|Checksums|SHA-256).*""", RegexOption.IGNORE_CASE)) ||
+                trimmed.contains("SHA-256 Checksums", ignoreCase = true) ||
+                trimmed.startsWith("**Full Changelog**:", ignoreCase = true) ||
+                trimmed.startsWith("**Full Changes**:", ignoreCase = true) ||
+                trimmed.startsWith("Download the APK", ignoreCase = true)
+            ) {
+                break
+            }
+            result.add(line)
+        }
+
+        return result.joinToString("\n")
+    }
+
+    private fun formatChangelogText(text: String): String {
+        val lines = text.lines()
+        val cleanedLines = mutableListOf<String>()
+
+        // Regex for stripping GitHub commit link badges like " ([6e5396c](https://github.com/...))"
+        val commitLinkRegex = Regex("""\s*\(\[[0-9a-zA-Z]{6,}\]\(https?://[^)]+\)\)""")
+        val boldRegex = Regex("""\*\*|__""")
+
+        for (rawLine in lines) {
+            var line = rawLine.trim()
+
+            // Skip blockquote warning/note markers if any leak in
+            if (line.startsWith(">")) continue
+
+            // Strip commit badges: ([sha](https://...))
+            line = commitLinkRegex.replace(line, "").trim()
+
+            // Handle headings: #### Features -> Features:
+            if (line.startsWith("#")) {
+                val headerContent = line.replace(Regex("""^#{1,6}\s*"""), "").replace(boldRegex, "").trim()
+                if (headerContent.isNotBlank()) {
+                    val formattedHeader = if (headerContent.endsWith(":")) headerContent else "$headerContent:"
+                    cleanedLines.add(formattedHeader)
+                }
+                continue
+            }
+
+            // Handle list bullets: "- foo" or "* foo" -> "• foo"
+            if (line.startsWith("- ") || line.startsWith("* ")) {
+                val item = line.substring(2).trim()
+                if (item.isNotBlank()) {
+                    cleanedLines.add("• $item")
+                }
+                continue
+            }
+
+            // Normal text line
+            if (line.isNotBlank()) {
+                cleanedLines.add(line)
+            } else if (cleanedLines.isNotEmpty() && cleanedLines.last().isNotBlank()) {
+                // Keep at most one blank line between paragraphs/sections
+                cleanedLines.add("")
+            }
+        }
+
+        val result = cleanedLines.joinToString("\n").trim()
+        return if (result.isBlank()) {
+            "Routine maintenance and stability build."
+        } else {
+            result
+        }
+    }
+
     fun openReleasePage(context: Context) {
         val fallback = if (isNightlyChannel(context)) NIGHTLY_RELEASE_PAGE_URL else STABLE_RELEASE_PAGE_URL
         val url = downloadUrl ?: fallback
@@ -570,6 +716,211 @@ object UpdateManager {
             context.startActivity(browserIntent)
         } catch (e: Exception) {
             Logger.e("UpdateManager") { "Could not open browser: ${e.message}" }
+        }
+    }
+
+    fun loadCachedReleaseHistory(context: Context): List<ReleaseHistoryItem> {
+        val prefs = context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString(KEY_CACHED_RELEASES_JSON, null) ?: return emptyList()
+        return try {
+            val jsonArray = JSONArray(jsonStr)
+            val list = mutableListOf<ReleaseHistoryItem>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                list.add(ReleaseHistoryItem(
+                    tagName = obj.optString("tagName"),
+                    name = obj.optString("name"),
+                    date = obj.optString("date"),
+                    rawBody = obj.optString("rawBody"),
+                    cleanNotes = obj.optString("cleanNotes"),
+                    isPrerelease = obj.optBoolean("isPrerelease"),
+                    htmlUrl = obj.optString("htmlUrl")
+                ))
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveReleaseHistoryCache(context: Context, items: List<ReleaseHistoryItem>) {
+        val prefs = context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+        val jsonArray = JSONArray()
+        for (item in items) {
+            val obj = JSONObject().apply {
+                put("tagName", item.tagName)
+                put("name", item.name)
+                put("date", item.date)
+                put("rawBody", item.rawBody)
+                put("cleanNotes", item.cleanNotes)
+                put("isPrerelease", item.isPrerelease)
+                put("htmlUrl", item.htmlUrl)
+            }
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_CACHED_RELEASES_JSON, jsonArray.toString()).apply()
+    }
+
+    fun fetchReleaseHistory(
+        context: Context,
+        force: Boolean = false,
+        onComplete: ((List<ReleaseHistoryItem>, String?) -> Unit)? = null
+    ) {
+        if (releaseHistory.isEmpty()) {
+            releaseHistory = loadCachedReleaseHistory(context)
+        }
+
+        if (!force && releaseHistory.isNotEmpty()) {
+            onComplete?.invoke(releaseHistory, null)
+            return
+        }
+
+        if (isFetchingHistory) return
+        isFetchingHistory = true
+
+        val request = JsonArrayRequest(
+            Request.Method.GET,
+            RELEASES_LIST_API_URL,
+            null,
+            { responseArray ->
+                isFetchingHistory = false
+                try {
+                    val items = mutableListOf<ReleaseHistoryItem>()
+                    for (i in 0 until responseArray.length()) {
+                        val obj = responseArray.getJSONObject(i)
+                        val tagName = obj.optString("tag_name", "")
+                        val name = obj.optString("name", "").ifBlank { tagName }
+                        val publishedAt = obj.optString("published_at", "")
+                        val dateStr = formatIsoDate(context, publishedAt)
+                        val rawBody = obj.optString("body", "")
+                        val clean = parseChangelog(rawBody) ?: "Routine maintenance and stability build."
+                        val isPrerelease = obj.optBoolean("prerelease", false)
+                        val htmlUrl = obj.optString("html_url", "")
+
+                        items.add(ReleaseHistoryItem(
+                            tagName = tagName,
+                            name = name,
+                            date = dateStr,
+                            rawBody = rawBody,
+                            cleanNotes = clean,
+                            isPrerelease = isPrerelease,
+                            htmlUrl = htmlUrl
+                        ))
+                    }
+                    releaseHistory = items
+                    saveReleaseHistoryCache(context, items)
+                    onComplete?.invoke(items, null)
+                } catch (e: Exception) {
+                    onComplete?.invoke(releaseHistory, e.message)
+                }
+            },
+            { error ->
+                isFetchingHistory = false
+                onComplete?.invoke(releaseHistory, error.message)
+            }
+        )
+        NetworkManager.getRequestQueue(context).add(request)
+    }
+
+    private fun formatIsoDate(context: Context, isoString: String): String {
+        if (isoString.isBlank()) return ""
+        return try {
+            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+            val date = parser.parse(isoString.substringBefore('.'))
+            if (date != null) {
+                android.text.format.DateFormat.getMediumDateFormat(context).format(date)
+            } else {
+                isoString.substringBefore('T')
+            }
+        } catch (e: Exception) {
+            isoString.substringBefore('T')
+        }
+    }
+
+    fun checkAndShowPostUpdateChangelog(activity: Activity) {
+        val prefs = activity.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+        val lastRunCode = prefs.getInt(KEY_LAST_RUN_VERSION_CODE, -1)
+        val lastRunName = prefs.getString(KEY_LAST_RUN_VERSION_NAME, null)
+        val currentCode = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
+        val currentName = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME
+
+        if (lastRunCode == -1) {
+            prefs.edit()
+                .putInt(KEY_LAST_RUN_VERSION_CODE, currentCode)
+                .putString(KEY_LAST_RUN_VERSION_NAME, currentName)
+                .apply()
+            return
+        }
+
+        if (lastRunCode != currentCode || lastRunName != currentName) {
+            prefs.edit()
+                .putInt(KEY_LAST_RUN_VERSION_CODE, currentCode)
+                .putString(KEY_LAST_RUN_VERSION_NAME, currentName)
+                .apply()
+
+            val pendingNotes = prefs.getString(KEY_PENDING_UPDATE_CHANGELOG, null)
+            prefs.edit().remove(KEY_PENDING_UPDATE_CHANGELOG).apply()
+
+            if (!pendingNotes.isNullOrBlank()) {
+                showPostUpdateDialog(activity, currentName, pendingNotes)
+            } else {
+                if (releaseHistory.isEmpty()) {
+                    releaseHistory = loadCachedReleaseHistory(activity)
+                }
+                val cached = releaseHistory.firstOrNull {
+                    it.tagName.equals(currentName, true) ||
+                    it.name.contains(currentName, true) ||
+                    (currentName.contains("nightly", true) && it.tagName.equals("nightly", true))
+                }?.cleanNotes
+
+                if (!cached.isNullOrBlank()) {
+                    showPostUpdateDialog(activity, currentName, cached)
+                } else {
+                    fetchReleaseHistory(activity, force = true) { items, _ ->
+                        if (!activity.isFinishing && !activity.isDestroyed) {
+                            val fetched = items.firstOrNull {
+                                it.tagName.equals(currentName, true) ||
+                                it.name.contains(currentName, true) ||
+                                (currentName.contains("nightly", true) && it.tagName.equals("nightly", true))
+                            }?.cleanNotes
+                            showPostUpdateDialog(activity, currentName, fetched)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showPostUpdateDialog(activity: Activity, version: String, notes: String?) {
+        if (activity.isFinishing || activity.isDestroyed) return
+
+        val msg = notes?.trim().takeIf { !it.isNullOrBlank() }
+            ?: activity.getString(R.string.update_post_update_generic_message)
+
+        val dialog = MaterialAlertDialogBuilder(activity)
+            .setTitle(activity.getString(R.string.whats_new_in_version, version))
+            .setMessage(msg)
+            .setPositiveButton(R.string.got_it, null)
+            .setNeutralButton(R.string.changelog_history_title) { _, _ ->
+                openChangelogHistory(activity)
+            }
+            .create()
+
+        dialog.show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
+    }
+
+    fun openChangelogHistory(context: Context) {
+        try {
+            val intent = Intent(context, com.nxd1frnt.clockdesk2.ui.settings.SettingsActivity::class.java).apply {
+                putExtra("target_fragment", "changelog_history")
+                if (context !is Activity) {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Logger.e("UpdateManager") { "Could not open changelog history: ${e.message}" }
         }
     }
 }

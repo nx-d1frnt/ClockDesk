@@ -110,9 +110,9 @@ jobs:
 
           FEATS=$(git log "$RANGE" --no-merges --grep="^feat" --pretty=format:"$FORMAT")
           FIXES=$(git log "$RANGE" --no-merges --grep="^fix" --pretty=format:"$FORMAT")
-          PERF=$(git log "$RANGE" --no-merges --grep="^\(perf\|refactor\)" --pretty=format:"$FORMAT")
-          MAINT=$(git log "$RANGE" --no-merges --grep="^\(chore\|docs\|ci\|build\|style\)" --pretty=format:"$FORMAT")
-          OTHER=$(git log "$RANGE" --no-merges --grep="^\(feat\|fix\|perf\|refactor\|chore\|docs\|ci\|build\|style\)" --invert-grep --pretty=format:"$FORMAT")
+          UI_PERF=$(git log "$RANGE" --no-merges --grep="^\(ui\|perf\|refactor\)" --pretty=format:"$FORMAT")
+          MAINT=$(git log "$RANGE" --no-merges --grep="^\(chore\|docs\|ci\|build\|style\|test\)" --pretty=format:"$FORMAT")
+          OTHER=$(git log "$RANGE" --no-merges --grep="^\(feat\|fix\|ui\|perf\|refactor\|chore\|docs\|ci\|build\|style\|test\)" --invert-grep --pretty=format:"$FORMAT")
 
           {
             echo "### 📦 ClockDesk $TAG"
@@ -120,31 +120,42 @@ jobs:
             echo "Download the APK for your device architecture, or choose the **universal** APK."
             echo ""
             echo "### What's Changed"
+            echo "<!-- changelog-start -->"
+            HAS_CHANGES=false
             if [ -n "$FEATS" ]; then
               echo ""
               echo "#### Features"
               echo "$FEATS"
+              HAS_CHANGES=true
             fi
             if [ -n "$FIXES" ]; then
               echo ""
               echo "#### Bug Fixes"
               echo "$FIXES"
+              HAS_CHANGES=true
             fi
-            if [ -n "$PERF" ]; then
+            if [ -n "$UI_PERF" ]; then
               echo ""
-              echo "#### Performance & Refactoring"
-              echo "$PERF"
+              echo "#### UI & Performance"
+              echo "$UI_PERF"
+              HAS_CHANGES=true
             fi
             if [ -n "$MAINT" ]; then
               echo ""
               echo "#### Maintenance & Chores"
               echo "$MAINT"
+              HAS_CHANGES=true
             fi
             if [ -n "$OTHER" ]; then
               echo ""
               echo "#### Other Changes"
               echo "$OTHER"
+              HAS_CHANGES=true
             fi
+            if [ "$HAS_CHANGES" = "false" ]; then
+              echo "- Routine maintenance and stability build."
+            fi
+            echo "<!-- changelog-end -->"
             if [ -n "$COMPARE_LINK" ]; then
               echo ""
               echo "$COMPARE_LINK"

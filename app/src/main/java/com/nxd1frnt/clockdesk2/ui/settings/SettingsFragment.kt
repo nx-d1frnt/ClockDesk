@@ -735,6 +735,13 @@ class UpdatesSettingsFragment : BaseM3SettingsFragment() {
                 rebuildSettings()
             }
             action(
+                title = getString(R.string.changelog_history_title),
+                summary = getString(R.string.changelog_history_summary),
+                showChevron = true
+            ) {
+                openSubFragment(ChangelogHistoryFragment())
+            }
+            action(
                 title = getString(R.string.update_view_release),
                 showChevron = true,
                 isVisible = { !checking }

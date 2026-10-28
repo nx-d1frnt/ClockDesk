@@ -71,18 +71,16 @@ class UpdatePlugin(private val context: Context) : ISmartChip {
     }
 
     private fun showAppUpdateDialog(){
-        val cleanNotes = UpdateManager.releaseNotes
-        ?.replace(Regex("###|##|#|\\*\\*|__"), "")
-        ?.trim()
+        val notes = UpdateManager.releaseNotes?.trim()
 
         val materialDialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
-        .setTitle(context.getString(R.string.new_version_title))
-        .setMessage(cleanNotes ?: context.getString(R.string.update_description_default))
-        .setPositiveButton(context.getString(R.string.install_action)) { _, _ ->
-            UpdateManager.downloadAndInstall(context)
-        }
-        .setNegativeButton(context.getString(R.string.later_action), null)
-        .create()
+            .setTitle(context.getString(R.string.new_version_title))
+            .setMessage(if (!notes.isNullOrBlank()) notes else context.getString(R.string.update_description_default))
+            .setPositiveButton(context.getString(R.string.install_action)) { _, _ ->
+                UpdateManager.downloadAndInstall(context)
+            }
+            .setNegativeButton(context.getString(R.string.later_action), null)
+            .create()
 
         materialDialog.show()
         com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager.styleAlertDialog(materialDialog)

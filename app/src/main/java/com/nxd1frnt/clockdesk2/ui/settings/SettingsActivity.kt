@@ -59,12 +59,24 @@ class SettingsActivity : AppCompatActivity() {
         if (isTablet) {
             categoryRecyclerView = findViewById(R.id.category_recycler_view)
             setupTabletNavigation(savedInstanceState)
+            if (intent.getStringExtra("target_fragment") == "changelog_history") {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.settings_container, ChangelogHistoryFragment())
+                    .commit()
+            }
         } else {
             // Phone single-pane default layout is inflated via XML (SettingsCategoryListFragment)
             if (savedInstanceState == null) {
                 supportFragmentManager.beginTransaction()
                     .replace(R.id.settings_container, SettingsCategoryListFragment())
                     .commit()
+                if (intent.getStringExtra("target_fragment") == "changelog_history") {
+                    supportFragmentManager.beginTransaction()
+                        .setTransition(androidx.fragment.app.FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
+                        .replace(R.id.settings_container, ChangelogHistoryFragment())
+                        .addToBackStack(null)
+                        .commit()
+                }
             }
         }
     }
@@ -106,6 +118,7 @@ class SettingsActivity : AppCompatActivity() {
             is MusicSourcesFragment -> getString(R.string.music_sources_title)
             is LastFmSettingsFragment -> getString(R.string.lastfm_plugin_name)
             is UpdatesSettingsFragment -> getString(R.string.updates_settings_title)
+            is ChangelogHistoryFragment -> getString(R.string.changelog_history_title)
             is AboutFragment -> getString(R.string.about_title)
             is com.nxd1frnt.clockdesk2.connect.ui.DeskConnectSettingsFragment -> getString(R.string.deskconnect_settings_title)
             else -> getString(R.string.settings_title)

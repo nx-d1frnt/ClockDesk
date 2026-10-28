@@ -769,6 +769,14 @@
     <string name="update_view_release">View release on GitHub</string>
     <string name="update_download_unknown_size">Downloaded %s · waiting for total size</string>
     <string name="update_whats_new">What\'s new</string>
+    <string name="whats_new_in_version">What\'s new in %s</string>
+    <string name="changelog_history_title">Changelog history</string>
+    <string name="changelog_history_summary">View release notes for past versions</string>
+    <string name="got_it">Got it</string>
+    <string name="loading_changelog_history">Loading changelog history…</string>
+    <string name="changelog_history_empty">No release notes available</string>
+    <string name="changelog_history_load_failed">Could not load changelog history</string>
+    <string name="update_post_update_generic_message">ClockDesk has been successfully updated. Explore the latest changes and features in changelog history.</string>
     <string name="update_show_more">Show more</string>
     <string name="update_show_less">Show less</string>
     <string name="update_nightly_channel_title">Nightly channel</string>
