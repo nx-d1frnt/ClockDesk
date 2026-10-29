@@ -113,25 +113,19 @@ jobs:
         id: changelog
         run: |
           REPO_URL="https://github.com/${{ github.repository }}"
-          PREV_TAG=$(git rev-parse refs/tags/nightly^{commit} 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            git fetch origin tag nightly --no-tags 2>/dev/null || true
-            PREV_TAG=$(git rev-parse refs/tags/nightly^{commit} 2>/dev/null || echo "")
-          fi
-
           HEAD_SHA=$(git rev-parse HEAD)
 
-          if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$HEAD_SHA" ]; then
+          # Force-fetch the remote nightly tag so we compare against the actual previous build
+          git fetch origin +refs/tags/nightly:refs/tags/nightly --no-tags 2>/dev/null || true
+          PREV_TAG=$(git rev-parse refs/tags/nightly^{commit} 2>/dev/null || echo "")
+
+          # Only use PREV_TAG if it exists, is distinct from HEAD, and is an ancestor of HEAD
+          if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$HEAD_SHA" ] && git merge-base --is-ancestor "$PREV_TAG" HEAD 2>/dev/null; then
             RANGE="$PREV_TAG..HEAD"
             COMPARE_LINK="**Full Changes**: $REPO_URL/compare/$PREV_TAG...$HEAD_SHA"
           else
             SINCE=$(date --date="24 hours ago" --iso-8601=seconds)
-            COMMITS_24H=$(git log --since="$SINCE" --oneline)
-            if [ -n "$COMMITS_24H" ]; then
-              RANGE="--since=\"$SINCE\""
-            else
-              RANGE="-n 10"
-            fi
+            RANGE="--since=$SINCE"
             COMPARE_LINK=""
           fi
 
