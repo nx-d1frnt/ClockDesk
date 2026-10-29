@@ -25,7 +25,7 @@ class NotificationsDeskView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs, defStyleAttr) {
     private val repository = DeskNotificationRepository.getInstance(context)
     private val adapter = NotificationAdapter(context, DeskConnectManager.getInstance(context)) {
-        repository.dismissNotification(it.deviceId, it.notificationId)
+        repository.dismissNotification(it)
     }
     private val recyclerView: RecyclerView
     private val emptyState: View

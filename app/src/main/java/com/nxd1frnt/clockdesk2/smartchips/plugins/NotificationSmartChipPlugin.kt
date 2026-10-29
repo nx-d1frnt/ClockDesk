@@ -49,7 +49,7 @@ class NotificationSmartChipPlugin(private val context: Context) : ISmartChip {
             if (action == "clear") {
                 val currentNotifications = repository.getNotifications()
                 for (item in currentNotifications) {
-                    repository.dismissNotification(item.deviceId, item.notificationId)
+                    repository.dismissNotification(item)
                 }
                 android.widget.Toast.makeText(view.context, R.string.notifications_cleared, android.widget.Toast.LENGTH_SHORT).show()
             } else {
@@ -84,7 +84,8 @@ class NotificationSmartChipPlugin(private val context: Context) : ISmartChip {
                     iconView,
                     firstItem.iconBytes,
                     firstItem.notificationId,
-                    textColor
+                    textColor,
+                    iconRes = firstItem.iconRes
                 )
                 iconView.tag = iconTag
             }

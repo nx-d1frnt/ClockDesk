@@ -85,7 +85,7 @@ object NotificationShadeBottomSheet {
             context = dialog.context,
             deskConnectManager = deskConnectManager,
             onDismissClick = { item ->
-                repository.dismissNotification(item.deviceId, item.notificationId)
+                repository.dismissNotification(item)
             }
         )
 
@@ -110,7 +110,7 @@ object NotificationShadeBottomSheet {
                 val position = viewHolder.bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val item = adapter.getItem(position)
-                    repository.dismissNotification(item.deviceId, item.notificationId)
+                    repository.dismissNotification(item)
                 }
             }
 

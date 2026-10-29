@@ -2,6 +2,8 @@ package com.nxd1frnt.clockdesk2.smartchips.ui
 
 import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
+import android.view.View
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -23,14 +25,17 @@ class NotificationChipSettingsActivity : AppCompatActivity() {
         val collapsingToolbar = findViewById<CollapsingToolbarLayout>(R.id.collapsingToolbar)
 
         setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+        toolbar.navigationIcon = null
 
         collapsingToolbar.title = getString(R.string.notification_chip_settings_title)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
-        toolbar.setNavigationOnClickListener {
+        findViewById<View>(R.id.btn_back).setOnClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             finish()
         }
 

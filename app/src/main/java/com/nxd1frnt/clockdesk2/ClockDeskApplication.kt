@@ -20,6 +20,7 @@ class ClockDeskApplication : Application() {
         val processName = getCurrentProcessName(this)
         // Only set the uncaught exception handler in the main process, not the crash reporting process itself.
         if (!processName.endsWith(":crash")) {
+            com.nxd1frnt.clockdesk2.notifications.AppNotificationManager.getInstance(this)
             val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
                 try {

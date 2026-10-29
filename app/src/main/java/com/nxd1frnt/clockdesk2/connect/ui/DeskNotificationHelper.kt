@@ -376,7 +376,8 @@ object DeskNotificationHelper {
         iconBytes: ByteArray?,
         notificationId: String,
         isClearable: Boolean,
-        isPreview: Boolean = false
+        isPreview: Boolean = false,
+        iconRes: Int? = null
     ) {
         val cardView = (view as? MaterialCardView) ?: view.findViewById(R.id.notification_card)
         val contentRow = view.findViewById<LinearLayout>(R.id.notification_content_row)
@@ -564,7 +565,7 @@ object DeskNotificationHelper {
 
         // 6. Icon & Monochrome Option
         val effectiveIconTint = if (monochromeIcon) headerColor else null
-        applyIcon(context, iconView, iconBytes, notificationId, effectiveIconTint)
+        applyIcon(context, iconView, iconBytes, notificationId, effectiveIconTint, iconRes)
     }
 
     fun applyIcon(
@@ -572,8 +573,18 @@ object DeskNotificationHelper {
         iconView: ImageView,
         iconBytes: ByteArray?,
         notificationId: String,
-        tintColor: Int? = null
+        tintColor: Int? = null,
+        iconRes: Int? = null
     ) {
+        if (iconRes != null) {
+            iconView.clearColorFilter()
+            ImageViewCompat.setImageTintList(iconView, null)
+            iconView.setImageResource(iconRes)
+            iconView.setColorFilter(tintColor ?: MaterialColors.getColor(
+                iconView, androidx.appcompat.R.attr.colorPrimary, Color.WHITE
+            ), PorterDuff.Mode.SRC_IN)
+            return
+        }
         var iconApplied = false
 
         if (iconBytes != null && iconBytes.isNotEmpty()) {

@@ -23,9 +23,12 @@ import android.widget.ImageView
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
-import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
+import com.nxd1frnt.clockdesk2.connect.model.DeskNotification
+import com.nxd1frnt.clockdesk2.connect.model.AppAlertType
+import com.nxd1frnt.clockdesk2.connect.model.NotificationOrigin
+import com.nxd1frnt.clockdesk2.connect.repo.DeskNotificationRepository
+import com.nxd1frnt.clockdesk2.notifications.AppNotificationManager
 import com.nxd1frnt.clockdesk2.desks.DeskType
-import com.nxd1frnt.clockdesk2.timer.TimerManager
 import com.nxd1frnt.clockdesk2.ui.MainActivity
 import com.nxd1frnt.clockdesk2.utils.Logger
 import java.util.LinkedList
@@ -37,150 +40,71 @@ class DeskNotificationManager(
     private val container: ViewGroup,
     private val deskConnectManager: DeskConnectManager
 ) {
-    data class NotificationItem(
-        val deviceId: String,
-        val notificationId: String,
-        val appName: String,
-        val title: String,
-        val text: String,
-        val iconBytes: ByteArray?,
-        val timestamp: Long,
-        val isClearable: Boolean
-    )
-
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val queue = LinkedList<NotificationItem>()
+    private val queue = LinkedList<DeskNotification>()
     private var currentView: View? = null
-    private var currentItem: NotificationItem? = null
+    private var currentItem: DeskNotification? = null
     private var dismissRunnable: Runnable? = null
     private var safetyWatchdogRunnable: Runnable? = null
     private var isDismissing = false
+    private var destroyed = false
 
-    private val deviceListener = object : DeskConnectManager.DeviceListener {
-        override fun onDeviceDiscovered(device: DeskConnectDevice) {}
-        override fun onDeviceConnected(device: DeskConnectDevice) {}
-        override fun onDeviceDisconnected(device: DeskConnectDevice) {
-            mainHandler.post {
-                queue.removeAll { it.deviceId == device.deviceId }
-                if (currentItem?.deviceId == device.deviceId) {
-                    dismissCurrent(notifyManager = false)
-                }
-            }
-        }
-        override fun onPairingRequested(device: DeskConnectDevice, verificationKey: String) {}
-        override fun onPairingStateChanged(device: DeskConnectDevice, isPaired: Boolean) {
-            if (!isPaired) {
-                mainHandler.post {
-                    queue.removeAll { it.deviceId == device.deviceId }
-                    if (currentItem?.deviceId == device.deviceId) {
-                        dismissCurrent(notifyManager = false)
-                    }
-                }
-            }
-        }
-    }
-
-    private val notificationListener = object : DeskConnectManager.NotificationListener {
-        override fun onNotificationReceived(
-            deviceId: String,
-            notificationId: String,
-            appName: String,
-            title: String,
-            text: String,
-            timestamp: Long,
-            iconBytes: ByteArray?,
-            isClearable: Boolean
-        ) {
-            val item = NotificationItem(
-                deviceId = deviceId,
-                notificationId = notificationId,
-                appName = appName,
-                title = title,
-                text = text,
-                iconBytes = iconBytes,
-                timestamp = timestamp,
-                isClearable = isClearable
-            )
-            enqueueNotification(item)
-        }
-
-        override fun onNotificationDismissed(deviceId: String, notificationId: String) {
-            if (currentItem?.deviceId == deviceId && currentItem?.notificationId == notificationId) {
-                dismissCurrent(notifyManager = false)
+    private val repository = DeskNotificationRepository.getInstance(context)
+    private val notificationListener = object : DeskNotificationRepository.EventListener {
+        override fun onPosted(item: DeskNotification, alert: Boolean) {
+            if (currentItem?.key == item.key) {
+                currentItem = item
+                currentView?.let { updateViewContent(it, item) }
+            } else if (alert) {
+                enqueueNotification(item)
             } else {
-                queue.removeAll { it.deviceId == deviceId && it.notificationId == notificationId }
+                val index = queue.indexOfFirst { it.key == item.key }
+                if (index >= 0) queue[index] = item
             }
+        }
+
+        override fun onRemoved(item: DeskNotification, acknowledged: Boolean) {
+            queue.removeAll { it.key == item.key }
+            if (currentItem?.key == item.key) dismissCurrent(notifyManager = false)
         }
     }
 
     init {
-        deskConnectManager.notificationListeners.add(notificationListener)
-        deskConnectManager.deviceListeners.add(deviceListener)
+        repository.addEventListener(notificationListener)
+        // Restore unfinished timer alerts, but do not replay a battery episode on every rotation.
+        repository.getNotifications().filter {
+            it.origin == NotificationOrigin.APP &&
+                (it.alertType == AppAlertType.TIMER_FINISHED || !repository.wasBannerPresented(it))
+        }.forEach(::enqueueNotification)
     }
-
-    fun showTimerExpiredNotification(title: String, text: String) {
-        val item = NotificationItem(
-            deviceId = "local_timer",
-            notificationId = "timer_expired",
-            appName = context.getString(R.string.desk_type_timer),
-            title = title,
-            text = text,
-            iconBytes = null,
-            timestamp = System.currentTimeMillis(),
-            isClearable = true
-        )
-        mainHandler.post {
-            enqueueNotification(item)
-        }
-    }
-
-    fun dismissTimerNotification() {
-        mainHandler.post {
-            queue.removeAll { it.deviceId == "local_timer" || it.notificationId == "timer_expired" }
-            if (currentItem?.deviceId == "local_timer" || currentItem?.notificationId == "timer_expired") {
-                dismissCurrent(notifyManager = false)
-            }
-        }
-    }
-
     private fun getPrefs() = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
-    private fun enqueueNotification(item: NotificationItem) {
-        val isTimer = item.deviceId == "local_timer" || item.notificationId == "timer_expired"
-        if (!isTimer && !getPrefs().getBoolean("desk_notification_popup_enabled", true)) {
-            return
+    private fun enqueueNotification(item: DeskNotification) {
+        if (destroyed) return
+        val bannerEnabled = when (item.alertType) {
+            AppAlertType.TIMER_FINISHED -> getPrefs().getBoolean(AppNotificationManager.TIMER_BANNER, true)
+            AppAlertType.DEVICE_BATTERY_LOW -> getPrefs().getBoolean(AppNotificationManager.BATTERY_BANNER, true)
+            null -> getPrefs().getBoolean("desk_notification_popup_enabled", true)
         }
-
-        // If this notification is currently displayed, update it in-place instead of queueing duplicate
-        if (currentItem?.deviceId == item.deviceId && currentItem?.notificationId == item.notificationId) {
-            currentItem = item
-            currentView?.let { view ->
-                updateViewContent(view, item)
-                // Refresh auto dismiss timer
-                val baseDurationSec = getPrefs().getInt("desk_notification_duration", 5)
-                val defaultDisplayMs = if (isTimer) 60_000L else (baseDurationSec * 1000L).coerceAtLeast(2000L)
-                scheduleAutoDismiss(if (queue.isNotEmpty() && !isTimer) 3000L else defaultDisplayMs)
-            }
-            return
-        }
-
+        if (!bannerEnabled) return
         // Replace existing notification in queue if same id
-        queue.removeAll { it.deviceId == item.deviceId && it.notificationId == item.notificationId }
+        queue.removeAll { it.key == item.key }
 
-        // Cap queue to 3 notifications max to prevent backlog
-        while (queue.size >= 3) {
-            queue.poll()
+        // Highest priority first. A timer can interrupt a routine banner immediately.
+        val position = queue.indexOfFirst { it.priority < item.priority }
+        if (position < 0) queue.add(item) else queue.add(position, item)
+        while (queue.size > 3) queue.removeLast()
+        if (item.priority > (currentItem?.priority ?: Int.MAX_VALUE)) {
+            dismissCurrent(notifyManager = false)
         }
-        queue.add(item)
-
         if (currentView == null && !isDismissing) {
             showNext()
         }
     }
 
-    private fun updateViewContent(view: View, item: NotificationItem) {
-        val deviceName = if (item.deviceId == "local_timer") null else {
-            val dev = deskConnectManager.discoveredDevices[item.deviceId]
+    private fun updateViewContent(view: View, item: DeskNotification) {
+        val deviceName = if (item.origin == NotificationOrigin.APP && item.relatedDeviceId == null) null else {
+            val dev = deskConnectManager.discoveredDevices[item.relatedDeviceId ?: item.deviceId]
             dev?.getDisplayName()
         }
 
@@ -195,12 +119,13 @@ class DeskNotificationManager(
             iconBytes = item.iconBytes,
             notificationId = item.notificationId,
             isClearable = item.isClearable,
+            iconRes = item.iconRes,
             isPreview = false
         )
     }
 
     private fun showNext() {
-        if (isDismissing) return
+        if (isDismissing || destroyed) return
 
         if (queue.isEmpty()) {
             currentView = null
@@ -265,22 +190,19 @@ class DeskNotificationManager(
 
         updateViewContent(view, item)
 
-        val isTimer = item.deviceId == "local_timer" || item.notificationId == "timer_expired"
-        if (isTimer) {
-            view.setOnClickListener {
-                TimerManager.reset()
-                MainActivity.openDeskType(DeskType.TIMER)
-                dismissCurrent(notifyManager = false)
+        val isTimer = item.alertType == AppAlertType.TIMER_FINISHED
+        view.setOnClickListener {
+            when (item.alertType) {
+                AppAlertType.TIMER_FINISHED -> {
+                    repository.dismissNotification(item)
+                    MainActivity.openDeskType(DeskType.TIMER)
+                }
+                AppAlertType.DEVICE_BATTERY_LOW -> MainActivity.openDeskType(DeskType.DEVICES)
+                null -> Unit
             }
         }
 
-        dismissBtn.setOnClickListener {
-            if (currentItem?.deviceId == "local_timer" || currentItem?.notificationId == "timer_expired") {
-                TimerManager.reset()
-            }
-            dismissCurrent(notifyManager = true)
-        }
-
+        dismissBtn.setOnClickListener { dismissCurrent(notifyManager = true) }
         setupSwipeToDismiss(view, isBottom)
 
         // Animate entrance: slide from top or bottom + fade in
@@ -288,6 +210,7 @@ class DeskNotificationManager(
         view.translationY = if (isBottom) 120f else -120f
         view.alpha = 0f
         container.addView(view)
+        repository.markBannerPresented(item)
 
         view.animate()
             .translationY(0f)
@@ -466,13 +389,9 @@ class DeskNotificationManager(
 
         isDismissing = true
 
-        val isTimer = itemToDismiss != null && (itemToDismiss.deviceId == "local_timer" || itemToDismiss.notificationId == "timer_expired")
-        if (isTimer) {
-            TimerManager.reset()
-        } else if (notifyManager && itemToDismiss != null && itemToDismiss.isClearable) {
-            deskConnectManager.dismissNotification(itemToDismiss.deviceId, itemToDismiss.notificationId)
+        if (notifyManager && itemToDismiss != null && itemToDismiss.isClearable) {
+            repository.dismissNotification(itemToDismiss)
         }
-
         viewToDismiss.animate()
             .translationX(exitTranslationX)
             .translationY(exitTranslationY)
@@ -504,8 +423,9 @@ class DeskNotificationManager(
     }
 
     fun destroy() {
-        deskConnectManager.notificationListeners.remove(notificationListener)
-        deskConnectManager.deviceListeners.remove(deviceListener)
+        destroyed = true
+        repository.removeEventListener(notificationListener)
+        currentView?.animate()?.setListener(null)?.cancel()
         dismissRunnable?.let { mainHandler.removeCallbacks(it) }
         safetyWatchdogRunnable?.let { mainHandler.removeCallbacks(it) }
         dismissRunnable = null

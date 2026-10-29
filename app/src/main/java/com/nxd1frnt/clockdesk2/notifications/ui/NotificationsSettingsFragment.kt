@@ -1,190 +1,80 @@
 package com.nxd1frnt.clockdesk2.notifications.ui
 
 import android.content.Intent
-import androidx.activity.result.contract.ActivityResultContracts
 import com.nxd1frnt.clockdesk2.R
-import com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationHelper
+import com.nxd1frnt.clockdesk2.notifications.AppNotificationManager
 import com.nxd1frnt.clockdesk2.smartchips.ui.NotificationChipSettingsActivity
 import com.nxd1frnt.clockdesk2.ui.settings.components.BaseM3SettingsFragment
 import com.nxd1frnt.clockdesk2.ui.settings.components.SettingsItem
 
+/** Overview: choose a notification type before changing its behavior. */
 class NotificationsSettingsFragment : BaseM3SettingsFragment() {
-
-    private val addFontLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null && isAdded) {
-            val ctx = requireContext()
-            val newFontId = DeskNotificationHelper.addCustomFont(ctx, uri)
-            if (newFontId != null) {
-                val fonts = DeskNotificationHelper.getFontsList(ctx)
-                val newIdx = fonts.indexOfFirst {
-                    DeskNotificationHelper.getFontIdentifier(ctx, it) == newFontId
-                }.takeIf { it >= 1 } ?: 1
-                prefs.edit()
-                    .putString(DeskNotificationHelper.KEY_FONT_ID, newFontId)
-                    .putInt(DeskNotificationHelper.KEY_FONT_INDEX, newIdx)
-                    .apply()
-                rebuildSettings()
-            }
-        }
+    override fun onResume() {
+        super.onResume()
+        rebuildSettings()
     }
 
     override fun buildSettings(): List<SettingsItem> = settings {
-        val popupEnabled = prefs.getBoolean("desk_notification_popup_enabled", true)
+        category(getString(R.string.notification_types_category)) {
+            action(
+                key = "notification_timer_settings",
+                title = getString(R.string.notification_timers_title),
+                summary = getString(R.string.notification_behavior_summary,
+                    getString(if (prefs.getBoolean(AppNotificationManager.TIMER_BANNER, true))
+                        R.string.notification_delivery_banner else R.string.notification_delivery_list),
+                    getString(if (prefs.getBoolean("timer_is_silent", false))
+                        R.string.notification_alarm_vibration else R.string.notification_alarm_sound)),
+                iconRes = R.drawable.ic_timer,
+                showChevron = true
+            ) { openSubFragment(TimerNotificationSettingsFragment()) }
 
-        category(getString(R.string.pref_cat_floating_banners)) {
-            switch(
-                key = "desk_notification_popup_enabled",
-                title = getString(R.string.desk_notification_popup_title),
-                summary = getString(R.string.desk_notification_popup_summary),
-                iconRes = R.drawable.ic_notifications,
-                defaultValue = true
-            )
+            val batterySummary = if (prefs.getBoolean(AppNotificationManager.BATTERY_ENABLED, true)) {
+                getString(R.string.notification_battery_status,
+                    prefs.getInt(AppNotificationManager.BATTERY_THRESHOLD, 20),
+                    getString(if (prefs.getBoolean(AppNotificationManager.BATTERY_BANNER, true))
+                        R.string.notification_delivery_banner else R.string.notification_delivery_list))
+            } else getString(R.string.notification_alerts_off)
+            action(
+                key = "notification_battery_settings",
+                title = getString(R.string.notification_device_battery_title),
+                summary = batterySummary,
+                iconRes = R.drawable.ic_battery_alert,
+                showChevron = true
+            ) { openSubFragment(DeviceBatteryNotificationSettingsFragment()) }
 
-            notificationPreview(
-                isEnabled = { popupEnabled }
-            )
-
-            notificationAppearance(
-                isEnabled = { popupEnabled },
-                onAddFontRequested = {
-                    addFontLauncher.launch(
-                        arrayOf(
-                            "font/ttf",
-                            "font/otf",
-                            "font/*",
-                            "application/x-font-ttf",
-                            "application/x-font-otf",
-                            "application/octet-stream",
-                            "*/*"
-                        )
-                    )
-                }
-            )
-
-            choice(
-                key = DeskNotificationHelper.KEY_STYLE,
-                title = getString(R.string.desk_notification_style_title),
-                summary = getString(R.string.desk_notification_style_summary),
-                entries = resources.getStringArray(R.array.desk_notification_style_entries),
-                entryValues = resources.getStringArray(R.array.desk_notification_style_values),
-                defaultValue = "standard",
-                isEnabled = { popupEnabled }
-            )
-
-            choice(
-                key = DeskNotificationHelper.KEY_POSITION,
-                title = getString(R.string.desk_notification_position_title),
-                summary = getString(R.string.desk_notification_position_summary),
-                entries = resources.getStringArray(R.array.desk_notification_position_entries),
-                entryValues = resources.getStringArray(R.array.desk_notification_position_values),
-                defaultValue = "top_center",
-                isEnabled = { popupEnabled }
-            )
-
-            slider(
-                key = DeskNotificationHelper.KEY_SCALE,
-                title = getString(R.string.desk_notification_scale_title),
-                summary = getString(R.string.desk_notification_scale_summary),
-                min = 80f,
-                max = 140f,
-                step = 5f,
-                defaultValue = 100f,
-                valueFormatter = { "${it.toInt()}%" },
-                isEnabled = { popupEnabled }
-            )
-
-            slider(
-                key = DeskNotificationHelper.KEY_BG_OPACITY,
-                title = getString(R.string.desk_notification_bg_opacity_title),
-                summary = getString(R.string.desk_notification_bg_opacity_summary),
-                min = 40f,
-                max = 100f,
-                step = 5f,
-                defaultValue = 100f,
-                valueFormatter = { "${it.toInt()}%" },
-                isEnabled = { popupEnabled }
-            )
-
-            slider(
-                key = "desk_notification_duration",
-                title = getString(R.string.desk_notification_duration_title),
-                summary = getString(R.string.desk_notification_duration_summary),
-                min = 2f,
-                max = 15f,
-                step = 1f,
-                defaultValue = 5f,
-                valueFormatter = { "${it.toInt()} s" },
-                isEnabled = { popupEnabled }
-            )
-
-            switch(
-                key = DeskNotificationHelper.KEY_MONOCHROME_ICON,
-                title = getString(R.string.desk_notification_monochrome_icon_title),
-                summary = getString(R.string.desk_notification_monochrome_icon_summary),
-                defaultValue = false,
-                isEnabled = { popupEnabled }
-            )
-
-            switch(
-                key = DeskNotificationHelper.KEY_SHOW_DEVICE,
-                title = getString(R.string.desk_notification_show_device_title),
-                summary = getString(R.string.desk_notification_show_device_summary),
-                defaultValue = true,
-                isEnabled = { popupEnabled }
-            )
-
-            switch(
-                key = DeskNotificationHelper.KEY_SHOW_DISMISS,
-                title = getString(R.string.desk_notification_show_dismiss_title),
-                summary = getString(R.string.desk_notification_show_dismiss_summary),
-                defaultValue = true,
-                isEnabled = { popupEnabled }
-            )
-
-            switch(
-                key = DeskNotificationHelper.KEY_HIDE_SENSITIVE,
-                title = getString(R.string.desk_notification_hide_sensitive_title),
-                summary = getString(R.string.desk_notification_hide_sensitive_summary),
-                defaultValue = false,
-                isEnabled = { popupEnabled }
-            )
+            action(
+                key = "notification_remote_settings",
+                title = getString(R.string.notification_remote_title),
+                summary = getString(R.string.notification_remote_summary),
+                iconRes = R.drawable.ic_devices,
+                showChevron = true
+            ) { openSubFragment(RemoteNotificationSettingsFragment()) }
         }
 
-        category(getString(R.string.pref_cat_phone_calls)) {
-            switch(
-                key = "desk_call_overlay_enabled",
-                title = getString(R.string.desk_call_overlay_title),
-                summary = getString(R.string.desk_call_overlay_summary),
-                defaultValue = true
-            )
-
-            switch(
-                key = "desk_call_missed_notification",
-                title = getString(R.string.desk_call_missed_notification_title),
-                summary = getString(R.string.desk_call_missed_notification_summary),
-                defaultValue = true
-            )
-        }
-
-        category(getString(R.string.pref_cat_smart_chip)) {
+        category(getString(R.string.notification_customize_category)) {
+            action(
+                key = "notification_banner_settings",
+                title = getString(R.string.notification_banner_appearance),
+                summary = getString(R.string.notification_banner_appearance_summary),
+                iconRes = R.drawable.ic_palette_swatch,
+                showChevron = true
+            ) { openSubFragment(NotificationBannerSettingsFragment()) }
             action(
                 key = "pref_key_notification_chip_settings",
-                title = getString(R.string.pref_notification_chip_settings_title),
-                summary = getString(R.string.pref_notification_chip_settings_summary),
+                title = getString(R.string.notification_chip_title),
+                summary = getString(R.string.notification_chip_summary),
+                iconRes = R.drawable.ic_notifications,
                 showChevron = true
-            ) {
-                val intent = Intent(requireContext(), NotificationChipSettingsActivity::class.java)
-                startActivity(intent)
-            }
+            ) { startActivity(Intent(requireContext(), NotificationChipSettingsActivity::class.java)) }
+        }
 
+        category(getString(R.string.notification_list_category)) {
             action(
                 key = "pref_key_open_notification_shade",
-                title = getString(R.string.pref_notification_shade_shortcut_title),
-                summary = getString(R.string.pref_notification_shade_shortcut_summary),
-                showChevron = true
-            ) {
-                NotificationShadeBottomSheet.show(requireContext())
-            }
+                title = getString(R.string.notification_open_list),
+                summary = getString(R.string.notification_open_list_summary),
+                iconRes = R.drawable.ic_notifications
+            ) { NotificationShadeBottomSheet.show(requireContext()) }
         }
     }
 }

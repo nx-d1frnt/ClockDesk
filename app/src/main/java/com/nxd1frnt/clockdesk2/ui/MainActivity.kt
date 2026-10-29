@@ -182,27 +182,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private lateinit var powerStateManager: PowerStateManager
     private lateinit var sensorManager: SensorManager
 
-    private val mainTimerListener = object : com.nxd1frnt.clockdesk2.timer.TimerManager.TimerListener {
-        override fun onTimerTick(remainingMillis: Long, totalDurationMillis: Long) {}
-        override fun onTimerStateChanged(state: com.nxd1frnt.clockdesk2.timer.TimerState) {
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                if (state == com.nxd1frnt.clockdesk2.timer.TimerState.FINISHED) {
-                    if (::deskNotificationManager.isInitialized) {
-                        deskNotificationManager.showTimerExpiredNotification(
-                            title = getString(R.string.timer_time_up),
-                            text = getString(R.string.timer_dismiss_to_stop)
-                        )
-                    }
-                } else {
-                    if (::deskNotificationManager.isInitialized) {
-                        deskNotificationManager.dismissTimerNotification()
-                    }
-                }
-            }
-        }
-    }
-
     // Desks Feature
     private lateinit var deskManager: DeskManager
     private lateinit var deskAppearancePreferences: DeskAppearancePreferences
@@ -460,7 +439,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         checkForFirstLaunchAnimation()
         restoreSavedWeatherState()
         startUpdates()
-        com.nxd1frnt.clockdesk2.timer.TimerManager.addListener(mainTimerListener)
         handleTimerIntent(intent)
     }
 
@@ -934,13 +912,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         val callContainer = findViewById<android.view.ViewGroup>(R.id.desk_call_container)
         deskNotificationManager = com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationManager(this, notificationContainer, deskConnectManager)
         deskCallOverlay = com.nxd1frnt.clockdesk2.connect.ui.DeskCallOverlay(this, callContainer, deskConnectManager)
-
-        if (com.nxd1frnt.clockdesk2.timer.TimerManager.state == com.nxd1frnt.clockdesk2.timer.TimerState.FINISHED) {
-            deskNotificationManager.showTimerExpiredNotification(
-                title = getString(R.string.timer_time_up),
-                text = getString(R.string.timer_dismiss_to_stop)
-            )
-        }
 
         val listener = object : com.nxd1frnt.clockdesk2.connect.DeskConnectManager.DeviceListener {
             override fun onDeviceDiscovered(device: com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice) {}
@@ -1692,7 +1663,6 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).removeListener(backgroundProviderListener)
         deskAppearancePreferences.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)
-        com.nxd1frnt.clockdesk2.timer.TimerManager.removeListener(mainTimerListener)
         if (instance === this) instance = null
     }
 

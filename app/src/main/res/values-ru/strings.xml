@@ -850,4 +850,42 @@
     </string-array>
     <string name="media_style_artwork_player">Плеер с обложкой</string>
     <string name="media_preview_song">Трек</string>
+
+    <!-- App notification settings and alerts -->
+    <string name="notification_types_category">Типы уведомлений</string>
+    <string name="notification_timers_title">Таймеры</string>
+    <string name="notification_device_battery_title">Батарея устройства</string>
+    <string name="notification_remote_title">Уведомления с устройств</string>
+    <string name="notification_remote_summary">Пересланные уведомления, входящие и пропущенные звонки</string>
+    <string name="notification_customize_category">Настройка вида</string>
+    <string name="notification_banner_appearance">Вид баннеров</string>
+    <string name="notification_banner_appearance_summary">Стиль, расположение и содержимое всех баннеров</string>
+    <string name="notification_chip_title">Чип уведомлений</string>
+    <string name="notification_chip_summary">Выберите содержимое чипа и действие при нажатии</string>
+    <string name="notification_list_category">Список уведомлений</string>
+    <string name="notification_open_list">Просмотреть уведомления</string>
+    <string name="notification_open_list_summary">Уведомления от ClockDesk и подключённых устройств</string>
+    <string name="notification_behavior_summary">%1$s · %2$s</string>
+    <string name="notification_delivery_banner">Баннер и список</string>
+    <string name="notification_delivery_list">Только список</string>
+    <string name="notification_battery_status">При заряде %1$d%% · %2$s</string>
+    <string name="notification_alerts_off">Выключено</string>
+    <string name="notification_timer_finished_category">Когда таймер завершается</string>
+    <string name="notification_show_banner">Показывать баннер</string>
+    <string name="notification_timer_banner_summary">Сигнал работает даже с выключенными баннерами.</string>
+    <string name="notification_timer_alarm">Сигнал</string>
+    <string name="notification_alarm_sound">Звук и вибрация</string>
+    <string name="notification_alarm_vibration">Только вибрация</string>
+    <string name="notification_low_battery_alerts">Предупреждения о низком заряде</string>
+    <string name="notification_low_battery_summary">Тихое уведомление, когда заряд подключённого устройства низкий.</string>
+    <string name="notification_battery_notify_at">Уведомлять при заряде не выше</string>
+    <string name="notification_battery_level">%1$d%%</string>
+    <string name="notification_battery_banner_summary">Показывать всплывающий баннер в дополнение к записи в списке уведомлений.</string>
+    <string name="notification_forwarded_category">Пересланные уведомления</string>
+    <string name="notification_forwarded_banner_summary">Показывать всплывающие уведомления с подключённых устройств.</string>
+    <string name="notification_banner_style_category">Стиль</string>
+    <string name="notification_banner_placement_category">Расположение и длительность</string>
+    <string name="notification_banner_content_category">Содержимое</string>
+    <string name="app_alert_device_battery_low">Низкий заряд: %1$s</string>
+    <string name="app_alert_battery_remaining">Осталось %1$d%% заряда. Подключите устройство к питанию.</string>
 </resources>

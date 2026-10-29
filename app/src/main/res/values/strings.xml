@@ -890,4 +890,42 @@
     </string-array>
     <string name="media_style_artwork_player">Artwork Player</string>
     <string name="media_preview_song">Song</string>
+
+    <!-- App notification settings and alerts -->
+    <string name="notification_types_category">Notification types</string>
+    <string name="notification_timers_title">Timers</string>
+    <string name="notification_device_battery_title">Device battery</string>
+    <string name="notification_remote_title">Notifications from devices</string>
+    <string name="notification_remote_summary">Forwarded notifications, incoming calls and missed calls</string>
+    <string name="notification_customize_category">Customize</string>
+    <string name="notification_banner_appearance">Banner appearance</string>
+    <string name="notification_banner_appearance_summary">Style, position and content for all banners</string>
+    <string name="notification_chip_title">Notification chip</string>
+    <string name="notification_chip_summary">Choose what the chip shows and what a tap does</string>
+    <string name="notification_list_category">Notification list</string>
+    <string name="notification_open_list">View notifications</string>
+    <string name="notification_open_list_summary">See alerts from ClockDesk and your connected devices</string>
+    <string name="notification_behavior_summary">%1$s · %2$s</string>
+    <string name="notification_delivery_banner">Banner and list</string>
+    <string name="notification_delivery_list">List only</string>
+    <string name="notification_battery_status">At %1$d%% · %2$s</string>
+    <string name="notification_alerts_off">Off</string>
+    <string name="notification_timer_finished_category">When a timer finishes</string>
+    <string name="notification_show_banner">Show a banner</string>
+    <string name="notification_timer_banner_summary">The alarm still works when banners are off.</string>
+    <string name="notification_timer_alarm">Alarm</string>
+    <string name="notification_alarm_sound">Sound and vibration</string>
+    <string name="notification_alarm_vibration">Vibration only</string>
+    <string name="notification_low_battery_alerts">Low battery alerts</string>
+    <string name="notification_low_battery_summary">Get a silent alert when a connected device is running low.</string>
+    <string name="notification_battery_notify_at">Notify at or below</string>
+    <string name="notification_battery_level">%1$d%%</string>
+    <string name="notification_battery_banner_summary">Show a popup as well as an entry in your notification list.</string>
+    <string name="notification_forwarded_category">Forwarded notifications</string>
+    <string name="notification_forwarded_banner_summary">Pop up notifications shared by connected devices.</string>
+    <string name="notification_banner_style_category">Style</string>
+    <string name="notification_banner_placement_category">Position and duration</string>
+    <string name="notification_banner_content_category">Content</string>
+    <string name="app_alert_device_battery_low">%1$s battery low</string>
+    <string name="app_alert_battery_remaining">%1$d%% remaining. Connect the device to power.</string>
 </resources>

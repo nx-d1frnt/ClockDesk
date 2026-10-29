@@ -16,6 +16,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskNotification
+import com.nxd1frnt.clockdesk2.connect.model.AppAlertType
+import com.nxd1frnt.clockdesk2.desks.DeskType
+import com.nxd1frnt.clockdesk2.ui.MainActivity
 import com.nxd1frnt.clockdesk2.connect.ui.DeskNotificationHelper
 import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
@@ -36,7 +39,7 @@ internal class NotificationAdapter(
             override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
                 val o = oldItems[oldItemPosition]
                 val n = newItems[newItemPosition]
-                return o.deviceId == n.deviceId && o.notificationId == n.notificationId
+                return o.key == n.key
             }
 
             override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
@@ -95,9 +98,9 @@ internal class NotificationAdapter(
             itemView.alpha = 1f
             dismissBtn.isEnabled = true
 
-            DeskNotificationHelper.applyIcon(context, appIcon, item.iconBytes, item.notificationId)
+            DeskNotificationHelper.applyIcon(context, appIcon, item.iconBytes, item.notificationId, iconRes = item.iconRes)
 
-            val dev = deskConnectManager.discoveredDevices[item.deviceId]
+            val dev = deskConnectManager.discoveredDevices[item.relatedDeviceId ?: item.deviceId]
             val deviceName = dev?.getDisplayName()
 
             val timeStr = if (item.timestamp > 0) {
@@ -128,6 +131,16 @@ internal class NotificationAdapter(
                 if (!item.isClearable) return@setOnClickListener
                 dismissBtn.isEnabled = false
                 onDismissClick(item)
+            }
+            itemView.setOnClickListener {
+                when (item.alertType) {
+                    AppAlertType.TIMER_FINISHED -> {
+                        onDismissClick(item)
+                        MainActivity.openDeskType(DeskType.TIMER)
+                    }
+                    AppAlertType.DEVICE_BATTERY_LOW -> MainActivity.openDeskType(DeskType.DEVICES)
+                    null -> Unit
+                }
             }
         }
     }
