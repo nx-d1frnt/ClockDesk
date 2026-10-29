@@ -95,7 +95,7 @@
     <string name="onboarding_widgets_title">Widgets &amp; Music Sync</string>
     <string name="onboarding_widgets_desc">Display real-time album art from your media player, and add modular info chips for battery status, updates, and background progress.</string>
     <string name="onboarding_deskconnect_title">Stay Connected</string>
-    <string name="onboarding_deskconnect_desc">Wirelessly pair your phone or PC with DeskConnect to view device battery levels, sync notifications, and see incoming call alerts directly on your desk.</string>
+    <string name="onboarding_deskconnect_desc">Wirelessly pair your phone or PC with Device Connect to view device battery levels, sync notifications, and see incoming call alerts directly on your desk.</string>
     <string name="onboarding_weather_title">Dynamic Environments</string>
     <string name="onboarding_weather_desc">Enjoy animated rain, snow, or fog effects and color gradients that evolve naturally with your local sunrise and sunset times.</string>
     <string name="onboarding_permission_title">Ready to Start?</string>
@@ -284,7 +284,7 @@
     <string name="burn_in_protection_summary">Prevent burn-in on OLED screens by moving UI elements periodically</string>
     <string name="system_media_plugin_name">System Media</string>
     <string name="lastfm_plugin_name">Last.fm</string>
-    <string name="deskconnect_plugin_name">DeskConnect</string>
+    <string name="deskconnect_plugin_name">Device Connect</string>
     <string name="system_media_plugin_description">Android MediaSession</string>
     <string name="lastfm_plugin_description">Scrobble API</string>
     <string name="deskconnect_plugin_description">Remote media from paired device</string>
@@ -358,7 +358,7 @@
     <!-- Backup & Restore Strings -->
     <string name="backup_restore_title">Backup and Restore</string>
     <string name="backup_connected_devices_title">Include connected devices</string>
-    <string name="backup_connected_devices_summary">Include paired DeskConnect devices and identity in backup</string>
+    <string name="backup_connected_devices_summary">Include paired Device Connect devices and identity in backup</string>
     <string name="export_settings">Backup settings</string>
     <string name="import_settings">Restore settings</string>
     <string name="export_success">Backup saved successfully</string>
@@ -569,10 +569,14 @@
     <string name="confirm_reset_layout_title">Reset Layout?</string>
     <string name="confirm_reset_layout_msg">This will restore the default widgets and positions.</string>
 
-    <!-- DeskConnect -->
-    <string name="deskconnect_settings_title">DeskConnect</string>
+    <!-- Device Connect -->
+    <string name="deskconnect_fingerprint">Certificate fingerprint</string>
+    <string name="deskconnect_pairing">Pairing…</string>
+    <string name="deskconnect_send_ping">Send ping</string>
+    <string name="deskconnect_ping_sent">Ping sent to %1$s</string>
+    <string name="deskconnect_settings_title">Device Connect</string>
     <string name="deskconnect_settings_subtitle">Connect phones &amp; PCs via KDE Connect protocol</string>
-    <string name="deskconnect_enable_title">Enable DeskConnect</string>
+    <string name="deskconnect_enable_title">Enable Device Connect</string>
     <string name="deskconnect_enable_summary">Allow nearby paired devices to stream notifications, music, and battery status</string>
     <string name="deskconnect_device_name_title">Device Name</string>
     <string name="deskconnect_device_name_summary">Name broadcasted to other devices on the local network</string>
@@ -593,14 +597,14 @@
     <string name="deskconnect_reject">Reject</string>
     <string name="incoming_call">Incoming Call</string>
     <string name="show_companion_battery_title">Companion Phone Battery</string>
-    <string name="show_companion_battery_summary">Show battery level of connected DeskConnect companion</string>
+    <string name="show_companion_battery_summary">Show battery level of connected Device Connect companion</string>
 
     <!-- Credits & Open Source Acknowledgments -->
     <string name="about_credits_title">Credits &amp; Acknowledgments</string>
     <string name="about_kde_connect_title">KDE Connect</string>
     <string name="about_kde_connect_desc">Cross-device communication &amp; MPRIS protocol by the KDE Community</string>
     <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
-    <string name="deskconnect_credits_text">DeskConnect uses the open-source protocol developed by the KDE Connect project. Special thanks to the KDE community!</string>
+    <string name="deskconnect_credits_text">Device Connect uses the open-source protocol developed by the KDE Connect project. Special thanks to the KDE community!</string>
 
     <!-- Notification Smart Chip & Shade -->
     <string name="show_notifications_chip">Notifications</string>
@@ -847,7 +851,7 @@
     <string name="device_ping_sent">Ping sent to %1$s</string>
     <string name="device_refresh_scan">Scan devices</string>
     <string name="no_devices_paired">No devices connected</string>
-    <string name="connect_device_prompt">Open DeskConnect settings or pair a device on the same Wi-Fi network</string>
+    <string name="connect_device_prompt">Open Device Connect settings or pair a device on the same Wi-Fi network</string>
     <string name="open_deskconnect_settings">Open Settings</string>
     <string name="kiosk_url_dialog_title">Web Kiosk Settings</string>
     <string name="kiosk_url_hint">URL (e.g. https://...)</string>

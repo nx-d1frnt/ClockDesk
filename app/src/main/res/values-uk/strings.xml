@@ -82,7 +82,7 @@
     <string name="onboarding_widgets_title">Віджети та музика</string>
     <string name="onboarding_widgets_desc">Відображайте обкладинку альбому треку, що зараз грає, та додавайте розумні чипи для показу заряду батареї, оновлень або прогресу у фоні.</string>
     <string name="onboarding_deskconnect_title">Завжди на зв\'язку</string>
-    <string name="onboarding_deskconnect_desc">Підключайте телефон або ПК через DeskConnect, щоб відстежувати рівень заряду, синхронізувати сповіщення та бачити виклики прямо на екрані.</string>
+    <string name="onboarding_deskconnect_desc">Підключайте телефон або ПК через Device Connect, щоб відстежувати рівень заряду, синхронізувати сповіщення та бачити виклики прямо на екрані.</string>
     <string name="onboarding_weather_title">Динамічний режим</string>
     <string name="onboarding_weather_desc">Насолоджуйтеся анімованими ефектами дощу, снігу або туману та градієнтами кольорів, які природно змінюються відповідно до сходу й заходу сонця.</string>
     <string name="onboarding_permission_title">Готові почати?</string>
@@ -339,7 +339,7 @@
 
     <string name="backup_restore_title">Бекап та відновлення</string>
     <string name="backup_connected_devices_title">Включати підключені пристрої</string>
-    <string name="backup_connected_devices_summary">Зберігати спарені пристрої DeskConnect та дані підключення</string>
+    <string name="backup_connected_devices_summary">Зберігати спарені пристрої Device Connect та дані підключення</string>
     <string name="export_settings">Бекап налаштувань</string>
     <string name="import_settings">Імпорт налаштувань</string>
     <string name="export_success">Бекап успішно збережено</string>
@@ -554,10 +554,14 @@
     <string name="confirm_reset_layout_title">Скинути макет?</string>
     <string name="confirm_reset_layout_msg">Це відновить віджети та їх розташування за замовчуванням.</string>
 
-    <!-- DeskConnect -->
-    <string name="deskconnect_settings_title">DeskConnect</string>
+    <!-- Device Connect -->
+    <string name="deskconnect_fingerprint">Відбиток сертифіката</string>
+    <string name="deskconnect_pairing">Сполучення…</string>
+    <string name="deskconnect_send_ping">Надіслати пінг</string>
+    <string name="deskconnect_ping_sent">Пінг надіслано на %1$s</string>
+    <string name="deskconnect_settings_title">Device Connect</string>
     <string name="deskconnect_settings_subtitle">Підключення телефонів та ПК за протоколом KDE Connect</string>
-    <string name="deskconnect_enable_title">Увімкнути DeskConnect</string>
+    <string name="deskconnect_enable_title">Увімкнути Device Connect</string>
     <string name="deskconnect_enable_summary">Дозволити спареним пристроям передавати сповіщення, музику та стан акумулятора</string>
     <string name="deskconnect_device_name_title">Назва пристрою</string>
     <string name="deskconnect_device_name_summary">Назва, що транслюється іншим пристроям у локальній мережі</string>
@@ -578,14 +582,14 @@
     <string name="deskconnect_reject">Відхилити</string>
     <string name="incoming_call">Вхідний виклик</string>
     <string name="show_companion_battery_title">Акумулятор телефона-компаньйона</string>
-    <string name="show_companion_battery_summary">Показувати рівень заряду підключеного компаньйона DeskConnect</string>
+    <string name="show_companion_battery_summary">Показувати рівень заряду підключеного компаньйона Device Connect</string>
 
     <!-- Credits & Open Source Acknowledgments -->
     <string name="about_credits_title">Подяки та автори</string>
     <string name="about_kde_connect_title">KDE Connect</string>
     <string name="about_kde_connect_desc">Протокол синхронізації пристроїв та MPRIS від KDE Community</string>
     <string name="about_kde_connect_url">https://kdeconnect.kde.org/</string>
-    <string name="deskconnect_credits_text">DeskConnect використовує протокол із відкритим вихідним кодом, розроблений проєктом KDE Connect. Щира подяка спільноті KDE!</string>
+    <string name="deskconnect_credits_text">Device Connect використовує протокол із відкритим вихідним кодом, розроблений проєктом KDE Connect. Щира подяка спільноті KDE!</string>
 
     <!-- Notification Smart Chip & Shade -->
     <string name="show_notifications_chip">Сповіщення</string>
@@ -810,8 +814,8 @@
     <string name="device_ping_sent">Сигнал надіслано на %1$s</string>
     <string name="device_refresh_scan">Пошук пристроїв</string>
     <string name="no_devices_paired">Немає підключених пристроїв</string>
-    <string name="connect_device_prompt">Відкрийте налаштування DeskConnect або підключіть пристрій у тій самій мережі Wi-Fi</string>
-    <string name="open_deskconnect_settings">Налаштування DeskConnect</string>
+    <string name="connect_device_prompt">Відкрийте налаштування Device Connect або підключіть пристрій у тій самій мережі Wi-Fi</string>
+    <string name="open_deskconnect_settings">Налаштування Device Connect</string>
     <string name="kiosk_url_dialog_title">Налаштування веб-кіоску</string>
     <string name="kiosk_url_hint">URL (наприклад, https://...)</string>
     <string name="kiosk_refresh_interval">Автооновлення (хвилини, 0 = вимк)</string>

@@ -49,7 +49,7 @@ Whether used as a standalone desk clock, your default device launcher, ClockDesk
   - ⏰ **Alarm Chip:** Next scheduled alarm time and countdown.
   - 🔔 **Notification Chip:** Quick count badge and one-tap access to your notifications.
   - 🔄 **Update Chip:** Direct notification and changelog preview when new updates are available.
-  - 📱 **DeskConnect Companion Chips:** Displays paired device battery status and connection notifications.
+  - 📱 **Device Connect Companion Chips:** Displays paired device battery status and connection notifications.
 - **Expandable Stacks:** Smart chip overflow handling with collapsible stack animations and badge counters.
 - **Extensible Plugin Architecture:** Third-party applications can supply custom chips via standard Android intents (`com.nxd1frnt.clockdesk2.ACTION_QUERY_SMART_CHIPS`).
 
@@ -59,7 +59,7 @@ Whether used as a standalone desk clock, your default device launcher, ClockDesk
 - **Flexible Widget Layouts:** Switch between compact, expanded, and minimal media layouts with media source icon badges.
 - **Modular Music Sources:** Reorder and toggle media providers using the unified plugin system.
 
-### DeskConnect (KDE Connect Integration) `[Experimental]`
+### Device Connect (KDE Connect Integration) `[Experimental]`
 - **Seamless Local Pairing:** Connect ClockDesk with your PC, laptop, or other devices using the trusted, open KDE Connect protocol over local Wi-Fi with TLS/RSA encryption.
 - **Workstation Media Sync (MPRIS):** View and control music or video playing on your computer directly from your desk clock, complete with album art streaming.
 - **Cross-Device Notifications:** Mirror PC notifications straight to ClockDesk with interactive swipe-to-dismiss.
@@ -88,7 +88,7 @@ Whether used as a standalone desk clock, your default device launcher, ClockDesk
 - **UI & Architecture:** Material Components 3, custom M3 Settings DSL, AndroidX ConstraintLayout, and custom OpenGL ES (GLSL) Shaders.
 - **Networking & Connectivity:**
   - Volley HTTP library with caching for weather and geocoding services.
-  - Native DeskConnect engine with UDP socket discovery and TLS communication backed by [BouncyCastle](https://www.bouncycastle.org/).
+  - Native Device Connect engine with UDP socket discovery and TLS communication backed by [BouncyCastle](https://www.bouncycastle.org/).
 - **Image Processing & Graphics:** [Glide](https://github.com/bumptech/glide), [AndroidX Palette](https://developer.android.com/develop/ui/views/graphics/palette-colors), [ColorPickerView](https://github.com/skydoves/ColorPickerView)
 - **Storage & State:** AndroidX Preferences with JSON backup/restore engine.
 
@@ -113,7 +113,7 @@ ClockDesk is available in:
 For the best experience, ClockDesk utilizes:
 - **Location (`ACCESS_COARSE_LOCATION` / `ACCESS_FINE_LOCATION`):** Required for automated sunrise/sunset calculation and local weather forecasts.
 - **Notification Listener Access:** Required if you want the "Now Playing" widget to read media sessions from your device.
-- **Local Network & Wi-Fi State (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`):** Required for weather updates and DeskConnect local device discovery/sync.
+- **Local Network & Wi-Fi State (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`):** Required for weather updates and Device Connect local device discovery/sync.
 - **Request Install Packages (`REQUEST_INSTALL_PACKAGES`):** Optional, enables seamless in-app updates directly from GitHub releases without manual file opening.
 
 ### Installation & Updates

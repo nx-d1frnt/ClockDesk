@@ -2,121 +2,148 @@ package com.nxd1frnt.clockdesk2.connect.ui
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.view.View
 import android.widget.Toast
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
-import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.preference.PreferenceManager
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.connect.model.DeskConnectDevice
+import com.nxd1frnt.clockdesk2.ui.settings.components.BaseM3SettingsFragment
+import com.nxd1frnt.clockdesk2.ui.settings.components.SettingsItem
 import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 
-class DeskConnectSettingsFragment : Fragment() {
-
+class DeskConnectSettingsFragment : BaseM3SettingsFragment() {
     private lateinit var deskConnectManager: DeskConnectManager
-    private lateinit var switchDeskConnect: MaterialSwitch
-    private lateinit var txtDeviceName: TextView
-    private lateinit var txtFingerprint: TextView
-    private lateinit var txtNoPaired: TextView
-    private lateinit var txtDiscovering: TextView
-    private lateinit var layoutPaired: LinearLayout
-    private lateinit var layoutAvailable: LinearLayout
-    private var btnRefreshDevices: MaterialButton? = null
+    private val pendingPairIds = mutableSetOf<String>()
 
     private val batteryListener = object : DeskConnectManager.BatteryListener {
         override fun onBatteryUpdated(deviceId: String, currentCharge: Int, isCharging: Boolean, thresholdEvent: Int) {
-            activity?.runOnUiThread { refreshDeviceLists() }
+            refreshDeviceLists()
         }
     }
 
     private val deviceListener = object : DeskConnectManager.DeviceListener {
-        override fun onDeviceDiscovered(device: DeskConnectDevice) {
-            activity?.runOnUiThread { refreshDeviceLists() }
-        }
-
-        override fun onDeviceConnected(device: DeskConnectDevice) {
-            activity?.runOnUiThread { refreshDeviceLists() }
-        }
-
-        override fun onDeviceDisconnected(device: DeskConnectDevice) {
-            activity?.runOnUiThread { refreshDeviceLists() }
-        }
+        override fun onDeviceDiscovered(device: DeskConnectDevice) = refreshDeviceLists()
+        override fun onDeviceConnected(device: DeskConnectDevice) = refreshDeviceLists()
+        override fun onDeviceDisconnected(device: DeskConnectDevice) = refreshDeviceLists()
 
         override fun onPairingRequested(device: DeskConnectDevice, verificationKey: String) {
-            activity?.let { act ->
-                act.runOnUiThread {
-                    showPairingDialog(act, device, verificationKey)
-                }
+            activity?.runOnUiThread {
+                if (view != null) showPairingDialog(requireContext(), device, verificationKey)
             }
         }
 
         override fun onPairingStateChanged(device: DeskConnectDevice, isPaired: Boolean) {
-            activity?.runOnUiThread { refreshDeviceLists() }
+            activity?.runOnUiThread {
+                pendingPairIds.remove(device.deviceId)
+                refreshDeviceLists()
+            }
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        val view = inflater.inflate(R.layout.fragment_desk_connect_settings, container, false)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // DeskConnect stores its identity and preferences in the default preference file.
+        prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
         deskConnectManager = DeskConnectManager.getInstance(requireContext())
+    }
 
-        switchDeskConnect = view.findViewById(R.id.switch_deskconnect)
-        txtDeviceName = view.findViewById(R.id.txt_device_name)
-        txtFingerprint = view.findViewById(R.id.txt_fingerprint)
-        txtNoPaired = view.findViewById(R.id.txt_no_paired)
-        txtDiscovering = view.findViewById(R.id.txt_discovering)
-        layoutPaired = view.findViewById(R.id.layout_paired_devices)
-        layoutAvailable = view.findViewById(R.id.layout_available_devices)
-        btnRefreshDevices = view.findViewById(R.id.btn_refresh_devices)
-
-        btnRefreshDevices?.setOnClickListener { performRefresh() }
-        btnRefreshDevices?.alpha = if (deskConnectManager.isEnabled) 1.0f else 0.4f
-
-        val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
-        switchDeskConnect.isChecked = deskConnectManager.isEnabled
-        switchDeskConnect.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("deskconnect_enabled", isChecked).apply()
-            btnRefreshDevices?.alpha = if (isChecked) 1.0f else 0.4f
-            if (isChecked) {
-                deskConnectManager.start()
-            } else {
-                deskConnectManager.stop()
-            }
-            refreshDeviceLists()
+    override fun buildSettings(): List<SettingsItem> = settings {
+        category(getString(R.string.deskconnect_settings_title)) {
+            switch(
+                key = "deskconnect_enabled",
+                title = getString(R.string.deskconnect_enable_title),
+                summary = getString(R.string.deskconnect_enable_summary),
+                iconRes = R.drawable.ic_devices,
+                defaultValue = true,
+                onCheckedChange = { enabled ->
+                    deskConnectManager.isEnabled = enabled
+                    pendingPairIds.clear()
+                }
+            )
+            action(
+                title = getString(R.string.deskconnect_device_name_title),
+                summary = deskConnectManager.customDeviceName
+            ) { }
+            action(
+                title = getString(R.string.deskconnect_fingerprint),
+                summary = deskConnectManager.security.getCertificateFingerprint()
+            ) { }
         }
 
-        txtDeviceName.text = deskConnectManager.customDeviceName
-        val fp = deskConnectManager.security.getCertificateFingerprint()
-        txtFingerprint.text = "Fingerprint: $fp"
-
-        view.findViewById<View>(R.id.card_kde_credits)?.setOnClickListener {
-            runCatching {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.about_kde_connect_url))))
+        val devices = deskConnectManager.discoveredDevices.values.toList()
+            .sortedBy { it.getDisplayName().lowercase() }
+        category(getString(R.string.deskconnect_paired_devices_title)) {
+            val paired = devices.filter { it.isPaired }
+            if (paired.isEmpty()) {
+                action(title = getString(R.string.deskconnect_no_paired_devices), isEnabled = { false }) { }
+            }
+            paired.forEach { device ->
+                action(
+                    key = "paired_${device.deviceId}",
+                    title = device.getDisplayName(),
+                    summary = deviceSummary(device),
+                    iconRes = device.getDeviceTypeIconRes(),
+                    statusText = if (device.isConnected && device.batteryLevel >= 0) "${device.batteryLevel}%" else null,
+                    showChevron = true
+                ) { showDeviceActions(device) }
             }
         }
-
-        return view
+        category(getString(R.string.deskconnect_discovered_devices_title)) {
+            action(
+                title = getString(R.string.deskconnect_refresh),
+                iconRes = R.drawable.ic_refresh,
+                isEnabled = { deskConnectManager.isEnabled }
+            ) { performRefresh() }
+            val available = devices.filter { !it.isPaired }
+            if (available.isEmpty() || !deskConnectManager.isEnabled) {
+                action(
+                    title = getString(if (deskConnectManager.isEnabled) R.string.deskconnect_no_devices_found
+                        else R.string.deskconnect_enable_title),
+                    isEnabled = { false }
+                ) { }
+            }
+            if (deskConnectManager.isEnabled) available.forEach { device ->
+                action(
+                    key = "available_${device.deviceId}",
+                    title = device.getDisplayName(),
+                    summary = deviceSummary(device),
+                    iconRes = device.getDeviceTypeIconRes(),
+                    statusText = getString(if (device.deviceId in pendingPairIds) R.string.deskconnect_pairing
+                        else R.string.deskconnect_pair),
+                    isEnabled = { device.deviceId !in pendingPairIds }
+                ) {
+                    pendingPairIds.add(device.deviceId)
+                    deskConnectManager.requestPair(device)
+                    refreshDeviceLists()
+                    view?.postDelayed({
+                        pendingPairIds.remove(device.deviceId)
+                        refreshDeviceLists()
+                    }, 30_000L)
+                }
+            }
+        }
+        category(getString(R.string.about_credits_title)) {
+            action(
+                title = getString(R.string.about_kde_connect_title),
+                summary = getString(R.string.deskconnect_credits_text),
+                iconRes = R.drawable.ic_kde_24dp,
+                showChevron = true
+            ) {
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.about_kde_connect_url))))
+                }
+            }
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -145,17 +172,12 @@ class DeskConnectSettingsFragment : Fragment() {
 
     private fun performRefresh() {
         if (!isAdded) return
-
         if (!deskConnectManager.isEnabled) {
             Toast.makeText(context, R.string.deskconnect_enable_title, Toast.LENGTH_SHORT).show()
             return
         }
-
-        btnRefreshDevices?.animate()?.rotationBy(360f)?.setDuration(600L)?.start()
         activity?.findViewById<View>(R.id.action_refresh)?.animate()?.rotationBy(360f)?.setDuration(600L)?.start()
-
         Toast.makeText(context, R.string.deskconnect_refreshing, Toast.LENGTH_SHORT).show()
-
         deskConnectManager.refreshDiscovery()
         deskConnectManager.requestAllBatteries()
         refreshDeviceLists()
@@ -165,142 +187,57 @@ class DeskConnectSettingsFragment : Fragment() {
         super.onResume()
         deskConnectManager.deviceListeners.add(deviceListener)
         deskConnectManager.batteryListeners.add(batteryListener)
-        deskConnectManager.broadcastDiscovery()
-        deskConnectManager.requestAllBatteries()
+        if (deskConnectManager.isEnabled) {
+            deskConnectManager.broadcastDiscovery()
+            deskConnectManager.requestAllBatteries()
+        }
         refreshDeviceLists()
     }
 
     override fun onPause() {
-        super.onPause()
         deskConnectManager.deviceListeners.remove(deviceListener)
         deskConnectManager.batteryListeners.remove(batteryListener)
+        super.onPause()
+    }
+
+    override fun onDestroyView() {
+        pendingPairIds.clear()
+        super.onDestroyView()
     }
 
     private fun refreshDeviceLists() {
-        if (!isAdded) return
+        activity?.runOnUiThread {
+            if (isAdded && view != null) rebuildSettings()
+        }
+    }
 
-        layoutPaired.removeAllViews()
-        layoutAvailable.removeAllViews()
+    private fun deviceSummary(device: DeskConnectDevice): String = buildList {
+        add(device.getDeviceTypeDisplayName())
+        if (device.isPaired) {
+            add(getString(if (device.isConnected) R.string.deskconnect_status_connected
+                else R.string.deskconnect_status_paired_offline))
+            if (device.isConnected && device.isCharging) add(getString(R.string.deskconnect_battery_charging))
+        }
+        device.ipAddress?.hostAddress?.let { add(it) }
+    }.joinToString(" • ")
 
-        val allDevices = deskConnectManager.discoveredDevices.values.toList()
-        val pairedDevices = allDevices.filter { it.isPaired }
-        val availableDevices = allDevices.filter { !it.isPaired }
-
-        txtNoPaired.visibility = if (pairedDevices.isEmpty()) View.VISIBLE else View.GONE
-        txtDiscovering.visibility = if (availableDevices.isEmpty()) View.VISIBLE else View.GONE
-
-        val inflater = LayoutInflater.from(requireContext())
-        val palette = UiMonetThemeManager.getPalette(requireContext())
-
-        for (dev in pairedDevices) {
-            val itemView = inflater.inflate(R.layout.item_connected_device, layoutPaired, false)
-            val iconView = itemView.findViewById<ImageView>(R.id.device_icon)
-            val nameView = itemView.findViewById<TextView>(R.id.device_name)
-            val statusView = itemView.findViewById<TextView>(R.id.device_status)
-            val batteryLayout = itemView.findViewById<View>(R.id.layout_device_battery)
-            val batteryIcon = itemView.findViewById<ImageView>(R.id.device_battery_icon)
-            val batteryText = itemView.findViewById<TextView>(R.id.device_battery_text)
-            val btnAction = itemView.findViewById<MaterialButton>(R.id.btn_action)
-
-            iconView.setImageResource(dev.getDeviceTypeIconRes())
-            nameView.text = dev.getDisplayName()
-            val typeText = dev.getDeviceTypeDisplayName()
-            val ipText = dev.ipAddress?.hostAddress
-
-            val statusText = if (dev.isConnected) {
-                if (dev.batteryLevel >= 0) {
-                    val chargingStr = if (dev.isCharging) " • ${getString(R.string.deskconnect_battery_charging)}" else ""
-                    "${getString(R.string.deskconnect_status_connected)} • ${dev.batteryLevel}%$chargingStr"
+    private fun showDeviceActions(device: DeskConnectDevice) {
+        val canPing = device.isConnected
+        val actions = mutableListOf(getString(R.string.deskconnect_unpair))
+        if (canPing) actions.add(0, getString(R.string.deskconnect_send_ping))
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(device.getDisplayName())
+            .setItems(actions.toTypedArray()) { _, index ->
+                if (canPing && index == 0) {
+                    deskConnectManager.sendPing(device.deviceId)
+                    Toast.makeText(context, getString(R.string.deskconnect_ping_sent, device.getDisplayName()), Toast.LENGTH_SHORT).show()
                 } else {
-                    getString(R.string.deskconnect_status_connected)
-                }
-            } else {
-                getString(R.string.deskconnect_status_paired_offline)
-            }
-            statusView.text = if (ipText != null) "$typeText • $statusText • $ipText" else "$typeText • $statusText"
-
-            if (dev.isConnected && dev.batteryLevel >= 0) {
-                batteryLayout.visibility = View.VISIBLE
-                batteryText.text = "${dev.batteryLevel}%"
-                batteryText.setTextColor(palette.onSurface)
-                (batteryLayout.background?.mutate() as? GradientDrawable)?.setColor(palette.surfaceContainerHigh)
-                when {
-                    dev.isCharging -> {
-                        batteryIcon.setImageResource(R.drawable.ic_battery_charging)
-                        batteryIcon.imageTintList = ColorStateList.valueOf(palette.primary)
-                    }
-                    dev.batteryLevel <= 20 -> {
-                        batteryIcon.setImageResource(R.drawable.ic_battery_alert)
-                        batteryIcon.imageTintList = ColorStateList.valueOf(palette.error)
-                    }
-                    else -> {
-                        batteryIcon.setImageResource(R.drawable.ic_battery_full)
-                        batteryIcon.imageTintList = ColorStateList.valueOf(palette.primary)
-                    }
-                }
-            } else {
-                batteryLayout.visibility = View.GONE
-            }
-
-            itemView.setOnClickListener {
-                if (dev.isConnected) {
-                    val batteryInfo = if (dev.batteryLevel >= 0) {
-                        if (dev.isCharging) "${dev.batteryLevel}% (${getString(R.string.deskconnect_battery_charging)})" else "${dev.batteryLevel}%"
-                    } else null
-                    val dialogTitle = if (batteryInfo != null) "${dev.getDisplayName()} • $batteryInfo" else dev.getDisplayName()
-
-                    val dialog = MaterialAlertDialogBuilder(requireContext())
-                        .setTitle(dialogTitle)
-                        .setItems(arrayOf("Send Ping", "Unpair")) { _, which ->
-                            when (which) {
-                                0 -> {
-                                    deskConnectManager.sendPing(dev.deviceId)
-                                    android.widget.Toast.makeText(context, "Ping sent to ${dev.getDisplayName()}", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                                1 -> {
-                                    deskConnectManager.unpairDevice(dev.deviceId)
-                                    refreshDeviceLists()
-                                }
-                            }
-                        }
-                        .show()
-                    UiMonetThemeManager.styleAlertDialog(dialog, palette)
+                    deskConnectManager.unpairDevice(device.deviceId)
+                    refreshDeviceLists()
                 }
             }
-
-            btnAction.text = getString(R.string.deskconnect_unpair)
-            btnAction.setOnClickListener {
-                deskConnectManager.unpairDevice(dev.deviceId)
-                refreshDeviceLists()
-            }
-            UiMonetThemeManager.applyLiveToViewHierarchy(itemView, palette)
-            layoutPaired.addView(itemView)
-        }
-
-        for (dev in availableDevices) {
-            val itemView = inflater.inflate(R.layout.item_connected_device, layoutAvailable, false)
-            val iconView = itemView.findViewById<ImageView>(R.id.device_icon)
-            val nameView = itemView.findViewById<TextView>(R.id.device_name)
-            val statusView = itemView.findViewById<TextView>(R.id.device_status)
-            val batteryLayout = itemView.findViewById<View>(R.id.layout_device_battery)
-            val btnAction = itemView.findViewById<MaterialButton>(R.id.btn_action)
-
-            batteryLayout.visibility = View.GONE
-            iconView.setImageResource(dev.getDeviceTypeIconRes())
-            nameView.text = dev.getDisplayName()
-            val typeText = dev.getDeviceTypeDisplayName()
-            val ipText = dev.ipAddress?.hostAddress
-            statusView.text = if (ipText != null) "$typeText • $ipText" else typeText
-
-            btnAction.text = getString(R.string.deskconnect_pair)
-            btnAction.setOnClickListener {
-                deskConnectManager.requestPair(dev)
-                btnAction.isEnabled = false
-                btnAction.text = "Pairing…"
-            }
-            UiMonetThemeManager.applyLiveToViewHierarchy(itemView, palette)
-            layoutAvailable.addView(itemView)
-        }
+            .show()
+        UiMonetThemeManager.styleAlertDialog(dialog)
     }
 
     private fun showPairingDialog(context: Context, device: DeskConnectDevice, verificationKey: String) {
