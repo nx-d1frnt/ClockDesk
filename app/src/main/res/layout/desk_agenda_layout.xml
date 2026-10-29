@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/agenda_columns"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="horizontal" android:paddingHorizontal="24dp"
+    android:paddingTop="20dp" android:paddingBottom="24dp">
+    <ScrollView android:id="@+id/agenda_calendar_panel"
+        android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="0.43" android:layout_marginEnd="16dp"
+        android:fillViewport="false">
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/agenda_calendar_card"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            app:cardCornerRadius="24dp" app:cardElevation="0dp">
+            <com.nxd1frnt.clockdesk2.desks.ui.AgendaCalendarView
+                android:id="@+id/agenda_calendar" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:padding="8dp" />
+        </com.google.android.material.card.MaterialCardView>
+    </ScrollView>
+    <LinearLayout android:id="@+id/agenda_day_panel"
+        android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="0.57" android:orientation="vertical">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/desk_type_agenda" android:textSize="24sp" android:textStyle="bold" />
+        <TextView android:id="@+id/agenda_date" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textSize="14sp" android:layout_marginBottom="12dp" />
+        <com.google.android.material.card.MaterialCardView android:id="@+id/agenda_next_card"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp" android:visibility="gone"
+            app:cardCornerRadius="20dp" app:cardElevation="0dp">
+            <TextView android:id="@+id/agenda_next" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:padding="16dp" android:textSize="18sp"
+                android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
+        </com.google.android.material.card.MaterialCardView>
+        <ScrollView android:id="@+id/agenda_state" android:layout_width="match_parent"
+            android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:gravity="center" android:padding="16dp">
+            <TextView android:id="@+id/agenda_message" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:gravity="center" android:textSize="18sp" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/agenda_action"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginTop="16dp" android:text="@string/agenda_allow_calendar" />
+            </LinearLayout>
+        </ScrollView>
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/agenda_events"
+            android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+            android:clipToPadding="false" android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

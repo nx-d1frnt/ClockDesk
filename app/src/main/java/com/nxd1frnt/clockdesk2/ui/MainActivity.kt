@@ -45,6 +45,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -279,6 +280,22 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private val editModeTimeout = 10000L // 10 seconds
     private val animationDuration = 300L // 300ms
     private val handler = Handler(Looper.getMainLooper())
+    private val calendarPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (::desksPagerAdapter.isInitialized) desksPagerAdapter.refreshAgendaPermissions()
+    }
+
+    private fun requestAgendaCalendarPermission() {
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val asked = prefs.getBoolean("agenda_calendar_permission_requested", false)
+        if (asked && !ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_CALENDAR)) {
+            startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:$packageName")))
+        } else {
+            prefs.edit().putBoolean("agenda_calendar_permission_requested", true).apply()
+            calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+        }
+    }
+
     private val permissionRequestCode = 100
     private val PICK_BG_REQUEST = 300
     private val PICK_FONT_REQUEST = 400
@@ -795,7 +812,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     }
 
     private fun setupDesksSystem() {
-        desksPagerAdapter = DesksPagerAdapter(deskManager, primaryWidgetsContainer) { desk ->
+        desksPagerAdapter = DesksPagerAdapter(deskManager, primaryWidgetsContainer, ::requestAgendaCalendarPermission) { desk ->
             if (desktopWidgetManager.layoutKey != desk.widgetLayoutKey) {
                 if (isEditMode) exitEditMode()
                 val positionsName = DesktopWidgetManager.positionPreferencesName(desk.widgetLayoutKey)

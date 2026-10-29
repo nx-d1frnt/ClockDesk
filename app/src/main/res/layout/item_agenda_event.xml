@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp" app:cardCornerRadius="20dp" app:cardElevation="0dp"
+    android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:padding="16dp" android:gravity="center_vertical">
+        <TextView android:id="@+id/agenda_event_time" android:layout_width="96dp"
+            android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold"
+            android:layout_marginEnd="12dp" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/agenda_event_title" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:textSize="18sp" android:textStyle="bold"
+                android:maxLines="2" android:ellipsize="end" />
+            <TextView android:id="@+id/agenda_event_details" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:textSize="13sp"
+                android:layout_marginTop="4dp" android:maxLines="2" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

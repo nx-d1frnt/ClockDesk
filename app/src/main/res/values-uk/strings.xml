@@ -878,4 +878,26 @@
     <string name="notification_banner_content_category">Вміст</string>
     <string name="app_alert_device_battery_low">Низький заряд: %1$s</string>
     <string name="app_alert_battery_remaining">Залишилося %1$d%% заряду. Під’єднайте пристрій до живлення.</string>
+    <string name="desk_type_agenda">Порядок денний</string>
+    <string name="agenda_permission_message">Події з календарів, синхронізованих на цьому пристрої. Дозвольте доступ до календаря, щоб почати.</string>
+    <string name="agenda_allow_calendar">Налаштувати доступ до календаря</string>
+    <string name="agenda_loading">Завантажуємо події…</string>
+    <string name="agenda_empty">На сьогодні більше нічого не заплановано.\nТут з’являться події з календарів пристрою.</string>
+    <string name="agenda_error">Не вдалося завантажити події календаря.</string>
+    <string name="agenda_retry">Спробувати знову</string>
+    <string name="agenda_now">Зараз</string>
+    <string name="agenda_next_event">%1$s · %2$s</string>
+    <string name="agenda_all_day">Увесь день</string>
+    <string name="agenda_untitled">Без назви</string>
+    <string name="agenda_no_calendar_app">Немає застосунку календаря для відкриття події.</string>
+    <plurals name="agenda_in_minutes">
+        <item quantity="one">Через %d хвилину</item>
+        <item quantity="few">Через %d хвилини</item>
+        <item quantity="many">Через %d хвилин</item>
+        <item quantity="other">Через %d хвилини</item>
+    </plurals>
+    <string name="agenda_previous_month">Попередній місяць</string>
+    <string name="agenda_next_month">Наступний місяць</string>
+    <string name="agenda_today">Сьогодні</string>
+    <string name="agenda_day_empty">На цей день подій немає.</string>
 </resources>

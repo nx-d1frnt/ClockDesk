@@ -17,6 +17,7 @@ import com.nxd1frnt.clockdesk2.utils.UiMonetThemeManager
 class DesksPagerAdapter(
     private val deskManager: DeskManager,
     private val widgetsView: View,
+    private val requestCalendarPermission: () -> Unit,
     private val onWidgetDeskSelected: (DeskItem) -> Unit
 ) : RecyclerView.Adapter<DesksPagerAdapter.DeskPageViewHolder>() {
     private val desks = deskManager.getDesks().toMutableList()
@@ -61,7 +62,12 @@ class DesksPagerAdapter(
     private fun updatePageActivity() {
         pageViews.forEach { (id, view) ->
             (view as? WebKioskDeskView)?.setPageActive(hostResumed && id == selectedDeskId)
+            (view as? AgendaDeskView)?.setPageActive(hostResumed && id == selectedDeskId)
         }
+    }
+
+    fun refreshAgendaPermissions() {
+        pageViews.values.filterIsInstance<AgendaDeskView>().forEach { it.refreshCalendarAccess() }
     }
 
     fun capturePreviews() {
@@ -132,6 +138,7 @@ class DesksPagerAdapter(
                 view.bindDesk(desk) { deskManager.updateDesk(it) }
                 view.setPageActive(hostResumed && desk.id == selectedDeskId)
             }
+            (view as? AgendaDeskView)?.setPageActive(hostResumed && desk.id == selectedDeskId)
             attach(holder, view)
         }
         trimDetachedPages()
@@ -145,6 +152,7 @@ class DesksPagerAdapter(
                 is AppsDeskView -> view.refreshMonetTheme(palette)
                 is TimerDeskView -> view.refreshMonetTheme(palette)
                 is NotificationsDeskView -> view.refreshMonetTheme(palette)
+                is AgendaDeskView -> view.refreshMonetTheme(palette)
                 else -> {
                     UiMonetThemeManager.applyLiveToViewHierarchy(view, palette)
                     DeskForegroundStyle.apply(view)
@@ -163,6 +171,7 @@ class DesksPagerAdapter(
             DeskType.TIMER -> TimerDeskView(context)
             DeskType.WEB_KIOSK -> WebKioskDeskView(context)
             DeskType.NOTIFICATIONS -> NotificationsDeskView(context)
+            DeskType.AGENDA -> AgendaDeskView(context, requestCalendarPermission)
             DeskType.WIDGETS -> error("Widgets use the activity host")
         }
         val palette = UiMonetThemeManager.getPalette(context)
@@ -172,6 +181,7 @@ class DesksPagerAdapter(
             is AppsDeskView -> page.refreshMonetTheme(palette)
             is TimerDeskView -> page.refreshMonetTheme(palette)
             is NotificationsDeskView -> page.refreshMonetTheme(palette)
+            is AgendaDeskView -> page.refreshMonetTheme(palette)
             else -> {
                 UiMonetThemeManager.applyLiveToViewHierarchy(page, palette)
                 DeskForegroundStyle.apply(page)
@@ -221,6 +231,7 @@ class DesksPagerAdapter(
         (view as? WebKioskDeskView)?.dispose()
         (view as? AppsDeskView)?.dispose()
         (view as? TimerDeskView)?.dispose()
+        (view as? AgendaDeskView)?.dispose()
     }
 
     fun destroy() {

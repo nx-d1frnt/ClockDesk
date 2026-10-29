@@ -932,4 +932,24 @@
     <string name="notification_banner_content_category">Content</string>
     <string name="app_alert_device_battery_low">%1$s battery low</string>
     <string name="app_alert_battery_remaining">%1$d%% remaining. Connect the device to power.</string>
+    <string name="desk_type_agenda">Daily agenda</string>
+    <string name="agenda_permission_message">See events from calendars synced on this device. Allow calendar access to get started.</string>
+    <string name="agenda_allow_calendar">Set up calendar access</string>
+    <string name="agenda_loading">Loading events…</string>
+    <string name="agenda_empty">Nothing else planned today.\nEvents from this device’s calendars will appear here.</string>
+    <string name="agenda_error">Could not load calendar events.</string>
+    <string name="agenda_retry">Try again</string>
+    <string name="agenda_now">Happening now</string>
+    <string name="agenda_next_event">%1$s · %2$s</string>
+    <string name="agenda_all_day">All day</string>
+    <string name="agenda_untitled">Untitled event</string>
+    <string name="agenda_no_calendar_app">No calendar app available to open this event.</string>
+    <plurals name="agenda_in_minutes">
+        <item quantity="one">In %d minute</item>
+        <item quantity="other">In %d minutes</item>
+    </plurals>
+    <string name="agenda_previous_month">Previous month</string>
+    <string name="agenda_next_month">Next month</string>
+    <string name="agenda_today">Today</string>
+    <string name="agenda_day_empty">No events on this day.</string>
 </resources>
