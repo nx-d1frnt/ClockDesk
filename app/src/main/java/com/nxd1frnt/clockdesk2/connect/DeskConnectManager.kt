@@ -1,5 +1,6 @@
 package com.nxd1frnt.clockdesk2.connect
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -158,6 +159,49 @@ class DeskConnectManager private constructor(private val context: Context) {
         get() = sharedPrefs.getString("deskconnect_device_name", null)
             ?: "ClockDesk (${Build.MODEL})"
 
+    private data class LocalBatteryState(val charge: Int, val charging: Boolean)
+
+    private var batteryReceiverRegistered = false
+    private var lastBroadcastBatteryState: LocalBatteryState? = null
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != Intent.ACTION_BATTERY_CHANGED) return
+            val state = readLocalBatteryState(intent)
+            if (state == lastBroadcastBatteryState) return
+            lastBroadcastBatteryState = state
+            activeConnections.values.forEach { sendLocalBattery(it, state) }
+        }
+    }
+
+    private fun readLocalBatteryState(intent: Intent?): LocalBatteryState {
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val present = intent?.getBooleanExtra(BatteryManager.EXTRA_PRESENT, true) ?: false
+        return LocalBatteryState(
+            charge = if (present && level >= 0 && scale > 0) (level * 100 / scale).coerceIn(0, 100) else -1,
+            charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        )
+    }
+
+    private fun sendLocalBattery(
+        connection: DeskConnectConnection,
+        state: LocalBatteryState = readLocalBatteryState(
+            context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        )
+    ) {
+        if (!connection.device.isPaired) return
+        connection.sendPacket(DeskConnectPacket(
+            id = 0,
+            type = DeskConnectPacket.TYPE_BATTERY,
+            body = JSONObject().apply {
+                put("currentCharge", state.charge)
+                put("isCharging", state.charging)
+                put("thresholdEvent", 0)
+            }
+        ))
+    }
+
     init {
         loadPairedDevices()
         if (isEnabled) {
@@ -168,6 +212,10 @@ class DeskConnectManager private constructor(private val context: Context) {
     fun start() {
         if (server != null) return
 
+        if (!batteryReceiverRegistered) {
+            context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            batteryReceiverRegistered = true
+        }
         registerNetworkCallback()
 
         val s = DeskConnectServer(security, customDeviceName) { sslSocket, cert, remoteDeviceId, initialPacket ->
@@ -202,6 +250,11 @@ class DeskConnectManager private constructor(private val context: Context) {
     }
 
     fun stop() {
+        if (batteryReceiverRegistered) {
+            context.unregisterReceiver(batteryReceiver)
+            batteryReceiverRegistered = false
+        }
+        lastBroadcastBatteryState = null
         unregisterNetworkCallback()
 
         discovery?.stop()
@@ -397,6 +450,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
         if (device.isPaired) {
             connection.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+            sendLocalBattery(connection)
             connection.sendPacket(DeskConnectPacket.createBatteryRequest())
         }
 
@@ -445,6 +499,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
             if (device.isPaired) {
                 connection.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                sendLocalBattery(connection)
                 connection.sendPacket(DeskConnectPacket.createBatteryRequest())
             }
 
@@ -500,6 +555,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
                 if (device.isPaired) {
                     conn.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                    sendLocalBattery(conn)
                     conn.sendPacket(DeskConnectPacket.createBatteryRequest())
                 }
 
@@ -520,6 +576,7 @@ class DeskConnectManager private constructor(private val context: Context) {
                     if (dev.isPaired || security.isDevicePaired(dev.deviceId)) {
                         dev.isPaired = true
                         conn.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                        sendLocalBattery(conn)
                         return
                     }
 
@@ -532,6 +589,7 @@ class DeskConnectManager private constructor(private val context: Context) {
                         sharedPrefs.edit().putString("deskconnect_paired_name_${dev.deviceId}", dev.deviceName).apply()
 
                         conn.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+                        sendLocalBattery(conn)
 
                         mainHandler.post {
                             deviceListeners.forEach { it.onPairingStateChanged(dev, true) }
@@ -648,19 +706,7 @@ class DeskConnectManager private constructor(private val context: Context) {
 
             DeskConnectPacket.TYPE_BATTERY_REQUEST -> {
                 if (!conn.device.isPaired) return
-                val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-                val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-                val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-                val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else -1
-
-                val respBody = JSONObject().apply {
-                    put("currentCharge", pct)
-                    put("isCharging", isCharging)
-                    put("thresholdEvent", 0)
-                }
-                conn.sendPacket(DeskConnectPacket(id = 0, type = DeskConnectPacket.TYPE_BATTERY, body = respBody))
+                sendLocalBattery(conn)
             }
 
             DeskConnectPacket.TYPE_BATTERY -> {
@@ -929,6 +975,7 @@ class DeskConnectManager private constructor(private val context: Context) {
         val conn = activeConnections[device.deviceId]
         conn?.sendPacket(DeskConnectPacket.createPair(true))
         conn?.sendPacket(DeskConnectPacket.createMprisPlayerListRequest())
+        conn?.let { sendLocalBattery(it) }
 
         mainHandler.post {
             deviceListeners.forEach { it.onPairingStateChanged(device, true) }

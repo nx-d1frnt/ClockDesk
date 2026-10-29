@@ -44,6 +44,7 @@ data class DeskConnectPacket(
         val DEFAULT_INCOMING_CAPABILITIES = listOf(
             TYPE_PAIR,
             TYPE_BATTERY,
+            TYPE_BATTERY_REQUEST,
             TYPE_NOTIFICATION,
             TYPE_TELEPHONY,
             TYPE_MPRIS,
@@ -52,6 +53,7 @@ data class DeskConnectPacket(
 
         val DEFAULT_OUTGOING_CAPABILITIES = listOf(
             TYPE_PAIR,
+            TYPE_BATTERY,
             TYPE_BATTERY_REQUEST,
             TYPE_NOTIFICATION_REQUEST,
             TYPE_MPRIS_REQUEST,
