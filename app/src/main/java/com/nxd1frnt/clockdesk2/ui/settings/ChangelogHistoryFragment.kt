@@ -15,7 +15,7 @@ class ChangelogHistoryFragment : BaseM3SettingsFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        loadHistory(force = false)
+        loadHistory(force = true)
     }
 
     private fun loadHistory(force: Boolean = false) {

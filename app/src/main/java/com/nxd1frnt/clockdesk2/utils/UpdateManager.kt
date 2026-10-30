@@ -68,6 +68,7 @@ object UpdateManager {
     const val KEY_PENDING_UPDATE_CHANGELOG = "pending_update_changelog"
     const val KEY_PENDING_UPDATE_VERSION = "pending_update_version"
     const val KEY_CHANGELOG_SHOWN_VERSION_CODE = "changelog_shown_version_code"
+    const val KEY_CHANGELOG_SHOWN_VERSION_NAME = "changelog_shown_version_name"
     private var checkedChannel: Boolean? = null
 
     var isChecking: Boolean = false
@@ -770,7 +771,13 @@ object UpdateManager {
         val escapedVer = Regex.escape(cleanVer)
         val namePattern = Regex("""(?:^|[\s_vV])${escapedVer}(?:$|[\s_])""", RegexOption.IGNORE_CASE)
         if (namePattern.containsMatchIn(item.name)) return true
-        if (version.contains("nightly", ignoreCase = true) && item.tagName.equals("nightly", ignoreCase = true)) return true
+        if (version.contains("nightly", ignoreCase = true) && item.tagName.equals("nightly", ignoreCase = true)) {
+            val installedCommit = Regex("nightly-([0-9a-f]{7,40})$", RegexOption.IGNORE_CASE)
+                .find(cleanVer)?.groupValues?.get(1) ?: return false
+            val releaseCommit = Regex("""\b([0-9a-f]{7,40})\b""", RegexOption.IGNORE_CASE)
+                .find(item.name)?.value ?: return false
+            return installedCommit.equals(releaseCommit, ignoreCase = true)
+        }
         val commit = Regex("""\b([0-9a-f]{7,8})\b""").find(version)?.value
         if (commit != null && (item.name.contains(commit, ignoreCase = true) || item.rawBody.contains(commit, ignoreCase = true))) {
             return true
@@ -852,6 +859,7 @@ object UpdateManager {
                 callbacks.forEach { it.invoke(releaseHistory, error.message) }
             }
         )
+        request.setShouldCache(!force)
         NetworkManager.getRequestQueue(context).add(request)
     }
 
@@ -878,7 +886,8 @@ object UpdateManager {
         val currentCode = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
         val currentName = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME
 
-        if (shownCode == currentCode) {
+        val shownName = prefs.getString(KEY_CHANGELOG_SHOWN_VERSION_NAME, null) ?: lastRunName
+        if (shownCode == currentCode && shownName == currentName) {
             return
         }
 
@@ -909,6 +918,7 @@ object UpdateManager {
                 .putInt(KEY_LAST_RUN_VERSION_CODE, currentCode)
                 .putString(KEY_LAST_RUN_VERSION_NAME, currentName)
                 .putInt(KEY_CHANGELOG_SHOWN_VERSION_CODE, currentCode)
+                .putString(KEY_CHANGELOG_SHOWN_VERSION_NAME, currentName)
                 .apply()
             return
         }
@@ -918,6 +928,7 @@ object UpdateManager {
                 .putInt(KEY_LAST_RUN_VERSION_CODE, currentCode)
                 .putString(KEY_LAST_RUN_VERSION_NAME, currentName)
                 .putInt(KEY_CHANGELOG_SHOWN_VERSION_CODE, currentCode)
+                .putString(KEY_CHANGELOG_SHOWN_VERSION_NAME, currentName)
                 .remove(KEY_PENDING_UPDATE_CHANGELOG)
                 .remove(KEY_PENDING_UPDATE_VERSION)
                 .apply()

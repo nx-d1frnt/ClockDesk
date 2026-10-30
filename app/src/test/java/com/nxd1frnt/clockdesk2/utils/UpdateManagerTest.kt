@@ -215,9 +215,10 @@ class UpdateManagerTest {
             isPrerelease = true,
             htmlUrl = "url"
         )
-        // Matches nightly by tag or commit hash
+        // A rolling nightly must match the installed commit.
         assertTrue(UpdateManager.isReleaseMatch(nightlyItem, "2.0.0-rc2.1-nightly-a7aa1a7"))
         assertTrue(UpdateManager.isReleaseMatch(nightlyItem, "nightly"))
+        assertFalse(UpdateManager.isReleaseMatch(nightlyItem, "2.0.0-rc2.1-nightly-2e58df2"))
         assertFalse(UpdateManager.isReleaseMatch(nightlyItem, "2.0.0-rc2.1"))
     }
 
@@ -239,6 +240,26 @@ class UpdateManagerTest {
         val currentCode = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
         assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_CHANGELOG_SHOWN_VERSION_CODE, -1))
         assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_LAST_RUN_VERSION_CODE, -1))
+    }
+
+    @Test
+    fun testNightlyUpdateWithSameVersionCodeShowsChangelog() {
+        val activity = Robolectric.buildActivity(FragmentActivity::class.java).setup().get()
+        val prefs = activity.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+        val code = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_CODE
+        val name = com.nxd1frnt.clockdesk2.BuildConfig.VERSION_NAME
+        prefs.edit().clear()
+            .putInt(UpdateManager.KEY_LAST_RUN_VERSION_CODE, code)
+            .putInt(UpdateManager.KEY_CHANGELOG_SHOWN_VERSION_CODE, code)
+            .putString(UpdateManager.KEY_LAST_RUN_VERSION_NAME, "2.0.0-rc2.1-nightly-a7aa1a7")
+            .putString(UpdateManager.KEY_PENDING_UPDATE_CHANGELOG, "• Updated nightly")
+            .apply()
+
+        UpdateManager.checkAndShowPostUpdateChangelog(activity)
+
+        assertNull(prefs.getString(UpdateManager.KEY_PENDING_UPDATE_CHANGELOG, null))
+        assertEquals(name, prefs.getString(UpdateManager.KEY_CHANGELOG_SHOWN_VERSION_NAME, null))
+        assertEquals(name, prefs.getString(UpdateManager.KEY_LAST_RUN_VERSION_NAME, null))
     }
 
     @Test
