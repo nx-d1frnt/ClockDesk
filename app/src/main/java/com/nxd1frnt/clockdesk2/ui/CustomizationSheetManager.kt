@@ -37,6 +37,7 @@ import com.nxd1frnt.clockdesk2.ui.adapters.MediaStyleAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.ColorAdapter
 import com.nxd1frnt.clockdesk2.ui.adapters.FontAdapter
 import com.nxd1frnt.clockdesk2.utils.ClockManager
+import com.nxd1frnt.clockdesk2.utils.ClockDigitAnimation
 import com.nxd1frnt.clockdesk2.utils.ClockStyle
 import com.nxd1frnt.clockdesk2.utils.DateStyle
 import com.nxd1frnt.clockdesk2.utils.MediaStyle
@@ -90,6 +91,8 @@ class CustomizationSheetManager(
     private val bsColorRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.color_recycler_view) }
     private val bsClockStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.clock_style_recycler_view) }
     private val bsClockStyleCard by lazy { sideSheetView.findViewById<View>(R.id.card_clock_style) }
+    private val bsClockAnimationsSwitch by lazy { sideSheetView.findViewById<MaterialSwitch>(R.id.clock_digit_animations_switch) }
+    private val bsClockAnimationStyleGroup by lazy { sideSheetView.findViewById<RadioGroup>(R.id.clock_animation_style_group) }
     private var clockStyleAdapter: ClockStyleAdapter? = null
 
     private val bsDateStyleRecyclerView by lazy { sideSheetView.findViewById<RecyclerView>(R.id.date_style_recycler_view) }
@@ -517,6 +520,7 @@ class CustomizationSheetManager(
             )
 
         bsClockStyleCard.visibility = if (features?.contains(WidgetFeature.CLOCK_STYLE) ?: isTime) View.VISIBLE else View.GONE
+        updateClockAnimationsVisibility(fontManager.getClockStyle())
         bsDateStyleCard.visibility = if (features?.contains(WidgetFeature.DATE_STYLE) ?: isDate) View.VISIBLE else View.GONE
         bsMediaStyleCard.visibility = if (features?.contains(WidgetFeature.MEDIA_STYLE) ?: isLastFm) View.VISIBLE else View.GONE
         bsTimeFormatGroup.visibility = if (isTime) View.VISIBLE else View.GONE
@@ -686,6 +690,31 @@ class CustomizationSheetManager(
         bsIgnoreCollisionSwitch.isChecked = widgetMover.isCollisionCheckEnabled()
 
         val prefs = fontManager.appearancePreferences
+        bsClockAnimationsSwitch.setOnCheckedChangeListener(null)
+        bsClockAnimationsSwitch.isChecked = prefs.getBoolean("clock_digit_animations", false)
+        bsClockAnimationsSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("clock_digit_animations", checked).apply()
+            updateClockAnimationsVisibility(fontManager.getClockStyle())
+            (focusedView as? com.nxd1frnt.clockdesk2.ui.view.ClockTextView)?.digitAnimationsEnabled = checked
+        }
+
+        bsClockAnimationStyleGroup.setOnCheckedChangeListener(null)
+        val animation = ClockDigitAnimation.fromId(prefs.getString("clock_digit_animation_style", null))
+        bsClockAnimationStyleGroup.check(when (animation) {
+            ClockDigitAnimation.SLIDE -> R.id.clock_animation_slide
+            ClockDigitAnimation.FADE -> R.id.clock_animation_fade
+            ClockDigitAnimation.FLIP -> R.id.clock_animation_flip
+        })
+        bsClockAnimationStyleGroup.setOnCheckedChangeListener { _, checkedId ->
+            val selected = when (checkedId) {
+                R.id.clock_animation_fade -> ClockDigitAnimation.FADE
+                R.id.clock_animation_flip -> ClockDigitAnimation.FLIP
+                else -> ClockDigitAnimation.SLIDE
+            }
+            prefs.edit().putString("clock_digit_animation_style", selected.id).apply()
+            (focusedView as? com.nxd1frnt.clockdesk2.ui.view.ClockTextView)?.digitAnimation = selected
+        }
+        updateClockAnimationsVisibility(fontManager.getClockStyle())
         bsShowMediaIconSwitch.setOnCheckedChangeListener(null)
         bsShowMediaIconSwitch.isChecked = prefs.getBoolean("show_media_icon", true)
         bsShowMediaIconSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -1094,11 +1123,19 @@ class CustomizationSheetManager(
         preventSheetDragForRecyclerView(bsClockStyleRecyclerView)
     }
 
+    private fun updateClockAnimationsVisibility(style: ClockStyle) {
+        bsClockAnimationsSwitch.visibility = if (style.isAnalog) View.GONE else View.VISIBLE
+        bsClockAnimationStyleGroup.visibility = if (!style.isAnalog && bsClockAnimationsSwitch.isChecked) {
+            View.VISIBLE
+        } else View.GONE
+    }
+
     private fun animateClockStyleChange(newStyle: ClockStyle) {
         if (fontManager.getClockStyle() == newStyle) return
 
         val view = focusedView ?: run {
             fontManager.setClockStyle(newStyle)
+            updateClockAnimationsVisibility(newStyle)
             clockManager.updateTimeText()
             return
         }
@@ -1126,6 +1163,7 @@ class CustomizationSheetManager(
                 }
 
                 fontManager.setClockStyle(newStyle)
+                updateClockAnimationsVisibility(newStyle)
                 clockManager.updateTimeText()
                 applyRealTimeFocusUpdate(true)
 

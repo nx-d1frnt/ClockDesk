@@ -1,5 +1,9 @@
 package com.nxd1frnt.clockdesk2.ui.view
 
+import android.animation.ValueAnimator
+import android.graphics.Region
+import android.os.PowerManager
+import android.provider.Settings
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -7,7 +11,10 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
 import android.util.AttributeSet
+import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.appcompat.widget.AppCompatTextView
+import com.nxd1frnt.clockdesk2.utils.ClockDigitAnimation
+import com.nxd1frnt.clockdesk2.utils.MotionUtils
 import java.util.Calendar
 import java.util.Date
 
@@ -16,6 +23,127 @@ class ClockTextView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : AppCompatTextView(context, attrs, defStyleAttr) {
+
+    var digitAnimationsEnabled: Boolean = false
+        set(value) {
+            field = value
+            if (!value) stopDigitAnimation()
+        }
+
+    var digitAnimation: ClockDigitAnimation = ClockDigitAnimation.SLIDE
+        set(value) {
+            if (field == value) return
+            field = value
+            stopDigitAnimation()
+        }
+
+    private var previousText: String? = null
+    private var outgoingText: String? = null
+    private var digitAnimator: ValueAnimator? = null
+    private var digitProgress = 1f
+
+    private fun stopDigitAnimation() {
+        digitAnimator?.cancel()
+        digitAnimator = null
+        outgoingText = null
+        invalidate()
+    }
+
+    override fun onTextChanged(text: CharSequence?, start: Int, lengthBefore: Int, lengthAfter: Int) {
+        super.onTextChanged(text, start, lengthBefore, lengthAfter)
+        val next = text?.toString().orEmpty()
+        val old = previousText
+        previousText = next
+        if (old == next) return
+        stopDigitAnimation()
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val systemAnimations = Settings.Global.getFloat(
+            context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+        ) > 0f
+        if (!digitAnimationsEnabled || isAnalogMode || !isShown || !isLaidOut ||
+            powerManager?.isPowerSaveMode == true || !systemAnimations || old == null ||
+            old.length != next.length || old.indices.any { old[it] != next[it] &&
+                (!old[it].isDigit() || !next[it].isDigit()) }) return
+        outgoingText = old
+        digitProgress = 0f
+        digitAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 250L
+            // Keep progress within 0..1: it also controls opacity and flip scale.
+            interpolator = when (digitAnimation) {
+                ClockDigitAnimation.SLIDE -> MotionUtils.EMPHASIZED_DECELERATE
+                ClockDigitAnimation.FADE -> MotionUtils.EMPHASIZED
+                ClockDigitAnimation.FLIP -> AccelerateDecelerateInterpolator()
+            }
+            addUpdateListener {
+                digitProgress = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        stopDigitAnimation()
+        super.onDetachedFromWindow()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun drawAnimatedDigits(canvas: Canvas): Boolean {
+        val old = outgoingText ?: return false
+        val current = text.toString()
+        val textLayout = layout ?: return false
+        if (digitProgress >= 1f || old.length != current.length) return false
+        val changed = current.indices.filter { old[it] != current[it] }
+        val xOffset = compoundPaddingLeft.toFloat() - scrollX
+        val yOffset = baseline.toFloat() - textLayout.getLineBaseline(0) - scrollY
+        val saved = canvas.save()
+        for (index in changed) {
+            val line = textLayout.getLineForOffset(index)
+            val left = xOffset + textLayout.getPrimaryHorizontal(index)
+            val right = xOffset + textLayout.getPrimaryHorizontal(index + 1)
+            canvas.clipRect(minOf(left, right), yOffset + textLayout.getLineTop(line),
+                maxOf(left, right), yOffset + textLayout.getLineBottom(line), Region.Op.DIFFERENCE)
+        }
+        super.onDraw(canvas)
+        canvas.restoreToCount(saved)
+        val originalAlpha = paint.alpha
+        paint.color = currentTextColor
+        for (index in changed) {
+            val line = textLayout.getLineForOffset(index)
+            val left = xOffset + textLayout.getPrimaryHorizontal(index)
+            val right = xOffset + textLayout.getPrimaryHorizontal(index + 1)
+            val top = yOffset + textLayout.getLineTop(line)
+            val bottom = yOffset + textLayout.getLineBottom(line)
+            val distance = bottom - top
+            val cell = canvas.save()
+            canvas.clipRect(minOf(left, right), top, maxOf(left, right), bottom)
+            val base = yOffset + textLayout.getLineBaseline(line)
+            when (digitAnimation) {
+                ClockDigitAnimation.SLIDE -> {
+                    paint.alpha = (originalAlpha * (1f - digitProgress)).toInt()
+                    canvas.drawText(old, index, index + 1, left, base - distance * digitProgress, paint)
+                    paint.alpha = (originalAlpha * digitProgress).toInt()
+                    canvas.drawText(current, index, index + 1, left, base + distance * (1f - digitProgress), paint)
+                }
+                ClockDigitAnimation.FADE -> {
+                    paint.alpha = (originalAlpha * (1f - digitProgress)).toInt()
+                    canvas.drawText(old, index, index + 1, left, base, paint)
+                    paint.alpha = (originalAlpha * digitProgress).toInt()
+                    canvas.drawText(current, index, index + 1, left, base, paint)
+                }
+                ClockDigitAnimation.FLIP -> {
+                    val outgoing = digitProgress < 0.5f
+                    val scale = if (outgoing) 1f - digitProgress * 2f else digitProgress * 2f - 1f
+                    canvas.scale(1f, scale, (left + right) / 2f, (top + bottom) / 2f)
+                    paint.alpha = originalAlpha
+                    canvas.drawText(if (outgoing) old else current, index, index + 1, left, base, paint)
+                }
+            }
+            canvas.restoreToCount(cell)
+        }
+        paint.alpha = originalAlpha
+        return true
+    }
 
     var isAnalogMode: Boolean = false
         set(value) {
@@ -151,7 +279,7 @@ class ClockTextView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         if (!isAnalogMode) {
-            super.onDraw(canvas)
+            if (!drawAnimatedDigits(canvas)) super.onDraw(canvas)
             return
         }
 

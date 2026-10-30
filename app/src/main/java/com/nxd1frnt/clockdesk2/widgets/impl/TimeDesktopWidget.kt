@@ -32,6 +32,10 @@ class TimeDesktopWidget(
         val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
 
         if (view is ClockTextView) {
+            view.digitAnimation = com.nxd1frnt.clockdesk2.utils.ClockDigitAnimation.fromId(
+                fontManager.appearancePreferences.getString("clock_digit_animation_style", null)
+            )
+            view.digitAnimationsEnabled = fontManager.appearancePreferences.getBoolean("clock_digit_animations", false)
             view.isAnalogMode = clockStyle.isAnalog
             view.setTime(currentTime)
         }

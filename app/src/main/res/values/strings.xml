@@ -954,4 +954,8 @@
     <string name="agenda_next_month">Next month</string>
     <string name="agenda_today">Today</string>
     <string name="agenda_day_empty">No events on this day.</string>
+    <string name="clock_digit_animations">Animate digits</string>
+    <string name="clock_animation_slide">Scroll</string>
+    <string name="clock_animation_fade">Fade</string>
+    <string name="clock_animation_flip">Flip</string>
 </resources>

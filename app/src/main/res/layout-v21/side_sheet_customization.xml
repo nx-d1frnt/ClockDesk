@@ -199,6 +199,40 @@
                         android:orientation="horizontal"
                         android:clipToPadding="false"
                         android:paddingHorizontal="16dp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/clock_digit_animations_switch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:layout_marginHorizontal="16dp"
+                        android:text="@string/clock_digit_animations" />
+
+                    <RadioGroup
+                        android:id="@+id/clock_animation_style_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="16dp"
+                        android:orientation="vertical">
+                        <RadioButton
+                            android:id="@+id/clock_animation_slide"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="48dp"
+                            android:text="@string/clock_animation_slide" />
+                        <RadioButton
+                            android:id="@+id/clock_animation_fade"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="48dp"
+                            android:text="@string/clock_animation_fade" />
+                        <RadioButton
+                            android:id="@+id/clock_animation_flip"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="48dp"
+                            android:text="@string/clock_animation_flip" />
+                    </RadioGroup>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

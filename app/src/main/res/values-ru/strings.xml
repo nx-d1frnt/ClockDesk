@@ -914,4 +914,8 @@
     <string name="agenda_next_month">Следующий месяц</string>
     <string name="agenda_today">Сегодня</string>
     <string name="agenda_day_empty">На этот день событий нет.</string>
+    <string name="clock_digit_animations">Анимация цифр</string>
+    <string name="clock_animation_slide">Прокрутка</string>
+    <string name="clock_animation_fade">Затухание</string>
+    <string name="clock_animation_flip">Перелистывание</string>
 </resources>

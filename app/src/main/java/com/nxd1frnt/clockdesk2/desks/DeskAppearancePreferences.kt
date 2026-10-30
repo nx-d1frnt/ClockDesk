@@ -15,7 +15,7 @@ class DeskAppearancePreferences(private val context: Context) : SharedPreference
         private val widgetKeys = listOf("time", "date", "lastfm", "chips", "weather")
             .flatMap { prefix -> widgetSuffixes.map { prefix + it } }.toSet() + setOf(
                 "timeFormatPattern", "dateFormatPattern", "clockStyle", "dateStyle", "mediaStyle",
-                "show_media_icon", "clock_show_seconds", "smart_chips_stack_overflow", "smart_chip_order"
+                "show_media_icon", "clock_show_seconds", "clock_digit_animations", "clock_digit_animation_style", "smart_chips_stack_overflow", "smart_chip_order"
             )
 
         fun profile(context: Context, layoutKey: String): SharedPreferences {

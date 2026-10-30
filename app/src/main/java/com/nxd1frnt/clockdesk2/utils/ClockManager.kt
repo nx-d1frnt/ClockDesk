@@ -101,6 +101,10 @@ class ClockManager(
         val timePattern = fontManager.getTimeFormatPattern().ifBlank { "HH:mm" }
 
         if (timeText is com.nxd1frnt.clockdesk2.ui.view.ClockTextView) {
+            timeText.digitAnimation = com.nxd1frnt.clockdesk2.utils.ClockDigitAnimation.fromId(
+                fontManager.appearancePreferences.getString("clock_digit_animation_style", null)
+            )
+            timeText.digitAnimationsEnabled = fontManager.appearancePreferences.getBoolean("clock_digit_animations", false)
             timeText.isAnalogMode = clockStyle.isAnalog
             timeText.setTime(currentTime)
         }

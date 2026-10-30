@@ -900,4 +900,8 @@
     <string name="agenda_next_month">Наступний місяць</string>
     <string name="agenda_today">Сьогодні</string>
     <string name="agenda_day_empty">На цей день подій немає.</string>
+    <string name="clock_digit_animations">Анімація цифр</string>
+    <string name="clock_animation_slide">Прокручування</string>
+    <string name="clock_animation_fade">Згасання</string>
+    <string name="clock_animation_flip">Перегортання</string>
 </resources>
