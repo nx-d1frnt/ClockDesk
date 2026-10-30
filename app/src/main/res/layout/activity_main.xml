@@ -104,7 +104,7 @@
             app:layout_constraintEnd_toEndOf="parent" />
 
         <!-- Edit Mode Bottom Action Bar / Dock -->
-        <com.google.android.material.card.MaterialCardView
+        <com.nxd1frnt.clockdesk2.ui.SwipeableEditDock
             android:id="@+id/edit_mode_action_bar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -121,6 +121,7 @@
             tools:visibility="visible">
 
             <LinearLayout
+                android:id="@+id/edit_dock_actions"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
@@ -214,7 +215,16 @@
                     app:icon="@drawable/ic_check" />
 
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_restore_edit_dock"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginHorizontal="8dp"
+                android:text="@string/show_edit_actions"
+                android:visibility="gone" />
+        </com.nxd1frnt.clockdesk2.ui.SwipeableEditDock>
     </androidx.constraintlayout.widget.ConstraintLayout>
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/side_sheet_container"

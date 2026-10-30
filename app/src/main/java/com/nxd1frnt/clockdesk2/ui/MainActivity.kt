@@ -590,6 +590,13 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
         editModeActionBar = findViewById(R.id.edit_mode_action_bar)
+        (editModeActionBar as SwipeableEditDock).onCollapse = {
+            setEditDockCollapsed(true)
+        }
+        findViewById<View>(R.id.btn_restore_edit_dock).setOnClickListener {
+            setEditDockCollapsed(false)
+        }
+        setEditDockCollapsed(false)
         btnAddWidget = findViewById(R.id.btn_add_widget)
         btnResetLayout = findViewById(R.id.btn_reset_layout)
         btnDoneEdit = findViewById(R.id.btn_done_edit)
@@ -979,6 +986,42 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                (::widgetGallerySideSheetManager.isInitialized && widgetGallerySideSheetManager.isShowing) ||
                (::backgroundSheetManager.isInitialized && backgroundSheetManager.isShowing) ||
                (::cropController.isInitialized && cropController.isActive())
+    }
+
+    private fun setEditDockCollapsed(collapsed: Boolean) {
+        val dock = editModeActionBar as SwipeableEditDock
+        if (dock.collapsed != collapsed && dock.isLaidOut && dock.isShown) {
+            val sceneRoot = dock.parent as android.view.ViewGroup
+            android.transition.TransitionManager.endTransitions(sceneRoot)
+            // Fade the actions out, resize the card, then reveal the restore button.
+            // Keep the transition scoped to the dock so widgets remain stationary.
+            val transition = android.transition.AutoTransition().apply {
+                duration = animationDuration / 3
+                interpolator = MotionUtils.EMPHASIZED
+                addTarget(R.id.edit_mode_action_bar)
+                addTarget(R.id.edit_dock_actions)
+                addTarget(R.id.btn_restore_edit_dock)
+            }
+            android.transition.TransitionManager.beginDelayedTransition(sceneRoot, transition)
+        }
+        dock.collapsed = collapsed
+        findViewById<View>(R.id.edit_dock_actions).visibility = if (collapsed) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.btn_restore_edit_dock).visibility = if (collapsed) View.VISIBLE else View.GONE
+        androidx.core.view.ViewCompat.removeAccessibilityAction(
+            editModeActionBar,
+            androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_DISMISS.id
+        )
+        if (!collapsed) {
+            androidx.core.view.ViewCompat.replaceAccessibilityAction(
+                editModeActionBar,
+                androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_DISMISS,
+                getString(R.string.hide_edit_actions)
+            ) { _, _ ->
+                setEditDockCollapsed(true)
+                true
+            }
+        }
+        if (isEditMode) resetEditModeTimeout()
     }
 
     private fun showDock(animate: Boolean = true) {
@@ -3008,6 +3051,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
             updateBackgroundFilters(force = true)
         }
 
+        setEditDockCollapsed(false)
         showDock(animate = true)
 
         updateEmptyDeskPromptVisibility()
