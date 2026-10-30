@@ -30,6 +30,12 @@ class DeskAppearancePreferences(private val context: Context) : SharedPreference
             return profile
         }
 
+        fun resetProfile(context: Context, layoutKey: String) {
+            val editor = profile(context, layoutKey).edit()
+            widgetKeys.forEach { editor.remove(it) }
+            editor.apply()
+        }
+
         fun copyProfile(context: Context, sourceKey: String, destinationKey: String) {
             val source = profile(context, sourceKey)
             val editor = profile(context, destinationKey).edit().clear()

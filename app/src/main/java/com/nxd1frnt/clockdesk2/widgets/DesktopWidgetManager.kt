@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.view.View
 import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.nxd1frnt.clockdesk2.desks.DeskAppearancePreferences
 import com.nxd1frnt.clockdesk2.R
 import com.nxd1frnt.clockdesk2.utils.Logger
 import com.nxd1frnt.clockdesk2.widgets.base.DesktopWidgetController
@@ -359,11 +360,10 @@ class DesktopWidgetManager(
     fun resetToDefaults() {
         activeControllers.values.forEach { it.onDestroy() }
         activeControllers.clear()
-        legacyPrefs.edit()
-            .putInt("lastfm_layout_order_index", 0)
-            .putInt("date_text_order_index", 1)
-            .putInt("time_text_order_index", 2)
-            .apply()
+        // Positions are stored separately from the widget list. Clear them before
+        // initializing defaults so migration cannot restore the customized layout.
+        legacyPrefs.edit().clear().apply()
+        DeskAppearancePreferences.resetProfile(context, layoutKey)
         migrateOrInitDefaults()
         onWidgetsChanged?.invoke()
     }

@@ -554,7 +554,7 @@
     <string name="widget_already_added">Уже добавлен на стол</string>
     <string name="empty_desk_prompt">Ваш стол пуст. Нажмите +, чтобы добавить виджет.</string>
     <string name="confirm_reset_layout_title">Сбросить макет?</string>
-    <string name="confirm_reset_layout_msg">Это восстановит виджеты и их позиции по умолчанию.</string>
+    <string name="confirm_reset_layout_msg">Это восстановит виджеты, их стили и позиции по умолчанию.</string>
 
     <!-- Device Connect -->
     <string name="deskconnect_fingerprint">Отпечаток сертификата</string>

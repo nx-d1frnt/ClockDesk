@@ -1418,7 +1418,9 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                 .setTitle(R.string.confirm_reset_layout_title)
                 .setMessage(R.string.confirm_reset_layout_msg)
                 .setPositiveButton(R.string.reset_layout) { _, _ ->
+                    showMediaIcon = false
                     desktopWidgetManager.resetToDefaults()
+                    smartChipManager.onPreferencesChanged()
                     Toast.makeText(this, R.string.reset_layout, Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton(R.string.cancel, null)

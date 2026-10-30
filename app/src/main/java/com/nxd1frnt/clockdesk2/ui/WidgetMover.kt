@@ -47,6 +47,7 @@ class WidgetMover(
         views.clear()
         views.addAll(newViews)
         checkAndInitializeDefaults()
+        loadInitialState()
         applyAllInternalGravities()
         if (isEditMode) {
             views.forEach { view ->

@@ -569,7 +569,7 @@
     <string name="widget_already_added">Already added to desk</string>
     <string name="empty_desk_prompt">Your desk is empty. Tap + to add a widget.</string>
     <string name="confirm_reset_layout_title">Reset Layout?</string>
-    <string name="confirm_reset_layout_msg">This will restore the default widgets and positions.</string>
+    <string name="confirm_reset_layout_msg">This will restore the default widgets, styles, and positions.</string>
 
     <!-- Device Connect -->
     <string name="deskconnect_fingerprint">Certificate fingerprint</string>

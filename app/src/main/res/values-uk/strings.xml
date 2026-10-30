@@ -552,7 +552,7 @@
     <string name="widget_already_added">Вже додано на стіл</string>
     <string name="empty_desk_prompt">Ваш стіл порожній. Натисніть +, щоб додати віджет.</string>
     <string name="confirm_reset_layout_title">Скинути макет?</string>
-    <string name="confirm_reset_layout_msg">Це відновить віджети та їх розташування за замовчуванням.</string>
+    <string name="confirm_reset_layout_msg">Це відновить віджети, їхні стилі та розташування за замовчуванням.</string>
 
     <!-- Device Connect -->
     <string name="deskconnect_fingerprint">Відбиток сертифіката</string>
