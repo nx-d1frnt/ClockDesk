@@ -60,12 +60,18 @@ class ClockTextView @JvmOverloads constructor(
         val systemAnimations = Settings.Global.getFloat(
             context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
         ) > 0f
-        if (!digitAnimationsEnabled || isAnalogMode || !isShown || !isLaidOut ||
+        if (!digitAnimationsEnabled || isAnalogMode || !isShown ||
             powerManager?.isPowerSaveMode == true || !systemAnimations || old == null ||
             old.length != next.length || old.indices.any { old[it] != next[it] &&
                 (!old[it].isDigit() || !next[it].isDigit()) }) return
         outgoingText = old
         digitProgress = 0f
+        // Start the clock only when the updated text can actually be drawn. Layout or
+        // a busy UI thread must not consume the animation before its first frame.
+        invalidate()
+    }
+
+    private fun startDigitAnimation() {
         digitAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 250L
             // Keep progress within 0..1: it also controls opacity and flip scale.
@@ -92,7 +98,8 @@ class ClockTextView @JvmOverloads constructor(
         val old = outgoingText ?: return false
         val current = text.toString()
         val textLayout = layout ?: return false
-        if (digitProgress >= 1f || old.length != current.length) return false
+        if (digitProgress >= 1f || old.length != current.length || textLayout.text.toString() != current) return false
+        if (digitAnimator == null) startDigitAnimation()
         val changed = current.indices.filter { old[it] != current[it] }
         val xOffset = compoundPaddingLeft.toFloat() - scrollX
         val yOffset = baseline.toFloat() - textLayout.getLineBaseline(0) - scrollY
