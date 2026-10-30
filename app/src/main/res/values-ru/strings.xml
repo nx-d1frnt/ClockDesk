@@ -918,4 +918,5 @@
     <string name="clock_animation_slide">Прокрутка</string>
     <string name="clock_animation_fade">Затухание</string>
     <string name="clock_animation_flip">Перелистывание</string>
+    <string name="edit_dock_more">Ещё действия</string>
 </resources>

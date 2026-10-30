@@ -904,4 +904,5 @@
     <string name="clock_animation_slide">Прокручування</string>
     <string name="clock_animation_fade">Згасання</string>
     <string name="clock_animation_flip">Перегортання</string>
+    <string name="edit_dock_more">Інші дії</string>
 </resources>

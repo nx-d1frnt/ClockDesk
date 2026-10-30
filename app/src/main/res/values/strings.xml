@@ -958,4 +958,5 @@
     <string name="clock_animation_slide">Scroll</string>
     <string name="clock_animation_fade">Fade</string>
     <string name="clock_animation_flip">Flip</string>
+    <string name="edit_dock_more">More actions</string>
 </resources>

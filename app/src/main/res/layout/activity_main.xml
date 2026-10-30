@@ -117,10 +117,12 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             android:visibility="gone"
+            android:layout_marginHorizontal="16dp"
+            app:layout_constrainedWidth="true"
             android:layout_marginBottom="16dp"
             tools:visibility="visible">
 
-            <LinearLayout
+            <com.nxd1frnt.clockdesk2.ui.AdaptiveEditDockActions
                 android:id="@+id/edit_dock_actions"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -184,6 +186,7 @@
                     app:icon="@drawable/ic_backup_restore" />
 
                 <Space
+                    android:id="@+id/edit_dock_reset_space"
                     android:layout_width="4dp"
                     android:layout_height="wrap_content" />
 
@@ -204,6 +207,17 @@
                     android:layout_marginHorizontal="8dp"
                     android:background="?attr/colorOutlineVariant" />
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_edit_dock_more"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="48dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/edit_dock_more"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_desk_more"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+
                 <!-- Confirmation Action -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_done_edit"
@@ -214,7 +228,7 @@
                     android:text="@string/done"
                     app:icon="@drawable/ic_check" />
 
-            </LinearLayout>
+            </com.nxd1frnt.clockdesk2.ui.AdaptiveEditDockActions>
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_restore_edit_dock"
                 style="@style/Widget.Material3.Button.TextButton"
