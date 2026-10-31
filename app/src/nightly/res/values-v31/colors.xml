@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Nightly Full-Time Dark Monet (API 31+) -->
-    <!-- Always pulls midnight/dark tones from the user's Monet wallpaper palette -->
-    <color name="ic_launcher_bg">@android:color/system_neutral1_900</color>
-    <color name="ic_launcher_pattern">@android:color/system_neutral2_800</color>
-    <color name="ic_launcher_tablet">@android:color/system_accent1_100</color>
-    <color name="ic_launcher_hour_hand">@android:color/system_accent1_700</color>
-    <color name="ic_launcher_minute_hand">@android:color/system_accent1_900</color>
+    <!-- Fixed midnight-blue Nightly palette on all Android versions -->
+    <color name="ic_launcher_bg">#151728</color>
+    <color name="ic_launcher_pattern">#2A2E4B</color>
+    <color name="ic_launcher_tablet">#1E4D70</color>
+    <color name="ic_launcher_hour_hand">#91C9F7</color>
+    <color name="ic_launcher_minute_hand">#CDE5FF</color>
 </resources>

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Keep layer IDs available when a build variant overrides the About icon. -->
+    <item name="about_icon_body" type="id" />
+    <item name="about_icon_hour" type="id" />
+    <item name="about_icon_minute" type="id" />
     <item name="tag_touch_listener_set" type="id" />
     <item name="tag_pulse_animator" type="id" />
     <item name="tag_target_alpha" type="id" />

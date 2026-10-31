@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.util.LruCache
 import android.util.TypedValue
@@ -871,8 +872,17 @@ object UiMonetThemeManager {
 
     private fun styleImageView(iv: ImageView, palette: UiMonetPalette) {
         when (iv.id) {
+            R.id.about_app_icon -> {
+                // Tint each part separately so custom palettes also work before Android 12.
+                // Nightly supplies a fixed-color vector instead of this layer drawable.
+                iv.imageTintList = null
+                (iv.drawable?.mutate() as? LayerDrawable)?.let { icon ->
+                    icon.findDrawableByLayerId(R.id.about_icon_body)?.setTint(palette.primaryContainer)
+                    icon.findDrawableByLayerId(R.id.about_icon_hour)?.setTint(palette.primary)
+                    icon.findDrawableByLayerId(R.id.about_icon_minute)?.setTint(palette.onPrimaryContainer)
+                }
+            }
             // Multi-color or raw icons that must NOT be tinted
-            R.id.about_app_icon,
             R.id.about_card_pattern,
             R.id.dialog_weather_icon,
             R.id.forecast_item_icon,
