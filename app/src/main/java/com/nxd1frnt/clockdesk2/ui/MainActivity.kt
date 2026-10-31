@@ -203,6 +203,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
     private var previewBackgroundUri: String? = null
     private var lastBackgroundSource: Any? = null
     private var lastBlurIntensity: Int? = null
+    private val lastValidPluginImages = mutableMapOf<String, Bitmap>()
     private data class BackgroundLoad(
         val model: Any,
         val blurIntensity: Int,
@@ -2178,6 +2179,25 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                         onLoadFailed(null)
                         return
                     }
+                    val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this@MainActivity)
+                    val providerId = bpm.getActiveProviderId()
+                    if (providerId.startsWith("external:")) {
+                        val payload = bpm.getExternalProviders().firstOrNull { it.id == providerId }
+                            ?.getCurrentPayload(this@MainActivity) ?: bpm.getSavedPayloadForId(providerId)
+                        val isPluginImage = when (payload) {
+                            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri ->
+                                model.toString() == payload.uriString
+                            is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap ->
+                                model === payload.bitmap
+                            else -> false
+                        }
+                        if (isPluginImage) {
+                            // Keep an independent copy: superseded color extraction may recycle bitmap.
+                            resource.copy(Bitmap.Config.ARGB_8888, false)?.let {
+                                lastValidPluginImages[providerId] = it
+                            }
+                        }
+                    }
                     activeBackgroundTarget = null
                     // Glide forbids clearing the request from inside its own target callback.
                     handler.post { requestManager.clear(this) }
@@ -2294,7 +2314,31 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
                         if (!isBackgroundRequestCurrent(requestId)) return@post
                         try {
                             val savedUri = backgroundManager.getSavedBackgroundUri()
-                            if (model.toString() != savedUri) {
+                            val bpm = com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this@MainActivity)
+                            val activeProviderId = bpm.getActiveProviderId()
+                            val providerPayload = if (activeProviderId.startsWith("external:")) {
+                                bpm.getExternalProviders().firstOrNull { it.id == activeProviderId }
+                                    ?.getCurrentPayload(this@MainActivity)
+                                    ?: bpm.getSavedPayloadForId(activeProviderId)
+                            } else null
+                            val failedProviderImage = when (providerPayload) {
+                                is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageUri ->
+                                    model.toString() == providerPayload.uriString
+                                is com.nxd1frnt.clockdesk2.background.provider.BackgroundPayload.ImageBitmap ->
+                                    model === providerPayload.bitmap
+                                else -> false
+                            }
+                            // Restoring this provider would reload the same cached payload and
+                            // request it again, creating an endless failure/broadcast loop.
+                            // Keep the provider selected so a later update can recover normally.
+                            val lastValidImage = lastValidPluginImages[activeProviderId]
+                            if (failedProviderImage && lastValidImage != null && model !== lastValidImage) {
+                                // This snapshot already includes blur; do not apply it twice.
+                                applyBitmapBackground(lastValidImage, blurIntensity = 0, skipAnimation = true)
+                            } else if (failedProviderImage || model.toString() == savedUri ||
+                                model === lastValidImage) {
+                                restoreGradientBackground()
+                            } else {
                                 restoreUserBackground(savedUri)
                             }
                         } catch (e: Exception) {
