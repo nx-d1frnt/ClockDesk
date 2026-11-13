@@ -68,122 +68,9 @@ class BlurTransformation(
             }
         }
 
-        // Algorithm selection based on Android version
-        var applied = false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            try {
-                applyRenderScriptBlur(context, bitmap, radius)
-                Logger.d("BlurTransformation") { "Applied RenderScript blur with radius $radius" }
-                applied = true
-            } catch (e: Throwable) {
-                applied = false
-            }
-        }
-
-        if (!applied) {
-            applyKotlinBoxBlur(bitmap, radius)
-            Logger.d("BlurTransformation") { "Applied Kotlin Box Blur with radius $radius" }
-        }
+        blurBitmapInPlace(context, bitmap, radius)
 
         return bitmap
-    }
-
-
-    private fun applyRenderScriptBlur(context: Context, bitmap: Bitmap, radius: Int) {
-        var rs: RenderScript? = null
-        var input: Allocation? = null
-        var output: Allocation? = null
-        var script: ScriptIntrinsicBlur? = null
-
-        try {
-            rs = RenderScript.create(context)
-            input = Allocation.createFromBitmap(rs, bitmap, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SCRIPT)
-            output = Allocation.createTyped(rs, input.type)
-            script = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs))
-
-            script.setRadius(radius.coerceIn(1, 25).toFloat())
-            script.setInput(input)
-            script.forEach(output)
-            output.copyTo(bitmap)
-        } finally {
-            rs?.destroy()
-            input?.destroy()
-            output?.destroy()
-            script?.destroy()
-        }
-    }
-
-
-    // Box Blur algorithm as a fallback for devices where RenderScript is not available
-    private fun applyKotlinBoxBlur(bitmap: Bitmap, radius: Int) {
-        val w = bitmap.width
-        val h = bitmap.height
-        val pixels = IntArray(w * h)
-
-        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-
-        val passes = 3
-        val adjustedRadius = max(1, radius / passes)
-
-        var currentPixels = pixels
-        var tempPixels = IntArray(w * h)
-
-        for (pass in 0 until passes) {
-            // Horizontal pass
-            for (y in 0 until h) {
-                val rowStart = y * w
-                for (x in 0 until w) {
-                    val left = max(0, x - adjustedRadius)
-                    val right = min(w - 1, x + adjustedRadius)
-                    val kernelSize = right - left + 1
-
-                    var sumA = 0; var sumR = 0; var sumG = 0; var sumB = 0
-
-                    for (i in left..right) {
-                        val pixel = currentPixels[rowStart + i]
-                        sumA += (pixel ushr 24) and 0xFF
-                        sumR += (pixel ushr 16) and 0xFF
-                        sumG += (pixel ushr 8) and 0xFF
-                        sumB += pixel and 0xFF
-                    }
-
-                    val avgA = sumA / kernelSize
-                    val avgR = sumR / kernelSize
-                    val avgG = sumG / kernelSize
-                    val avgB = sumB / kernelSize
-
-                    tempPixels[rowStart + x] = (avgA shl 24) or (avgR shl 16) or (avgG shl 8) or avgB
-                }
-            }
-
-            // Vertical pass
-            for (x in 0 until w) {
-                for (y in 0 until h) {
-                    val top = max(0, y - adjustedRadius)
-                    val bottom = min(h - 1, y + adjustedRadius)
-                    val kernelSize = bottom - top + 1
-
-                    var sumA = 0; var sumR = 0; var sumG = 0; var sumB = 0
-
-                    for (i in top..bottom) {
-                        val pixel = tempPixels[i * w + x]
-                        sumA += (pixel ushr 24) and 0xFF
-                        sumR += (pixel ushr 16) and 0xFF
-                        sumG += (pixel ushr 8) and 0xFF
-                        sumB += pixel and 0xFF
-                    }
-
-                    val avgA = sumA / kernelSize
-                    val avgR = sumR / kernelSize
-                    val avgG = sumG / kernelSize
-                    val avgB = sumB / kernelSize
-
-                    currentPixels[y * w + x] = (avgA shl 24) or (avgR shl 16) or (avgG shl 8) or avgB
-                }
-            }
-        }
-
-        bitmap.setPixels(currentPixels, 0, w, 0, 0, w, h)
     }
 
     override fun equals(other: Any?): Boolean {
@@ -196,5 +83,116 @@ class BlurTransformation(
     override fun hashCode(): Int {
         // Callback НЕ участвует в хэше
         return "BlurTransformation($radius,$sampling)".hashCode()
+    }
+
+    companion object {
+        fun blurBitmapInPlace(context: Context, bitmap: Bitmap, radius: Int) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                try {
+                    applyRenderScriptBlur(context, bitmap, radius)
+                    Logger.d("BlurTransformation") { "Applied RenderScript blur with radius $radius" }
+                    return
+                } catch (_: Throwable) {
+                }
+            }
+            applyKotlinBoxBlur(bitmap, radius)
+            Logger.d("BlurTransformation") { "Applied Kotlin Box Blur with radius $radius" }
+        }
+
+        private fun applyRenderScriptBlur(context: Context, bitmap: Bitmap, radius: Int) {
+            var rs: RenderScript? = null
+            var input: Allocation? = null
+            var output: Allocation? = null
+            var script: ScriptIntrinsicBlur? = null
+
+            try {
+                rs = RenderScript.create(context)
+                input = Allocation.createFromBitmap(rs, bitmap, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SCRIPT)
+                output = Allocation.createTyped(rs, input.type)
+                script = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs))
+
+                script.setRadius(radius.coerceIn(1, 25).toFloat())
+                script.setInput(input)
+                script.forEach(output)
+                output.copyTo(bitmap)
+            } finally {
+                rs?.destroy()
+                input?.destroy()
+                output?.destroy()
+                script?.destroy()
+            }
+        }
+
+        // Box Blur algorithm as a fallback for devices where RenderScript is not available
+        private fun applyKotlinBoxBlur(bitmap: Bitmap, radius: Int) {
+            val w = bitmap.width
+            val h = bitmap.height
+            val pixels = IntArray(w * h)
+
+            bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+            val passes = 3
+            val adjustedRadius = max(1, radius / passes)
+
+            val currentPixels = pixels
+            val tempPixels = IntArray(w * h)
+
+            for (pass in 0 until passes) {
+                // Horizontal pass
+                for (y in 0 until h) {
+                    val rowStart = y * w
+                    for (x in 0 until w) {
+                        val left = max(0, x - adjustedRadius)
+                        val right = min(w - 1, x + adjustedRadius)
+                        val kernelSize = right - left + 1
+
+                        var sumA = 0; var sumR = 0; var sumG = 0; var sumB = 0
+
+                        for (i in left..right) {
+                            val pixel = currentPixels[rowStart + i]
+                            sumA += (pixel ushr 24) and 0xFF
+                            sumR += (pixel ushr 16) and 0xFF
+                            sumG += (pixel ushr 8) and 0xFF
+                            sumB += pixel and 0xFF
+                        }
+
+                        val avgA = sumA / kernelSize
+                        val avgR = sumR / kernelSize
+                        val avgG = sumG / kernelSize
+                        val avgB = sumB / kernelSize
+
+                        tempPixels[rowStart + x] = (avgA shl 24) or (avgR shl 16) or (avgG shl 8) or avgB
+                    }
+                }
+
+                // Vertical pass
+                for (x in 0 until w) {
+                    for (y in 0 until h) {
+                        val top = max(0, y - adjustedRadius)
+                        val bottom = min(h - 1, y + adjustedRadius)
+                        val kernelSize = bottom - top + 1
+
+                        var sumA = 0; var sumR = 0; var sumG = 0; var sumB = 0
+
+                        for (i in top..bottom) {
+                            val pixel = tempPixels[i * w + x]
+                            sumA += (pixel ushr 24) and 0xFF
+                            sumR += (pixel ushr 16) and 0xFF
+                            sumG += (pixel ushr 8) and 0xFF
+                            sumB += pixel and 0xFF
+                        }
+
+                        val avgA = sumA / kernelSize
+                        val avgR = sumR / kernelSize
+                        val avgG = sumG / kernelSize
+                        val avgB = sumB / kernelSize
+
+                        currentPixels[y * w + x] = (avgA shl 24) or (avgR shl 16) or (avgG shl 8) or avgB
+                    }
+                }
+            }
+
+            bitmap.setPixels(currentPixels, 0, w, 0, 0, w, h)
+        }
     }
 }

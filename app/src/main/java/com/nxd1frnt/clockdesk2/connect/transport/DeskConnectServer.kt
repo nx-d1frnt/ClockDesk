@@ -11,6 +11,9 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.security.cert.X509Certificate
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.SSLSocket
 
@@ -28,6 +31,7 @@ class DeskConnectServer(
     private val isRunning = AtomicBoolean(false)
     private var serverSocket: ServerSocket? = null
     private var serverThread: Thread? = null
+    private var incomingExecutor: ExecutorService? = null
     var boundPort: Int = DEFAULT_PORT
         private set
 
@@ -56,6 +60,9 @@ class DeskConnectServer(
             return false
         }
 
+        incomingExecutor = Executors.newFixedThreadPool(4) { runnable ->
+            Thread(runnable, "DeskConnect-Incoming")
+        }
         serverThread = Thread {
             runServerLoop()
         }.apply {
@@ -73,6 +80,8 @@ class DeskConnectServer(
             // Ignored
         }
         serverSocket = null
+        incomingExecutor?.shutdownNow()
+        incomingExecutor = null
         serverThread?.interrupt()
         serverThread = null
         Logger.d("DeskConnectServer") { "TCP Server stopped" }
@@ -84,9 +93,15 @@ class DeskConnectServer(
             try {
                 val clientSocket = s.accept()
                 Logger.d("DeskConnectServer") { "Accepted incoming TCP socket from ${clientSocket.inetAddress}:${clientSocket.port}" }
-                Thread {
-                    handleIncomingSocket(clientSocket)
-                }.start()
+                try {
+                    incomingExecutor?.execute {
+                        handleIncomingSocket(clientSocket)
+                    } ?: run {
+                        try { clientSocket.close() } catch (_: Exception) {}
+                    }
+                } catch (e: RejectedExecutionException) {
+                    try { clientSocket.close() } catch (_: Exception) {}
+                }
             } catch (e: Exception) {
                 if (isRunning.get()) {
                     Logger.e("DeskConnectServer") { "Error accepting client: ${e.message}" }

@@ -11,10 +11,6 @@ import android.graphics.Shader
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.ScriptIntrinsicBlur
 import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
@@ -24,10 +20,10 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.google.android.material.card.MaterialCardView
 import com.nxd1frnt.clockdesk2.R
+import com.nxd1frnt.clockdesk2.background.BlurTransformation
 import com.nxd1frnt.clockdesk2.connect.DeskConnectManager
 import com.nxd1frnt.clockdesk2.utils.Logger
-import kotlin.math.max
-import kotlin.math.min
+import java.util.concurrent.Executors
 
 class DeskCallOverlay(
     private val context: Context,
@@ -35,6 +31,8 @@ class DeskCallOverlay(
     private val deskConnectManager: DeskConnectManager
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val blurExecutor = Executors.newSingleThreadExecutor()
+    private var isDestroyed = false
     private var currentCallView: View? = null
 
     private val telephonyListener = object : DeskConnectManager.TelephonyListener {
@@ -46,33 +44,34 @@ class DeskCallOverlay(
             phoneThumbnailBase64: String?
         ) {
             mainHandler.post {
+                if (isDestroyed) return@post
                 val dev = deskConnectManager.discoveredDevices[deviceId]
                 val deviceName = dev?.getDisplayName() ?: "Phone"
-
-                var photoBitmap: Bitmap? = null
-                if (!phoneThumbnailBase64.isNullOrEmpty()) {
-                    try {
-                        val decodedBytes = Base64.decode(phoneThumbnailBase64, Base64.DEFAULT)
-                        val rawBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-                        if (rawBitmap != null) {
-                            photoBitmap = blurBitmap(rawBitmap, radius = 22)
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("DeskCallOverlay") { "Failed to decode/blur contact photo: ${e.message}" }
-                    }
-                }
-
                 val prefs = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
 
                 when (event.lowercase()) {
                     "ringing" -> {
                         if (prefs.getBoolean("desk_call_overlay_enabled", true)) {
+                            val displayName = contactName ?: phoneNumber
+                            val subtitle = if (contactName != null) phoneNumber else ""
                             showIncomingCall(
                                 deviceName = deviceName,
-                                displayName = contactName ?: phoneNumber,
-                                subtitle = if (contactName != null) phoneNumber else "",
-                                contactPhoto = photoBitmap
+                                displayName = displayName,
+                                subtitle = subtitle,
+                                contactPhoto = null
                             )
+                            if (!phoneThumbnailBase64.isNullOrEmpty() && !blurExecutor.isShutdown) {
+                                blurExecutor.execute {
+                                    val photoBitmap = decodeAndBlurPhoto(phoneThumbnailBase64)
+                                    if (photoBitmap != null) {
+                                        mainHandler.post {
+                                            if (!isDestroyed && currentCallView != null) {
+                                                updateCallInfo(deviceName, displayName, subtitle, photoBitmap)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     "missedcall" -> {
@@ -213,102 +212,23 @@ class DeskCallOverlay(
             .start()
     }
 
-    private fun blurBitmap(src: Bitmap, radius: Int = 20): Bitmap {
-        val mutable = src.copy(Bitmap.Config.ARGB_8888, true)
-        val clampedRadius = radius.coerceIn(1, 25)
-
-        try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                var rs: RenderScript? = null
-                var input: Allocation? = null
-                var output: Allocation? = null
-                var script: ScriptIntrinsicBlur? = null
-                try {
-                    rs = RenderScript.create(context)
-                    input = Allocation.createFromBitmap(rs, mutable, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SCRIPT)
-                    output = Allocation.createTyped(rs, input.type)
-                    script = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs))
-                    script.setRadius(clampedRadius.toFloat())
-                    script.setInput(input)
-                    script.forEach(output)
-                    output.copyTo(mutable)
-                    return mutable
-                } finally {
-                    try { script?.destroy() } catch (_: Exception) {}
-                    try { input?.destroy() } catch (_: Exception) {}
-                    try { output?.destroy() } catch (_: Exception) {}
-                    try { rs?.destroy() } catch (_: Exception) {}
-                }
-            }
-        } catch (e: Throwable) {
-            Logger.w("DeskCallOverlay") { "RenderScript blur exception: ${e.message}" }
+    private fun decodeAndBlurPhoto(phoneThumbnailBase64: String): Bitmap? {
+        return try {
+            val decodedBytes = Base64.decode(phoneThumbnailBase64, Base64.DEFAULT)
+            val rawBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size) ?: return null
+            val mutable = rawBitmap.copy(Bitmap.Config.ARGB_8888, true) ?: return null
+            BlurTransformation.blurBitmapInPlace(context, mutable, radius = 22)
+            mutable
+        } catch (e: Exception) {
+            Logger.e("DeskCallOverlay") { "Failed to decode/blur contact photo: ${e.message}" }
+            null
         }
-
-        return applyKotlinBoxBlur(mutable, clampedRadius)
-    }
-
-    private fun applyKotlinBoxBlur(bitmap: Bitmap, radius: Int): Bitmap {
-        val w = bitmap.width
-        val h = bitmap.height
-        val pixels = IntArray(w * h)
-        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-
-        val passes = 3
-        val r = max(1, radius / passes)
-        val tempPixels = IntArray(w * h)
-
-        for (pass in 0 until passes) {
-            // Horizontal pass
-            for (y in 0 until h) {
-                val rowStart = y * w
-                for (x in 0 until w) {
-                    val left = max(0, x - r)
-                    val right = min(w - 1, x + r)
-                    val kernelSize = right - left + 1
-
-                    var sumA = 0; var sumR = 0; var sumG = 0; var sumB = 0
-                    for (i in left..right) {
-                        val p = pixels[rowStart + i]
-                        sumA += (p ushr 24) and 0xFF
-                        sumR += (p ushr 16) and 0xFF
-                        sumG += (p ushr 8) and 0xFF
-                        sumB += p and 0xFF
-                    }
-                    tempPixels[rowStart + x] = ((sumA / kernelSize) shl 24) or
-                            ((sumR / kernelSize) shl 16) or
-                            ((sumG / kernelSize) shl 8) or
-                            (sumB / kernelSize)
-                }
-            }
-
-            // Vertical pass
-            for (x in 0 until w) {
-                for (y in 0 until h) {
-                    val top = max(0, y - r)
-                    val bottom = min(h - 1, y + r)
-                    val kernelSize = bottom - top + 1
-
-                    var sumA = 0; var sumR = 0; var sumG = 0; var sumB = 0
-                    for (i in top..bottom) {
-                        val p = tempPixels[i * w + x]
-                        sumA += (p ushr 24) and 0xFF
-                        sumR += (p ushr 16) and 0xFF
-                        sumG += (p ushr 8) and 0xFF
-                        sumB += p and 0xFF
-                    }
-                    pixels[y * w + x] = ((sumA / kernelSize) shl 24) or
-                            ((sumR / kernelSize) shl 16) or
-                            ((sumG / kernelSize) shl 8) or
-                            (sumB / kernelSize)
-                }
-            }
-        }
-
-        bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
-        return bitmap
     }
 
     fun destroy() {
+        isDestroyed = true
+        blurExecutor.shutdownNow()
+        mainHandler.removeCallbacksAndMessages(null)
         deskConnectManager.telephonyListeners.remove(telephonyListener)
         currentCallView?.let { container.removeView(it) }
         currentCallView = null

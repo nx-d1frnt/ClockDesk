@@ -70,9 +70,8 @@ class LastFmPlugin(private val context: Context) : IMusicPlugin {
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            if (isEnabled) {
-                fetch()
-            }
+            if (!isEnabled) return
+            fetch()
 
             val nextInterval = if (dynamicRefreshEnabled && isPlaying) {
                 activeRefreshInterval

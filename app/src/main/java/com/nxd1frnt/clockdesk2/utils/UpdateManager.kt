@@ -69,6 +69,7 @@ object UpdateManager {
     const val KEY_PENDING_UPDATE_VERSION = "pending_update_version"
     const val KEY_CHANGELOG_SHOWN_VERSION_CODE = "changelog_shown_version_code"
     const val KEY_CHANGELOG_SHOWN_VERSION_NAME = "changelog_shown_version_name"
+    private const val KEY_DOWNLOADED_APK_NAME = "downloaded_apk_name"
     private var checkedChannel: Boolean? = null
 
     var isChecking: Boolean = false
@@ -201,17 +202,23 @@ object UpdateManager {
         downloadProgress = 0
         downloadedBytes = 0L
         totalBytes = 0L
+        context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+            .edit().remove(KEY_DOWNLOADED_APK_NAME).apply()
         notifyStateChanged()
     }
 
     fun getDownloadedFile(context: Context): File? {
-        val name = apkFileName ?: return null
+        val prefs = context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+        val name = apkFileName ?: prefs.getString(KEY_DOWNLOADED_APK_NAME, null) ?: return null
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
         val file = File(dir, name)
         // DownloadManager writes directly to the destination; a failed download may leave a partial file.
         if (!file.exists() || file.length() == 0L) return null
         val archive = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-        return if (archive?.packageName == context.packageName) file else null
+        return if (archive?.packageName == context.packageName) {
+            apkFileName = name
+            file
+        } else null
     }
 
     fun formatBytes(bytes: Long): String {
@@ -432,6 +439,8 @@ object UpdateManager {
                 .setMimeType("application/vnd.android.package-archive")
 
             activeDownloadId = downloadManager.enqueue(request)
+            context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+                .edit().putString(KEY_DOWNLOADED_APK_NAME, fileName).apply()
             downloadState = DownloadState.DOWNLOADING
             downloadProgress = 0
             downloadedBytes = 0L

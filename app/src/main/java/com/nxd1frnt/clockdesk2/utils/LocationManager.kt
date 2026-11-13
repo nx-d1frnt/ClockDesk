@@ -36,7 +36,7 @@ class LocationManager(private val context: Context, private val permissionReques
         }
     }
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray, callback: (Double, Double) -> Unit) {
-        if (requestCode == permissionRequestCode && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == permissionRequestCode && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) {
             fetchLocation(callback)
         } else {
             callback(40.7128, -74.0060) // Fallback: New York
@@ -45,14 +45,16 @@ class LocationManager(private val context: Context, private val permissionReques
     }
 
     fun fetchLocation(callback: (Double, Double) -> Unit) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        val hasFine = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) {
             Logger.w("LocationManager"){"Location permission denied, using fallback: New York"}
             callback(40.7128, -74.0060)
             return
         }
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         try {
-            val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val location = (if (hasFine) locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) else null)
                 ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             if (location != null) {
                 Logger.d("LocationManager"){"Fetched location: lat=${location.latitude}, lon=${location.longitude}"}

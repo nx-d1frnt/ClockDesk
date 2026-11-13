@@ -277,4 +277,28 @@ class UpdateManagerTest {
         assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_CHANGELOG_SHOWN_VERSION_CODE, -1))
         assertEquals(currentCode, updatePrefs.getInt(UpdateManager.KEY_LAST_RUN_VERSION_CODE, -1))
     }
+
+    @Test
+    fun testGetDownloadedFileRestoresNameFromPrefs() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val updatePrefs = context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+        val dir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)!!
+        dir.mkdirs()
+        val apkFile = java.io.File(dir, "ClockDesk-test.apk")
+        apkFile.writeBytes(byteArrayOf(1, 2, 3))
+
+        val pkgInfo = android.content.pm.PackageInfo().apply { packageName = context.packageName }
+        org.robolectric.Shadows.shadowOf(context.packageManager).setPackageArchiveInfo(apkFile.absolutePath, pkgInfo)
+
+        val field = UpdateManager::class.java.getDeclaredField("apkFileName").apply { isAccessible = true }
+        field.set(UpdateManager, null)
+        updatePrefs.edit().putString("downloaded_apk_name", "ClockDesk-test.apk").apply()
+
+        val found = UpdateManager.getDownloadedFile(context)
+        assertNotNull(found)
+        assertEquals(apkFile.absolutePath, found?.absolutePath)
+
+        UpdateManager.cancelDownload(context)
+        assertNull(updatePrefs.getString("downloaded_apk_name", null))
+    }
 }
