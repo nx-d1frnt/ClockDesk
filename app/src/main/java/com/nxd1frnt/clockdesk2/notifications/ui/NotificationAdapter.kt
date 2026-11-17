@@ -126,6 +126,7 @@ internal class NotificationAdapter(
             bodyText.text = item.text
             bodyText.visibility = if (item.text.isNotEmpty()) View.VISIBLE else View.GONE
 
+            AlarmNotificationActions.bind(itemView.findViewById(R.id.notification_alarm_actions), item)
             dismissBtn.visibility = if (item.isClearable) View.VISIBLE else View.GONE
             dismissBtn.setOnClickListener {
                 if (!item.isClearable) return@setOnClickListener
@@ -138,6 +139,7 @@ internal class NotificationAdapter(
                         onDismissClick(item)
                         MainActivity.openDeskType(DeskType.TIMER)
                     }
+                    AppAlertType.ALARM_RINGING -> MainActivity.openDeskType(DeskType.ALARMS)
                     AppAlertType.DEVICE_BATTERY_LOW -> MainActivity.openDeskType(DeskType.DEVICES)
                     null -> Unit
                 }

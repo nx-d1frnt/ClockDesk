@@ -38,6 +38,24 @@ class AppNotificationManager internal constructor(private val context: Context) 
         }
     }
 
+    private val alarmListener = object : com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.AlarmListener {
+        override fun onAlarmRinging(alarm: com.nxd1frnt.clockdesk2.alarms.DeskAlarm?) {
+            resolve(AppAlertType.ALARM_RINGING)
+            if (alarm == null) return
+            val trigger = alarm.scheduledTriggerMillis ?: System.currentTimeMillis()
+            repository.postNotification(DeskNotification(
+                deviceId = "", notificationId = "alarm:${alarm.id}:$trigger",
+                appName = context.getString(R.string.alarm_ringing_title),
+                title = alarm.label.ifBlank { context.getString(R.string.alarm_ringing_title) },
+                text = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(trigger)),
+                timestamp = trigger, iconBytes = null, isClearable = false,
+                origin = NotificationOrigin.APP, alertType = AppAlertType.ALARM_RINGING,
+                priority = 200, iconRes = R.drawable.ic_alarm,
+                relatedAlarmId = alarm.id, alarmTriggerMillis = trigger
+            ))
+        }
+    }
+
     private val events = object : DeskNotificationRepository.EventListener {
         override fun onRemoved(item: DeskNotification, acknowledged: Boolean) {
             if (acknowledged && item.origin == NotificationOrigin.APP &&
@@ -85,6 +103,7 @@ class AppNotificationManager internal constructor(private val context: Context) 
     init {
         repository.addEventListener(events)
         TimerManager.addListener(timerListener)
+        com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.addListener(alarmListener)
         connect.batteryListeners.add(batteryListener)
         connect.deviceListeners.add(deviceListener)
         prefs.registerOnSharedPreferenceChangeListener(preferenceListener)
@@ -93,6 +112,7 @@ class AppNotificationManager internal constructor(private val context: Context) 
     internal fun close() {
         repository.removeEventListener(events)
         TimerManager.removeListener(timerListener)
+        com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.removeListener(alarmListener)
         connect.batteryListeners.remove(batteryListener)
         connect.deviceListeners.remove(deviceListener)
         prefs.unregisterOnSharedPreferenceChangeListener(preferenceListener)

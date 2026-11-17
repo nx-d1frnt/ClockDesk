@@ -1,7 +1,7 @@
 package com.nxd1frnt.clockdesk2.connect.model
 
 enum class NotificationOrigin { REMOTE, APP }
-enum class AppAlertType { TIMER_FINISHED, DEVICE_BATTERY_LOW }
+enum class AppAlertType { TIMER_FINISHED, DEVICE_BATTERY_LOW, ALARM_RINGING }
 
 data class DeskNotification(
     val deviceId: String,
@@ -16,7 +16,9 @@ data class DeskNotification(
     val alertType: AppAlertType? = null,
     val relatedDeviceId: String? = null,
     val priority: Int = 0,
-    val iconRes: Int? = null
+    val iconRes: Int? = null,
+    val relatedAlarmId: String? = null,
+    val alarmTriggerMillis: Long? = null
 ) {
     val key: String get() = "${origin.name}:$deviceId:$notificationId"
 
@@ -34,7 +36,8 @@ data class DeskNotification(
         if (timestamp != other.timestamp) return false
         if (isClearable != other.isClearable) return false
         if (origin != other.origin || alertType != other.alertType || relatedDeviceId != other.relatedDeviceId ||
-            priority != other.priority || iconRes != other.iconRes) return false
+            priority != other.priority || iconRes != other.iconRes ||
+            relatedAlarmId != other.relatedAlarmId || alarmTriggerMillis != other.alarmTriggerMillis) return false
         if (iconBytes != null) {
             if (other.iconBytes == null) return false
             if (!iconBytes.contentEquals(other.iconBytes)) return false
@@ -57,6 +60,8 @@ data class DeskNotification(
         result = 31 * result + (relatedDeviceId?.hashCode() ?: 0)
         result = 31 * result + priority
         result = 31 * result + (iconRes ?: 0)
+        result = 31 * result + (relatedAlarmId?.hashCode() ?: 0)
+        result = 31 * result + (alarmTriggerMillis?.hashCode() ?: 0)
         return result
     }
 }

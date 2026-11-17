@@ -151,6 +151,7 @@ class DesksPagerAdapter(
                 is DevicesDeskView -> view.refreshMonetTheme(palette)
                 is AppsDeskView -> view.refreshMonetTheme(palette)
                 is TimerDeskView -> view.refreshMonetTheme(palette)
+                is AlarmsDeskView -> view.refreshMonetTheme(palette)
                 is NotificationsDeskView -> view.refreshMonetTheme(palette)
                 is AgendaDeskView -> view.refreshMonetTheme(palette)
                 else -> {
@@ -169,6 +170,7 @@ class DesksPagerAdapter(
             DeskType.DEVICES -> DevicesDeskView(context)
             DeskType.WEATHER -> WeatherDeskView(context)
             DeskType.TIMER -> TimerDeskView(context)
+            DeskType.ALARMS -> AlarmsDeskView(context)
             DeskType.WEB_KIOSK -> WebKioskDeskView(context)
             DeskType.NOTIFICATIONS -> NotificationsDeskView(context)
             DeskType.AGENDA -> AgendaDeskView(context, requestCalendarPermission)
@@ -180,6 +182,7 @@ class DesksPagerAdapter(
             is DevicesDeskView -> page.refreshMonetTheme(palette)
             is AppsDeskView -> page.refreshMonetTheme(palette)
             is TimerDeskView -> page.refreshMonetTheme(palette)
+            is AlarmsDeskView -> page.refreshMonetTheme(palette)
             is NotificationsDeskView -> page.refreshMonetTheme(palette)
             is AgendaDeskView -> page.refreshMonetTheme(palette)
             else -> {
@@ -231,6 +234,7 @@ class DesksPagerAdapter(
         (view as? WebKioskDeskView)?.dispose()
         (view as? AppsDeskView)?.dispose()
         (view as? TimerDeskView)?.dispose()
+        (view as? AlarmsDeskView)?.dispose()
         (view as? AgendaDeskView)?.dispose()
     }
 

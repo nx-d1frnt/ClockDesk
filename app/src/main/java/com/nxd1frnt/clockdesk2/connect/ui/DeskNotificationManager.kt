@@ -28,6 +28,7 @@ import com.nxd1frnt.clockdesk2.connect.model.AppAlertType
 import com.nxd1frnt.clockdesk2.connect.model.NotificationOrigin
 import com.nxd1frnt.clockdesk2.connect.repo.DeskNotificationRepository
 import com.nxd1frnt.clockdesk2.notifications.AppNotificationManager
+import com.nxd1frnt.clockdesk2.notifications.ui.AlarmNotificationActions
 import com.nxd1frnt.clockdesk2.desks.DeskType
 import com.nxd1frnt.clockdesk2.ui.MainActivity
 import com.nxd1frnt.clockdesk2.utils.Logger
@@ -74,7 +75,7 @@ class DeskNotificationManager(
         // Restore unfinished timer alerts, but do not replay a battery episode on every rotation.
         repository.getNotifications().filter {
             it.origin == NotificationOrigin.APP &&
-                (it.alertType == AppAlertType.TIMER_FINISHED || !repository.wasBannerPresented(it))
+                (it.alertType == AppAlertType.TIMER_FINISHED || it.alertType == AppAlertType.ALARM_RINGING || !repository.wasBannerPresented(it))
         }.forEach(::enqueueNotification)
     }
     private fun getPrefs() = context.getSharedPreferences("ClockDeskPrefs", Context.MODE_PRIVATE)
@@ -82,6 +83,7 @@ class DeskNotificationManager(
     private fun enqueueNotification(item: DeskNotification) {
         if (destroyed) return
         val bannerEnabled = when (item.alertType) {
+            AppAlertType.ALARM_RINGING -> true
             AppAlertType.TIMER_FINISHED -> getPrefs().getBoolean(AppNotificationManager.TIMER_BANNER, true)
             AppAlertType.DEVICE_BATTERY_LOW -> getPrefs().getBoolean(AppNotificationManager.BATTERY_BANNER, true)
             null -> getPrefs().getBoolean("desk_notification_popup_enabled", true)
@@ -122,6 +124,7 @@ class DeskNotificationManager(
             iconRes = item.iconRes,
             isPreview = false
         )
+        AlarmNotificationActions.bind(view.findViewById(R.id.notification_alarm_actions), item)
     }
 
     private fun showNext() {
@@ -197,13 +200,14 @@ class DeskNotificationManager(
                     repository.dismissNotification(item)
                     MainActivity.openDeskType(DeskType.TIMER)
                 }
+                AppAlertType.ALARM_RINGING -> MainActivity.openDeskType(DeskType.ALARMS)
                 AppAlertType.DEVICE_BATTERY_LOW -> MainActivity.openDeskType(DeskType.DEVICES)
                 null -> Unit
             }
         }
 
         dismissBtn.setOnClickListener { dismissCurrent(notifyManager = true) }
-        setupSwipeToDismiss(view, isBottom)
+        if (item.alertType != AppAlertType.ALARM_RINGING) setupSwipeToDismiss(view, isBottom)
 
         // Animate entrance: slide from top or bottom + fade in
         view.translationX = 0f
@@ -218,6 +222,9 @@ class DeskNotificationManager(
             .setDuration(400)
             .setInterpolator(OvershootInterpolator(0.8f))
             .start()
+
+        // Alarm controls stay available until the alarm manager dismisses or snoozes this occurrence.
+        if (item.alertType == AppAlertType.ALARM_RINGING) return
 
         // Auto dismiss based on user preference: duration if single, 3 seconds if backlog exists (timers stay 60s)
         val baseDurationSec = prefs.getInt("desk_notification_duration", 5)

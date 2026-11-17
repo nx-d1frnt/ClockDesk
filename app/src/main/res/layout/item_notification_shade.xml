@@ -80,6 +80,13 @@
                 android:maxLines="3"
                 android:ellipsize="end"
                 tools:text="Hey, are we still meeting today at 4?" />
+            <LinearLayout
+                android:id="@+id/notification_alarm_actions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <ImageButton

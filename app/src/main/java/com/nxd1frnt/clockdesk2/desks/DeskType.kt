@@ -14,6 +14,7 @@ enum class DeskType(
     DEVICES("devices", R.string.desk_type_devices, R.drawable.ic_devices),
     WEATHER("weather", R.string.desk_type_weather, R.drawable.ic_mostly_cloudy_day),
     TIMER("timer", R.string.desk_type_timer, R.drawable.ic_timer),
+    ALARMS("alarms", R.string.desk_type_alarms, R.drawable.ic_alarm),
     WEB_KIOSK("web_kiosk", R.string.desk_type_web_kiosk, R.drawable.ic_web),
     NOTIFICATIONS("notifications", R.string.desk_type_notifications, R.drawable.ic_notifications),
     AGENDA("agenda", R.string.desk_type_agenda, R.drawable.ic_calendar);

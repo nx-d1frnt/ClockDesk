@@ -588,6 +588,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         tutorialFinger = findViewById(R.id.tutorial_finger_icon)
         tutorialText = findViewById(R.id.tutorial_text)
         smartPixelOverlay = findViewById(R.id.smart_pixel_overlay)
+        setupAlarmDisplay()
         editModeBlurLayer = findViewById(R.id.edit_mode_blur_layer)
         editModeActionBar = findViewById(R.id.edit_mode_action_bar)
         (editModeActionBar as SwipeableEditDock).onCollapse = {
@@ -1725,6 +1726,7 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         com.nxd1frnt.clockdesk2.background.provider.BackgroundProviderManager.getInstance(this).removeListener(backgroundProviderListener)
         deskAppearancePreferences.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
         sensorManager.unregisterListener(sensorEventListener)
+        com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.removeListener(deskAlarmListener)
         if (instance === this) instance = null
     }
 
@@ -3203,8 +3205,19 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         updateEmptyDeskPromptVisibility()
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.nxd1frnt.clockdesk2.alarms.AlarmPresentation.setDeskVisible(true)
+    }
+
+    override fun onStop() {
+        com.nxd1frnt.clockdesk2.alarms.AlarmPresentation.setDeskVisible(false)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
+        com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.refreshSchedule()
         if (::desksPagerAdapter.isInitialized) desksPagerAdapter.setHostResumed(true)
         isResumed = true
         desktopWidgetManager.getControllers().forEach { it.onResume() }
@@ -3793,7 +3806,64 @@ class MainActivity : AppCompatActivity(), PowerSaveObserver, DesktopWidgetHost {
         }
     }
 
-    private fun applyBrightnessOverride(brightnessValue: Float) {
+    private lateinit var sunriseOverlay: View
+    private var sunriseWasActive = false
+
+    private val deskAlarmListener = object : com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.AlarmListener {
+        override fun onSunriseChanged(progress: Float, alarm: com.nxd1frnt.clockdesk2.alarms.DeskAlarm?) {
+            runOnUiThread { applySunriseState(progress, alarm) }
+        }
+
+        override fun onAlarmRinging(alarm: com.nxd1frnt.clockdesk2.alarms.DeskAlarm?) {
+            runOnUiThread { applyAlarmRingingState(alarm) }
+        }
+    }
+
+    private fun setupAlarmDisplay() {
+        sunriseOverlay = findViewById(R.id.sunrise_overlay)
+        com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.addListener(deskAlarmListener)
+    }
+
+    private fun applySunriseState(progress: Float, alarm: com.nxd1frnt.clockdesk2.alarms.DeskAlarm?) {
+        if (!::sunriseOverlay.isInitialized) return
+        if (progress > 0f && alarm != null) {
+            sunriseWasActive = true
+            sunriseOverlay.visibility = View.VISIBLE
+            sunriseOverlay.setBackgroundColor(com.nxd1frnt.clockdesk2.alarms.AlarmScheduler.sunriseOverlayColor(progress, alarm.sunriseTone))
+            val targetBrightness = com.nxd1frnt.clockdesk2.alarms.AlarmScheduler.sunriseBrightness(progress, alarm)
+            applyBrightnessOverride(targetBrightness, fromSunrise = true)
+        } else {
+            sunriseOverlay.visibility = View.GONE
+            if (sunriseWasActive) {
+                sunriseWasActive = false
+                restoreNormalBrightness()
+            }
+        }
+    }
+
+    private fun applyAlarmRingingState(alarm: com.nxd1frnt.clockdesk2.alarms.DeskAlarm?) {
+        val ringing = alarm != null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(ringing)
+            setTurnScreenOn(ringing)
+        } else {
+            @Suppress("DEPRECATION")
+            val flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            if (ringing) window.addFlags(flags) else window.clearFlags(flags)
+        }
+    }
+
+    private fun restoreNormalBrightness() {
+        val prefs = getSharedPreferences("ClockDeskPrefs", MODE_PRIVATE)
+        val policy = PowerSavePolicy.read(prefs, isPowerSavingMode)
+        val brightness = policy.brightnessOverride
+        if (brightness != null) applyBrightnessOverride(brightness)
+        else if (prefs.getString("brightness_mode", "system") == "smart_night") applyNightDimMode(currentNightDimState)
+        else applyBrightnessOverride(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+    }
+
+    private fun applyBrightnessOverride(brightnessValue: Float, fromSunrise: Boolean = false) {
+        if (!fromSunrise && com.nxd1frnt.clockdesk2.alarms.DeskAlarmManager.isSunriseActive) return
         val layoutParams = window.attributes
         if (layoutParams.screenBrightness != brightnessValue) {
             layoutParams.screenBrightness = brightnessValue
